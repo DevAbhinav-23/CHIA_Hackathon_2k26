@@ -1,0 +1,41 @@
+{
+  "argv_template": [
+    [
+      "circt-opt",
+      "--firrtl-lower-types",
+      "%s"
+    ]
+  ],
+  "bumps_away": null,
+  "committed_date_utc": "2025-11-04T09:17:33+00:00",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "dialect_bucket": "firrtl",
+  "dialect_bucket_unmerged": "firrtl",
+  "diff": "--- a/lib/Dialect/FIRRTL/Transforms/LowerTypes.cpp\n+++ b/lib/Dialect/FIRRTL/Transforms/LowerTypes.cpp\n@@ -412,6 +412,8 @@\n   auto fieldType = bundle.getElementType(index);\n+  if (fieldType.getBitWidthOrSentinel() == 0)\n+    return failure();\n   return lowerProducer(op, fieldType);\n",
+  "entry_tool": "circt-opt",
+  "llvm_pin": "9c4e17a0b3d85f2619e07c4a8b3d5f1902e6a7c4",
+  "parent_sha": "b7c2e40a19d8f635a0c41b7e2d95836f0a4c1b7e",
+  "polarity": [
+    "expect_zero"
+  ],
+  "run_lines": [
+    "RUN: circt-opt --firrtl-lower-types %s | FileCheck %s"
+  ],
+  "sdk_exact": true,
+  "sdk_tag": "firtool-1.86.0",
+  "seed_sha": "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1",
+  "shape": [
+    "plain"
+  ],
+  "source_paths": [
+    "lib/Dialect/FIRRTL/Transforms/LowerTypes.cpp"
+  ],
+  "subject": "[FIRRTL] Fix crash on zero-width bundle field in LowerTypes",
+  "test_files": {
+    "test/Dialect/FIRRTL/lower-types.mlir": "// RUN: circt-opt --firrtl-lower-types %s | FileCheck %s\nfirrtl.circuit \"Top\" {\n  firrtl.module @Top(in %a: !firrtl.bundle<x: uint<0>>) {}\n}\n"
+  },
+  "test_paths": [
+    "test/Dialect/FIRRTL/lower-types.mlir"
+  ]
+}

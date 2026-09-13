@@ -1,0 +1,32 @@
+{
+  "abandon_reason": null,
+  "abandoned": false,
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "entries": [
+    {
+      "oracle_class": "assertion",
+      "oracle_summary": "Assertion `fieldType && \"lowering a null field type\"' failed. at LowerTypes.cpp:412",
+      "probe_id": "p-0000000001",
+      "reason": "oracle_fired",
+      "reduced_from_bytes": 1841,
+      "reduced_text": "firrtl.circuit \"Top\" {\n  firrtl.module @Top(in %a: !firrtl.bundle<x: uint<0>>) {}\n}\n",
+      "reduced_to_bytes": 96,
+      "stopped_at_stage": "gate"
+    },
+    {
+      "oracle_class": null,
+      "oracle_summary": null,
+      "probe_id": "p-0000000003",
+      "reason": "no_oracle_clean_exit",
+      "reduced_from_bytes": null,
+      "reduced_text": null,
+      "reduced_to_bytes": null,
+      "stopped_at_stage": "stage_4"
+    }
+  ],
+  "iteration": 1,
+  "run_manifest_id": "7c1f4a9d6e2b48c0a53f81d27e6b09c4",
+  "seed_sha": "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1",
+  "terminating_condition": null
+}

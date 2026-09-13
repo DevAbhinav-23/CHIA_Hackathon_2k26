@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "circt-opt",
+    "--firrtl-lower-types",
+    "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000002/probe_0002.mlir"
+  ],
+  "arm": "mutation",
+  "contract_version": "2.0",
+  "differential": null,
+  "expected_outcome": "clean_exit",
+  "input_filename": "probe_0002.mlir",
+  "input_path": "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000002/probe_0002.mlir",
+  "input_text": "firrtl.circuit \"Top\" {\n  firrtl.module @Top(in %a: !firrtl.bundle<x: uint<1024>>) {}\n}\n",
+  "iteration": 0,
+  "mutator_id": "widen-integer-width",
+  "mutator_seed_int": 8172634,
+  "polarity": "expect_zero",
+  "probe_id": "p-0000000002",
+  "run_manifest_id": "7c1f4a9d6e2b48c0a53f81d27e6b09c4",
+  "seed_sha": "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1",
+  "shape": "plain",
+  "source_test_path": "test/Dialect/FIRRTL/lower-types.mlir",
+  "tool": "circt-opt",
+  "turn_cost": {
+    "cost_usd": null,
+    "metered": false,
+    "tokens_in": null,
+    "tokens_out": null,
+    "turn": null,
+    "wall_seconds": 0.008
+  }
+}

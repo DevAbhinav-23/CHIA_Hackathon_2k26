@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "circt-opt",
+    "--firrtl-lower-types",
+    "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000001/probe_0001.mlir"
+  ],
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "differential": null,
+  "expected_outcome": "clean_exit",
+  "input_filename": "probe_0001.mlir",
+  "input_path": "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000001/probe_0001.mlir",
+  "input_text": "firrtl.circuit \"Top\" {\n  firrtl.module @Top(in %a: !firrtl.bundle<x: uint<0>>) {}\n}\n",
+  "iteration": 0,
+  "mutator_id": null,
+  "mutator_seed_int": null,
+  "polarity": "expect_zero",
+  "probe_id": "p-0000000001",
+  "run_manifest_id": "7c1f4a9d6e2b48c0a53f81d27e6b09c4",
+  "seed_sha": "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1",
+  "shape": "plain",
+  "source_test_path": null,
+  "tool": "circt-opt",
+  "turn_cost": {
+    "cost_usd": 0.0043,
+    "metered": true,
+    "tokens_in": 3184,
+    "tokens_out": 512,
+    "turn": "probe_write",
+    "wall_seconds": 4.2
+  }
+}

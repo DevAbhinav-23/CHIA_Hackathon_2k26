@@ -1,0 +1,21 @@
+{
+  "arm": "seeded",
+  "artefact_dir": "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000001",
+  "assertion_site": "LowerTypes.cpp:412",
+  "assertion_text": "circt-opt: lib/Dialect/FIRRTL/Transforms/LowerTypes.cpp:412: Assertion `fieldType && \"lowering a null field type\"' failed.",
+  "build_status": "assertion",
+  "contract_version": "2.0",
+  "exit_status": null,
+  "iteration": 0,
+  "limit_hit": null,
+  "oracle_class": "assertion",
+  "oracle_fired": true,
+  "probe_id": "p-0000000001",
+  "reduced_path": "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000001/reduced.mlir",
+  "reduced_text": "firrtl.circuit \"Top\" {\n  firrtl.module @Top(in %a: !firrtl.bundle<x: uint<0>>) {}\n}\n",
+  "run_manifest_id": "7c1f4a9d6e2b48c0a53f81d27e6b09c4",
+  "seed_sha": "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1",
+  "signal": "SIGABRT",
+  "stopping_reason": "gate_decided",
+  "stopping_stage": "gate"
+}
