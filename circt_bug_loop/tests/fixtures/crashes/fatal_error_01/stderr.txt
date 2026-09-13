@@ -1,0 +1,48 @@
+LLVM ERROR: neither the scoping op nor the type class provide data layout information for !sim.dstring
+PLEASE submit a bug report to https://github.com/llvm/circt and include the crash backtrace.
+Stack dump:
+0.	Program arguments: /home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt /home/adi/.cache/chia-pin-smoke/w09/attempts/v3-classnew/parent-p08/input.mlir --convert-moore-to-core
+ #0 0x00007f6446e08a18 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x208a18)
+ #1 0x00007f6446e05ca5 llvm::sys::RunSignalHandlers() (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x205ca5)
+ #2 0x00007f6446e09831 SignalHandler(int, siginfo_t*, void*) Signals.cpp:0:0
+ #3 0x00007f6446444e70 (/usr/lib/libc.so.6+0x44e70)
+ #4 0x00007f64464aeceb pthread_kill (/usr/lib/libc.so.6+0xaeceb)
+ #5 0x00007f6446444d48 raise (/usr/lib/libc.so.6+0x44d48)
+ #6 0x00007f64464257c1 abort (/usr/lib/libc.so.6+0x257c1)
+ #7 0x00007f6446d4dacd llvm::report_fatal_error(llvm::Twine const&, bool) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x14dacd)
+ #8 0x00007f6448311eee (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRDataLayoutInterfaces.so+0x5eee)
+ #9 0x00007f64483122cc (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRDataLayoutInterfaces.so+0x62cc)
+#10 0x00007f64483124ae mlir::DataLayout::getTypeABIAlignment(mlir::Type) const (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRDataLayoutInterfaces.so+0x64ae)
+#11 0x00007f6447cddf40 mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits(mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Concept const*, mlir::Type, mlir::DataLayout const&, llvm::ArrayRef<mlir::DataLayoutEntryInterface>) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRLLVMDialect.so+0x6ddf40)
+#12 0x00007f64483115a5 mlir::detail::getDefaultTypeSizeInBits(mlir::Type, mlir::DataLayout const&, llvm::ArrayRef<mlir::DataLayoutEntryInterface>) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRDataLayoutInterfaces.so+0x55a5)
+#13 0x00007f6448317eb6 llvm::TypeSize llvm::function_ref<llvm::TypeSize (mlir::Type)>::callback_fn<mlir::DataLayout::getTypeSize(mlir::Type) const::$_0>(long, mlir::Type) DataLayoutInterfaces.cpp:0:0
+#14 0x00007f644831235f mlir::DataLayout::getTypeSize(mlir::Type) const (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRDataLayoutInterfaces.so+0x635f)
+#15 0x000056387561181d operator unsigned long /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/TypeSize.h:376:9
+#16 0x000056387561181d (anonymous namespace)::ClassNewOpConversion::matchAndRewrite(circt::moore::ClassNewOp, circt::moore::ClassNewOpAdaptor, mlir::ConversionPatternRewriter&) const /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Conversion/MooreToCore/MooreToCore.cpp:895:25
+#17 0x0000563875611f72 _M_reset /usr/lib64/gcc/x86_64-pc-linux-gnu/16/../../../../include/c++/16/optional:360:12
+#18 0x0000563875611f72 ~_Optional_payload /usr/lib64/gcc/x86_64-pc-linux-gnu/16/../../../../include/c++/16/optional:484:57
+#19 0x0000563875611f72 ~_Optional_base /usr/lib64/gcc/x86_64-pc-linux-gnu/16/../../../../include/c++/16/optional:508:12
+#20 0x0000563875611f72 llvm::LogicalResult mlir::ConversionPattern::dispatchTo1To1<mlir::OpConversionPattern<circt::moore::ClassNewOp>, circt::moore::ClassNewOp>(mlir::OpConversionPattern<circt::moore::ClassNewOp> const&, circt::moore::ClassNewOp, circt::moore::ClassNewOp::GenericAdaptor<llvm::ArrayRef<mlir::ValueRange>>, mlir::ConversionPatternRewriter&) /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/Transforms/DialectConversion.h:1071:1
+#21 0x000056387561146a mlir::OpConversionPattern<circt::moore::ClassNewOp>::matchAndRewrite(mlir::Operation*, llvm::ArrayRef<mlir::ValueRange>, mlir::ConversionPatternRewriter&) const /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/Transforms/DialectConversion.h:715:3
+#22 0x00007f6449684268 mlir::ConversionPattern::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&) const (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRTransformUtils.so+0x2a268)
+#23 0x00007f644964e8ed void llvm::function_ref<void ()>::callback_fn<mlir::PatternApplicator::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&, llvm::function_ref<bool (mlir::Pattern const&)>, llvm::function_ref<void (mlir::Pattern const&)>, llvm::function_ref<llvm::LogicalResult (mlir::Pattern const&)>)::$_0>(long) PatternApplicator.cpp:0:0
+#24 0x00007f644964b774 mlir::PatternApplicator::matchAndRewrite(mlir::Operation*, mlir::PatternRewriter&, llvm::function_ref<bool (mlir::Pattern const&)>, llvm::function_ref<void (mlir::Pattern const&)>, llvm::function_ref<llvm::LogicalResult (mlir::Pattern const&)>) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRRewrite.so+0x7774)
+#25 0x00007f644968553f (anonymous namespace)::OperationLegalizer::legalize(mlir::Operation*) DialectConversion.cpp:0:0
+#26 0x00007f64496852a4 mlir::OperationConverter::convert(mlir::Operation*, bool) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRTransformUtils.so+0x2b2a4)
+#27 0x00007f64496860ee mlir::OperationConverter::applyConversion(llvm::ArrayRef<mlir::Operation*>) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRTransformUtils.so+0x2c0ee)
+#28 0x00007f6449694ce4 void llvm::function_ref<void ()>::callback_fn<applyConversion(llvm::ArrayRef<mlir::Operation*>, mlir::ConversionTarget const&, mlir::FrozenRewritePatternSet const&, mlir::ConversionConfig, (anonymous namespace)::OpConversionMode)::$_0>(long) DialectConversion.cpp:0:0
+#29 0x00007f644968b28d applyConversion(llvm::ArrayRef<mlir::Operation*>, mlir::ConversionTarget const&, mlir::FrozenRewritePatternSet const&, mlir::ConversionConfig, (anonymous namespace)::OpConversionMode) DialectConversion.cpp:0:0
+#30 0x00007f644968b40e mlir::applyFullConversion(mlir::Operation*, mlir::ConversionTarget const&, mlir::FrozenRewritePatternSet const&, mlir::ConversionConfig) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRTransformUtils.so+0x3140e)
+#31 0x00005638755f75b9 (anonymous namespace)::MooreToCorePass::runOnOperation() /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Conversion/MooreToCore/MooreToCore.cpp:3231:14
+#32 0x00007f64494447c7 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x177c7)
+#33 0x00007f64494477e9 mlir::PassManager::run(mlir::Operation*) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x1a7e9)
+#34 0x00007f644ac63fba performActions(llvm::raw_ostream&, std::shared_ptr<llvm::SourceMgr> const&, mlir::MLIRContext*, mlir::MlirOptMainConfig const&) MlirOptMain.cpp:0:0
+#35 0x00007f644ac6310e llvm::LogicalResult llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>::callback_fn<mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_0>(long, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&) MlirOptMain.cpp:0:0
+#36 0x00007f6447f74187 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>, llvm::raw_ostream&, llvm::StringRef, llvm::StringRef) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRSupport.so+0x27187)
+#37 0x00007f644ac59558 mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa558)
+#38 0x00007f644ac59849 mlir::MlirOptMain(int, char**, llvm::StringRef, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa849)
+#39 0x00007f644ac59a7d mlir::MlirOptMain(int, char**, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xaa7d)
+#40 0x0000563873db6306 main /home/adi/.cache/chia-pin-smoke/w09/wt143/tools/circt-opt/circt-opt.cpp:88:23
+#41 0x00007f6446427d0e (/usr/lib/libc.so.6+0x27d0e)
+#42 0x00007f6446427e4b __libc_start_main (/usr/lib/libc.so.6+0x27e4b)
+#43 0x0000563873db59e5 _start (/home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt+0x12619e5)

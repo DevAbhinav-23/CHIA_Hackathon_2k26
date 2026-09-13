@@ -186,8 +186,8 @@ def strip_prologue(frames):
     return frames[n:], n
 
 
-def run(stderr, rc, sdk, build_root, src_root, top_n=5):
-    status, reason = classify(rc, stderr)
+def run(stderr, rc, sdk, build_root, src_root, top_n=5, limit_hit=None):
+    status, reason = classify(rc, stderr, limit_hit)
     text, site, fatal, kind, func = extract(status, stderr)
     frames = symbolise(parse_frames(stderr), sdk, build_root, src_root)
     stripped, dropped = strip_prologue(frames)
@@ -224,8 +224,16 @@ def run(stderr, rc, sdk, build_root, src_root, top_n=5):
 if __name__ == "__main__":
     a = sys.argv[1:]
     err = open(a[0], errors="backslashreplace").read()
-    rc = int(a[1])
+    # The second argument is the exit status, or the runner's own run.json, which
+    # also carries `limit_hit`: a run killed at the wall or the CPU bound has no
+    # exit status at all, and 3.6 step 3 classifies it `timeout` before it looks
+    # at stderr.  int("None") is what the earlier spelling did instead.
+    if a[1].endswith(".json"):
+        rec = json.load(open(a[1]))
+        rc, limit_hit = rec["rc"], rec.get("limit_hit")
+    else:
+        rc, limit_hit = int(a[1]), None
     sdk = a[a.index("--sdk") + 1] if "--sdk" in a else ""
     b = a[a.index("--build") + 1] if "--build" in a else ""
     s = a[a.index("--src") + 1] if "--src" in a else ""
-    print(json.dumps(run(err, rc, sdk, b, s), indent=1))
+    print(json.dumps(run(err, rc, sdk, b, s, limit_hit=limit_hit), indent=1))

@@ -36,8 +36,7 @@ for WHICH in parent seed; do
           --out "$A" --tag "$WHICH" || exit 1
   # Symbolise only while the binary is the one that produced the trace.
   for D in "$A/$WHICH"-p*/; do
-    python3 "$HERE/w09_oracle.py" "$D/stderr.txt" \
-      "$(python3 -c "import json;print(json.load(open('$D/run.json'))['rc'])")" \
+    python3 "$HERE/w09_oracle.py" "$D/stderr.txt" "$D/run.json" \
       --sdk "$SDK" --build "$B" --src "$WT" > "$D/oracle.json"
   done
 done

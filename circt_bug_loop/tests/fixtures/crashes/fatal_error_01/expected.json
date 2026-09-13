@@ -1,0 +1,16 @@
+{
+ "class": "fatal_error",
+ "assertion_text": null,
+ "assertion_site": null,
+ "fingerprint_frame": "main circt-opt.cpp",
+ "prologue_dropped": 8,
+ "top_frames": [
+  "",
+  "",
+  "mlir::DataLayout::getTypeABIAlignment",
+  "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+  "mlir::detail::getDefaultTypeSizeInBits"
+ ],
+ "exit_status": null,
+ "signal": "SIGABRT"
+}
