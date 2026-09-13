@@ -1,0 +1,7 @@
+[
+ "circt-opt",
+ "-om-elaborate-object=all-public-classes=true allow-unevaluated=true",
+ "input.mlir",
+ "-verify-diagnostics",
+ "-split-input-file"
+]
