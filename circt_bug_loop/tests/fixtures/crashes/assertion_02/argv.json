@@ -1,0 +1,6 @@
+[
+ "circt-opt",
+ "--sv-trace-iverilog",
+ "input.mlir",
+ "-verify-diagnostics"
+]

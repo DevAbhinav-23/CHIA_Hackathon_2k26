@@ -1,0 +1,29 @@
+circt-opt: /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230: FailureOr<llvm::ArrayRef<InstanceGraphNode *>> circt::igraph::InstanceGraph::getInferredTopLevelNodes(): Assertion `!candidateTopLevels.empty() && "if non-cyclic, there should be at least 1 candidate top level"' failed.
+PLEASE submit a bug report to https://github.com/llvm/circt and include the crash backtrace.
+Stack dump:
+0.	Program arguments: /home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt --sv-trace-iverilog /home/adi/.cache/chia-pin-smoke/w09/attempts/v4-instancegraph/parent-p00/input.mlir -verify-diagnostics
+ #0 0x00007f8654408a18 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x208a18)
+ #1 0x00007f8654405ca5 llvm::sys::RunSignalHandlers() (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x205ca5)
+ #2 0x00007f8654409831 SignalHandler(int, siginfo_t*, void*) Signals.cpp:0:0
+ #3 0x00007f8653a44e70 (/usr/lib/libc.so.6+0x44e70)
+ #4 0x00007f8653aaeceb pthread_kill (/usr/lib/libc.so.6+0xaeceb)
+ #5 0x00007f8653a44d48 raise (/usr/lib/libc.so.6+0x44d48)
+ #6 0x00007f8653a257c1 abort (/usr/lib/libc.so.6+0x257c1)
+ #7 0x00007f8653a26a5d (/usr/lib/libc.so.6+0x26a5d)
+ #8 0x00007f8653a3b254 __assert_fail (/usr/lib/libc.so.6+0x3b254)
+ #9 0x00005587daf8f82b append<const char (&)[68]> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/Diagnostics.h:354:5
+#10 0x00005587daf8f82b operator<<<const char (&)[68]> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/Diagnostics.h:344:12
+#11 0x00005587daf8f82b circt::igraph::InstanceGraph::getInferredTopLevelNodes() /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:221:9
+#12 0x00005587daaa4012 (anonymous namespace)::SVTraceIVerilogPass::runOnOperation() /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Dialect/SV/Transforms/SVTraceIVerilog.cpp:54:31
+#13 0x00007f8656a497c7 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x177c7)
+#14 0x00007f8656a4c7e9 mlir::PassManager::run(mlir::Operation*) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x1a7e9)
+#15 0x00007f8658269fba performActions(llvm::raw_ostream&, std::shared_ptr<llvm::SourceMgr> const&, mlir::MLIRContext*, mlir::MlirOptMainConfig const&) MlirOptMain.cpp:0:0
+#16 0x00007f8658268fe7 llvm::LogicalResult llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>::callback_fn<mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_0>(long, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&) MlirOptMain.cpp:0:0
+#17 0x00007f865557b187 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>, llvm::raw_ostream&, llvm::StringRef, llvm::StringRef) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRSupport.so+0x27187)
+#18 0x00007f865825f558 mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa558)
+#19 0x00007f865825f849 mlir::MlirOptMain(int, char**, llvm::StringRef, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa849)
+#20 0x00007f865825fa7d mlir::MlirOptMain(int, char**, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xaa7d)
+#21 0x00005587d9523936 main /home/adi/.cache/chia-pin-smoke/w09/wt143/tools/circt-opt/circt-opt.cpp:88:23
+#22 0x00007f8653a27d0e (/usr/lib/libc.so.6+0x27d0e)
+#23 0x00007f8653a27e4b __libc_start_main (/usr/lib/libc.so.6+0x27e4b)
+#24 0x00005587d9523015 _start (/home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt+0x1262015)
