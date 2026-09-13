@@ -1,0 +1,135 @@
+# budget.yaml - the pre-registration of the CIRCT bug-loop campaign.
+#
+# THE COMMIT THAT LANDS THIS FILE IS THE REGISTRATION (G-32, FR-14.3). Editing it
+# mid-campaign invalidates the campaign (FR-14.7): every stage compares this
+# file's commit SHA against the one in the RunManifest and refuses on a
+# difference. Every [DEFAULT] in 01-FRD.md resolves to exactly one key here.
+
+# --- the primary budget unit (G-48) -----------------------------------------
+# One elapsed wall-clock second of an arm's fixed window W, metered by the
+# campaign driver on the head. The arms run SEQUENTIALLY, each for this same W,
+# in the order below, on the same fixed-size cluster at the same apparatus
+# concurrency. Nothing else is the budget.
+arm_window_seconds: 14400.0            # 4 hours per arm, 8 hours for the campaign
+arm_order: [seeded, mutation]
+
+# --- the model, and the money cap (ADR-D-03, superseding section 2026-09-14) --
+# ONE model id for every agent stage: stages 1, 2 and 6 and the offline mutator
+# synthesis. CHIA's vertex backend in Vertex AI express mode. There is no
+# per-stage model selector and no --model default in the code.
+model_id: gemini-3.8-flash
+
+# The HARD money cap for the whole campaign, both arms together. It is a CAP and
+# not the budget: the primary unit is still the arm window above (G-48). The
+# driver stops BOTH arms when the cumulative cost_usd of the ledger reaches it
+# (FR-18.10's third stop condition), and the results artefact states the spend.
+# 200 against the user's USD 300 credit, leaving headroom for the pilot and for
+# a re-run.
+campaign_spend_cap_usd: 200.0
+
+# The two prices the ledger turns tokens into money with. The backend reports
+# usage_metadata token counts and no price, so the arithmetic is the ledger's:
+#   cost_usd = tokens_in/1e6 * input_price + tokens_out/1e6 * output_price
+# Introductory Vertex pricing for gemini-3.8-flash through 2026-12-31,
+# AGGREGATOR-SOURCED 2026-09-14 and [UNVERIFIED] against Google's own pricing
+# page, which ADR-D-03 requires to be re-read and these two figures rewritten
+# BEFORE the commit that lands this file. budget.py check 6 requires both.
+price_usd_per_m_input_tokens: 0.75
+price_usd_per_m_output_tokens: 3.75
+
+# --- safety caps, equal for both arms, which bound damage and are not the budget
+generated_inputs_per_day: 2000
+filings_per_day: 3
+filings_total: 10
+
+# --- the campaign's own window ----------------------------------------------
+campaign_start_utc: "2026-09-20T00:00:00+00:00"
+campaign_end_utc:   "2026-09-24T11:59:00+00:00"
+
+# --- the corpus (FR-01.11) --------------------------------------------------
+# Measured, not chosen: this is the HEAD at which analysis/pin_window_raw.json was
+# computed, and the SHA at which FR-01.1's counts of 187 and 171 hold.
+corpus_head_sha: "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2"
+
+# --- the fingerprint (G-43) -------------------------------------------------
+# The headline metric counts DISTINCT bugs, one per primary fingerprint, and a
+# crash fingerprint is this many frame names long. Fixing it here is what stops
+# the headline carrying a parameter chosen after the data exists.
+fingerprint_top_n: 5
+
+# --- calibration (ADR-D-01, D-01(d)) ----------------------------------------
+# DRAWN BEFORE THIS FILE IS COMMITTED, by `bug_loop.py --draw-calibration`, which
+# samples 20 of the 171 exact-pin seeds with random.Random(corpus_head_sha). The
+# commit that lands this file is the registration, so a sample drawn afterwards
+# would invalidate the campaign (FR-14.3, FR-14.7). budget.py check 5 asserts
+# len(calibration_sample_shas) == calibration_sample_size.
+# The twenty below are an ILLUSTRATION of the shape and not the campaign's draw.
+calibration_sample_size: 20
+calibration_sample_shas:
+  - "0000000000000000000000000000000000000001"
+  - "0000000000000000000000000000000000000002"
+  - "0000000000000000000000000000000000000003"
+  - "0000000000000000000000000000000000000004"
+  - "0000000000000000000000000000000000000005"
+  - "0000000000000000000000000000000000000006"
+  - "0000000000000000000000000000000000000007"
+  - "0000000000000000000000000000000000000008"
+  - "0000000000000000000000000000000000000009"
+  - "0000000000000000000000000000000000000010"
+  - "0000000000000000000000000000000000000011"
+  - "0000000000000000000000000000000000000012"
+  - "0000000000000000000000000000000000000013"
+  - "0000000000000000000000000000000000000014"
+  - "0000000000000000000000000000000000000015"
+  - "0000000000000000000000000000000000000016"
+  - "0000000000000000000000000000000000000017"
+  - "0000000000000000000000000000000000000018"
+  - "0000000000000000000000000000000000000019"
+  - "0000000000000000000000000000000000000020"
+
+# --- per-seed caps ----------------------------------------------------------
+per_seed_probe_cap: 5                  # FR-04.5, and the mutation arm's cap too
+per_seed_iteration_cap: 3              # FR-16.3
+
+# --- per-probe limits (FR-06.2, FR-06.4) ------------------------------------
+# Applied to the child by prlimit --as --cpu --nofile, never by the container's
+# limits: container limits protect the machine, rlimits classify the probe.
+probe_wall_seconds: 60
+probe_address_space_bytes: 4294967296  # 4 GiB
+probe_cpu_seconds: 45
+probe_output_byte_cap: 1000000         # per stream
+
+# --- reduction (FR-09.4, FR-09.13) ------------------------------------------
+# 600, not 60. circt-reduce made 56 interestingness calls to remove 27% of a
+# SIX-OPERATION module (measured by the LLD review), and each call is bounded by
+# probe_wall_seconds, which is 60. At 60 s the reducer got one or two calls on
+# any realistic input, every ReducedCase came back fixpoint=false, and FR-13.3
+# refused every candidate at gate question 2 as not_minimal. The per-CALL wall is
+# probe_wall_seconds and lives in the interestingness script; this key is the
+# wall for the WHOLE reduction and they are not the same number.
+reduction_wall_seconds: 600
+reduction_sigkill_grace_seconds: 10
+
+# --- the issue mirror (FR-10.9) ---------------------------------------------
+# An ISSUE cap, not a page cap: GithubIssuesNode.recent takes n and pages
+# internally. Comments are never mirrored.
+issue_mirror_issue_cap: 20000
+
+# --- filing (FR-13.16) ------------------------------------------------------
+filing_poll_window_seconds: 3600
+
+# --- artefacts (FR-17.7) ----------------------------------------------------
+# 256 KiB. Larger artefacts go to disk by path. It also caps a SourceReadTool
+# return (3.5) and a SeedRecord's diff and test_files (2.4). It was 10 MB, which
+# contradicted SQLiteNode's own guidance that this design quotes.
+artefact_inline_cap_bytes: 262144
+
+# --- feature-acceptance sample sizes (9.3) ----------------------------------
+acceptance:
+  seed_sample: 5
+  entry_tools: 3
+  probe_batch: 20
+  recorded_failures: 5
+  recorded_crashes_for_reduction: 3
+  labelled_pairs: 20
+  iterations: 3
