@@ -1063,9 +1063,12 @@ def _local_query_one(db_path: str, sql: str, params: tuple = ()) -> Optional[dic
         conn.close()
 
 
+#: The five SQLiteNode members LoopStore dispatches, and their in-process twins.
+#: init_schema is not among them: it is a module-level function of its own,
+#: because both shapes of *node* have to reach the same script.
 _LOCAL_MEMBERS = {"execute": _local_execute, "executemany": _local_executemany,
                   "transaction": _local_transaction, "query": _local_query,
-                  "query_one": _local_query_one, "init_schema": None}
+                  "query_one": _local_query_one}
 
 
 # ---------------------------------------------------------------------------
