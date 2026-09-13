@@ -1,0 +1,5 @@
+- **Version.** Contract `2.0`, the `CONTRACT_VERSION` string in `schema.py` and in every committed fixture.
+- **Commit.** The commit that adds this file, which is the one the annotated tag `contract-2.0` names (`git rev-list -n1 contract-2.0`).
+- **Date.** 2026-09-14, `05-Work-Plan.md` W-03.
+- **The version rule.** Any change to one of the seven members, to a nested dataclass or to the `generate` interface is a version bump under `03-LLD.md` §2.2, a new freeze commit and a new `contract-<version>` tag, with every fixture re-recorded; `T-U-fixt-01` is the tripwire that fails at the commit which lets the package and the fixture set drift apart.
+- **The fixture-replacement rule (`05-Work-Plan.md` §2.1).** Every instance under `fixtures/` is constructed rather than recorded and is replaced by a recorded one at W-17, in a commit of its own; that replacement commit may change fixture contents and may not change the schema, because a schema field found wrong by recording is a MAJOR bump that escalates under §4 rather than being absorbed.

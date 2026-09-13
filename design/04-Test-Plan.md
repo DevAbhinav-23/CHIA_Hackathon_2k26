@@ -1833,3 +1833,19 @@ exactly four keys, `T-U-schema-08` asserts that an extra key fails as loudly as 
 `03-LLD.md` §2.2 makes adding a declared key a **MAJOR** bump to 3.0, which would invalidate every
 committed fixture for a diagnostic string. The reason lives on `RepairResult.token_capture`, which is
 the loop's own object and not a member of the seven-schema seam, and the contract stays at **2.0**.
+
+### 16.7 Errata from implementation, 2026-09-14
+
+`W-02` wrote §1.1's and §1.2's tests and `W-03` froze the package they test. Five places where this
+plan and the committed tests differ are recorded here. **Four tests were added and no identifier
+moved**: §1.1 is its 23 plus `T-U-schema-24` to `T-U-schema-27`, the four rules `BudgetFile`'s
+`budget.yaml` keys brought (`03-LLD.md` §16), so `contract/schema.py` is 27 tests and
+`contract/fixtures/` is still 3.
+
+| The item | What the committed tests do | Why |
+|---|---|---|
+| `T-U-schema-20`'s wording | the `1.0` payload it rejects is a **complete** one, and a payload short of `diff` and `test_files` is asserted to raise `E002_MISSING_FIELD` **first** | §1.1's row says a `1.0` payload is rejected "before any key is read". That holds for `validate`, which checks the version first, and not for `from_json`, whose order is `E009`, then `json.loads`, then the missing-field check, then construction and `validate`. A short `1.0` payload therefore raises `E002` and never reaches `check_version`. The test asserts both orders rather than the one sentence, and `T-U-schema-01` keeps the `E001` pair on complete documents |
+| `contract/fixtures/malformed/` | every malformed case is derived inside `test_schema.py` from the committed valid instance by the one edit §13 describes, and nothing malformed is committed | `T-U-fixt-01` validates **every** file under `contract/fixtures/`, so a committed malformed document would fail it by construction. The derivation is the same one edit either way; only its home moves, from a second committed document to the line of the test that needs it. §13's `malformed/` and `roundtrip/` rows describe fixtures this package does not commit, and `contract/fixtures/README.md` says so at the directory |
+| The module for `T-U-fixt-*` | `circt_bug_loop/tests/test_fixtures.py` | §1.2 heads its table `contract/fixtures/` and names no test module, while §1.3 names `tests/test_layout.py` for `T-U-layout-*`. The three fixture tests walk the committed set and belong beside the schema tests, not inside them: `test_schema.py` tests the validator and `test_fixtures.py` tests the set the validator is pointed at |
+| The tier markers | `pytest.ini` registers `t0`, `t1`, `t2` and `t3` **and** `needs_sdk`, `needs_image` and `needs_cluster`; a module states its tier with `pytestmark` | §0.5's table gives T1, T2 and T3 a `needs_*` marker and T0 none, and §14's matrix and §15's order select by tier. Both sets are therefore needed, the `t<N>` marker to select a tier and the `needs_*` marker to name the resource, and `--strict-markers` rejects an unregistered one, so all seven are registered with one line each |
+| The `conftest.py` interlock | a session-scoped autouse fixture **asserts** that `BUGLOOP_ALLOW_LIVE_MODEL` is absent from the environment and fails the run if it is set | §0.5 has `conftest.py` delete the variable and set `GEMINI_API_KEY` to the synthetic value in `fixtures/secrets/known_values.txt`, so that `generate_task.build_llm` raises `LiveModelRefused` on any unmocked path. Neither the fixture nor `build_llm` exists yet, so there is nothing to set a key for and no refusal to reach. Refusing to start is strictly stronger than deleting the variable, and it is replaced by §0.5's rule verbatim when the secrets fixture and `build_llm` land; `T-U-layout-08` is the test that will then assert the fixture's own effect |

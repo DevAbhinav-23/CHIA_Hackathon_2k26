@@ -7840,3 +7840,24 @@ are closed and kept struck through rather than deleted.
 ~~Seven~~ **Nine** things, then, two of them added on 2026-09-14 and two closed the same day.
 Everything else in this document is either cited to CHIA or CIRCT at a path and a line, verified by
 running the tool, measured, or marked `[DEFAULT]` with its home named.
+
+---
+
+## 16. Errata from implementation, 2026-09-14
+
+`W-02` typed §2 into `circt_bug_loop/contract/` and `W-03` froze it. Seven places where the code and
+this document differed are recorded here rather than left to be rediscovered. Six are the package's
+own and the seventh is a rule of §3.1 that the package showed to be about a different set of
+callables than its wording covers. Every one was settled while the contract was still unfrozen, so
+each is at version **2.0** and none of them is a bump; the freeze is the annotated tag
+`contract-2.0`.
+
+| Item | LLD section | What the code does | Why |
+|---|---|---|---|
+| `SeedRecord.sdk_tag` and `SeedRecord.bumps_away` | §2.4 | both declared `= None` | §2.6's `validate` derives optionality from the default, `optional = f.default is None`, so without the two defaults every exact-pin seed fails `E002_MISSING_FIELD` on the two fields whose own comments in §2.4 say they are null on exactly those seeds. 171 of the 187 seeds are exact-pin, so the rule as written rejected the corpus |
+| The `field` import | §2.1 | `from dataclasses import dataclass`, without `field` | §2.1's header block imports `field` and no member of §2.4 uses it. An unused import at the seam is noise in the one module both halves read, and FR-19.8's import check reads this package first |
+| `ERROR_CODES` | §2.1 | a module-level tuple of the ten codes, in `E001` to `E010` order, exported | §2.1's table is the closed set and a table is not assertable. `T-U-schema-21` asserts the set is closed, that it has ten members numbered `E001` to `E010`, and that `E010_TOOL_MISMATCH` is in it although `validate` never raises it, which is what §2.1's own note claims |
+| `__all__` | §2.1 | a module-level list naming the seam's public names, and nothing else | `contract/__init__.py` re-exports with `from .schema import *`. Without `__all__` that also re-exports `json`, `typing` and `dataclasses`, so a consumer could reach the standard library through the seam and an import check could not tell the two apart |
+| `LedgerSnapshot` in §2.3's rebuild list | §2.3 | not rebuilt anywhere; no `__post_init__` mentions it | §2.3 names `FeedbackEntry`, `RunCommit` and `LedgerSnapshot` as the nested dataclasses the owning member's `__post_init__` rebuilds. `LedgerSnapshot` has no owning member: §2.5 makes it the generator's read-only argument view, it is a field of none of the seven, and `_MEMBERS` excludes it, so `from_json` refuses it by design. It serialises through `to_json` and stops there, and `T-U-schema-12` asserts exactly that |
+| `BudgetFile`'s four keys of 2026-09-14 | §2.4, §9.1 | `model_id: str`, `campaign_spend_cap_usd: float`, `price_usd_per_m_input_tokens: float` and `price_usd_per_m_output_tokens: float`, all four required; `model_id` non-blank, the three money figures positive and finite with an `int` accepted per §2.3 | §9.1 and §9.5 gained the four keys with the backend decision and §2.4's dataclass was not updated with them. The parsed `budget.yaml` therefore could not carry what FR-14.1 requires the file to declare, and NFR-08's campaign-wide USD cap had no home in the seam at all. `T-U-schema-24` to `T-U-schema-27` cover the four rules; the fixture carries §9.5's values |
+| §3.1's docstring rule | §3.1 | applied to `@ChiaFunction` nodes and `ChiaTool` methods; `contract/` is exempt | §3.1's three paragraphs are **Returns**, **Worker** and **Raises**, and **Worker** is "the resource the node needs, spelled as the dict it declares". A pure function in `contract/schema.py` runs in whichever process calls it, declares no resource and reaches no worker, so the paragraph could only be false or empty. `T-U-layout-03` therefore exempts `contract/` and covers the nodes and the tools the rule was written for |

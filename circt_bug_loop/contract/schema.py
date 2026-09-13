@@ -156,11 +156,22 @@ class BudgetFile:
     Produced by A6a (budget.py). Read by A6a, A6b, B9c and B12. Its keys are
     exactly FR-14.1's list and no others, which is what makes the
     pre-registration of FR-14.2 mean anything.
+
+    model_id, campaign_spend_cap_usd and the two prices are the four keys the
+    2026-09-14 backend decision added (01-FRD.md 1.8, 03-LLD.md 9.1). They are
+    campaign parameters and not implementation constants: the model is fixed
+    before the data exists, the money cap bounds damage exactly as the per-day
+    input cap does, and a price edited afterwards would put a free parameter
+    inside a reported number (NFR-08).
     """
     contract_version: str = CONTRACT_VERSION
     budget_file_sha: str                    # the commit that landed this file
     arm_window_seconds: float
     arm_order: list[Arm]
+    model_id: str                           # one model for every agent stage
+    campaign_spend_cap_usd: float           # a CAP, not the budget (G-48, ADR-D-04)
+    price_usd_per_m_input_tokens: float     # the ledger's own arithmetic, 9.1
+    price_usd_per_m_output_tokens: float    # the backend reports tokens, no price
     generated_inputs_per_day: int
     filings_per_day: int
     filings_total: int
@@ -548,6 +559,24 @@ def _probe_result_conditionals(o: ProbeResult) -> None:
                  f"ProbeResult.{name} is non-null exactly on oracle_class 'assertion'")
 
 
+def _budget_conditionals(o: BudgetFile) -> None:
+    """The arm window, the model id and the three money figures (FR-14.1, NFR-08).
+
+    `0 < value < float("inf")` is the whole finiteness rule: it rejects zero, a
+    negative, both infinities and NaN (every comparison against which is False)
+    without importing math, which 03-LLD.md 0's dependency list does not carry.
+    An int is an acceptable value for any of them, as 2.3's float rule says.
+    """
+    _require(o.arm_window_seconds > 0, "E003_WRONG_TYPE",
+             "BudgetFile.arm_window_seconds must be positive")
+    _require(bool(o.model_id.strip()), "E002_MISSING_FIELD",
+             "BudgetFile.model_id must name a model")
+    for name in ("campaign_spend_cap_usd", "price_usd_per_m_input_tokens",
+                 "price_usd_per_m_output_tokens"):
+        _require(0 < getattr(o, name) < float("inf"), "E003_WRONG_TYPE",
+                 f"BudgetFile.{name} must be positive and finite")
+
+
 def _feedback_conditionals(o: FeedbackBundle) -> None:
     _require((o.abandon_reason is not None) == o.abandoned,
              "E005_CONDITIONAL_REQUIRED",
@@ -583,9 +612,7 @@ _CONDITIONALS = {
         len(o.argv_template) == len(o.run_lines) == len(o.polarity) == len(o.shape),
         "E005_CONDITIONAL_REQUIRED",
         "SeedRecord's four per-run-line lists must be the same length"),
-    BudgetFile: lambda o: _require(
-        o.arm_window_seconds > 0, "E003_WRONG_TYPE",
-        "BudgetFile.arm_window_seconds must be positive"),
+    BudgetFile: _budget_conditionals,
     ProbeSpec: _probe_spec_conditionals,
     ProbeResult: _probe_result_conditionals,
     FeedbackBundle: _feedback_conditionals,

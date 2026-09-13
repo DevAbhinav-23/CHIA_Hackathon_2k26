@@ -19,7 +19,7 @@ canonical by construction. None of them is evidence of anything a run did.
 | Directory | File | Shape |
 |---|---|---|
 | `seed_record/` | `exact_pin_01.json` | `sdk_exact` true, so `bumps_away` is null; one run line, one source path, one test file |
-| `budget_file/` | `complete_01.json` | every field of `03-LLD.md` §2.4, `acceptance` carrying §9.3's seven keys |
+| `budget_file/` | `complete_01.json` | every field of `BudgetFile`, the four keys `03-LLD.md` §9.1 added on 2026-09-14 included, at §9.5's values; `acceptance` carrying §9.3's seven keys |
 | `probe_spec/` | `seeded_01.json` | the seeded arm: the three mutation fields null, `turn_cost` metered |
 | `probe_spec/` | `mutation_01.json` | the mutation arm: the three mutation fields set, `turn_cost.turn` null and unmetered |
 | `probe_result/` | `assertion_01.json` | `oracle_class` `assertion`, so both assertion fields set; reduced text with its path |

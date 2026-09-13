@@ -1,6 +1,7 @@
 """`contract/schema.py`: every validator error code, both serialisers.
 
-`04-Test-Plan.md` §1.1, the 23 `T-U-schema-*` tests. Every one is tier 0: the
+`04-Test-Plan.md` §1.1, the 27 `T-U-schema-*` tests: its 23 plus the four that
+`BudgetFile`'s 2026-09-14 keys brought (§16.7). Every one is tier 0: the
 seam imports nothing outside the standard library, so nothing here forks a
 compiler, opens a socket or needs a clone.
 
@@ -559,3 +560,76 @@ def test_T_U_schema_23():
                    edit(spec, input_text=None, input_path=""))
     assert "FR-04.3" in str(error)
     schema.validate(edit(spec, input_path=""))
+
+
+#: the four keys the 2026-09-14 backend decision added to `budget.yaml`, three of
+#: which are money (`03-LLD.md` §9.1, `01-FRD.md` §1.8).
+_MONEY = ("campaign_spend_cap_usd", "price_usd_per_m_input_tokens",
+          "price_usd_per_m_output_tokens")
+_NEW_BUDGET_KEYS = ("model_id",) + _MONEY
+
+
+def test_T_U_schema_24():
+    """T-U-schema-24 (FR-14.1, NFR-08): the four 2026-09-14 keys are REQUIRED.
+
+    `model_id` and the three money figures are what NFR-08's USD cap and
+    FR-14.6's cost arithmetic are computed from, so each is `None`-rejected by
+    name and a payload lacking all four raises `E002` listing all four sorted.
+    """
+    for name in _NEW_BUDGET_KEYS:
+        error = raises("E002_MISSING_FIELD", schema.validate,
+                       edit(budget(), **{name: None}))
+        assert f"BudgetFile.{name} is None" in str(error)
+    document = payload("budget_file/complete_01.json")
+    for name in _NEW_BUDGET_KEYS:
+        del document[name]
+    error = raises("E002_MISSING_FIELD", schema.from_json,
+                   json.dumps(document), schema.BudgetFile)
+    assert str(sorted(_NEW_BUDGET_KEYS)) in str(error)
+
+
+def test_T_U_schema_25():
+    """T-U-schema-25 (FR-14.1, NFR-08): `model_id` names a model, or raises.
+
+    One model id serves every agent stage, so an empty or blank one is a
+    campaign with no model rather than a campaign with a default; it raises
+    `E002_MISSING_FIELD`. A non-string raises `E003` from the type check first.
+    """
+    assert budget().model_id == "gemini-3.8-flash"
+    for blank in ("", "   ", "\t\n"):
+        error = raises("E002_MISSING_FIELD", schema.validate,
+                       edit(budget(), model_id=blank))
+        assert "BudgetFile.model_id must name a model" in str(error)
+    raises("E003_WRONG_TYPE", schema.validate, edit(budget(), model_id=7))
+
+
+def test_T_U_schema_26():
+    """T-U-schema-26 (FR-14.1, NFR-08): the cap and both prices are POSITIVE.
+
+    A zero or negative spend cap would stop the campaign before its first turn
+    and a zero price would report a spend of nothing against NFR-08's cap, so
+    each of the three raises `E003_WRONG_TYPE` naming itself.
+    """
+    for name in _MONEY:
+        for bad in (0, 0.0, -1, -0.75):
+            error = raises("E003_WRONG_TYPE", schema.validate,
+                           edit(budget(), **{name: bad}))
+            assert f"BudgetFile.{name} must be positive and finite" in str(error)
+    assert (budget().campaign_spend_cap_usd, budget().price_usd_per_m_input_tokens,
+            budget().price_usd_per_m_output_tokens) == (200.0, 0.75, 3.75)
+
+
+def test_T_U_schema_27():
+    """T-U-schema-27 (FR-14.1, NFR-08): the three are FINITE, and an int is one.
+
+    An infinite or NaN cap is a cap that never binds and an infinite price makes
+    every `cost_usd` infinite, so both raise `E003_WRONG_TYPE`; an `int` is
+    accepted for all three, which is `03-LLD.md` §2.3's float rule.
+    """
+    for name in _MONEY:
+        for bad in (float("inf"), float("-inf"), float("nan")):
+            raises("E003_WRONG_TYPE", schema.validate, edit(budget(), **{name: bad}))
+        assert schema.validate(edit(budget(), **{name: 1})) is None
+    assert schema.validate(edit(budget(), campaign_spend_cap_usd=200,
+                                price_usd_per_m_input_tokens=1,
+                                price_usd_per_m_output_tokens=4)) is None
