@@ -38,12 +38,18 @@ SINCE = "2024-09-11"
 #: `budget.yaml`'s `artefact_inline_cap_bytes` (`04-Test-Plan.md` T-U-corpus-23).
 INLINE_CAP_BYTES = 262144
 
-#: Ray prints a `FutureWarning` about accelerator environment variables the
-#: first time CHIA's profiler touches it, which `-W error` would turn into an
-#: error inside whichever tier-1 test called a node first. It is Ray's notice
-#: about Ray, not this flow's, so the tests that call a node ignore that one
-#: class and nothing else.
-_RAY_WARNING = pytest.mark.filterwarnings("ignore::FutureWarning")
+#: Calling a `@ChiaFunction` locally runs it in-process, but CHIA's profiler
+#: still asks Ray whether a collector actor exists, and that question starts a
+#: local Ray instance the first time. Ray's own startup emits a `FutureWarning`
+#: about accelerator environment variables and leaks two `/dev/null` handles
+#: that surface later as `ResourceWarning`s, which pytest re-raises as
+#: `PytestUnraisableExceptionWarning`; under `-W error` all three would fail
+#: whichever tier-1 test happened to call a node first. They are Ray's notices
+#: about Ray, so the node-calling tests ignore exactly those three classes and
+#: nothing else. No test here opens a file of its own.
+_RAY_WARNING = pytest.mark.filterwarnings(
+    "ignore::FutureWarning", "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning")
 
 
 def logical_line(name: str) -> str:
