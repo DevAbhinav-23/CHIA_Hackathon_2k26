@@ -1,6 +1,6 @@
 # Design document set: the closed CIRCT bug loop
 
-**Status: Draft.** Owner: Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla (IIIT Hyderabad).
+**Status: Approved 2026-09-14.** Owner: Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla (IIIT Hyderabad).
 Date: 2026-09-13.
 
 ## Purpose
@@ -18,13 +18,13 @@ through CHIA's existing phase chain, and gates every filing behind a named human
 
 | # | Document | Answers | Status |
 |---|---|---|---|
-| 00 | `00-README.md` | What this set is, how it is numbered, when code may start | Draft |
-| 01 | `01-FRD.md` | What the system shall do, testably | Draft |
-| 02 | `02-HLD.md` | What the parts are, what each owns, where the seam is | Draft, revised after its red-team review |
-| 03 | `03-LLD.md` | Every module, class, schema, file format, command line | Draft, revised after its red-team review |
-| 04 | `04-Test-Plan.md` | How each requirement is shown to hold | Not started |
-| 05 | `05-Work-Plan.md` | Who builds which half, in what order, against which contract | Not started |
-| n/a | `ADR/` | One file per resolved open decision, named `ADR-D-nn-<slug>.md` | 14 files |
+| 00 | `00-README.md` | What this set is, how it is numbered, when code may start | Approved 2026-09-14 |
+| 01 | `01-FRD.md` | What the system shall do, testably | Approved 2026-09-14 |
+| 02 | `02-HLD.md` | What the parts are, what each owns, where the seam is | Approved 2026-09-14 |
+| 03 | `03-LLD.md` | Every module, class, schema, file format, command line | Approved 2026-09-14 |
+| 04 | `04-Test-Plan.md` | How each requirement is shown to hold | Approved 2026-09-14 |
+| 05 | `05-Work-Plan.md` | The single-track dated plan, and the human actions | Approved 2026-09-14 |
+| n/a | `ADR/` | One file per resolved open decision, named `ADR-D-nn-<slug>.md` | 14 files; `ADR-D-03` carries a **superseding** section dated 2026-09-14, which is the decision in force |
 | n/a | `reviews/` | One hostile review per document, plus its disposition table. `red-team-FRD.md` and `red-team-FRD-disposition.md` are the pair for 01; `red-team-HLD.md` and `red-team-HLD-disposition.md` the pair for 02; `red-team-LLD.md` and `red-team-LLD-disposition.md` the pair for 03 | Current |
 
 Read them in that order. 01 is normative for behaviour; 02 and 03 are normative for structure; 04
@@ -91,8 +91,13 @@ cannot be the up-flowing member because a candidate exists only where an oracle 
 needs a record per probing input, and it left `SeedRecord`, the budget file and the generator call
 crossing the line uncontracted.
 
-**The contract is at version 2.0**, revised 2026-09-14 after the LLD review. The seven members and
-the one interface are unchanged; `SeedRecord` gained two **required** fields, `diff` (the seed
+**The contract is at version 2.0**, revised 2026-09-14 after the LLD review, and **unchanged by the
+backend decision of the same day**: that decision populates `LedgerEntry.observed` and
+`ProbeSpec.turn_cost` rather than re-shaping them, and adds only `budget.yaml` keys, which are
+`BudgetFile` content and not schema members.
+
+The seven members and the one interface are unchanged by the LLD review too; `SeedRecord` gained two
+**required** fields, `diff` (the seed
 commit's diff of its `lib/` and `include/` paths) and `test_files` (each changed test path to its full
 text at the seed commit), which by the package's own rule is a MAJOR bump. They exist because neither
 generator arm could otherwise reach its seed's contents: both arms run on worker containers whose only
@@ -100,6 +105,31 @@ CIRCT tree is a one-commit checkout and whose only bind mount is the artefact ro
 arm's `$diff` and the mutation arm's starting inputs had no source at all. With them the record is
 self-contained and neither arm needs git. `03-LLD.md` §2.1 and §2.4 carry the detail.
 
+## Where the documents and the code live
+
+The design set is written in `~/Projects/chia-hackathon/design/` and re-synced into the team
+repository, `https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26`, at sign-off; the repository
+is the source of truth from that moment. **The code's home is that repository too**, decided
+2026-09-14: the loop lives at `circt_bug_loop/` at the repository root with exactly the internal
+layout `03-LLD.md` §1.1 gives, the CHIA-core proposals live at `upstream/`, and
+`upstream/sync-to-chia.sh` produces the CHIA-shaped `examples/circt_bug_loop/` for the upstream pull
+request from a CHIA checkout at `~/Projects/chia-bugloop`. Every `examples/circt_bug_loop/` path in
+02, 03 and 04 is therefore the **published** path, and `03-LLD.md` §1.4 is normative for the
+difference. One rule follows and it is the only one the code can see: **no module may derive CHIA's
+package directory from its own location**, because the two trees have different ancestors.
+
+## One rule about credentials
+
+Two credentials exist, a GitHub read token and a Google Cloud API key, and **neither is ever a
+literal in any document of this set, in any committed file, or in any artefact**. A cluster YAML
+carries a `${...}` reference; a design document names the variable. `git grep -E
+'AQ\.[A-Za-z0-9_-]{30,}|AIza[0-9A-Za-z_-]{30,}'` over the repository must return nothing, and
+`03-LLD.md` §11 is normative for both paths.
+
 `05-Work-Plan.md` is a single-track, dated plan for the one builder. It may not reduce scope: everything
 `01-FRD.md` marks Must is built. Human actions the plan schedules but cannot perform (the forum post,
 any filing, the GCP hand-over) are listed with the date by which the user must act.
+
+## Sign-off record
+
+**Approved 2026-09-14 by the architect, on the user's delegation of 2026-09-13 ("no need to split work u finish the entire work start to end").** Basis: each of 01, 02 and 03 was attacked by a fresh-context red team (13, 7 and 16 kills respectively; `reviews/`), every finding dispositioned and the fixes verified by execution where executable; 04 was written against the final 03 and realigned twice; 05 was written against 04's tiers. Mechanical checks at sign-off: zero em-dashes in all six documents; 198 FRs, all traced in 04 §12.1; 477 test ids, all unique; all 66 Python blocks in 03 parse; 03's DDL (21 tables, 9 indexes) and mirror query execute; both cluster YAMLs load through CHIA's config loader; no superseded model id survives as a default. Open assumptions are listed in 01 §7 with owners and dates in 05 §6; nothing Must is deferred. Code may start.

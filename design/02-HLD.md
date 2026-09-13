@@ -89,6 +89,123 @@ errata the same review forced are that document's §1.7.
 | §2.1 | FR-16.2's criterion is amended in `01-FRD.md` §1.7 rather than by this document. §2.1 asserted the amendment itself, which `00-README.md` does not permit: "Where 02 or 03 contradicts 01, 01 wins". The design is unchanged; its authority moves. | K11 |
 | §4.1 | Every worker type passes `--user $(id -u):$(id -g)`, not only `bugloop_llm`. The artefact bind mount is a host directory the operator owns, and a container running as the image's own user fails FR-17.9's writability check. | W20 |
 
+### 0.2 Errata from the backend decision, 2026-09-14
+
+Dated **2026-09-14**. `design/ADR/ADR-D-03-model-backend.md` gained a superseding section the same
+day: the user supplied a Google Cloud API key, Vertex AI express mode accepts it, and the backend for
+development, tests and the campaign is CHIA's **`vertex`** backend
+(`chia:chia/models/vertex.py:207-266`) with **`gemini-3.8-flash`** at every agent stage, stages 1, 2
+and 6 and the offline mutator synthesis A7. The `claude` backend survives only as a named fallback
+for a Vertex outage. No `gemini-3.1-pro-preview`, `claude-opus-5` or `claude-sonnet-5` default
+remains anywhere in this document; those ids survive only in the historical text of `ADR/`.
+
+| Where | Change |
+|---|---|
+| §1.4 | Both added `ChiaTool`s are now driven **client-side over MCP by the backend itself**, which is the same transport CHIA's other raw-API backends use. Neither tool changes. |
+| §2.5 | `budget.yaml` gains four keys: `model_id`, `campaign_spend_cap_usd`, `price_usd_per_m_input_tokens`, `price_usd_per_m_output_tokens`. |
+| §2.9, §2.11 | `LedgerEntry.observed` and `ProbeSpec.turn_cost` are **populated** on the campaign backend rather than null: `tokens_in` is `usage_metadata.prompt_token_count`, `tokens_out` is `candidates_token_count`, and `cost_usd` is computed by the ledger from the two `budget.yaml` prices. No key is added or removed, so the contract stays at **2.0**. |
+| §3 | A3, A7 and B7 dispatch their turn through the loop's own `llm_turn` node at `{"llm": 1.0}` rather than through `llm.prompt.options(...)` directly, because `QueryResult` carries no usage field and the backend's counts live on the LLM object. The interlock of §4.3 is checked before any real backend is built. |
+| §4.1 | `bugloop_llm` becomes `ghcr.io/ucb-bar/chia:latest`, keeps count 2 `[DEFAULT]` and `{"llm": 1}`, gains `-e GEMINI_API_KEY=${GEMINI_API_KEY}`, and loses the `~/.claude` mount and the two Claude `run_setup_commands`. |
+| §4.3 | The backend credential is an **environment variable expanded from the operator's shell at `chia up`**, not a directory mount and not job metadata. NFR-06's grep gains the key's value pattern. |
+| §8.2 | The loop's home is the **team repository**, with the CHIA-shaped copy produced by a sync script. |
+| §9 | The reuse rows for A3, A6a, A6b, A7 and B7 name the `vertex` backend and its usage metadata. No dependency is added: `google-genai` is already a CHIA dependency (`chia:pyproject.toml:24-35`). |
+
+**Three facts this decision rests on, each executed on 2026-09-14 with no network call, and each
+recorded where it bites.**
+
+1. **Express mode needs `project` and `location` to be `None`, and CHIA's constructor makes
+   `location` non-null.** `VertexGeminiLLM.__init__` sets
+   `self.location = location or os.environ.get("GOOGLE_CLOUD_LOCATION") or "us-central1"`
+   (`chia:chia/models/vertex.py:242-247`), and `_run_generate_async` passes both to
+   `genai.Client(vertexai=True, project=self.project, location=self.location, **self.client_kwargs)`
+   (`chia:chia/models/vertex.py:406-411`). `google-genai` 2.8.0 raises
+   `ValueError: Project/location and API key are mutually exclusive in the client initializer.`
+   on that combination. **Measured:** constructing `VertexGeminiLLM(model="gemini-3.8-flash",
+   project=None, location=None, client_kwargs={"api_key": "<dummy>"})` in `~/.cache/chia-venv`
+   left `project=None, location='us-central1'` and the client build raised; setting both attributes
+   to `None` after construction built the express client with `project=None, location=None` and the
+   key set. The loop's backend constructor therefore nulls both, in two lines, and CHIA is unchanged
+   (§4.3).
+2. **Token counts do not survive a remote dispatch of `prompt`.** The backend accumulates them into
+   `self._last_metadata` on the LLM object (`chia:chia/models/vertex.py:479-482`, `579`) and returns
+   a plain `QueryResult`, whose five fields carry no usage (`chia:chia/base/llm_call.py:15-35`;
+   `chia:chia/models/vertex.py:586-591`). `chia_remote` dispatches through a Ray trampoline that
+   serialises the object (`chia:chia/base/ChiaFunction.py:228-273`), so the mutated copy dies on the
+   worker. `AntigravityLLM` escapes this by returning its own `QueryResult` subclass carrying
+   `usage` (`chia:chia/models/antigravity.py:213`, `322-331`), which the `vertex` backend does not
+   do. §3's `llm_turn` is the fix and it is four lines.
+3. **CHIA's repair chain has no `vertex` branch.** `run_issue_remote`'s `_turn` selects
+   `antigravity`, `opencode`, else `ClaudeCodeLLM`
+   (`chia:examples/circt_issue_solver/issue_task.py:81-123`), so `cfg["backend"] = "vertex"` would
+   fall through to the Claude CLI silently. ~~FR-12.1 pins that file byte for byte, so the loop may not
+   add the branch. The decision names stages 1, 2, 6 and A7 and does not name stage 7; §3 and §8.2
+   record the consequence, `RunManifest.model_ids` spells every value `"<backend>:<model id>"` so the
+   difference is visible in one place, and `stages_metered["stage_7"]` is false whenever the two
+   backends differ.~~ **Overtaken by §0.3 the same day**: the fact above stands, the consequence drawn
+   from it does not. The loop adds the branch, as nineteen additive lines, and FR-12.1's acceptance
+   becomes hunk equality rather than a byte comparison.
+
+---
+
+### 0.3 Errata from the image build and the repair-backend decision, 2026-09-14
+
+Dated **2026-09-14**, later the same day than §0.2. `01-FRD.md` §1.9 is the normative list and names
+every changed requirement id; this section is what changes here.
+
+**The decision.** Stage 7 runs on the **same `vertex` backend as every other stage**, overruling
+§0.2's `--repair-backend claude` default. The mechanism is one **additive** `elif backend == "vertex":`
+branch in `chia:examples/circt_issue_solver/issue_task.py`'s `_turn`, nineteen lines, no line of that
+file deleted or altered: it constructs a `VertexGeminiLLM` from `cfg["model"]`, `cfg["system_prompt"]`
+and `cfg["timeouts"][phase]` with `client_kwargs={"api_key": os.environ["GEMINI_API_KEY"],
+"http_options": {"timeout": cfg["timeouts"][phase] * 1000}}`, then sets `llm.project = None` and
+`llm.location = None`, which is the express-mode fix §0.2 fact 1 measured. The branch is unreachable
+for every existing CHIA caller, `_turn` selecting on a string no CHIA caller sets to `"vertex"`. It
+lives in `upstream/issue_task-vertex-branch.patch` and is proposed to CHIA as part of the same pull
+request, so §8.3's fifth core change stops being "offered and not depended on" and becomes
+**depended on locally, offered upstream**. Verified 2026-09-14: the patch applies to `16c35e92` with
+`git apply --check`, the patched file parses, and `git diff` is one hunk, 19 insertions, 0 deletions.
+
+**Why.** Three reasons, in order of weight. The campaign stops depending on the user's Claude
+subscription and its observed rate limit. One backend serves all seven stages, so there is one
+credential, one model id, one price table and one failure mode rather than two of each. And the
+nineteen lines are a contribution CHIA plainly wants, `vertex` being a backend CHIA ships but its own
+example cannot select.
+
+| Where | Change |
+|---|---|
+| §3, stage 7's row | Rewritten: the chain is handed `cfg["backend"] = "vertex"` and `cfg["model"] = "gemini-3.8-flash"`, and `stages_metered["stage_7"]` is **true** by default |
+| §8.3, the fifth core change | The `vertex` branch becomes **depended on locally**; the `location` default fix stays offered and worked around in two lines |
+| §9 | B8's reuse row names the one additive branch; the dependency list is still unmoved, `google-genai` and `mcp` being CHIA dependencies already |
+| §4.1, §4.3 | **`bugloop_repair` now carries the credential too**, `-e GEMINI_API_KEY` and `-e BUGLOOP_ALLOW_LIVE_MODEL`, because stage 7's backend is constructed on that worker by CHIA's `_turn`. The credential is still an environment variable expanded at `chia up` and never job metadata, so NFR-06's rule is unchanged and its grep covers one more container |
+| §6 | B8 gains one failure row: the interlock refuses, `LiveModelRefused`, and the run stops **before** the chain is invoked. `repair_adapt` carries the check because CHIA's file cannot (`03-LLD.md` §3.5.1, §3.8) |
+
+**The one thing that does not follow, stated because it would otherwise be assumed.** Stage 7 is on
+the metered backend and its **tokens are still not observed**. `_turn` dispatches its turn with
+`get(llm.prompt.options(resources={"llm": 1.0}).chia_remote(llm, prompt, tools))`
+(`chia:examples/circt_issue_solver/issue_task.py:124`), which serialises the LLM object, and
+`VertexGeminiLLM` accumulates its counts into `self._last_metadata` on that object rather than onto
+the returned `QueryResult`. That is §0.2 fact 2 exactly, and the loop's fix for its own stages,
+`llm_turn`, is a change to the **call site**; line 124 is outside the additive branch and editing it
+would falsify the hunk-equality acceptance. CHIA's driver reads `getattr(cli, "usage", None)` and
+writes `llm_usage` only where it is truthy (`circt_issue_loop.py:132-136`), so the field is absent for
+`vertex`, and the backend's `stream_result` carries no token line to parse instead. Stage 7's
+`LedgerEntry.observed` therefore carries **null** tokens and **null** `cost_usd` with `metered` true;
+the reason, `unavailable_remote_dispatch`, is carried on the loop's own `RepairResult` and **not**
+inside `observed`, whose four declared keys the contract freezes, so §2.9's contract is unchanged and
+still at **2.0**; and
+the results artefact prints the campaign USD figure as a **lower bound excluding stage 7**.
+`stages_metered` answers FR-14.8's question and `observed` answers FR-14.6's; this is the first
+revision in which the two disagree, and conflating them would report either that stage 7 is free or
+that it is outside the budget, both false.
+
+**The image, built.** `analysis/measurements/2026-09-14-image-build.md` records W-04: the image is
+pinned at `eade0de61bc5` with `firtool-1.159.0`, 972 s of build, 1,912,742,097 B in 23 layers,
+703,211,208 B of tool binaries, 778 compile commands all carrying `-UNDEBUG`, 536 of 555 `obj.CIRCT`
+objects referencing `__assert_fail`, and **zero** failures over CHIA's own lit gate scope with the 62
+`REQUIRES: slang` tests running for the first time. Nothing in this document's component structure
+changes because of it; `01-FRD.md` §1.9 carries the requirement-level errata and `03-LLD.md` §4.11
+carries the seven Dockerfile deviations.
+
 ---
 
 ## 1. Components
@@ -290,6 +407,24 @@ the rule is satisfied vacuously and its acceptance check still runs. The work th
 wrapped is done by B2, B5 and B6a as ordinary nodes, which is where it belongs.
 `[accepted 2026-09-13]`
 
+**How the two tools reach the model, 2026-09-14 (§0.2).** Nothing about either tool changes under the
+`vertex` backend, and the reason is worth one paragraph because the transport is now visible rather
+than hidden inside a CLI. `VertexGeminiLLM` "drives the agentic tool loop client-side, executing each
+ChiaTool's MCP server over HTTP, exactly like the Bedrock and Claude API backends"
+(`chia:chia/models/vertex.py:1-5`): it opens `http://<tool.hostname>:<tool.port>/<tool.name>/mcp`
+for every tool it is handed, lists that server's functions and declares each to Gemini under the
+namespaced name `<tool name>__<function name>`, truncated at 64 characters
+(`chia:chia/models/vertex.py:422-443`); when a turn comes back with `function_call` parts it calls
+them over the same MCP sessions and feeds `function_response` parts back, looping until the model
+asks for no more (`chia:chia/models/vertex.py:544-572`). So the placement rules of §3 are what they
+were: `ProbeWriteTool` stays on the `circt` worker whose filesystem holds the probe directory,
+`SourceReadTool` stays on the head where the clone is, and the model reaches both over HTTP from the
+`llm` worker. One consequence is recorded rather than discovered later: the backend strips
+`$schema`, `$id`, `$defs`, `definitions`, `additionalProperties` and `title` from every tool's input
+schema before declaring it, because Gemini rejects them (`chia:chia/models/vertex.py:593-610`), so
+neither tool may rely on a schema key in that list to constrain what the model sends. Both tools
+validate their own arguments in their bodies already, which is why this costs nothing.
+
 ---
 
 ## 2. The seam: the contract package
@@ -404,6 +539,18 @@ keys, each an erratum to FR-14.1 (§10): the **arm window** `W` in wall-clock se
 order**, and the issue-mirror **issue cap** that replaces FR-10.9's page cap. `BudgetFile` also
 carries `budget_file_sha`, the commit SHA the manifest records, so no consumer has to re-hash the
 file.
+
+**Four further keys, 2026-09-14 (§0.2), each an erratum to FR-14.1.** `model_id`, one value for every
+agent stage, `gemini-3.8-flash`; `campaign_spend_cap_usd`, `[DEFAULT]` 200, the hard money cap the
+driver stops both arms on; and the two prices the ledger turns tokens into money with,
+`price_usd_per_m_input_tokens` `[DEFAULT]` 0.75 and `price_usd_per_m_output_tokens` `[DEFAULT]` 3.75,
+which are introductory Vertex prices for `gemini-3.8-flash` through 2026-12-31, aggregator-sourced on
+2026-09-14 and **`[UNVERIFIED]`** against Google's own pricing page until it is re-read before the
+pre-registration commit. They are `budget.yaml` keys and not implementation constants for the reason
+FR-14.1 gives: a price that can be edited after the data exists is a free parameter in the headline,
+and the money cap is a campaign parameter in exactly the sense the arm window is. The prices are
+**both required**, because a ledger holding one of the two would silently value half the spend at
+zero.
 
 ### 2.6 `ProbeSpec`, direction down
 
@@ -570,8 +717,14 @@ by the other arm's load, which is exactly the variable D-04 chose wall-clock to 
 becomes: each arm stops when its window expires or one of its safety caps binds, and the results
 artefact states both windows (erratum, §10).
 
-`observed` holds tokens, cost and CPU seconds where the backend reports them, and its values are null
-on the `claude` backend, where `metered` is then false (ADR-D-03, FR-14.8).
+`observed` holds tokens, cost and CPU seconds where the backend reports them. **Under the campaign
+backend they are populated rather than null** (§0.2): `tokens_in` is the turn's summed
+`usage_metadata.prompt_token_count`, `tokens_out` its summed `candidates_token_count`
+(`chia:chia/models/vertex.py:479-482`), and `cost_usd` is computed by the ledger, never by the
+backend, as `tokens_in / 1e6 * price_usd_per_m_input_tokens + tokens_out / 1e6 *
+price_usd_per_m_output_tokens` from the two committed prices of §2.5. The values are null, and
+`metered` false, only on the `claude` fallback, which reports no per-phase usage at all (FR-14.8).
+The cumulative `cost_usd` over an arm is what FR-18.10's third stop condition reads.
 
 ### 2.10 `RunManifest`, direction both
 
@@ -656,6 +809,15 @@ without a MINOR bump and no key removed without a MAJOR one.
 `image_spec.tool_hashes` is new: a map from tool name to the SHA-256 of that binary in the published
 image. It is what B2 checks before every probe (§3, K2).
 
+**Three of those dicts are re-stated rather than re-shaped, 2026-09-14 (§0.2).** No key is added and
+none removed, so the package stays at **2.0**; what changes is what fills them.
+`turn_cost.tokens_in` and `observed.tokens_in` are **prompt tokens**, `tokens_out` is **output
+tokens**, and `cost_usd` is **US dollars**, computed by the ledger from `budget.yaml`'s two prices
+and never taken from the backend, which reports no price. `metered` is true exactly when all three
+are non-null. `model_ids`'s four values are each spelled **`"<backend>:<model id>"`**, which is the
+spelling the `Assisted-by:` trailer already uses, so a run whose repair stage falls back to a
+different backend than its generator stages says so in the manifest rather than in prose.
+
 `dedup_evidence` is also where FR-20.4's prohibition is enforced. Its keys carry an issue's
 **number, URL, state and labels** and never its text, and B6a mirrors no comments at all, so no
 maintainer's words can reach a prompt through the triage path. B6a and B6b jointly own that
@@ -711,6 +873,38 @@ is CHIA's tag for a node that touches the CIRCT tree or its binaries
 prompt, applied at the call site rather than at the node
 (`chia:examples/circt_issue_solver/issue_task.py:124`). The third, `{"repair": 1}`, is new and exists
 for one reason, given below.
+
+**Where the `llm` tag is applied, corrected 2026-09-14 (§0.2).** CHIA's example writes
+`llm.prompt.options(resources={"llm": 1.0}).chia_remote(llm, prompt, tools)`, and the loop keeps the
+resource, the count and the placement and changes the callable. The reason is that
+`.options(...).chia_remote(...)` dispatches through a Ray trampoline which **serialises the LLM
+object** (`chia:chia/base/ChiaFunction.py:228-273`), while the `vertex` backend writes its token
+counts onto that object, `self._last_metadata`, and its `QueryResult` carries no usage field
+(`chia:chia/models/vertex.py:479-482`, `579`, `586-591`; `chia:chia/base/llm_call.py:15-35`). The
+counts would therefore die on the worker and FR-14.6 would be unsatisfiable on the campaign backend,
+which is the one thing the superseding decision exists to buy. So A3, A7 and B7 call one loop-owned
+node instead:
+
+```python
+@ChiaFunction(resources={"llm": 1.0}, max_retries=0)
+def llm_turn(llm, user_message: str, tools: list) -> dict:
+    """One model turn on an llm worker, with its token counts brought home."""
+    cli = llm.prompt(user_message, tools)          # direct call: runs in THIS process
+    meta = dict(getattr(llm, "_last_metadata", {}) or {})
+    return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
+            "success": bool(cli.success),
+            "usage": {"tokens_in": meta.get("input_tokens", 0),
+                      "tokens_out": meta.get("output_tokens", 0),
+                      "num_turns": meta.get("num_turns", 0),
+                      "model": meta.get("model")}}
+```
+
+`llm.prompt(...)` inside it is a direct call of a `@ChiaFunction`, which "just runs in the caller's
+own process and isn't a node" (`chia:docs/concepts/overview.rst:36-37`), so the turn runs on the
+`llm` worker the node landed on, the MCP tool servers are reached over HTTP exactly as before, and
+the metadata is read in the same process that wrote it. `03-LLD.md` §3.5 is normative for it.
+Nothing else about the dispatch moves: the resource is `{"llm": 1.0}`, the cap is still the container
+count, and `RunManifest.llm_concurrency` still records it.
 
 **Why `repair` is a separate worker type.** B8 runs CHIA's chain, and the chain's verify step calls
 `circt_util.circt_ninja_build(cfg["tool_targets"], ...)` **with the agent's diff applied**
@@ -788,12 +982,12 @@ parameters (FR-14.1).
 |---|---|---|---|---|---|
 | A1 `seed_corpus_build` | head | n/a | 1800 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Fully idempotent.** Two runs on a clone reset to the recorded head produce byte-identical output (FR-01.6, FR-01.11). |
 | A2 `pinned_main_select` | head | n/a | 600 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Idempotent given a fixed clone and tag list.** Not idempotent across a `git fetch` that moves head, which is why the result is stamped into the manifest and never recomputed mid-run. |
-| A3 `generate_seeded` | `{"circt": 1}`, prompt at `{"llm": 1.0}` | assertions-on; prompt on the backend image | 2400 s `[DEFAULT]`, `turn` | `max_retries=0`; a failed turn is recorded, charged and skipped (FR-04.8) | **Not idempotent.** A model turn is not deterministic. Replay is by CHIA's bypass from the stored transcript, which is the only mechanism NFR-01 accepts for an agent turn. |
+| A3 `generate_seeded` | `{"circt": 1}`, prompt at `{"llm": 1.0}` via `llm_turn` | assertions-on; prompt on `ghcr.io/ucb-bar/chia:latest` | 2400 s `[DEFAULT]`, `turn` | `max_retries=0`; a failed turn is recorded, charged and skipped (FR-04.8) | **Not idempotent.** A model turn is not deterministic. Replay is by CHIA's bypass from the stored transcript, which is the only mechanism NFR-01 accepts for an agent turn. |
 | A4 `generate_mutation` | `{"circt": 1}` | assertions-on | 600 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Fully idempotent.** Every mutator is a pure function of (input text, seed integer) (FR-05.3). |
 | A5 `feedback_bundle_build` | head | n/a | 120 s `[DEFAULT]`, `driver` | `max_retries=0` | **Fully idempotent.** A pure function of the iteration's stored `ProbeResult`s and the previous bundle. |
 | A6a `budget_load` | head | n/a | 120 s `[DEFAULT]`, `driver` | `max_retries=0` | **Fully idempotent.** A pure function of the committed file and its commit metadata. |
 | A6b `ledger_accrue` | head | n/a | 120 s `[DEFAULT]`, `driver` | `max_retries=0` | **Not idempotent:** it appends, so a replay would double-charge, which is exactly why `max_retries=0` is set. Entries carry `entry_id`, so a duplicate is detectable at reconciliation. |
-| A7 `mutator_synthesis` | head, prompt at `{"llm": 1.0}` | head env; prompt on the backend image | 3600 s `[DEFAULT]`, `turn` | `max_retries=0` | **Not idempotent, and run once.** Its output is frozen, committed and referenced by SHA (FR-05.2), so the campaign never re-runs it. Runs **before** the pre-registration commit. |
+| A7 `mutator_synthesis` | head, prompt at `{"llm": 1.0}` via `llm_turn` | head env; prompt on `ghcr.io/ucb-bar/chia:latest` | 3600 s `[DEFAULT]`, `turn` | `max_retries=0` | **Not idempotent, and run once.** Its output is frozen, committed and referenced by SHA (FR-05.2), so the campaign never re-runs it. Runs **before** the pre-registration commit. |
 | B1 `image_build` | `{"circt": 1}` | builds an image; runs on the base | 10800 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Idempotent by digest.** A rebuild at the same SHA, tag, target list and flag string is a no-op if the digest already exists; a partial build publishes nothing (FR-03.13). |
 | B2 `probe_execute` | `{"circt": 1}` | assertions-on | the per-probe wall-clock limit of FR-06.2 plus a node-level margin `[DEFAULT]`, `subprocess`. The address-space and CPU-time limits are **not** enforced here: they are set by the `prlimit --as --cpu --nofile --` prefix on the probe's own argv, so they belong to the child rather than to the node (FR-06.2, amended 2026-09-13) | `max_retries=0`, because a retried probe would double-charge the ledger and could turn a recorded `oom` into a silent success (FR-06.2, NFR-05) | **Idempotent in verdict, not in timing.** The status, the signal and the stderr are deterministic in the same image and against binaries whose hashes match `image_spec.tool_hashes` (NFR-02); the wall time and peak memory are not, and are recorded as non-deterministic fields. Each run writes to its own per-probe scratch directory (FR-06.8). |
 | B3 `oracle_primary` | `{"circt": 1}` | assertions-on | 600 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Fully idempotent.** A pure function of the stored `BuildResult` plus `llvm-symbolizer` on a fixed binary. |
@@ -801,8 +995,8 @@ parameters (FR-14.1).
 | B5 `reduce_case` | `{"circt": 1}` | assertions-on | the reduction wall-clock budget of FR-09.4 plus the SIGKILL grace of FR-09.13, `subprocess` | `max_retries=0` | **Idempotent when the reduction reaches a fixpoint; not otherwise.** A budget-truncated reduction carries `fixpoint=false` and `budget_truncated=true`, which is how NFR-02 keeps a non-reproducible row visible. |
 | B6a `issue_mirror_refresh` | head | n/a | 1800 s `[DEFAULT]`, `turn` | bounded in-client 5xx retry only | **Idempotent by design and by policy.** Refreshed once per run; a second run in the same campaign reuses it unless the operator asks (FR-10.9). Runs on the head because `GithubIssuesNode` is a "Service-pattern node (head-node only, not a Ray task)" (`chia:chia/github/github_issues_node.py:31`) and because that is where the token is. |
 | B6b `dedup_and_contamination_screen` | head | n/a | 900 s `[DEFAULT]`, `subprocess` | `max_retries=0` | **Idempotent in verdict, order-independent in partition.** The duplicate relation is string equality, so the partition does not depend on arrival order (FR-10.2). A second run over the same candidate returns `duplicate_of_candidate` naming the first, which is FR-10.6's requirement rather than a violation of idempotency. Runs on the head because the commit scans of FR-10.4 and FR-15.1 need 24 months of `main`, which only the head's blobless clone holds, and because the issue mirror is a table in `loop.db` (LLD review K5, K7). It runs no CIRCT binary. |
-| B7 `triage_report` | `{"circt": 1}`, prompt at `{"llm": 1.0}` | assertions-on; prompt on the backend image | 1200 s `[DEFAULT]`, `turn` | `max_retries=0`; a failed turn yields `untriaged` and a hold (FR-11.8) | **Not idempotent in prose, fully idempotent in numbers.** Every number in the report is substituted from the record (FR-11.4), so a re-render with a different prose turn changes no number. |
-| B8 `repair_adapt` | `{"repair": 1}` | assertions-on | CHIA's five phase timeouts, unchanged, `turn` | `max_retries=0` | **Not idempotent.** It mutates the CIRCT tree. It resets to the run's commit before starting (FR-12.6), **and resets and rebuilds the tool targets after finishing**, and the loop's row is written before CHIA's (FR-12.10). A re-run is safe and produces a new attempt, not the same one. |
+| B7 `triage_report` | `{"circt": 1}`, prompt at `{"llm": 1.0}` via `llm_turn` | assertions-on; prompt on `ghcr.io/ucb-bar/chia:latest` | 1200 s `[DEFAULT]`, `turn` | `max_retries=0`; a failed turn yields `untriaged` and a hold (FR-11.8) | **Not idempotent in prose, fully idempotent in numbers.** Every number in the report is substituted from the record (FR-11.4), so a re-render with a different prose turn changes no number. |
+| B8 `repair_adapt` | `{"repair": 1}`; the chain dispatches its own turns at `{"llm": 1.0}` | assertions-on | CHIA's five phase timeouts, unchanged, `turn` | `max_retries=0` | **Not idempotent.** It mutates the CIRCT tree. It resets to the run's commit before starting (FR-12.6), **and resets and rebuilds the tool targets after finishing**, and the loop's row is written before CHIA's (FR-12.10). A re-run is safe and produces a new attempt, not the same one. |
 | B9a `gate_decide` | head | n/a | 900 s `[DEFAULT]`, `driver` for its own work, `turn` for the FR-13.16 poll | `max_retries=0` | **Idempotent in the four answers; question 1 re-runs by construction.** Holds **no** `circt` resource, so it can never hold a slot while waiting for one. |
 | B9b `gate_rerun` | `{"circt": 1}` | assertions-on | the per-probe wall-clock limit plus a margin `[DEFAULT]`, `subprocess` | `max_retries=0` | **Deliberately not idempotent in placement.** FR-13.2 requires a fresh process and a newly created working directory each time, so the re-run is the point rather than a side effect. |
 | B9c `bugloop-approve` CLI | head, interactive | n/a | none; a human's own pace | none | **Idempotent by refusal.** Approval is per report and does not generalise (FR-13.13); a second approval of the same report is refused with the first approval's timestamp. |
@@ -821,6 +1015,24 @@ the same filesystem namespace as the probe directory A3 is filling. It is a plai
 `AsyncJobTool`, because a file write does not hold the transport for minutes; with the other four
 tools deleted (§1.4), `AsyncJobTool._MAX_POLL_SECONDS` and its "one job at a time per tool instance"
 rule (`chia:chia/base/tools/AsyncJobTool.py:34-37`, `47`) no longer price anything in this design.
+
+**Stage 7's backend, rewritten 2026-09-14 (§0.3).** B8 runs CHIA's chain with **one additive branch**
+and nothing else changed (FR-12.1, as amended). That chain's turn selector knew `antigravity`,
+`opencode` and `claude` and nothing else (`chia:examples/circt_issue_solver/issue_task.py:81-123`):
+handed `cfg["backend"] = "vertex"` it would have built a `ClaudeCodeLLM` and said nothing. The loop
+adds the fourth arm, nineteen lines, unreachable for every existing CHIA caller, carried as
+`upstream/issue_task-vertex-branch.patch` and proposed upstream. Four things follow. The adapter
+passes `cfg["backend"] = "vertex"` and `cfg["model"] = "gemini-3.8-flash"`, the same pair every other
+stage runs on; `RunManifest.model_ids["repair_adapt"]` reads `vertex:gemini-3.8-flash`, equal to
+`RunManifest.backend`'s half for the first time; `stages_metered["stage_7"]` is **true** by default,
+FR-14.8's rule unchanged and its outcome flipped; and `--repair-backend` with `--repair-model` and
+`--no-repair` survive as fallbacks for a Vertex outage, defaulting to `vertex`. What does **not**
+follow is token observability: `_turn`'s dispatch at `issue_task.py:124` is remote and
+`VertexGeminiLLM` keeps its counts on the LLM object, so stage 7's `LedgerEntry.observed` carries null
+tokens and null `cost_usd` with the reason named (§0.3). ~~The campaign may instead be run with the
+repair stage disabled, in which case F-12's results rows are empty with the reason stated~~ is
+**kept**, `--no-repair` being both the outage fallback and the way to run a campaign whose reported
+spend is complete.
 
 **How B12 sequences the campaign.** One manifest, one image, one mirror, then the arms **one after
 the other** in `arm_order`, each for `W` seconds metered on the head. Inside an arm, seeds are
@@ -854,8 +1066,9 @@ recorded either way.
 
 ## 4. Cluster topology
 
-One backend per run, because a backend is a cluster and not a flag (C-20, ADR-D-03). Two cluster YAML
-files are named here and written in `03-LLD.md`.
+One backend per run, because a backend is a cluster and not a flag (C-20, ADR-D-03). **The backend is
+CHIA's `vertex` backend in Vertex AI express mode** (ADR-D-03's superseding section, §0.2). Two
+cluster YAML files are named here and written in `03-LLD.md`.
 
 ### 4.1 Single machine, the Must (NFR-10, ADR-D-14)
 
@@ -864,7 +1077,7 @@ the shape CHIA's own example already uses (`chia:examples/circt_issue_solver/clu
 
 | Worker type | Resources | Count | Image | Why |
 |---|---|---|---|---|
-| `bugloop_llm` | `{"llm": 1}` | 2 `[DEFAULT]` | the backend's image: `ghcr.io/ucb-bar/chia-claude-code:latest`, or `chia-antigravity`, or `chia-opencode` | Holds the agent CLI and its login. One resource unit per container, so the concurrent-prompt cap is exactly the container count, 2, and the manifest records it as `llm_concurrency`. |
+| `bugloop_llm` | `{"llm": 1}` | 2 `[DEFAULT]` | `ghcr.io/ucb-bar/chia:latest` | Runs the turn. Under the `vertex` backend there is no CLI to install and no login to mount: the backend is a Python client in the `chia` package, and `ghcr.io/ucb-bar/chia:latest` is "`rayproject/ray:2.54.0-cpu` with the `chia` package pip-installed on top" (`chia:docs/user_guides/docker_images.rst:45-49`), which by `chia:pyproject.toml:24-35` brings `google-genai` and `mcp` with it. One resource unit per container, so the concurrent-prompt cap is exactly the container count, 2, and the manifest records it as `llm_concurrency`. |
 | `bugloop_circt` | `{"circt": 1}` | 2 `[DEFAULT]` | `chia-circt-assert:<tag>`, the assertions-on image of B1 | Owns a `/workspace/circt` checkout at the run's commit with the tool targets already built in the image. Two containers on one host cannot share one build path, so each owns its own. |
 | `bugloop_repair` | `{"repair": 1}` | 1 `[DEFAULT]` | `chia-circt-assert:<tag>`, the same image | B8 only. Isolates the one stage that patches and rebuilds the tree from every stage that measures (§3). |
 
@@ -873,6 +1086,27 @@ concurrent prompts" (`chia:examples/circt_issue_solver/cluster.yaml:3-4`), which
 means something it does not say. This design writes `{"llm": 1}` and states the cap, because the
 seeded arm's throughput is bounded by `llm` slots rather than by `circt` slots and FR-14.5 requires
 the manifest to name the concurrency. `[accepted 2026-09-13]`
+
+**`run_options` on `bugloop_llm`, rewritten 2026-09-14 (§0.2).** Under the `claude` backend the row
+carried `-v ~/.claude:/home/ray/.claude` and two `run_setup_commands` that copied a login file and
+set `skipDangerousModePermissionPrompt` inside the container. **All three are withdrawn.** What
+replaces them is one line:
+
+```
+- "-e GEMINI_API_KEY=${GEMINI_API_KEY}"
+```
+
+and nothing else changes on that type: `--ulimit nofile`, `--shm-size`, the SSH agent socket and its
+variable, and `--user $(id -u):$(id -g)` stay, and the type still carries no `--cpus` and no
+`--memory` because it holds no CIRCT tree. The `${GEMINI_API_KEY}` reference is expanded **by CHIA's
+own config loader, from the operator's shell, at `chia up`**: `load_raw_config` runs
+`_expand_env_vars` over the whole parsed document, substituting `${VAR}` from `os.environ` and
+leaving `$VAR` alone (`chia:chia/cluster/config.py:300-309`, `694-710`, `951-957`). CHIA's own
+multi-backend test cluster passes `OPENAI_API_KEY` and `GOOGLE_CLOUD_PROJECT` exactly this way
+(`chia:chia/models/tests/cluster/all_models.yaml:143-152`), so the mechanism is CHIA's and not this
+design's. The consequence that matters for NFR-06 is §4.3's: the value ends up in the host's
+`docker run` command line and in the container's environment, and **never** in `chia job submit`
+runtime-env metadata, which is where CHIA's own wrapper warns a secret becomes visible.
 
 `min_workers` and `max_workers` are equal on all three types, so the cluster is fixed-size and
 `apparatus_concurrency` in the manifest is exactly the `bugloop_circt` count. **Both arms run from
@@ -1001,10 +1235,44 @@ is an rsync to each node's **host**, before the container starts
 delivered a credential into a container at all. With the credential on the head, GCP needs no
 credential mechanism of its own.
 
-The backend's own credential is a directory mount and never a value: `~/.claude`, `~/.gemini` or
-`~/.config/gcloud`, exactly as CHIA's three example YAMLs already do
-(`chia:examples/circt_issue_solver/cluster.yaml:36`;
-`chia:examples/circt_issue_solver/README.md:63-84`).
+**The backend's own credential, rewritten 2026-09-14 (§0.2).** It is no longer a directory mount. The
+`vertex` backend in express mode authenticates with one API key, which the loop passes as
+`client_kwargs={"api_key": os.environ["GEMINI_API_KEY"]}`
+(`chia:chia/models/vertex.py:228`, `250`, `406-411`), so the credential is a **value in one
+environment variable on the `llm` worker** and the loop holds a second credential where before it
+held one. Five rules contain it, and each is a mechanism rather than a policy.
+
+1. **It lives in one file on the head**, `~/.config/bugloop/gemini.env`, mode 0600, outside every
+   repository, holding one `GEMINI_API_KEY=...` line. The operator **sources it before `chia up`**
+   and nothing else reads the file.
+2. **It reaches the container through `run_options`, expanded at `chia up`.** `-e
+   GEMINI_API_KEY=${GEMINI_API_KEY}` is substituted from the operator's shell by
+   `chia.cluster.config._expand_env_vars` (`chia:chia/cluster/config.py:300-309`, `708`), so the
+   value lives in the host's `docker run` argument list and in the container's environment, and the
+   committed YAML holds the reference and not the key.
+3. **The submit wrapper forwards no credential.** `bug_loop_submit.sh` keeps
+   `--runtime-env-json` for the three non-secret variables of §8.2 and adds no fourth; in particular
+   it does **not** forward `GEMINI_API_KEY`, because a `runtime_env` value is stored in the job's
+   metadata and is visible in `chia job` output and the dashboard, which CHIA's own wrapper records
+   as the reason it is a poor place for a token
+   (`chia:examples/circt_issue_solver/fix_issues_submit.sh:21-24`).
+4. **Nothing writes it down.** No prompt, transcript, log, database row or artefact carries it, and
+   no node passes it as an argument: the backend constructor reads `os.environ` on the worker it is
+   already running on. NFR-06's grep of the artefact tree, every prompt file, every transcript, both
+   databases and the job metadata is extended to the key's own **value pattern**, `AQ.` or `AIza`
+   followed by thirty or more URL-safe characters, which is the pattern the team repository's
+   pre-commit scan already uses.
+5. **The head holds it too, and only in one process.** A7 runs on the head and its turn is dispatched
+   to an `llm` worker like every other, so the head needs the variable only to build the LLM object
+   whose `client_kwargs` the worker then uses. That is the one place the value crosses a Ray
+   boundary, and it crosses inside an object and not inside job metadata.
+
+**The live-call interlock (§0.2, the user's rule).** No real backend is built unless the environment
+variable `BUGLOOP_ALLOW_LIVE_MODEL` is `1`. `03-LLD.md` §3.5 gives the function; what matters here is
+that it is a refusal in the **construction** path rather than a flag read at dispatch, so no code
+path reaches Vertex without it, and that tiers T0 to T2 of `04-Test-Plan.md` run with the model layer
+mocked the way CHIA's own `chia/models/tests/test_vertex.py` mocks it. The pilot is the first run
+that sets it.
 
 ---
 
@@ -1303,8 +1571,14 @@ on 2026-09-13 in answer to this review and carry their own revision note.
 
 ### 8.1 Byte-identical, and checked as such
 
-`examples/circt_issue_solver/issue_task.py` is **byte-identical** to CHIA at `16c35e92`, and FR-12.1's
-acceptance criterion is a byte comparison of that file. B8 presents a local report in the shape the
+~~`examples/circt_issue_solver/issue_task.py` is **byte-identical** to CHIA at `16c35e92`, and FR-12.1's
+acceptance criterion is a byte comparison of that file.~~ **Corrected 2026-09-14 (§0.3).** That file
+is the **one** CHIA file under `examples/` this design changes, and it changes by **addition only**:
+one `elif backend == "vertex":` arm in `_turn`, nineteen lines, no deletion and no altered line,
+carried as `upstream/issue_task-vertex-branch.patch`. FR-12.1's acceptance is a `git diff` against
+`16c35e92` showing exactly that one hunk and nothing else. Everything else in this subsection stands,
+and the file belongs in §8.1 rather than §8.2 because nothing CHIA already does behaves differently:
+the arm is unreachable for every existing CHIA caller. B8 presents a local report in the shape the
 chain already consumes, so `run_issue_remote(issue_md: str, number: int, ...)` needs no change: the
 adapter supplies both arguments and constructs a full `GithubIssue`-shaped object carrying the
 synthetic integer identifier (FR-12.2). The chain's own post-verify behaviour, which leaves the tree
@@ -1324,7 +1598,23 @@ Governance files are untouched, as FR-19.9 requires: `STEERING_COMMITTEE.md`, `C
 
 ### 8.2 The new example directory, and how its modules reach a worker
 
-Everything the loop adds lives under **`examples/circt_bug_loop/`**, a sibling of
+**Erratum, 2026-09-14 (§0.2): the loop's home is the team repository, and the CHIA-shaped copy is
+produced from it.** This section was written as though the working tree were a CHIA checkout. It is
+not. The loop is developed in
+`https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26` (cloned at `~/Projects/CHIA_Hackathon_2k26`),
+where it lives at **`circt_bug_loop/` at the repository root**, with exactly the internal layout
+`03-LLD.md` §1.1 gives; the CHIA-core proposals of §8.3, the Dockerfile, the workflow and the three
+generic functions as a patch, live at **`upstream/`**; and `upstream/sync-to-chia.sh` copies
+`circt_bug_loop/` into a CHIA checkout as `examples/circt_bug_loop/` and applies the core files, for
+the pull request against `ucb-bar/chia` from the clone at `~/Projects/chia-bugloop`, branch
+`bugloop`. Everything below that names `examples/circt_bug_loop/` is therefore the **published**
+path, which is what the pull request and this design's CHIA citations are about, and
+`circt_bug_loop/` is the development path. The two differ in exactly one respect that the code can
+see, and §8.2's `_PY_MODULES` list is where it bites: the loop must not derive CHIA's package
+directory from its own location. `03-LLD.md` §13.1 is normative and derives it from the **installed
+`chia` module** instead, which is correct from both trees.
+
+Everything the loop adds lives under **`examples/circt_bug_loop/`** once published, a sibling of
 `examples/circt_issue_solver/`. The name follows CHIA's own convention, one directory per flow named
 for what the flow does: `circt_issue_solver`, `riscv_extensions`, `memcpy`, `timing_opt`,
 `gem5_align`, `spec_build` and ten more under `examples/` (counted 2026-09-13 at `16c35e92`). It is
@@ -1366,18 +1656,25 @@ list is stated here rather than left to the LLD:
 
 ```
 _PY_MODULES = [probe_task.py, generate_task.py, triage_task.py, repair_adapter.py,
-               gate.py, store.py, corpus.py, pin_select.py, mutators/, contract/,
-               <repo>/chia,
-               <repo>/examples/circt_issue_solver/issue_task.py,
-               <repo>/examples/circt_issue_solver/circt_util.py]
+               gate.py, store.py, corpus.py, pin_select.py, ddmin.py,
+               mutators/, contract/,
+               <the installed chia package directory>,
+               <that package's sibling>/examples/circt_issue_solver/issue_task.py,
+               <that package's sibling>/examples/circt_issue_solver/circt_util.py]
 ```
+
+The last three entries read `<repo>/chia` and `<repo>/examples/...` until 2026-09-14, which was only
+correct from a CHIA checkout. They are now derived from the **imported `chia` module's own path**,
+never from the flow directory's ancestors, so the same driver runs from the team repository and from
+a CHIA checkout with no edit. `03-LLD.md` §13.1 gives the four lines that do it.
 
 `py_modules` takes directories as well as files, which is how `chia` itself ships, so `contract/` and
 `mutators/` ship as packages rather than loose files. The last two entries are the sharp one and are
 deliberate: **B8 needs CHIA's own `issue_task.py` and `circt_util.py` on the worker's `sys.path`**,
-from a different example directory, because FR-12.1 forbids copying or modifying them. One example
+from a different example directory, because FR-12.1 forbids **copying** them and allows only the one
+additive branch (§0.3). One example
 shipping another's worker modules has no precedent in CHIA's `examples/`, and it is the price of
-running the chain byte-identical. `bug_loop_submit.sh` passes no `py_modules` of its own; the driver
+running the chain as CHIA wrote it. `bug_loop_submit.sh` passes no `py_modules` of its own; the driver
 owns the list, as CHIA's does.
 
 `bug_loop.py` also passes `excludes=["**/__pycache__", "**/*.pyc"]`, as CHIA's driver does
@@ -1420,6 +1717,23 @@ Four, all additions, none a modification of an existing line.
    functions of item 3 get their tests. `examples/circt_bug_loop/tests/` covers the flow-specific
    code and does not satisfy this, which is why the earlier count of three was wrong.
 
+**A fifth, 2026-09-14 (§0.2), half of it depended on since §0.3.** Two one-line defects in CHIA's
+`vertex` backend were found while folding in the superseding decision. (i) `VertexGeminiLLM.__init__`
+defaults `location` to `"us-central1"` (`chia:chia/models/vertex.py:243-247`), which makes express
+mode impossible: `google-genai` 2.8.0 raises `ValueError: Project/location and API key are mutually
+exclusive in the client initializer.` when a `location` and an `api_key` are both given. (ii)
+`run_issue_remote`'s turn selector has no `vertex` branch
+(`chia:examples/circt_issue_solver/issue_task.py:81-123`). Both live in `upstream/` as patches and
+both are offered to CHIA, and the two are no longer in the same position. **(i) stays offered and not
+depended on**: the loop works around it in two lines in its own backend constructor (§4.3), so nothing
+waits on a CHIA merge. ~~(ii) is recorded rather than patched, because FR-12.1 pins that file~~ is
+**withdrawn 2026-09-14 (§0.3)**: the loop **applies** (ii) locally, as
+`upstream/issue_task-vertex-branch.patch`, nineteen additive lines with no deletion, and FR-12.1's
+acceptance becomes hunk equality against `16c35e92`. So stage 7 depends on the patch being applied in
+the loop's own tree, and still not on it being merged: an unmerged branch costs the upstream pull
+request a review comment and costs the campaign nothing, because the file the campaign runs is the
+one `sync-to-chia.sh` produced.
+
 Nothing else under `chia/` changes. In particular the node dispatch, the tool base classes, the
 database layer, the GitHub layer, the cache and bypass mechanism, the job submission path, the
 cluster layer, the metrics logger and the profiler are all reused unchanged (FRD §4.2).
@@ -1430,7 +1744,11 @@ cluster layer, the metrics logger and the profiler are all reused unchanged (FRD
 
 For each component: what it reuses, and the one-line justification for anything new.
 
-**Dependency list.** CHIA's own dependencies, plus the Python standard library, and nothing else.
+**Dependency list.** CHIA's own dependencies, plus the Python standard library, and nothing else. The
+2026-09-14 backend decision adds none: `google-genai` and `mcp`, which the `vertex` backend imports
+lazily (`chia:chia/models/vertex.py:401-404`), are already CHIA dependencies
+(`chia:pyproject.toml:24-35`, `google-genai>=1.64.0` and `mcp==1.27.1`), so FR-19.8's check is
+unmoved.
 `sqlite3`, `json`, `dataclasses`, `subprocess`, `signal`, `hashlib`, `re`, `pathlib` and `difflib`
 are all standard library. No serialisation library, no schema library, no test framework beyond what
 CHIA already uses, and no reducer library. FR-19.8's acceptance is that the dependency list is
@@ -1444,11 +1762,11 @@ any more.
 |---|---|---|
 | A1 | `analysis/pin_window.py` and `pin_window_raw.json`, already written and re-runnable (PIN §7); `git` itself | The `RUN:`-line extraction, the tool classification, the `SeedRecord` and `SdkMap` serialisations. New because CHIA has no supply of work other than a GitHub issue and no corpus of any kind. |
 | A2 | The pin-window walk in `analysis/pin_window.py` | The "newest commit with a release" selection and the lag report. New because nothing in CHIA selects a CIRCT commit: `ChiaCirctBaseDockerfile:85-86` clones `--branch "${CIRCT_VER}"` and stops there. |
-| A3 | The per-phase turn machinery, backend selection, timeouts and transcript capture (`chia:examples/circt_issue_solver/issue_task.py:71-136`); `Template.safe_substitute` rendering (`issue_task.py:138-141`), which matters because MLIR and shell braces would break `str.format`; ~~**`BashTool` for read-only source access, unchanged**~~ | Two prompts, `ProbeWriteTool`, `SourceReadTool`, and the `ProbeSpec` emitter. New because no CHIA prompt reads a fix diff to propose new inputs, and because CHIA has no read-only source tool: `BashTool` is a shell on a worker whose `PATH` puts the CIRCT build first, so it reaches every measured result FR-04.4 forbids (§0.1, §1.4, 2026-09-14). |
+| A3 | The per-phase turn machinery, timeouts and transcript capture (`chia:examples/circt_issue_solver/issue_task.py:71-136`); **CHIA's `vertex` backend whole, `VertexGeminiLLM` and its client-side MCP tool loop** (`chia:chia/models/vertex.py:207-266`, `386-443`, `544-572`); `Template.safe_substitute` rendering (`issue_task.py:138-141`), which matters because MLIR and shell braces would break `str.format`; ~~**`BashTool` for read-only source access, unchanged**~~ | Two prompts, `ProbeWriteTool`, `SourceReadTool`, the `ProbeSpec` emitter, and **two small pieces of backend glue named in §3 and §4.3**: `llm_turn`, four lines, because `QueryResult` has no usage field and a remote dispatch would drop the token counts; and the express-mode constructor, which nulls `project` and `location` after construction because CHIA's own default makes express mode raise, and which refuses to build a real backend without `BUGLOOP_ALLOW_LIVE_MODEL=1`. New because no CHIA prompt reads a fix diff to propose new inputs, and because CHIA has no read-only source tool: `BashTool` is a shell on a worker whose `PATH` puts the CIRCT build first, so it reaches every measured result FR-04.4 forbids (§0.1, §1.4, 2026-09-14). |
 | A4 | The `ProbeSpec` contract and validator; `random.Random(seed)` from the standard library, which is the whole of the determinism | The deterministic mutator runner. New because CHIA has no mutation of any kind. |
 | A5 | The stateless-phase pattern of CHIA's chain, where a later phase's context is inlined into its prompt rather than resumed (`chia:examples/circt_issue_solver/issue_task.py:44-48`) | The bundle's own field set and FR-16.6's abandonment rule. New because FR-16.1 requires the generator half to import no apparatus schema, which a shared type would violate. |
-| A6a, A6b | Per-phase usage capture already in `verdict.json` (`chia:examples/circt_issue_solver/circt_issue_loop.py:132-136`); `SQLiteNode` for the ledger; `yaml`, already a CHIA dependency, for the budget file | The accrual, the `scope` split, the stop rule and the equal-window check. New because CHIA has a usage record and no budget. |
-| A7 | CHIA's models layer for one offline turn; B6a's mirror as the synthesis input | The synthesis prompt and the frozen-set format. New because ADR-D-05 needs a mutator set and none exists; it is a component rather than a footnote because it has an ordering constraint that binds B6a and the pre-registration commit. |
+| A6a, A6b | Per-phase usage capture already in `verdict.json` (`chia:examples/circt_issue_solver/circt_issue_loop.py:132-136`); **the backend's own token accounting, `usage_metadata.prompt_token_count` and `candidates_token_count` accumulated per turn** (`chia:chia/models/vertex.py:479-482`, `579`); `SQLiteNode` for the ledger; `yaml`, already a CHIA dependency, for the budget file | The accrual, the `scope` split, the stop rule, the equal-window check, and **the price arithmetic**: the backend reports tokens and no price, so the ledger multiplies by the two committed `budget.yaml` prices to get `cost_usd` and stops both arms at `campaign_spend_cap_usd`. New because CHIA has a usage record and no budget. |
+| A7 | CHIA's models layer for one offline turn, the same `vertex` backend and the same `llm_turn` node A3 uses; B6a's mirror as the synthesis input | The synthesis prompt and the frozen-set format. New because ADR-D-05 needs a mutator set and none exists; it is a component rather than a footnote because it has an ordering constraint that binds B6a and the pre-registration commit. |
 | B1 | The whole of `chia:dockerfiles/ChiaCirctBaseDockerfile`, including its image-wide `ENV LD_LIBRARY_PATH=/opt/circt-sdk/lib` at 77-79, which sits **before** the cmake and ninja layers at 92-113 and is what makes the SDK's `mlir-tblgen` runnable at build time (C-02, amended) | Fetch-by-SHA, the pin equality check, the flag string, `circt-reduce`, slang, Verilator, the two transport packages the base omits, baking the whole target set, the `ImageSpec` record including `tool_hashes`, and **one cmake variable for lit discovery**, `-DMLIR_SOURCE_DIR=/opt/circt-sdk` (FR-03.17, new 2026-09-13). New because CHIA's image compiles CIRCT's assertions out, so the primary oracle would have nothing to detect. The earlier claim that `circt_warm_build` is reuse here is **withdrawn**: nothing calls it, because the image is warm on arrival (§4.1). **The lit variable is a one-line addition that CHIA's own image will need too**, and this is the sharpest piece of reuse-by-correction in the design: at any CIRCT commit after 2026-07-16, `test/Tools/circt-tblgen/lit.local.cfg` raises during lit **discovery** in an SDK-based build because `config.mlir_src_root` is empty, `--filter-out` is applied only after discovery so CHIA's own exclusion cannot reach it, and lit exits 2 with zero tests. The SDK ships `/opt/circt-sdk/include/mlir/IR/OpBase.td`, so the variable satisfies the resolver's first candidate; verified end to end on 2026-09-13, a fresh SDK-based configure carrying it yields `config.mlir_src_root = "<sdk>"` and `lit --show-tests` over the whole `test/` tree exits 0 with 1,390 tests and no discovery error. Nothing else in the image changes, and CHIA's `--filter-out=circt-tblgen` goes back to doing the job it was written for. |
 | B2 | The process-group discipline of `circt_ninja_build` (`chia:chia/chipyard/circt.py:628-631`, `648-658`); `@ChiaFunction(resources={"circt": 1})` placement | Direct `execve` with an argument list, per-probe rlimits in the child, the binary-hash check and the seven-way status. New, and deliberately **not** `circt_run_script`: it runs `bash <script>`, under which SIGABRT reaches the caller as exit status 134 rather than as a signal, and its timeout path returns `exit_code: -1`, which collides with the negative return code a signal-terminated child produces (FR-06.1). The limits are applied by **prefixing the probe's own argv with `prlimit --as=<bytes> --cpu=<seconds> --nofile=<n> --`**, so `prlimit(1)` sets all three limits in its own process and then `execvp`s the tool, and the limits are in force from the tool's first instruction. **Not** `preexec_fn` calling `resource.setrlimit`: Python documents `preexec_fn` as unsafe in the presence of threads, because the child can deadlock before `exec`, and a Ray worker is threaded; it also forces CPython off `posix_spawn` onto `fork`, which is the hazard itself (`/usr/lib/python3.14/subprocess.py:1862`, the `and preexec_fn is None` conjunct). ~~The earlier text here, "the limits take FR-06.2's first route ... not `prlimit`, which would be a dependency and which races the child's first allocations",~~ is **withdrawn**: measured on 2026-09-13, `/usr/bin/prlimit` is already present in the stock `ubuntu:24.04` base this image is built from (`chia:dockerfiles/ChiaCirctBaseDockerfile:30`), belonging to `util-linux`, which that image marks `Essential: yes, Priority: required`, so nothing is added; and the race objection was to `resource.prlimit(pid, ...)` on a running child, which `prlimit(1)` is not. util-linux is GPL-2.0-or-later, invoked as a separate process and neither imported nor linked, so FR-19.8's check passes and NFR-11 is untouched. `[decided against, 2026-09-13]` |
 | B3 | The SDK's `llvm-symbolizer`, **measured** to resolve `file:line` under FR-03.4's flag string (M2); the exit-status and log capture pattern; CHIA's LLVM and MLIR scope boundary as a rule (`chia:examples/circt_issue_solver/README.md:152-154`) | Assertion-text extraction, frame symbolisation, scope classification and the reproducing-command emitter. New because CHIA has no oracle: its work starts from an issue that already states the failure. |
@@ -1457,7 +1775,7 @@ any more.
 | B6a | `GithubIssuesNode` with `state="all"`, on the head where CHIA documents it; the typed error classes; `SQLiteNode` for the mirror | The bounded once-per-run mirror. It calls `recent(n, fetch_comments=False)`: the default fetches "one extra paginated request per issue that has comments" (`chia:chia/github/github_issues_node.py:67-71`), which over `llvm/circt`'s thousands of open and closed issues would spend the 5,000/hour budget FR-10.7 only detects, and CHIA's own example passes `False` for exactly this reason (`chia:examples/circt_issue_solver/triage.py:61`). The cost is that a known-issue match existing **only** in a comment is missed, which is recorded as `comments_mirrored=false` in the manifest and disclosed; the benefit is that no maintainer's words can reach a prompt, which is FR-20.4. `IssueMirrorTool` is **deleted**. `[accepted 2026-09-13]` |
 | B6b | The mirror; `hashlib`; the head's clone for the commit scan | The primary fingerprint, the if-and-only-if match rule, the post-pin scan and the two-level contamination screen. New because CHIA has **no search call**: `chia/github/github_client.py` has no `/search/` caller, only listing by recency, so screening is a mirror-then-query rather than a query (C-04). |
 | B7 | The turn machinery and transcript capture; the writeup phase's honesty requirements as a model (`chia:examples/circt_issue_solver/prompts/writeup.md:19-34`) | The report prompt, the issue-shaped template and the number-substitution rule. New because CHIA's writeup is a pull-request description that requires a `Fixes #<number>` line (`prompts/writeup.md:35`), and an issue report is a different artefact. |
-| B8 | The entire chain, unchanged: `run_issue_remote`, all six prompts, `circt_util`, `BuildTool`, `LitTool`, the `verify` determinism, the regression turn; `circt_git_reset` and `circt_ninja_build` for the post-attempt restore, both CHIA's own | The local-report shim, the identifier scheme, the pre-written repro, and the quarantine of §3. New because all four of CHIA's entry points begin at a `GithubIssue` fetched from the tracker (`circt_issue_loop.py:209-245`). |
+| B8 | The entire chain: `run_issue_remote`, all six prompts byte-identical, `circt_util`, `BuildTool`, `LitTool`, the `verify` determinism, the regression turn; `circt_git_reset` and `circt_ninja_build` for the post-attempt restore, both CHIA's own | The local-report shim, the identifier scheme, the pre-written repro, and the quarantine of §3. New because all four of CHIA's entry points begin at a `GithubIssue` fetched from the tracker (`circt_issue_loop.py:209-245`). **Plus, 2026-09-14 (§0.3), nineteen additive lines in `issue_task.py`**: an `elif backend == "vertex":` arm in `_turn` that no existing CHIA caller can reach. Justification in one line: without it stage 7 is the only stage on a second backend, a second credential and a second model id, and the nineteen lines delete all three at the cost of one hunk that is itself a contribution CHIA is offered. |
 | B9a, B9b, B9c | The image and the re-run machinery; `ray.nodes()` filtered to `Alive` and `NodeAffinitySchedulingStrategy`, both CHIA's own (`chia:chia/base/dispatch_proxy.py:85-94`; `chia:chia/base/cache.py:356-357`); Ray's worker and node identity for FR-13.2; the read-only `GithubIssuesNode` for the reconciliation poll | The four-question gate, the mechanical validity check, the approval record, the licence confirmation, the per-day cap, the `good first issue` refusal and the CLI. New because CHIA has no human approval step: "No GitHub writes, both flows only read" (`chia:examples/circt_issue_solver/README.md:8-9`). The CLI is `input()` and `print()`; no framework. |
 | B10a, B10b | `SQLiteNode` and its members; the `issue_logs/issue_<N>/` layout and `_persist`; `MetricsLogger`; cache and bypass for **agent-turn replay only** | The probe and candidate schemas, the `RunManifest` id, the large-artefact rule of §2.12, the shared artefact root, and the tool-stage re-execution harness. The harness is new because bypass returns stored data instead of recomputing (`chia:chia/base/bypass.py:3-5`), so it can evidence that a row was stored and never that it reproduces, which is the opposite of what NFR-01 asks. Per-stage counters ride home on each node's return value and are logged by B12 on the head, because `MetricsLogger` is head-node-only and not serialisable (`chia:chia/trace/metrics.py:14-17`). |
 | B11 | The artefact store; the ledger; the per-status vocabulary CHIA already uses (`chia:examples/circt_issue_solver/db.py:27`) | The results table, the validation table, the taxonomy, the disclosures and the regeneration check. New because every CHIA example runs one configuration and none compares two arms. |
@@ -1473,6 +1791,9 @@ already supplies.
 
 **Things deliberately not built.** A web service for approval (D-12), a second `verilator` worker
 type (ADR-D-09), a Postgres store (ADR-D-11), a per-stage backend selector (C-20, ADR-D-03), a
+per-stage model selector (§0.2: one model id, `gemini-3.8-flash`, for every agent stage), a fork or
+a vendored copy of `chia/models/vertex.py` (the two workarounds of §4.3 are attribute assignments on
+CHIA's own object), a
 similarity measure for dedup (FR-10.2 admits one key), four of the five MCP tools the earlier draft
 declared (§1.4), a comparison against FLEX, ISSTA-2024, Nüwa or DESIL (FR-18.9 forbids it), and a
 GitHub write path of any kind (NFR-04, NFR-07).
@@ -1512,3 +1833,31 @@ is renumbered and none is reused.
 | FR-19.5 | Core additions are tested under `chia/chipyard/test/`, the directory's real name | §8.3 |
 | FR-20.5 | The licence confirmation is a recorded field of the `FilingRecord` | §5.2 |
 | §10.1 item 2 | Seam membership restated at seven schemas plus the interface | §2.1 |
+
+**Five further errata, 2026-09-14, from the backend decision (§0.2).** They are carried in
+`01-FRD.md` §1.8, "Errata from the backend decision, 2026-09-14", under the same convention.
+
+| FRD item | What changed | Driven by |
+|---|---|---|
+| D-03 | The status line points at the ADR's **superseding** section rather than at its original decision | §0.2 |
+| FR-14.1 | Four keys added to `budget.yaml`: `model_id`, `campaign_spend_cap_usd` and the two per-million-token prices | §2.5 |
+| FR-14.6 | Tokens and money are **observable on the campaign backend**, so the criterion's "only `antigravity` and `opencode` report usage" is corrected and the `claude` default it named is withdrawn | §2.9 |
+| FR-18.10 | A **third** stop condition: an arm also stops when the campaign's cumulative `cost_usd` reaches `campaign_spend_cap_usd`, and the results state the spend | §2.9 |
+| NFR-08 | The criterion names the **USD cap** beside the primary unit and the two safety caps | §2.5, §2.9 |
+
+**Ten further errata, 2026-09-14, from the image build and the repair-backend decision (§0.3).**
+They are carried in `01-FRD.md` §1.9, "Errata from the image build and the repair-backend decision,
+2026-09-14", under the same convention.
+
+| FRD item | What changed | Driven by |
+|---|---|---|
+| D-03 | The status line points at the ADR's **addendum** as well as at its superseding section; `gemini-3.8-flash` covers every stage, stage 7 included | §0.3 |
+| FR-03.5 | The assertion baseline is re-based on the image: 536 of 555 `obj.CIRCT` objects referencing, the other 19 named | W-04 |
+| FR-03.7 | A note fixing this campaign's pin, `eade0de61bc5` with `firtool-1.159.0` | W-04 |
+| FR-12.1 | Byte equality becomes **hunk equality**: one additive branch, 19 insertions, 0 deletions | §0.3 |
+| FR-14.6 | Stage 7's tokens are **not** observable even on the campaign backend, and the ledger says so | §0.3 |
+| FR-14.8 | `stages_metered["stage_7"]` is **true** by default | §0.3 |
+| A-03 | Measured at image level for size and time, the flag's own delta excepted | W-04 |
+| A-11 | Settled: `LLVMConfig.cmake:173` is the override | W-04 |
+| A-16 | Exercised: `circt-bmc` runs against the image's `libz3.so.4` | W-04 |
+| A-20 | Half closed: zero failures over CHIA's whole gate scope; the set equality awaits W-04b | W-04 |

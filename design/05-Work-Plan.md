@@ -35,7 +35,16 @@ version 2.0, and §2 below is written against that. The erratum is recorded, not
 ---
 
 
-> **Amendment 2026-09-14 (architect).** ADR-D-03 was superseded the same day: the user's Gemini API key works in Vertex AI express mode, so the development, test and campaign backend is CHIA's `vertex` backend (`gemini-3.8-flash` for every stage; the user ruled out `gemini-3.1-pro-preview`). **API discipline (user, 2026-09-14): the key carries a USD 300 limit; no live model call is made until tiers T0 to T2 are green with the model layer mocked and the code red team has passed; the first live call is the pilot (W-18) with its tiny budget; `budget.yaml` carries `campaign_spend_cap_usd` and the driver stops on it.** H-04 (Claude model ids in the `chia-claude-code` image) is optional. W-13 and W-23a use the `vertex` backend; the LLM worker image is `ghcr.io/ucb-bar/chia:latest`; `GEMINI_API_KEY` is set from the operator's shell at `chia up`, never in job metadata. The credential lives at `~/.config/bugloop/gemini.env` (mode 600).
+> **Amendment 2026-09-14 (architect).** ADR-D-03 was superseded the same day: the user's Gemini API key works in Vertex AI express mode, so the development, test and campaign backend is CHIA's `vertex` backend (`gemini-3.8-flash` for every stage; the user ruled out `gemini-3.1-pro-preview`). **API discipline (user, 2026-09-14): the key carries a USD 300 limit; no live model call is made until tiers T0 to T2 are green with the model layer mocked and the code red team has passed; the first live call is the pilot (W-18) with its tiny budget; `budget.yaml` carries `campaign_spend_cap_usd` and the driver stops on it.** The fold-in across the design set landed the same day: `01-FRD.md` §1.8, `02-HLD.md` §0.2, `03-LLD.md` §0, §1.4, §2.7, §3.5.1, §3.7, §3.8, §9, §11.2, §12.1, §13, §14.6, and `04-Test-Plan.md` §16.5, which added seventeen tests. **Seven consequences for this plan, each of which changes a row below.**
+>
+> 1. **W-20 moves before W-18.** The user's rule is that the code red team passes *before* the first live call, and the plan had W-18's pilot on 09-19 and W-20's red team on 09-20. W-20 now depends on **W-17** and runs on 09-19 after the join; W-18 depends on **W-20**; W-19's T3 block depends on W-18. Nothing else in the order moves and no date slips: W-20 was always a same-day task once T0 to T2 were green, and the join is what makes them green.
+> 2. **The interlock is a task step, not a habit.** `BUGLOOP_ALLOW_LIVE_MODEL=1` is exported by the operator, in their own shell, **at W-18 and not before**, beside `GEMINI_API_KEY`, and both reach the `llm` containers through `chia up`. Every task up to and including W-20 runs with it unset, which makes `generate_task.build_llm` refuse (`03-LLD.md` §3.5.1) rather than relying on anyone remembering.
+> 3. **W-01's skeleton is in the team repository, not in a CHIA fork.** `circt_bug_loop/` at the repository root with `03-LLD.md` §1.1's internal layout, `upstream/` for the CHIA-core proposals, and `upstream/sync-to-chia.sh`; the CHIA clone at `~/Projects/chia-bugloop`, branch `bugloop`, is needed only at **W-26**, the pull request. H-03's fork question therefore stops gating W-01 and gates W-26 instead.
+> 4. **The LLM worker image is `ghcr.io/ucb-bar/chia:latest`**, with no `~/.claude` mount and no Claude `run_setup_commands`; `GEMINI_API_KEY` is set from the operator's shell at `chia up` and never in job metadata; the credential lives at `~/.config/bugloop/gemini.env` (mode 600). W-16's cluster YAML is written that way from the start.
+> 5. **W-22's pre-registration commit gains one step**: re-read Google's own Vertex pricing page and rewrite `price_usd_per_m_input_tokens` and `price_usd_per_m_output_tokens` in `budget.yaml` before committing. They are aggregator-sourced and `[UNVERIFIED]`, and the commit is the registration, so a later correction invalidates the campaign (FR-14.7).
+> 6. **H-04 is optional** and no longer gates anything: it confirmed two Claude model ids inside the `chia-claude-code` image, and no Claude model id is a default anywhere in the design set now. It matters only to an operator who runs `--repair-backend claude`.
+> 7. ~~**Stage 7 keeps a second backend, and the plan says so.**~~ **Overruled later the same day by the architect's addendum to ADR-D-03** (`01-FRD.md` §1.9, `02-HLD.md` §0.3, `03-LLD.md` §3.8). CHIA's repair chain implemented `claude`, `antigravity` and `opencode` and not `vertex` (`chia:examples/circt_issue_solver/issue_task.py:81-123`), and FR-12.1 pinned that file **byte for byte**, which is the rule that has gone: FR-12.1's acceptance is now `git diff` **hunk equality**, and the loop adds one nineteen-line `elif backend == "vertex":` arm, no deletion, as `upstream/issue_task-vertex-branch.patch`. **Stage 7 therefore runs on the campaign backend**, `--repair-backend` defaults to `vertex`, and `stages_metered["stage_7"]` is true. W-14 writes the adapter against that default; **W-01 adds the patch and the sync step that applies it** to `upstream/`; W-26's pull request still carries the branch, now as a contribution the loop **applies locally** and offers upstream rather than one it merely offers. One thing does not follow and W-15 must render it: stage 7's per-turn tokens stay unobservable, `_turn`'s dispatch being remote, so the ledger writes null and `results.py` prints the USD total as a lower bound excluding stage 7 (`03-LLD.md` §15 item 9).
+
 
 ## 1. Ownership and working rules
 
@@ -112,7 +121,7 @@ recorded as done.
 | Working branch | `circt-bug-loop`, cut from upstream `main` at `16c35e92` |
 | New code | `examples/circt_bug_loop/` only, plus the four CHIA additions of `03-LLD.md` §1.2 |
 | Commit message | CHIA's own format (`chia:AGENTS.md`): `<type>(<scope>): <short summary>`, types `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`; scope is the module basename, for example `feat(contract): the seven schemas and the validator` |
-| Trailers | `Assisted-by: Claude Code:<the model id H-04 confirms>` and `Signed-off-by: <the named approver>` on every commit, with no exception, because FR-20.3 requires the trailer on filed text and a repository that carries it everywhere cannot omit it where it matters |
+| Trailers | `Assisted-by: <backend>:<model id>`, the spelling `RunManifest.model_ids` uses, and `Signed-off-by: <the named approver>` on every commit, with no exception, because FR-20.3 requires the trailer on filed text and a repository that carries it everywhere cannot omit it where it matters |
 | Force-push | Permitted on a task branch before merge. **Forbidden on `circt-bug-loop` from the pre-registration commit onward** (2026-09-20 20:00), because FR-14.2 resolves the registration by `git log -1 --format=%H%x09%cI -- budget.yaml` and a rewritten history changes the answer |
 | Upstream PR target | `ucb-bar/chia`, branch `main`, opened from `circt-bug-loop` on 2026-09-23. The three generic functions proposed for `chia/chipyard/circt.py` are separated in the pull request's file list, per `03-LLD.md` §14.6 |
 | Governance files | Untouched, per FR-19.9 and `chia:AGENTS.md` |
@@ -241,11 +250,11 @@ gating checks land before the tasks they gate.
 | Decision | Follow-up check | Owner | Date | Tasks it gates |
 |---|---|---|---|---|
 | D-08 | A-03: build FR-03.7's target set under the three flag strings; host part measured 2026-09-13 (M2); the **image** part is the first image build: `docker save` size, layer cost, per-probe cost inside the container | builder | 2026-09-15 | W-08 and every T2 test |
-| D-08 | A-20: FR-03.6's set-equality run over the whole `test/` tree; measured 2026-09-13 on the host build (M3, 1,127 discovered, 0 failed on both sides); **re-run inside the image**, where the 62 `REQUIRES: slang` tests are no longer skipped | builder | 2026-09-15 | W-14's repair adapter, whose verify gate depends on the answer |
+| D-08 | A-20: FR-03.6's set-equality run over the whole `test/` tree; measured 2026-09-13 on the host build (M3, 1,127 discovered, 0 failed on both sides); **re-run inside the image (done in W-04: 1119 pass / 0 fail over CHIA's gate scope, 2026-09-14)**, where the 62 `REQUIRES: slang` tests are no longer skipped | builder | 2026-09-15 | W-14's repair adapter, whose verify gate depends on the answer |
 | D-13 | A-03's slang half: branch (a) proven on the host 2026-09-13 (M7, 841 s at `-j8`); the image-level cost closes with the first image build | builder | 2026-09-15 | W-08's `.sv` probe path, W-13's slang-entry seeds |
 | D-09 | A-19: run FR-08.1's applicability rule over the corpus and report the count **with the rule that produced it**. Verilator's packaged version settled 2026-09-13 (M8, 5.020-1, all four flags present) and is re-recorded in the `ImageSpec` | builder | 2026-09-15 | all F-08 work; a count of zero drops the harness generators to a documented non-applicability, not to silence |
 | D-07 | A-02: read the diffs of a random sample of 30 seeds and report the precision of the 187 and 171 counts | builder | 2026-09-15 | nothing; it qualifies the corpus and belongs beside the headline as a threat to validity |
-| D-03 | The two Claude model ids: `claude --print --model claude-opus-5 -p - <<< 'reply ok'`, repeated for `claude-sonnet-5`, inside the `chia-claude-code` image with `~/.claude` mounted | **user (H-04)** | 2026-09-14 | W-10's B7 turn, W-13's A3 turns, W-14's B8 chain |
+| D-03 | **Superseded 2026-09-14.** The follow-up is no longer a Claude id probe: it is the re-read of Google's own Vertex pricing page and the rewrite of `budget.yaml`'s two price keys before W-22. ~~The two Claude model ids~~ are optional and gate nothing | builder | 2026-09-20 20:00 | **W-22** only; W-10, W-13 and W-14 are unblocked, the model id coming from `budget.yaml` |
 | D-05 | A-21: counted 2026-09-13 (M9, 487 closed and 101 open `label:bug`), so the fallback to fix-commit synthesis is not needed. What remains is sufficiency, answered by the synthesis itself | builder | 2026-09-17 | W-13's mutation arm, and the pre-registration commit, which records the frozen set's digest |
 | D-06 | A-05: the collision and false-merge rates over the twenty labelled pairs | builder | 2026-09-17 | W-23's headline, which prints both rates |
 | D-11 | No measurement. FR-12.10's acceptance is a test: kill the chain between the two writes and assert the reconciliation names the loop row | builder | 2026-09-18 | nothing |
@@ -267,11 +276,11 @@ legal day and finishes overnight.
 
 | ID | Status on 2026-09-14 | Task | Owner | Date |
 |---|---|---|---|---|
-| A-03 | Host part **measured** 2026-09-13 (M2, M7). Image part open: no assertions-on image has ever been built | **W-04**, the first image build. Wall time, layer count, `docker save` size, per-probe cost inside the container, the `-gline-tables-only` delta re-confirmed at image level | builder | **2026-09-14 21:00 start, 2026-09-15 by 12:00 reported** |
-| A-20 | **Settled on the host** (M3): 1,127 discovered, 1,058 passed, 0 failed on both builds. The 62 `REQUIRES: slang` tests were skipped there | W-04b, inside the image where slang is on: the same set-equality, with the 62 now running | builder | 2026-09-15 |
-| A-10 | **Verified** 2026-09-13 (M5) against `ghcr.io/ucb-bar/chia-circt:latest` | W-04c re-asserts it against the loop's own image: `nm -u circt-opt \| grep -c __assert_fail` must now be **non-zero**, which is the inverse assertion and the one that matters | builder | 2026-09-15 |
-| A-11 | **Inference** | W-04d: `cmake --trace-expand` on the image's configure step, recorded. Gates nothing; it explains why the SDK's `LLVMConfig.cmake` wins | builder | 2026-09-15 |
-| A-16 | **Never executed** | W-04e: `circt-bmc --run` once inside the image against the shimmed `libz3.so.4`. Gates nothing; it stops the image's z3 handling from being assumed fully exercised | builder | 2026-09-15 |
+| A-03 | **Measured at image level (size and time) 2026-09-14 by W-04, except the flag's own delta, which is pending W-04b.** 972 s of build at `-j8` over 1371 cold ninja edges, 23 layers against the base's 17, 1,912,742,097 B by `{{.Size}}`, 703,211,208 B of tool binaries, 1.7 GB build tree. Host part measured 2026-09-13 (M2, M7) | **W-04b** closes the rest, and closes it for free alongside FR-03.6: the `-gline-tables-only` size and time **delta**, which needs a second image differing only in the flag string, and a per-probe **slowdown**, W-04's 18.55 ms and 91.28 ms being in-container absolutes and not a delta | builder | **2026-09-15** |
+| A-20 | **Half closed 2026-09-14 by W-04**, and the half that closed is the one that mattered: inside the image at `eade0de6`, over CHIA's own gate scope verbatim, 1380 discovered, 253 excluded, 1127 considered, **1119 passed**, 1 Unsupported, 7 XFAIL, **0 failed**, exit 0, with **61** `REQUIRES: slang` tests moving from Unsupported to Passed and one to XFAIL. CHIA's rule now runs at all, where on the host it exited 2 with zero tests, so FR-12.8's `lit_unusable` branch is unreachable on this image. Settled on the host earlier (M3): 1,127 discovered, 1,058 passed, 0 failed on both builds, the 62 slang tests skipped | **Pending W-04b**: FR-03.6's set equality needs the `-DNDEBUG` image, and only that. Both sets are expected empty and the criterion is set equality, so an empty pair satisfies it; the run is one `docker build` with `CXX_FLAGS_RELEASE="-O3 -DNDEBUG -gline-tables-only"` plus `w04b_lit_runs.sh` inside it and a `comm` over the two sorted failing-name sets | builder | 2026-09-15 |
+| A-10 | **Closed 2026-09-14.** Verified 2026-09-13 (M5) against `ghcr.io/ucb-bar/chia-circt:latest`, and **inverted on the loop's own image** by W-04: `nm -u \| grep -c __assert_fail` is **1** for all six targets, and 536 of 555 `obj.CIRCT` objects reference it | ~~W-04c~~ done inside W-04's own acceptance run; no separate task | builder | 2026-09-14 |
+| A-11 | **Settled 2026-09-14** by reading both sides inside the built image: `CMakeCache.txt:474` holds `LLVM_ENABLE_ASSERTIONS:UNINITIALIZED=ON`, CHIA's value accepted into the cache, and `/opt/circt-sdk/lib/cmake/llvm/LLVMConfig.cmake:173` runs `set(LLVM_ENABLE_ASSERTIONS OFF)` after the cache is read, so it wins in every CIRCT target's directory scope | ~~W-04d's `cmake --trace-expand`~~ **withdrawn**: those two lines are the whole mechanism and a trace would restate them at the cost of a second configure. No task | builder | 2026-09-14 |
+| A-16 | **Exercised 2026-09-14** inside the image: `circt-bmc` with `--module`, `-b 1` and `--shared-libs=/opt/circt-sdk/lib/libCIRCTSMTToZ3LLVM.so` printed `Bound reached with no violations!` and exited 0 | ~~W-04e~~ done inside W-04's own acceptance run; no separate task. It still gates nothing | builder | 2026-09-14 |
 | A-02 | **Unverified**: subject-keyword proxy | W-05b: read the diffs of 30 randomly sampled seeds, report the precision, record the sample | builder | 2026-09-15 |
 | A-19 | **Unmeasured** | W-05c: run FR-08.1's applicability rule over the corpus; report the count **and the rule**. Scheduled before any F-08 work, as ADR-D-09 requires | builder | 2026-09-15 |
 | A-17 | **Resolved** 2026-09-13: one denominator, 3,257 | No task | n/a | 2026-09-13 |
@@ -288,6 +297,16 @@ legal day and finishes overnight.
 | A-12 | **Incomplete by construction** | No verification exists and none is invented. FR-15.3's mandatory disclosure is the whole mitigation, and W-23 renders it beside the headline; M4's 96.3% file-level and 77.0% symbol-level flag rates are reported as the screen's discrimination, not as its correctness | builder | 2026-09-21 |
 | A-14 | **No prior estimate**; zero is a possible and reportable outcome | W-23: the campaign's own count, rendered by `results.py`, which refuses to render without the zero-bug path being exercised | builder | 2026-09-21 |
 | A-07 | **Unknown** | H-06's forum post and the response to it, read continuously; the post's URL and date go into the `RunManifest`, and any objection stops filing (§13, R-10) | **user (H-06)** posts 2026-09-17; response read to 2026-09-24 09:00 | 2026-09-17 to 2026-09-24 |
+
+**W-04b, the one task this table now points at twice.** It is not an assumption and so has no row: it
+is the **second image**, built from the same Dockerfile with
+`CXX_FLAGS_RELEASE="-O3 -DNDEBUG -gline-tables-only"` and nothing else changed, plus the same two lit
+runs inside it and a `comm` over the two sorted failing-name sets. It closes **A-20's remaining half**,
+FR-03.6's set equality, and **A-03's remaining half**, the `-gline-tables-only` size and time delta
+and the per-probe slowdown, and it closes them together because both are differences between the same
+two images. Its scripts already exist beside the W-04 report as `w04b_*.sh`. Budget: about 16 minutes
+of build and about 2.5 GB of disk, on **2026-09-15**, before W-08. Until it runs, `T-U-image-06` is
+**skipped with the skip recorded** rather than reported as a pass.
 
 ---
 
@@ -367,10 +386,11 @@ Dependency order, with the parallel partner named. "Tier" is the tier that close
 
 | Task | What | Depends on | Parallel with | Tier | Date |
 |---|---|---|---|---|---|
-| W-01 | Repository skeleton in the fork: branch, `examples/circt_bug_loop/`, `pyproject.toml` with the `bugloop-approve` entry point, `.gitignore`, `env.yml`, README stub, `tests/` layout | H-01, H-03 | none | none | 09-14 |
+| W-01 | Repository skeleton **in the team repository**: `circt_bug_loop/` with `03-LLD.md` §1.1's internal layout, `pyproject.toml` with the `bugloop-approve` entry point, `.gitignore`, `env.yml`, README stub, `tests/` layout; and `upstream/` with `sync-to-chia.sh` | H-01 | none | none | 09-14 |
 | **W-02** | **The contract package 2.0**: `schema.py`, `__init__.py`, the validator, the error codes, the hand-derived malformed set, the constructed roundtrip set | W-01 | none | T0 | 09-14 |
 | **W-03** | **The freeze commit** | W-02 | none | T0 | 09-14 |
-| W-04 | `ChiaCirctAssertDockerfile` and its workflow; the first image build; A-03, A-20, A-10, A-11, A-16 | W-03, D-08, D-13 | W-05 | T2 (after) | 09-14 evening to 09-15 |
+| W-04 | `ChiaCirctAssertDockerfile` and its workflow; the first image build; A-03, A-20, A-10, A-11, A-16. **Done 2026-09-14**, report at `analysis/measurements/2026-09-14-image-build.md`; A-10, A-11 and A-16 closed, A-03 and A-20 half closed, seven deviations accepted into `03-LLD.md` §4.11 | W-03, D-08, D-13 | W-05 | T2 (after) | 09-14 evening to 09-15 |
+| **W-04b** | The **second image**, `-DNDEBUG` and nothing else changed, plus the same two lit runs and a `comm` over the two sorted failing-name sets. Closes A-20's set equality (FR-03.6) and A-03's `-gline-tables-only` delta and per-probe slowdown together. Scripts already written as `w04b_*.sh`; about 16 min and about 2.5 GB. Until it runs, `T-U-image-06` is skipped with the skip recorded | W-04 | W-05, W-06 | T2 | 09-15 |
 | W-05 | `corpus.py` (A1): the mine, the `RUN:` normalisation, `SeedRecord` with diff and test files, the `SdkMap`; A-02, A-19 | W-03 | W-04, W-06 | T0, T1 | 09-15 |
 | W-06 | `store.py` (B10a, B10b), `budget.py` (A6a), `ledger.py` (A6b) | W-03 | W-05 | T0 | 09-15 |
 | W-07 | `pin_select.py` (A2); A-09 | W-05 | W-08 | T0, T1 | 09-16 |
@@ -384,11 +404,11 @@ Dependency order, with the parallel partner named. "Tier" is the tier that close
 | W-15 | `feedback.py` (A5), `results.py` (B11) | W-06, W-08 | W-13, W-14 | T0 | 09-18 |
 | W-16 | `bug_loop.py` (B12), `cluster_single.yaml`, `bug_loop_submit.sh`, the example README | W-13, W-14, W-15 | none | T0 | 09-19 |
 | **W-17** | **The join**: the seventeen integration tests, `--record-fixtures`, then T0, T1, T2 in full | W-16 | none | T0, T1, T2 | 09-19 |
-| W-18 | A-01's five-seed generator pilot; A-08's harness acceptance if A-19 permits | W-17 | none | T2 | 09-19 |
-| W-19 | The T3 block: cluster, isolation, discovery, calibration, artefact, submit, lit control, pilot, regeneration | W-17, W-18 | none | T3 | 09-20 |
-| **W-20** | **The code red team**, fresh context, plus the disposition table and the fixes it forces | W-19 | none | T0 to T2 re-run | 09-20 |
+| W-18 | A-01's five-seed generator pilot; A-08's harness acceptance if A-19 permits. **The first live model request the project makes**: the operator exports `BUGLOOP_ALLOW_LIVE_MODEL=1` beside `GEMINI_API_KEY` here and not before, and `budget.yaml`'s spend cap is in force | **W-20** | none | T2 | 09-19 evening |
+| W-19 | The T3 block: cluster, isolation, discovery, calibration, artefact, submit, lit control, pilot, regeneration | W-18 | none | T3 | 09-20 |
+| **W-20** | **The code red team**, fresh context, plus the disposition table and the fixes it forces. **It runs before any live model call**, which is the user's rule of 2026-09-14, so it depends on the join and not on the T3 block | **W-17** | none | T0 to T2 re-run | 09-19 |
 | W-21 | A-15: the calibration-mode run over the drawn sample | W-19 | W-20 | T3 | 09-20 |
-| **W-22** | **The pre-registration commit** | W-12, W-19, W-20, W-21 | none | T0 | 09-20 20:00 |
+| **W-22** | **The pre-registration commit**, including the re-read of Google's own Vertex pricing page and the rewrite of the two price keys | W-12, W-19, W-20, W-21 | none | T0 | 09-20 20:00 |
 | W-23 | The campaign, both arms; then the results render, the reconciliation and every mandatory disclosure | W-22 | none | T3 | 09-20 21:00 to 09-21 |
 | W-24 | The live approval walkthrough and the filings, one report at a time, behind H-08 | W-23, H-06 | W-25 | none | 09-21 |
 | W-25 | The paper's results section and its results figure, from the rendered tables only | W-23 | W-24 | none | 09-21 to 09-22 |
@@ -429,16 +449,16 @@ Times are the end of the task on that date unless stated.
 
 | Date | Task | What it delivers | Tier and wall time |
 |---|---|---|---|
-| 2026-09-14 12:00 | H-01, H-03 | Design set Approved; fork URL and approver identity in hand. Nothing before this is legal under the no-code rule | none |
-| 2026-09-14 18:00 | H-04, W-01, **W-02**, **W-03** | Model ids confirmed; repository skeleton; **the contract package 2.0 written and frozen** | T0, under 90 s |
+| 2026-09-14 12:00 | H-01, H-03 | Design set Approved; approver identity in hand. The fork is needed only by W-26 (amendment item 3). Nothing before this is legal under the no-code rule | none |
+| 2026-09-14 18:00 | W-01, **W-02**, **W-03** | Repository skeleton in the team repository; **the contract package 2.0 written and frozen**. H-04 is optional and gates nothing | T0, under 130 s |
 | 2026-09-14 21:00 to 2026-09-15 12:00 | **W-04** | Environment and **the first assertions-on image build**; A-03's image cost, A-20 inside the image, A-10 inverted, A-11, A-16 | image 841 s with slang, then T2 about 45 min |
 | 2026-09-15 | W-05, W-06 | Corpus and `SeedRecord`s; A-02's precision; **A-19's applicability count**; store, budget and ledger | T0 90 s, T1 about 25 min |
 | 2026-09-16 | W-07, W-08, W-09 | Pin selector and A-09; **the apparatus probe path**, the four probe nodes, `ddmin`, the three core additions; **the five recorded real crashes and the reducer fixtures** | T0, T1, T2 |
 | 2026-09-17 | W-10, W-11, W-12 | Mirror, fingerprint, both screens, triage report; **A-05's two rates**; **the mutator synthesis run and the frozen set** | T0, T1, T2 |
 | 2026-09-17 18:00 | **H-06** | **The forum post**, three days before the campaign | none |
 | 2026-09-18 | W-13, W-14, W-15 | **Both generators and the four prompts**; repair adapter, gate, `bugloop-approve`; feedback and results | T0 90 s, T1 about 25 min |
-| 2026-09-19 | W-16, **W-17**, W-18 | Driver, cluster YAML, submit wrapper; **the join**: 17 integration tests, recorded fixtures, then T0, T1, T2 in full; `T-S-cluster-01` and `T-S-disc-01` in the evening; **A-01's five-seed pilot** | T0 90 s + T1 25 min + T2 45 min, then about 40 min of cluster |
-| 2026-09-20 09:00 to 18:00 | **W-19**, **W-20**, W-21 | **The full T3 block**, the pilot and the regeneration check; **the code red team** and its fixes; A-15's fail-to-pass rate | T3 about 2 h 30 min, then T0 to T2 re-run |
+| 2026-09-19 | W-16, **W-17**, **W-20**, W-18 | Driver, cluster YAML, submit wrapper; **the join**: 17 integration tests, recorded fixtures, then T0, T1, T2 in full, all with the model layer mocked; **then the code red team and its fixes**; **then A-01's five-seed pilot, the first live model request**, with `BUGLOOP_ALLOW_LIVE_MODEL=1` exported for the first time | T0 130 s + T1 25 min + T2 45 min, then the red team, then about 40 min of cluster |
+| 2026-09-20 09:00 to 18:00 | **W-19**, W-21 | **The full T3 block**, the pilot and the regeneration check; A-15's fail-to-pass rate. W-20's red team has already passed, on 09-19, which is what made W-18's live call legal | T3 about 2 h 30 min |
 | 2026-09-20 20:00 | **W-22** | **The pre-registration commit** | T0 |
 | 2026-09-20 21:00 to 2026-09-21 06:00 | **W-23a** | **The campaign**: seeded arm for W, then mutation arm for W, sequential, one cluster, one concurrency | 2 × W + about 1 h fixed |
 | 2026-09-21 09:00 to 18:00 | W-23b, W-24 | **The results render** and every disclosure; the live approval walkthrough; the first filings behind H-08 | none |
@@ -525,8 +545,10 @@ The ten riskiest items that remain open, drawn from the three red teams' "riskie
 tables, ordered by expected damage. Items those tables carried that have since been settled are not
 repeated: reducibility (M1, 98.9%), symbolised frames naming CIRCT paths (M2), the full lit suite
 under `-UNDEBUG` (M3), the assertion finding inside the published image (M5), the slang build (M7),
-Verilator's flags (M8), the closed-bug count (M9), and the two Claude model ids, which H-04 settles on
-the first day.
+Verilator's flags (M8) and the closed-bug count (M9). ~~and the two Claude model ids, which H-04
+settles on the first day~~ is **withdrawn** 2026-09-14: no Claude model id is a default anywhere, and
+what is unverified instead is the pair of Vertex prices, which W-22 re-reads from Google's own page
+before the pre-registration commit.
 
 | ID | Risk | Source | Trigger | Mitigation | Resolve by |
 |---|---|---|---|---|---|
@@ -610,8 +632,8 @@ Six of the ten are on or before 2026-09-17.
 |---|---|---|---|
 | **H-01** | Approve `01-FRD.md` through `05-Work-Plan.md`, moving each to Approved | **2026-09-14 12:00** | **Everything.** The no-code rule permits no implementation before it |
 | **H-02** | Confirm the A³ HotCRP abstract registration is lodged | 2026-09-15 12:00, against a hard deadline of 2026-09-15 17:29 (2026-09-14 AoE) | The optional second venue only |
-| **H-03** | Create the fork of `ucb-bar/chia`, supply its URL, and name the approver whose identity goes in every `Signed-off-by:` and every `FilingRecord` | **2026-09-14 12:00** | W-01, and therefore the whole build |
-| **H-04** | Confirm the two model ids inside the `chia-claude-code` image: `claude --print --model claude-opus-5 -p - <<< 'reply ok'`, repeated for `claude-sonnet-5`, with `~/.claude` mounted. It consumes the user's subscription, which is why it is a human action | **2026-09-14 18:00** | W-10's B7 turn, W-13's A3 turns, W-14's B8 chain, that is every agent stage |
+| **H-03** | Name the approver whose identity goes in every `Signed-off-by:` and every `FilingRecord`, and, **by W-26 rather than by W-01** (amendment 2026-09-14, item 3), create the fork of `ucb-bar/chia` and supply its URL: the loop is built in the team repository and needs no fork until the pull request | **2026-09-14 12:00** for the approver; **2026-09-23** for the fork | the approver gates W-01; the fork gates W-26 |
+| ~~**H-04**~~ **Optional from 2026-09-14** | ~~Confirm the two model ids inside the `chia-claude-code` image~~. The backend is `vertex` and no Claude model id is a default anywhere, so nothing waits on it. It matters only to an operator who runs `--repair-backend claude`. **What replaces it is not a human action**: the operator exports `GEMINI_API_KEY` and, at W-18 and not before, `BUGLOOP_ALLOW_LIVE_MODEL=1` | none | nothing |
 | **H-05** | Place a **read-only** `GITHUB_TOKEN` in one file on the head machine, mode 0600, outside the repository. No write scope anywhere, per NFR-07 | **2026-09-16 12:00** | W-10's issue-mirror test, and through it W-12's synthesis and the pre-registration commit |
 | **H-06** | **Post the method to CIRCT's forum**, §8's nine points, and return the URL and date | **2026-09-17 18:00** | The campaign start (FR-20.1) and the first filing |
 | **H-07** | The GCP hand-over decision: supply the project and credits, or say GCP is dropped. Trigger already met by `T-S-disc-01` green on 2026-09-19 | 2026-09-20 09:00, latest useful 2026-09-22 18:00 | The NFR-10 Should only. §12 drops it first |

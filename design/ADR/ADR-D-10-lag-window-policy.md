@@ -41,3 +41,5 @@ FR-18.8 already commits to a confirmation cut-off date.
 ## Follow-up measurements
 
 None. F-02 measures the lag on every run into the `RunManifest`, so there is no separate task.
+
+**First application (2026-09-14).** `origin/main` HEAD `eab8d182` (2026-09-12) carries LLVM pin `e297b52e`, which has no `firtool-*` release. The selector chose the newest commit whose pin has one: `eade0de61bc5a0d2ba1b9da951b69efcab19f8ce` (2026-09-07), pin `62797005`, tags `firtool-1.159.0` / `1.158.0` / `1.157.0`; lag 8 first-parent commits, 4.807 days, recorded for the manifest. Option (c) behaved as specified.

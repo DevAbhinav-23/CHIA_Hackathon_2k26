@@ -1,0 +1,28 @@
+--- a/examples/circt_issue_solver/issue_task.py
++++ b/examples/circt_issue_solver/issue_task.py
+@@ -114,6 +114,25 @@
+                 timeout_seconds=cfg["timeouts"][phase],
+                 additional_providers=[gemini], config=perms,
+             )
++        elif backend == "vertex":
++            # chia.models.vertex: Gemini on Vertex AI in EXPRESS mode, which takes
++            # an API key and NO project and NO location. The constructor defaults
++            # location to "us-central1" and project to $GOOGLE_CLOUD_PROJECT, and
++            # google-genai raises ValueError("Project/location and API key are
++            # mutually exclusive in the client initializer.") on that pair, so
++            # both are nulled after construction. http_options.timeout is in
++            # MILLISECONDS and is the only thing that bounds the request:
++            # VertexGeminiLLM stores timeout_seconds and never reads it again.
++            from chia.models.vertex import VertexGeminiLLM
++            llm = VertexGeminiLLM(
++                model=cfg["model"], system_message=cfg["system_prompt"],
++                timeout_seconds=cfg["timeouts"][phase],
++                client_kwargs={"api_key": os.environ["GEMINI_API_KEY"],
++                               "http_options": {
++                                   "timeout": cfg["timeouts"][phase] * 1000}},
++            )
++            llm.project = None
++            llm.location = None
+         else:
+             llm = ClaudeCodeLLM(
+                 model=cfg["model"], system_message=cfg["system_prompt"],
