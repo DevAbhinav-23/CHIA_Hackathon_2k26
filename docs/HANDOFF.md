@@ -95,3 +95,9 @@ Run SDK binaries with: `export LD_LIBRARY_PATH=~/.cache/chia-pin-smoke/circt-sdk
 ## Source of truth (from 2026-09-14 sign-off)
 
 All five design documents are **Approved** (`design/00-README.md` sign-off record). From this point the team repository `~/Projects/CHIA_Hackathon_2k26` is the single source of truth for `design/`, `docs/`, `analysis/`, `paper/`, `upstream/` and the loop code in `circt_bug_loop/`; `~/Projects/chia-hackathon` is a frozen working copy and is not edited further. This file continues as `docs/HANDOFF.md` in the repository.
+
+## Phase 2 (implementation) started 2026-09-14
+
+- W-01/W-02 (contract package 2.0 + tier-0 tests) and W-09 (five real crash fixtures via host builds at seed parent commits) running as Opus agents in this repo; the architect verifies (`pytest -m t0`) and pushes.
+- Disk: `/` (docker data-root) has ~11 GB free after pruning; images stay on `/`, host builds and artefacts on `/home` (463 GB free). Ask the user to move docker's data-root to `/home` (daemon.json `data-root`) before the campaign if more images are needed.
+- Live-call rule in force: `BUGLOOP_ALLOW_LIVE_MODEL` unset everywhere until W-20 (code red team) passes; first live call = W-18 pilot.
