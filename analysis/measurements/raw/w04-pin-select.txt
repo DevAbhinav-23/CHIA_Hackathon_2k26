@@ -1,0 +1,29 @@
+HEAD          eab8d18294469806fa48998f44da5c96eafe1d1b  2026-09-12T11:30:30+00:00  pin=e297b52ec9d8b5c38042e53ae5650922717970cd
+HEAD pin has release: False
+
+CHOSEN commit eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+  date        2026-09-07T16:08:17+00:00
+  subject     [HW] Preserve attributes in PortConverter (#11082)
+  llvm pin    6279700538792da0c5a08e17babfe9b6e824c69f
+  tags sharing pin (newest first): ['firtool-1.159.0', 'firtool-1.158.0', 'firtool-1.157.0']
+  CIRCT_VER   firtool-1.159.0   (tag date 2026-09-07T16:08:17+00:00)
+  lag_commits 8
+  lag_days    4.807
+
+verification, both ls-tree:
+  commit: 160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f	llvm
+  tag   : 160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f	llvm
+
+first 12 first-parent commits, pin and whether tagged:
+  eab8d1829446 2026-09-12 pin=e297b52ec9d8 tagged=False
+  b792c772819d 2026-09-11 pin=e297b52ec9d8 tagged=False
+  d7e94049bde3 2026-09-11 pin=e297b52ec9d8 tagged=False
+  bad3f7bb565c 2026-09-11 pin=e297b52ec9d8 tagged=False
+  9b7d63b4cde4 2026-09-10 pin=e297b52ec9d8 tagged=False
+  9de24b873409 2026-09-09 pin=e297b52ec9d8 tagged=False
+  97ac568f5058 2026-09-09 pin=e297b52ec9d8 tagged=False
+  ddb3d1bd4317 2026-09-08 pin=e297b52ec9d8 tagged=False
+  eade0de61bc5 2026-09-07 pin=627970053879 tagged=True
+  e7f97d48cfd1 2026-09-04 pin=627970053879 tagged=True
+  4e3e8eed2e5b 2026-09-03 pin=627970053879 tagged=True
+  f1a41b921d8d 2026-09-03 pin=627970053879 tagged=True

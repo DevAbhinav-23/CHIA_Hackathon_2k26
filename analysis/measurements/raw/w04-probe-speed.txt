@@ -1,0 +1,9 @@
+input: 4003 lines
+circt-opt --version, best of 15:                        18.551 ms
+4000 comb ops, --canonicalize --cse, best of 9:         91.275 ms
+
+FR-07.4: does a symbolised frame name a CIRCT source file and line?
+addr=0x00000000034fe940
+circt::chooseName(llvm::StringRef, llvm::StringRef)
+/workspace/circt/lib/Support/Naming.cpp:47:0
+

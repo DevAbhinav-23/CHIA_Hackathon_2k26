@@ -1,0 +1,322 @@
+
+### IMAGE IDENTITY
+$ bash -c echo "BUGLOOP_CIRCT_SHA=$BUGLOOP_CIRCT_SHA"; echo "BUGLOOP_CIRCT_VER=$BUGLOOP_CIRCT_VER"; echo "BUGLOOP_TOOL_TARGETS=$BUGLOOP_TOOL_TARGETS"; echo "BUGLOOP_CXX_FLAGS_RELEASE=$BUGLOOP_CXX_FLAGS_RELEASE"; echo "BUGLOOP_SLANG=$BUGLOOP_SLANG"
+BUGLOOP_CIRCT_SHA=eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+BUGLOOP_CIRCT_VER=firtool-1.159.0
+BUGLOOP_TOOL_TARGETS=circt-opt firtool circt-translate arcilator circt-reduce circt-verilog
+BUGLOOP_CXX_FLAGS_RELEASE=-O3 -UNDEBUG -gline-tables-only
+BUGLOOP_SLANG=ON
+[rc=0]
+
+### FR-03.1  source commit, fetched by SHA
+$ git -C /workspace/circt rev-parse HEAD
+eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+[rc=0]
+$ git -C /workspace/circt log -1 --format=%H %cI %s
+eade0de61bc5a0d2ba1b9da951b69efcab19f8ce 2026-09-08T00:08:17+08:00 [HW] Preserve attributes in PortConverter (#11082)
+[rc=0]
+
+### FR-03.2  pin equality, re-derived inside the image
+$ bash -c git -C /workspace/circt ls-tree $BUGLOOP_CIRCT_SHA llvm
+160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f	llvm
+[rc=0]
+$ bash -c git -C /workspace/circt ls-tree $BUGLOOP_CIRCT_VER llvm
+160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f	llvm
+[rc=0]
+$ bash -c test "$(git -C /workspace/circt ls-tree $BUGLOOP_CIRCT_SHA llvm | awk "{print \$3}")" = "$(git -C /workspace/circt ls-tree $BUGLOOP_CIRCT_VER llvm | awk "{print \$3}")" && echo EQUAL || echo DIFFERENT
+EQUAL
+[rc=0]
+--- negative control: the same check against a tag with a different pin
+$ bash -c git -C /workspace/circt fetch -q --depth 1 origin tag firtool-1.156.0 2>/dev/null; git -C /workspace/circt ls-tree firtool-1.156.0 llvm; test "$(git -C /workspace/circt ls-tree $BUGLOOP_CIRCT_SHA llvm | awk "{print \$3}")" = "$(git -C /workspace/circt ls-tree firtool-1.156.0 llvm | awk "{print \$3}")"
+160000 commit 44a65223cc4ba384d231f33aa9121c3fef37d435	llvm
+[rc=1]
+
+### FR-03.3  CHIA's SDK strip retained
+$ bash -c ls -d /opt/circt-sdk/include/circt 2>&1; ls -d /opt/circt-sdk/lib/cmake/circt 2>&1; test ! -e /opt/circt-sdk/include/circt && test ! -e /opt/circt-sdk/lib/cmake/circt && echo "BOTH ABSENT"
+ls: cannot access '/opt/circt-sdk/include/circt': No such file or directory
+ls: cannot access '/opt/circt-sdk/lib/cmake/circt': No such file or directory
+BOTH ABSENT
+[rc=0]
+
+### FR-03.4  the flag string
+$ bash -c grep -E "^CMAKE_(CXX|C)_FLAGS_RELEASE:" /workspace/circt/build/CMakeCache.txt
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -UNDEBUG -gline-tables-only
+CMAKE_C_FLAGS_RELEASE:STRING=-O3 -UNDEBUG -gline-tables-only
+[rc=0]
+$ bash -c grep -c -- -DNDEBUG /workspace/circt/build/compile_commands.json
+0
+[rc=1]
+$ bash -c grep -c -- -UNDEBUG /workspace/circt/build/compile_commands.json
+778
+[rc=0]
+$ bash -c python3 -c "import json,sys; print(len(json.load(open(\"/workspace/circt/build/compile_commands.json\"))))" 2>/dev/null || grep -c "\"command\"" /workspace/circt/build/compile_commands.json
+778
+[rc=0]
+$ bash -c readelf -S /workspace/circt/build/bin/circt-opt | grep -c debug_line
+2
+[rc=0]
+$ bash -c readelf -S /workspace/circt/build/bin/circt-opt | grep -oE "\.debug[a-z_]*" | sort -u | tr "\n" " "
+.debug_abbrev .debug_addr .debug_info .debug_line .debug_line_str .debug_rnglists .debug_str .debug_str_o [rc=0]
+
+### FR-03.5  assertions in the binaries
+$ bash -c for t in $BUGLOOP_TOOL_TARGETS; do printf "%-18s %s\n" "$t" "$(nm -u /workspace/circt/build/bin/$t | grep -c __assert_fail)"; done
+circt-opt          1
+firtool            1
+circt-translate    1
+arcilator          1
+circt-reduce       1
+circt-verilog      1
+[rc=0]
+--- obj.CIRCT objects that do NOT reference __assert_fail
+$ bash -c 
+tot=0; non=0; : > /tmp/nonref.txt
+while read -r o; do
+  tot=$((tot+1))
+  if ! nm --undefined-only "$o" 2>/dev/null | grep -q __assert_fail; then
+    non=$((non+1)); echo "$o" >> /tmp/nonref.txt
+  fi
+done < <(find /workspace/circt/build -path "*obj.CIRCT*.dir*" -name "*.o" | sort)
+echo "obj.CIRCT objects total=$tot  referencing=$((tot-non))  NOT referencing=$non"
+sed "s#^/workspace/circt/build/##" /tmp/nonref.txt
+obj.CIRCT objects total=555  referencing=536  NOT referencing=19
+lib/Dialect/Debug/CMakeFiles/obj.CIRCTDebug.dir/DebugDialect.cpp.o
+lib/Dialect/Emit/CMakeFiles/obj.CIRCTEmit.dir/EmitOpInterfaces.cpp.o
+lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaPassPipelines.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGAttrInterfaces.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyAttrInterfaces.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyOpInterfaces.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyTypeInterfaces.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGOpInterfaces.cpp.o
+lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGTypeInterfaces.cpp.o
+lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqOpInterfaces.cpp.o
+lib/Dialect/Synth/CMakeFiles/obj.CIRCTSynth.dir/SynthOpInterfaces.cpp.o
+lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCOpInterfaces.cpp.o
+lib/Dialect/Verif/CMakeFiles/obj.CIRCTVerif.dir/VerifOpInterfaces.cpp.o
+lib/Support/CMakeFiles/obj.CIRCTSupport.dir/APInt.cpp.o
+lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Debug.cpp.o
+lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Passes.cpp.o
+lib/Support/CMakeFiles/obj.CIRCTSupport.dir/ProceduralRegionTrait.cpp.o
+lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Version.cpp.o
+lib/Tools/arcilator/CMakeFiles/obj.CIRCTArcilator.dir/pipelines.cpp.o
+[rc=0]
+
+### FR-03.7  every target exists and runs --version
+$ bash -c for t in $BUGLOOP_TOOL_TARGETS; do printf "== %s\n" "$t"; ls -l /workspace/circt/build/bin/$t >/dev/null 2>&1 && /workspace/circt/build/bin/$t --version 2>&1 | head -4 || echo "MISSING"; done
+== circt-opt
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+== firtool
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+== circt-translate
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+== arcilator
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+== circt-reduce
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+== circt-verilog
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+[rc=0]
+
+### FR-03.8  lit, libz3, Verilator; lit installed exactly once
+$ bash -c command -v lit; lit --version
+/home/ray/anaconda3/envs/py_worker/bin/lit
+lit 23.1.1
+[rc=0]
+$ ls -l /home/ray/anaconda3/envs/py_worker/bin/lit
+-rwxr-xr-x 1 root root 237 Sep 13 19:30 /home/ray/anaconda3/envs/py_worker/bin/lit
+[rc=0]
+$ bash -c verilator --version
+Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+[rc=0]
+$ bash -c /workspace/circt/build/bin/arcilator --version | head -3
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+[rc=0]
+$ bash -c ldd /opt/circt-sdk/bin/circt-opt | grep z3
+	libz3.so.4 => /lib/x86_64-linux-gnu/libz3.so.4 (0x00007f43d9835000)
+[rc=0]
+$ bash -c /home/ray/anaconda3/envs/py_worker/bin/pip install lit 2>&1 | tail -3
+
+[notice] A new release of pip is available: 23.0.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[rc=0]
+
+### FR-03.9  CHIA compatibility
+$ bash -c python --version; python -c "import sys; print(sys.executable)"
+Python 3.10.19
+/home/ray/anaconda3/envs/py_worker/bin/python
+[rc=0]
+$ bash -c python -c "import ray; print(ray.__version__)"
+2.54.0
+[rc=0]
+$ bash -c python -c "import chia; print(chia.__file__)" 2>&1 | tail -1
+None
+[rc=0]
+$ bash -c echo $SHELL; readlink -f /bin/sh; bash --version | head -1
+/bin/bash
+/usr/bin/dash
+GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)
+[rc=0]
+$ bash -c ssh -V
+OpenSSH_9.6p1 Ubuntu-3ubuntu13.19, OpenSSL 3.0.13 30 Jan 2024
+[rc=0]
+$ bash -c rsync --version | head -1
+rsync  version 3.2.7  protocol version 31
+[rc=0]
+
+### FR-03.11  version string after -UNDEBUG
+$ bash -c /workspace/circt/build/bin/circt-opt --version
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+[rc=0]
+
+### FR-03.12  MLIR/LLVM assertions stay off
+$ bash -c grep -n "LLVM_ENABLE_ABI_BREAKING_CHECKS" /opt/circt-sdk/include/llvm/Config/abi-breaking.h
+19:#define LLVM_ENABLE_ABI_BREAKING_CHECKS 0
+60:#pragma detect_mismatch("LLVM_ENABLE_ABI_BREAKING_CHECKS", LLVM_XSTR(LLVM_ENABLE_ABI_BREAKING_CHECKS))
+74:#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+[rc=0]
+$ bash -c grep -n "LLVM_ENABLE_ASSERTIONS" /opt/circt-sdk/lib/cmake/llvm/LLVMConfig.cmake | head -3
+173:set(LLVM_ENABLE_ASSERTIONS OFF)
+[rc=0]
+
+### FR-03.14  both slang entry points
+$ bash -c /workspace/circt/build/bin/circt-verilog --version
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT eade0de
+slang version 11.0.385+44dc55f99
+[rc=0]
+$ bash -c /workspace/circt/build/bin/circt-translate --help 2>&1 | grep -c import-verilog
+1
+[rc=0]
+$ bash -c /workspace/circt/build/bin/circt-translate --help 2>&1 | grep -i import-verilog
+      --import-verilog                                    - import Verilog or SystemVerilog
+[rc=0]
+$ bash -c grep -E "^CIRCT_SLANG" /workspace/circt/build/CMakeCache.txt
+CIRCT_SLANG_BUILD_FROM_SOURCE:BOOL=ON
+CIRCT_SLANG_FRONTEND_ENABLED:BOOL=ON
+[rc=0]
+
+### FR-03.15  Verilator version, one for the campaign
+$ bash -c verilator --version
+Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+[rc=0]
+$ bash -c verilator --help 2>&1 | grep -E -- "--x-initial|--x-assign" | head -4
+    --x-assign <mode>           Assign non-initial Xs to this value
+    --x-initial <mode>          Assign initial Xs to this value
+    --x-initial-edge            Enable initial X->0 and X->1 edge triggers
+[rc=0]
+
+### FR-03.16  SHA-256 of every published tool binary
+$ bash -c for t in $BUGLOOP_TOOL_TARGETS; do sha256sum /workspace/circt/build/bin/$t; done
+dcb9599a27a063a1d604873bb20daae29a0a1960a145073973b56b496b51d042  /workspace/circt/build/bin/circt-opt
+9ca9b3ba0138fe08bd9a8e49063a5aa05aa7790a088394d89e10979064b149b9  /workspace/circt/build/bin/firtool
+f59b0f93b30b281e045ecff833c6d6b5868edbc69b0ae339b68b8e0e1acdf685  /workspace/circt/build/bin/circt-translate
+96a4144e3709cf1a7ee40c04c7d37da13da1596513cf564510077cbf9a828053  /workspace/circt/build/bin/arcilator
+4c8d44794a9c0b6ffaf3d3d7b64a6a2738a203f29ae2c8a81a6d7ea8b79f082a  /workspace/circt/build/bin/circt-reduce
+53c3cbd5d41f4f92cd23133d5cb7dfb1a5362cce424b130ea2ddc58ad78487d2  /workspace/circt/build/bin/circt-verilog
+[rc=0]
+$ bash -c sha256sum /opt/circt-sdk/bin/llvm-symbolizer /usr/bin/verilator
+6ab1a7f8de1bf87cf4ae97fa86435e90eed3aebbb9f9eed686fb4c5e992629a4  /opt/circt-sdk/bin/llvm-symbolizer
+4c6292ab82e57b7f34ab26dbae86ba9c494bacfb088b6ff34be93c553d1301b1  /usr/bin/verilator
+[rc=0]
+
+### FR-03.17  MLIR_SOURCE_DIR and lit discovery
+$ bash -c grep mlir_src_root /workspace/circt/build/test/lit.site.cfg.py
+config.mlir_src_root = "/opt/circt-sdk"
+[rc=0]
+$ bash -c cd /workspace/circt/build && lit --no-progress-bar --show-tests /workspace/circt/build/test > /tmp/lit-show-tests.txt 2>&1; echo "rc=$?"; echo "discovered=$(grep -c "^    " /tmp/lit-show-tests.txt)"; echo "parse-errors=$(grep -c "unable to parse config file" /tmp/lit-show-tests.txt)"; grep -c "Tools/circt-tblgen" /tmp/lit-show-tests.txt
+rc=0
+discovered=0
+parse-errors=0
+253
+[rc=0]
+$ bash -c head -3 /tmp/lit-show-tests.txt; grep "Tools/circt-tblgen" /tmp/lit-show-tests.txt | head -2
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-synth-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-ir-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-om-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+  CIRCT :: Tools/circt-tblgen/rtg-instruction-list.td
+  CIRCT :: Tools/circt-tblgen/rtg-instruction-methods-errors.td
+[rc=0]
+
+### OTHER TOOLING
+$ bash -c prlimit --version
+prlimit from util-linux 2.39.3
+[rc=0]
+$ bash -c /opt/circt-sdk/bin/llvm-symbolizer --version | head -2
+llvm-symbolizer
+LLVM (http://llvm.org/):
+[rc=0]
+$ bash -c command -v FileCheck not count split-file
+/opt/circt-sdk/bin/FileCheck
+/opt/circt-sdk/bin/not
+/opt/circt-sdk/bin/count
+/opt/circt-sdk/bin/split-file
+[rc=0]
+$ bash -c clang --version | head -1; ninja --version; cmake --version | head -1; git --version
+Ubuntu clang version 18.1.3 (1ubuntu1)
+1.11.1
+cmake version 3.28.3
+git version 2.43.0
+[rc=0]
+$ bash -c du -sh /workspace/circt/build; du -sh /opt/circt-sdk; du -sb /workspace/circt/build/bin/* | sort -k2
+1.7G	/workspace/circt/build
+661M	/opt/circt-sdk
+50517536	/workspace/circt/build/bin/arcilator
+11012	/workspace/circt/build/bin/arcilator-header-cpp.py
+4522	/workspace/circt/build/bin/arcilator-runtime.h
+6025	/workspace/circt/build/bin/circt-cocotb-driver.py
+217251208	/workspace/circt/build/bin/circt-opt
+132128112	/workspace/circt/build/bin/circt-reduce
+10536	/workspace/circt/build/bin/circt-rtl-sim.py
+832992	/workspace/circt/build/bin/circt-tblgen
+130715592	/workspace/circt/build/bin/circt-translate
+75559336	/workspace/circt/build/bin/circt-verilog
+97039424	/workspace/circt/build/bin/firtool
+862	/workspace/circt/build/bin/py-split-input-file.py
+[rc=0]
+
+### A-11  why -DLLVM_ENABLE_ASSERTIONS=ON is ineffective
+$ bash -c grep -n "LLVM_ENABLE_ASSERTIONS" /opt/circt-sdk/lib/cmake/llvm/LLVMConfig.cmake
+173:set(LLVM_ENABLE_ASSERTIONS OFF)
+[rc=0]
+$ bash -c grep -n "^LLVM_ENABLE_ASSERTIONS" /workspace/circt/build/CMakeCache.txt
+474:LLVM_ENABLE_ASSERTIONS:UNINITIALIZED=ON
+[rc=0]
+$ bash -c grep -rn "LLVM_ENABLE_ABI_BREAKING_CHECKS" /opt/circt-sdk/include/llvm/Config/abi-breaking.h
+19:#define LLVM_ENABLE_ABI_BREAKING_CHECKS 0
+60:#pragma detect_mismatch("LLVM_ENABLE_ABI_BREAKING_CHECKS", LLVM_XSTR(LLVM_ENABLE_ABI_BREAKING_CHECKS))
+74:#if LLVM_ENABLE_ABI_BREAKING_CHECKS
+[rc=0]
+
+### A-16  the SDK's z3 path, exercised once
+$ bash -c ls -l /opt/circt-sdk/bin/circt-bmc 2>&1
+-rwxr-xr-x 1 1001 1001 103632 Sep  9 23:42 /opt/circt-sdk/bin/circt-bmc
+[rc=0]
+$ bash -c printf "hw.module @t(in %%a : i1, out o : i1) { hw.output %%a : i1 }\n" > /tmp/bmc.mlir; /opt/circt-sdk/bin/circt-bmc /tmp/bmc.mlir --module=t -b 1 --shared-libs=/opt/circt-sdk/lib/libCIRCTSMTToZ3LLVM.so 2>&1 | head -10
+/tmp/bmc.mlir:0:0: warning: no property provided to check in module - will trivially find no violations.
+Bound reached with no violations!
+[rc=0]
+Requirement already satisfied: lit in /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages (23.1.1)
+
+[notice] A new release of pip is available: 23.0.1 -> 26.2.1
