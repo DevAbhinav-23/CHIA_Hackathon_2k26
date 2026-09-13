@@ -47,3 +47,12 @@ Each row: task, what the code does that the design did not say or said different
 
 ## W-02/W-03 contract (2026-09-14)
 Recorded directly in LLD §16 and test plan §16.7.
+
+## W-09 crash fixtures (2026-09-14): real-output findings, architect's decisions
+| # | Finding | Decision | Owed to |
+|---|---|---|---|
+| 1 | §3.7.1 step 2 cuts at the first depth-zero `(`, so `(anonymous namespace)::X::f` normalises to `""` and is skipped; every trace loses a frame; `fatal_error` fingerprints collapse to `main` | Strip a leading `(anonymous namespace)::` (and any `(anonymous namespace)::` segment) before the cut; keep the qualified name | 03 §3.7.1; probe_task `_normalise_function` |
+| 2 | §3.6.2 step 4 `out_of_scope_root` reads only the first `#n` line of frames sharing one address (inlined chain); 3 of 4 mined bugs wrongly out of scope | Frames sharing an address form one group; the group is in scope if any member resolves to a CIRCT source file; the fingerprint frame is the group's deepest CIRCT member | 03 §3.6.2; probe_task `out_of_scope_root` |
+| 3 | `strip_probe_only_options` only knows `--verify-diagnostics`/`--split-input-file`; CIRCT tests also write the single-dash forms, which survive into probe argv | Accept both dash spellings (bare and `=`-valued) | 03 §3.3/§4.2; corpus.py |
+| 4 | Fixture root is `tests/fixtures/crashes/` (brief and crash_01); plan §5.2/§13 and T-E-input-02 say `fixtures/oracle/<class>_<nn>/` | Keep `crashes/`; amend the plan | 04 §5.2, §13 |
+| 5 | Six fixtures (crash_01, assertion_01..04, fatal_error_01), two SDK tags (1.143.0, 1.156.0); `_ASSERT_UNREACHABLE` still unexercised on real output; calibration-mode build costs measured: 14 s to 601 s per parent build | 01 A-01 note; 05 |
