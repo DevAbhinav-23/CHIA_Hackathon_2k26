@@ -1,0 +1,16 @@
+{
+ "class": "assertion",
+ "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+ "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+ "fingerprint_frame": "main circt-opt.cpp",
+ "prologue_dropped": 9,
+ "top_frames": [
+  "createZeroValue",
+  "",
+  "_M_reset",
+  "~_Optional_payload",
+  "~_Optional_base"
+ ],
+ "exit_status": null,
+ "signal": "SIGABRT"
+}

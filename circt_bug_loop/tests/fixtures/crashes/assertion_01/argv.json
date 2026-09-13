@@ -1,0 +1,5 @@
+[
+ "circt-opt",
+ "input.mlir",
+ "--convert-moore-to-core"
+]

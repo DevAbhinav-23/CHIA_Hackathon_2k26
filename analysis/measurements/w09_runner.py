@@ -1,54 +1,42 @@
 #!/usr/bin/env python3
-"""W-09 attempt runner: normalise one lit RUN: line (03-LLD.md 3.3 steps 0-6 and
-4.4's strip_probe_only_options), split the input on '// -----' when
---split-input-file was present, and run each piece under prlimit+timeout.
+"""W-09 attempt runner: normalise one lit RUN: line with the flow's OWN
+`corpus.normalise_run_line` and `corpus.strip_probe_only_options` (03-LLD.md 3.3
+steps 0-6 and 4.4), split the input on '// -----' when --split-input-file was
+present, and run each piece under prlimit+timeout.
 
 usage: w09_runner.py --input <mlir> --bin <build>/bin --sdk <sdk> --out <dir>
                      [--runline <file with the verbatim RUN: body>] [--tag label]
+                     [--repo <repository root>]
 
 With no --runline the first `RUN:` line of the input file is used, which is the
 seed's own test's first RUN line (04-Test-Plan.md 5.1 step 3).
+
+`corpus.py` imports `chia.base.ChiaFunction` at module scope and `chia` pulls in
+Ray, neither of which is installed on the mining host.  A stub decorator is put
+in `sys.modules` before the import, which is exactly what the flow's own
+`tests/test_store.py:193-195` does for the same reason; `normalise_run_line` and
+`strip_probe_only_options` are plain functions and neither is decorated, so the
+stub changes nothing about what is being exercised.
 """
-import argparse, json, os, re, shlex, subprocess, sys, time
+import argparse, json, os, re, subprocess, sys, time, types
 
-PROBE_ONLY = ("--verify-diagnostics", "-verify-diagnostics",
-              "--split-input-file", "-split-input-file")
+#: Repository root, so the mined fixtures come out of the committed normaliser.
+REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", ".."))
 
 
-def normalise(line):
-    notes = {}
-    toks = shlex.split(line)
-    polarity = "expect_zero"
-    if toks and toks[0] == "not":
-        toks = toks[1:]
-        polarity = "expect_nonzero"
-        if toks and toks[0] == "--crash":
-            toks = toks[1:]
-            notes["not_crash"] = True
-    env = {}
-    if toks and toks[0] == "env":
-        toks = toks[1:]
-        while toks and "=" in toks[0] and not toks[0].startswith("-"):
-            k, v = toks[0].split("=", 1)
-            env[k] = v
-            toks = toks[1:]
-    shape = "plain"
-    if toks and toks[0] == "split-file":
-        shape = "split_file"
-    # step 4: drop from the first unquoted '|' onwards.  shlex already removed
-    # quoting, so a bare '|' token is the unquoted pipe.
-    if "|" in toks:
-        i = toks.index("|")
-        notes["dropped_tail"] = " ".join(toks[i:])
-        toks = toks[:i]
-    stripped = [t for t in toks if t in PROBE_ONLY or
-                any(t.startswith(p + "=") for p in PROBE_ONLY)]
-    toks = [t for t in toks if t not in stripped]
-    notes["stripped_probe_only"] = stripped
-    notes["polarity"] = polarity
-    notes["shape"] = shape
-    notes["env"] = env
-    return toks[0], toks[1:], notes
+def _load_corpus(repo):
+    for name, mod in (("chia", types.ModuleType("chia")),
+                      ("chia.base", types.ModuleType("chia.base")),
+                      ("chia.base.ChiaFunction",
+                       types.ModuleType("chia.base.ChiaFunction"))):
+        sys.modules.setdefault(name, mod)
+    sys.modules["chia.base.ChiaFunction"].ChiaFunction = \
+        lambda *a, **k: (lambda fn: fn)
+    if repo not in sys.path:
+        sys.path.insert(0, repo)
+    from circt_bug_loop import corpus
+    return corpus
 
 
 def main():
@@ -59,7 +47,9 @@ def main():
     ap.add_argument("--sdk", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--tag", default="run")
+    ap.add_argument("--repo", default=REPO)
     a = ap.parse_args()
+    corpus = _load_corpus(a.repo)
     os.makedirs(a.out, exist_ok=True)
     text = open(a.input, errors="backslashreplace").read()
     if a.runline:
@@ -69,10 +59,19 @@ def main():
         if not m:
             sys.exit(f"no RUN: line in {a.input}")
         line = m.group(1).strip()
-    tool, argv, notes = normalise(line)
 
-    did_split = any(t.startswith("--split-input-file") or t.startswith("-split-input-file")
-                    for t in notes["stripped_probe_only"])
+    # The template pass, with no bindings: it fixes the tool, the shape and the
+    # probe-only tokens, and its argv still carries lit's own `%s`.
+    tool, argv, polarity, shape, env_line, notes = corpus.normalise_run_line(line)
+    argv, stripped = corpus.strip_probe_only_options(argv)
+    if shape != "plain":
+        sys.exit(f"unsupported RUN: shape {shape!r} ({notes['unsupported_construct']})")
+    notes = dict(notes, polarity=polarity, shape=shape, env=env_line,
+                 stripped_probe_only=stripped,
+                 survived_single_dash=[t for t in argv if t in
+                                       ("-verify-diagnostics", "-split-input-file")])
+
+    did_split = any(t.startswith("--split-input-file") for t in stripped)
     pieces = text.split("\n// -----\n") if did_split else [text]
     if did_split and len(pieces) == 1:
         pieces = text.split("// -----")
@@ -80,14 +79,20 @@ def main():
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = (os.path.join(a.sdk, "lib") + ":" +
                               os.path.expanduser("~/.cache/chia-pin-smoke/shim"))
-    env.update(notes["env"])
+    env.update(env_line)
     results = []
     for n, piece in enumerate(pieces):
         pdir = os.path.join(a.out, f"{a.tag}-p{n:02d}")
         os.makedirs(pdir, exist_ok=True)
         ipath = os.path.join(pdir, "input" + os.path.splitext(a.input)[1])
         open(ipath, "w").write(piece)
-        full = [os.path.join(a.bin, tool)] + [ipath if t == "%s" else t for t in argv]
+        # The binding pass: `%s`, `%t` and `%S` resolved against THIS piece, by
+        # the same committed function, so the substitution is textual and not
+        # token-wise (a `%t.dir` stays one token).
+        _, bound, _, _, _, _ = corpus.normalise_run_line(
+            line, subs={"s": ipath, "t": os.path.join(pdir, "t"), "S": pdir})
+        bound, _ = corpus.strip_probe_only_options(bound)
+        full = [os.path.join(a.bin, tool)] + bound
         # 03-LLD.md 4.1: the recorded argv is the tool's own; prlimit is a prefix
         # and is not part of it.  The 180 s wall bound is applied by the caller
         # rather than by timeout(1), whose own "dumped core" line would otherwise

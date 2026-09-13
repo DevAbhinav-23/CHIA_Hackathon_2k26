@@ -1,0 +1,7 @@
+{
+ "circt_sha": "87f131c0af7f58bfe81f1c88c486c959f69691fa",
+ "parent_of": "b3b407b37bb255aee5cfd559dc32988b88c6e43d",
+ "sdk_tag": "firtool-1.143.0",
+ "llvm_pin": "7cb3005ba22899b8ab7efe4fe43cba09cb7e12d4",
+ "source": "seed"
+}
