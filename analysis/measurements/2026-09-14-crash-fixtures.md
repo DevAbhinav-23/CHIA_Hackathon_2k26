@@ -70,6 +70,14 @@ the slang front end; it was not built, so the discard is only about the `.mlir` 
 
 Two configures, one per SDK tag, both from `w09_lib.sh:configure`; every attempt after the
 first on a tag reuses its build directory, which is why attempt 7 rebuilt nothing at all.
+One honesty note on attempt 1's 14 s. `b143` was **not** empty when attempt 1 ran: it
+already held a full `circt-opt` built at `5481d1901ca0` in the preceding session
+(`~/.cache/chia-pin-smoke/w09/build-143-5481d190.log`), together with six exploratory probes
+that located three of the candidates re-run here as attempts 2, 3 and 4. Every build figure
+in the table is therefore an **increment**, not a from-scratch cost; the only from-scratch
+figure measured here is `b156`'s cold `circt-opt`, which is the 606 pre-warm edges plus
+attempt 5's 420, 1,026 edges in about 17 minutes at `-j4` and `-j10`.
+
 Attempts 1 to 4 share one worktree and one build directory and were run in commit order, so
 each parent build is an increment on the previous attempt's seed build; the 601 s of attempt
 3 is the one large jump in that chain.
