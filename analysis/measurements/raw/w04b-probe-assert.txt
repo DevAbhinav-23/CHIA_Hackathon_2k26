@@ -1,0 +1,7 @@
+### flags: -O3 -UNDEBUG -gline-tables-only
+### input: 4003 lines, sha256 ed5ead0c3d0ded1e9bf8bbc80522076f12c12bda4f696dfb7c93273148d3cfb1
+### circt-opt: 217251208 bytes
+circt-opt --canonicalize --cse bench-big.mlir  reps=20 median=29375 us  min=26590 us  max=40137 us
+  all (sorted, us): 26590 26615 26773 26804 27169 27796 27874 28925 29039 29148 29603 30023 30236 30727 31282 31671 32972 35450 37412 40137 
+circt-opt --version                            reps=20 median=17968 us  min=14882 us  max=28503 us
+  all (sorted, us): 14882 14943 15136 15612 16303 16383 16945 17188 17316 17681 18256 18375 18392 18476 19835 19848 20322 21115 22686 28503 

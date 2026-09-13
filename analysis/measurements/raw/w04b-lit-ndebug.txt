@@ -1,0 +1,30 @@
+### lit: lit 23.1.1
+### commit: eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+### flags: -O3 -DNDEBUG -gline-tables-only
+
+=== RUN 1: the FRD slice, test/Dialect/{FIRRTL,HW,Comb,Seq} + test/Conversion ===
+rc=0 wall=6s
+Testing Time: 5.83s
+
+Total Discovered Tests: 523
+  Passed           : 519 (99.24%)
+  Expectedly Failed:   4 (0.76%)
+### FAILSET-SLICE-BEGIN
+### FAILSET-SLICE-END
+
+=== RUN 2: CHIA's gate scope verbatim (circt_lit_gate_paths + --filter-out=circt-tblgen) ===
+gate paths (22): test/Analysis test/Conversion test/Dialect test/Scheduling test/Target test/Tools test/Transforms test/Unit test/arcilator test/circt-as-dis test/circt-opt test/circt-reduce test/circt-synth test/circt-test test/circt-translate test/circt-verilog test/firld test/firtool test/hlstool test/kanagawatool test/lib test/om-linker
+rc=0 wall=10s
+Testing Time: 9.68s
+
+Total Discovered Tests: 1380
+  Excluded         :  253 (18.33%)
+  Unsupported      :    1 (0.07%)
+  Passed           : 1119 (81.09%)
+  Expectedly Failed:    7 (0.51%)
+--- discovery errors (unable to parse config file) ---
+0
+--- UNSUPPORTED count ---
+1
+### FAILSET-GATE-BEGIN
+### FAILSET-GATE-END

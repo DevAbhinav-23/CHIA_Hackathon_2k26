@@ -343,3 +343,218 @@ and `CIRCT_PKG` keeps CHIA's own default `circt-full-shared-linux-x64.tar.gz`.
   needs the same second image.
 - **The image is not published.** No registry, no push, so `RepoDigests` is empty and the manifest
   records the image ID. `bug_loop.build_image` step 8 is what fills that field.
+
+---
+
+# W-04b — the assertions-off twin, and what the flag string costs
+
+**Date** 2026-09-14. **Task** W-04b of `05-Work-Plan.md` §6, the item §7 above left open.
+**Closes** FR-03.6, A-20's image half, and A-03's flag-string cost at image level.
+
+Scripts sit beside this file as `w04b_*.{sh,py}`; raw output is under `raw/`:
+
+| Artefact | Path |
+|---|---|
+| build transcript | `raw/w04b-image-build.log`, `raw/w04b-image-build.rc` |
+| in-image size/flag report, both images | `raw/w04b-sizes-assert.txt`, `raw/w04b-sizes-ndebug.txt` |
+| lit, both images | `raw/w04b-lit-assert.txt`, `raw/w04b-lit-ndebug.txt` |
+| the two failing-name sets and the `comm` | `raw/w04b-failset-{gate,slice}-{assert,ndebug}.txt`, `raw/w04b-comm-gate.txt` |
+| per-probe cost, both images | `raw/w04b-probe-assert.txt`, `raw/w04b-probe-ndebug.txt` |
+| driver | `w04b_run_all.sh` |
+
+**No Dockerfile change was needed and nothing was committed.** `ChiaCirctAssertDockerfile:52`
+already reads `ARG CXX_FLAGS_RELEASE="-O3 -UNDEBUG -gline-tables-only"` — the flag string is
+already a build arg with the assertions-on default — so the twin is one `--build-arg` away and
+the default build is byte-identical in behaviour by construction, not by re-verification.
+
+---
+
+## 1. The build
+
+```
+docker build -f dockerfiles/ChiaCirctAssertDockerfile \
+  -t chia-circt-ndebug:eade0de61bc5 \
+  --build-arg CIRCT_SHA=eade0de61bc5a0d2ba1b9da951b69efcab19f8ce \
+  --build-arg CIRCT_VER=firtool-1.159.0 \
+  --build-arg CXX_FLAGS_RELEASE="-O3 -DNDEBUG -gline-tables-only" \
+  --build-arg BUILD_JOBS=8 .
+```
+
+`CIRCT_SHA`, `CIRCT_VER`, `TOOL_TARGETS`, `SLANG`, `BUILD_JOBS` and
+`-DLLVM_PARALLEL_LINK_JOBS=2` are all W-04's; `CXX_FLAGS_RELEASE` is the only difference.
+
+| Quantity | assertions on (W-04) | assertions off (W-04b) |
+|---|---|---|
+| tag | `chia-circt-assert:eade0de61bc5` | **`chia-circt-ndebug:eade0de61bc5`** |
+| exit code | 0 | **0** |
+| **wall** | **972 s** | **793 s (13 min 13 s)**, 01:37:05 → 01:50:18 +05:30 |
+| ninja edges | 1371, all executed | **1371, all executed** |
+| ccache hits during the build | cold | **2 of 1262 cacheable calls (0.16%)** — cold |
+| Docker steps served from cache | 8 (`SHELL` + the seven `ARG`s) | **the same 8** |
+| Docker steps re-run | 11–20 (apt, pip, SDK, fetch, configure, ninja, env) | **the same 11–20** |
+| image ID | `sha256:8ac3cb3118…` | `sha256:ee370a126d0d…` |
+| layers | 23 | **23** |
+
+The two builds therefore ran the *same* work: the legacy builder invalidates at the first `RUN`
+below the changed `ARG`, so apt, pip, the SDK download and the fetch re-ran in both, and neither
+build got a warm ccache. **The 179 s (−18.4%) is the assertions' share of build time**, not a
+caching artefact.
+
+---
+
+## 2. Size — what `-UNDEBUG` costs the image
+
+Per-binary, `du -sb` inside each image (`raw/w04b-sizes-*.txt`):
+
+| Binary | `-UNDEBUG` | `-DNDEBUG` | delta | |
+|---|---|---|---|---|
+| `circt-opt` | 217,251,208 | 173,725,000 | +43,526,208 | **+25.05%** |
+| `circt-reduce` | 132,128,112 | 103,471,496 | +28,656,616 | +27.70% |
+| `circt-translate` | 130,715,592 | 107,050,024 | +23,665,568 | +22.11% |
+| `firtool` | 97,039,424 | 76,580,664 | +20,458,760 | +26.72% |
+| `circt-verilog` | 75,559,336 | 64,265,208 | +11,294,128 | +17.57% |
+| `arcilator` | 50,517,536 | 39,810,936 | +10,706,600 | +26.89% |
+| **six targets, total** | **703,211,208** | **564,903,328** | **+138,307,880** | **+24.48%** |
+
+| Quantity | `-UNDEBUG` | `-DNDEBUG` | delta |
+|---|---|---|---|
+| `du -sb /workspace/circt/build` | 1,796,502,200 | 1,441,126,307 | **+355,375,893 (+24.66%)** |
+| the ninja layer (`docker history`) | 1.94 GB | 1.57 GB | +0.37 GB |
+| `docker system df` unique size | 3.656 GB | 3.179 GB | +0.477 GB |
+| `docker image inspect .Size` (content, compressed) | 1,912,742,097 | 1,809,494,659 | +103,247,438 (+5.71%) |
+| `du -sb /opt/circt-sdk` | 677,901,751 | 677,901,751 | 0 |
+
+The two size columns measure different things and both are reported because they differ by more
+than rounding: this host's Docker uses the containerd image store, where `.Size` is the sum of the
+**compressed** blobs and `docker system df`'s unique size is the **unpacked** bytes on disk. The
+unpacked delta (0.477 GB) is the one that matters for a worker's disk and it agrees with the layer
+delta (0.37 GB) and the build-tree delta (0.355 GB) to within what `du` and layer tar accounting
+differ by anyway.
+
+Everything else in the two reports is identical (`diff -u` over `raw/w04b-sizes-*.txt` shows only
+the flag string, the assertion counts and the sizes). In particular **the debug sections are the
+same in both**: `readelf -S bin/circt-opt | grep -c debug_line` = 2 and the same eight `.debug_*`
+sections, because `-gline-tables-only` is in *both* flag strings. That is what makes the delta
+above the assertions' cost and nothing else's.
+
+The flag reached every compile command in both images: 778 compile commands, **778** carrying
+`-DNDEBUG` and 0 carrying `-UNDEBUG` in the twin, exactly inverted from W-04.
+
+`__assert_fail`, the mechanical statement of what this whole image is for:
+
+| | `-UNDEBUG` | `-DNDEBUG` |
+|---|---|---|
+| the six targets with an undefined `__assert_fail` | **6 of 6** | **0 of 6** |
+| `obj.CIRCT` objects referencing `__assert_fail` | **536 of 555 (96.58%)** | **0 of 555** |
+
+---
+
+## 3. lit, in both images — the assertion false-positive set
+
+Both runs use `w04b_lit_runs.sh`, which is W-04's `w04_lit_runs.sh` plus machine-readable markers
+around the failing-name sets. Same scope, same `--filter-out=circt-tblgen`, same `-j8`, same
+`lit 23.1.1`, same commit `eade0de6`, run back to back with nothing else on the host.
+
+**Run 1 — the FRD slice**, `test/Dialect/{FIRRTL,HW,Comb,Seq}` + `test/Conversion`:
+
+| | `-UNDEBUG` | `-DNDEBUG` |
+|---|---|---|
+| exit code | 0 | **0** |
+| wall | 5.91 s | 5.83 s |
+| **Discovered** | **523** | **523** |
+| **Passed** | **519 (99.24%)** | **519 (99.24%)** |
+| Expectedly Failed | 4 | 4 |
+| **Failed / UNRESOLVED / TIMEOUT / XPASS** | **0** | **0** |
+
+**Run 2 — CHIA's gate scope verbatim** (`circt_lit_gate_paths()`, 22 paths, `--filter-out=circt-tblgen`):
+
+| | `-UNDEBUG` | `-DNDEBUG` |
+|---|---|---|
+| exit code | 0 | **0** |
+| wall | 9.82 s | 9.68 s |
+| **Discovered** | **1380** | **1380** |
+| Excluded by `--filter-out` | 253 | 253 |
+| **considered** | **1127** | **1127** |
+| **Passed** | **1119 (99.29% of considered)** | **1119 (99.29% of considered)** |
+| Unsupported | 1 | 1 |
+| Expectedly Failed | 7 | 7 |
+| **Failed / UNRESOLVED / TIMEOUT / XPASS** | **0** | **0** |
+| `unable to parse config file` | 0 | 0 |
+
+The two failing-name sets, from the markers, sorted:
+
+```
+$ wc -l raw/w04b-failset-gate-assert.txt raw/w04b-failset-gate-ndebug.txt
+0 raw/w04b-failset-gate-assert.txt
+0 raw/w04b-failset-gate-ndebug.txt
+$ comm raw/w04b-failset-gate-assert.txt raw/w04b-failset-gate-ndebug.txt
+                                        (no output)
+assert-only  0
+ndebug-only  0
+both         0
+```
+
+**The assertion false-positive set is empty.** Not "small", not "tractable" — there is no test in
+CHIA's gate scope that this CIRCT commit passes with assertions compiled out and fails with them
+compiled in. The FRD slice gives the same answer. Both sets are empty, so set equality holds and
+FR-03.6's criterion — *lit no redder than under `-DNDEBUG`* — is satisfied in its strongest form.
+
+This is the FR-07.9 control run the seed corpus needs: a seed that trips an assertion on this image
+trips it because of what the seed does, not because the image's own test suite is already red.
+
+---
+
+## 4. Per-probe cost — the first image-level delta this design has
+
+The probe is **M2's**, `raw/bench-big.mlir`: one `hw.module`, 4,000 `comb` operations cycling
+add/mul/and/or/xor, 4,003 lines. No generator script was stored with M2, so `w04b_gen_probe.py`
+reconstructs it and is verified byte-identical —
+`sha256 ed5ead0c3d0ded1e9bf8bbc80522076f12c12bda4f696dfb7c93273148d3cfb1` for both the stored
+artefact and the regenerated one. It is bind-mounted read-only into each container, so both images
+see the same bytes. 20 repetitions each, **median**, `circt-opt --canonicalize --cse`:
+
+| | `-UNDEBUG` | `-DNDEBUG` | **ratio** |
+|---|---|---|---|
+| **median of 20** | **29.375 ms** | **28.020 ms** | **1.048 (+4.84%)** |
+| min of 20 | 26.590 ms | 25.571 ms | 1.040 (+3.98%) |
+| max of 20 | 40.137 ms | 34.435 ms | |
+| `circt-opt --version`, median of 20 | 17.968 ms | 18.491 ms | **0.972** |
+
+**About 4%, and the caveat is stated rather than buried.** The two distributions overlap heavily —
+the assertions-on minimum (26.59 ms) is below the assertions-off median (28.02 ms) — so 4.8% is a
+median difference across 20 noisy in-container samples, not a tight bound. The min-of-20 statistic
+M2 used gives 4.0% on the same data. Both land in the same place: **the assertions cost single-digit
+percent per probe, and the answer at image level agrees with M2's host-level bound of at most about
+4%.** The `--version` row is the control and behaves like one: the ratio is *below* 1, which is only
+possible if start-up is dominated by process creation and dynamic linking rather than by anything
+the flag changes.
+
+---
+
+## 5. What FR-03.6, A-03 and A-20 now say
+
+- **FR-03.6 — PASS.** Two images differing only in `-UNDEBUG` / `-DNDEBUG` produce the same lit
+  result over CHIA's gate scope at `eade0de6` — 1119 passed, 7 XFAIL, 1 unsupported, **0 failures
+  in both** — so the assertions-on image is not one test redder than the assertions-off one.
+- **A-03 — closed at image level.** The flag string costs **+24.5% of binary bytes (+138 MB over
+  six targets), +24.7% of build tree (+355 MB), +0.48 GB of unpacked image, +179 s of build wall
+  (+22.6%), and ~4% per probe.** The cost is disk and build time; the per-probe cost is small enough
+  that the loop's throughput is not set by it.
+- **A-20 — closed.** The assertion false-positive set over CHIA's gate scope is **empty**. No test
+  needs excluding from the gate, no allow-list is required, and FR-07.9's control run is a
+  single `comm` that produces nothing.
+
+---
+
+## 6. One correction to §7 above, and what is still open
+
+§7 said the `-gline-tables-only` size and time delta "falls out of that same second build for
+free." **It does not.** The twin's flag string is `-O3 -DNDEBUG -gline-tables-only`: it differs
+from the assertions-on image in `NDEBUG` alone, which is what FR-03.6 requires and is why the
+debug sections are identical in both. What this build measures is the **assertions** delta at image
+level. A `-gline-tables-only` delta at image level would need a *third* image at
+`-O3 -UNDEBUG`, and nothing in F-03 needs one — M2's host measurement of that delta stands and is
+not contradicted by anything here.
+
+Still open, unchanged by W-04b: FR-03.9's `chia up` half (W-08/W-16), FR-03.10's `ImageSpec`
+object (W-16), and publication — neither image has been pushed, so both `.RepoDigests` are empty.

@@ -1,0 +1,80 @@
+
+### IDENTITY
+$ bash -c echo "BUGLOOP_CIRCT_SHA=$BUGLOOP_CIRCT_SHA"; echo "BUGLOOP_CIRCT_VER=$BUGLOOP_CIRCT_VER"; echo "BUGLOOP_TOOL_TARGETS=$BUGLOOP_TOOL_TARGETS"; echo "BUGLOOP_CXX_FLAGS_RELEASE=$BUGLOOP_CXX_FLAGS_RELEASE"; echo "BUGLOOP_SLANG=$BUGLOOP_SLANG"
+BUGLOOP_CIRCT_SHA=eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+BUGLOOP_CIRCT_VER=firtool-1.159.0
+BUGLOOP_TOOL_TARGETS=circt-opt firtool circt-translate arcilator circt-reduce circt-verilog
+BUGLOOP_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -gline-tables-only
+BUGLOOP_SLANG=ON
+[rc=0]
+$ git -C /workspace/circt rev-parse HEAD
+eade0de61bc5a0d2ba1b9da951b69efcab19f8ce
+[rc=0]
+
+### THE FLAG STRING, as the build actually saw it
+$ bash -c grep -E "^CMAKE_(CXX|C)_FLAGS_RELEASE:" /workspace/circt/build/CMakeCache.txt
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -gline-tables-only
+CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -gline-tables-only
+[rc=0]
+$ bash -c echo -n "compile commands: "; python3 -c "import json;print(len(json.load(open(\"/workspace/circt/build/compile_commands.json\")))) "
+compile commands: 778
+[rc=0]
+$ bash -c echo -n "-DNDEBUG occurrences: "; grep -c -- -DNDEBUG /workspace/circt/build/compile_commands.json
+-DNDEBUG occurrences: 778
+[rc=0]
+$ bash -c echo -n "-UNDEBUG occurrences: "; grep -c -- -UNDEBUG /workspace/circt/build/compile_commands.json
+-UNDEBUG occurrences: 0
+[rc=1]
+
+### ASSERTIONS IN THE BINARIES (FR-03.5)
+$ bash -c for t in $BUGLOOP_TOOL_TARGETS; do printf "%-18s __assert_fail undefined: %s\n" "$t" "$(nm -u /workspace/circt/build/bin/$t | grep -c __assert_fail)"; done
+circt-opt          __assert_fail undefined: 0
+firtool            __assert_fail undefined: 0
+circt-translate    __assert_fail undefined: 0
+arcilator          __assert_fail undefined: 0
+circt-reduce       __assert_fail undefined: 0
+circt-verilog      __assert_fail undefined: 0
+[rc=0]
+$ bash -c 
+tot=0; non=0
+while read -r o; do
+  tot=$((tot+1))
+  nm --undefined-only "$o" 2>/dev/null | grep -q __assert_fail || non=$((non+1))
+done < <(find /workspace/circt/build -path "*obj.CIRCT*.dir*" -name "*.o" | sort)
+echo "obj.CIRCT objects total=$tot  referencing=$((tot-non))  NOT referencing=$non"
+obj.CIRCT objects total=555  referencing=0  NOT referencing=555
+[rc=0]
+
+### DEBUG INFO (FR-03.4 half that is the SAME in both images)
+$ bash -c readelf -S /workspace/circt/build/bin/circt-opt | grep -c debug_line
+2
+[rc=0]
+$ bash -c readelf -S /workspace/circt/build/bin/circt-opt | grep -oE "\.debug[a-z_]*" | sort -u | tr "\n" " "; echo
+.debug_abbrev .debug_addr .debug_info .debug_line .debug_line_str .debug_rnglists .debug_str .debug_str_o 
+[rc=0]
+
+### SIZES
+$ bash -c for t in $BUGLOOP_TOOL_TARGETS; do printf "%-18s %12d\n" "$t" "$(du -sb /workspace/circt/build/bin/$t | cut -f1)"; done
+circt-opt             173725000
+firtool                76580664
+circt-translate       107050024
+arcilator              39810936
+circt-reduce          103471496
+circt-verilog          64265208
+[rc=0]
+$ bash -c tot=0; for t in $BUGLOOP_TOOL_TARGETS; do tot=$((tot+$(du -sb /workspace/circt/build/bin/$t | cut -f1))); done; echo "six targets total: $tot bytes"
+six targets total: 564903328 bytes
+[rc=0]
+$ bash -c du -sb /workspace/circt/build; du -sh /workspace/circt/build
+1441126307	/workspace/circt/build
+1.4G	/workspace/circt/build
+[rc=0]
+$ bash -c du -sb /opt/circt-sdk; du -sh /opt/circt-sdk
+677901751	/opt/circt-sdk
+661M	/opt/circt-sdk
+[rc=0]
+$ bash -c circt-opt --version 2>/dev/null | head -3 || /workspace/circt/build/bin/circt-opt --version | head -3
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+[rc=0]
