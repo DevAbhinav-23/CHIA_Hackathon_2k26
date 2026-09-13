@@ -162,6 +162,12 @@ qualifying frame is, which in a `circt-opt` trace is `main` in `circt-opt.cpp`: 
 candidate in a campaign would then carry one of a handful of identical fingerprints, which
 is exactly the collapse K3 introduced the prologue strip to prevent.
 
+**This is now live, not only textual.** `circt_bug_loop/probe_task.py`, committed by W-08
+at `de43f65` while this set was being mined, implements the rule as written:
+`_normalise_function` cuts *"at the first `(` at bracket depth zero"*
+(`probe_task.py:376-391`). So the apparatus reproduces the defect, and `assertion_02`'s and
+`fatal_error_01`'s `expected.json` are what it will produce.
+
 The fix is one clause, and belongs in `03-LLD.md` §3.7.1 rather than here: step 2 should
 skip a leading `(anonymous namespace)` (and the `::` after it) before looking for the first
 depth-zero `(`, or equivalently cut at the first depth-zero `(` that is **not** at offset 0
@@ -249,6 +255,10 @@ Measured over the four fixtures mined here:
 CIRCT assertion, in a CIRCT file, fixed by a CIRCT commit — and the design as written puts
 it out of scope. `crash_01` is the same shape: `#4` through `#10` share
 `0x0000561553f7dfd5` and `#10` is `SimOps.cpp:541`.
+
+This too is live: `probe_task.py:287` is
+`out_of_scope_root=bool(fired) and not (stripped and stripped[0].in_circt_object)`, the
+first stripped frame and nothing else.
 
 So three of the four real bugs are out of scope under the rule as written, and only
 `fatal_error_01`'s `true` is the answer the rule wanted. The fix is again one clause for
