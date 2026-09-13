@@ -1,0 +1,1 @@
+// RUN: circt-reduce %s --test /bin/sh --test-arg -c --test-arg 'firtool "$0" 2>&1 | grep -q "error: sink \"x1.x\" not fully initialized"' --keep-best=0 --include root-port-pruner | FileCheck %s

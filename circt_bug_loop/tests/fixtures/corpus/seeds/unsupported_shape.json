@@ -1,0 +1,46 @@
+{
+  "argv_template": [
+    [
+      "%s",
+      "--run",
+      "--jit-entry=main",
+      "--jit-vcd-file=%t",
+      "&&",
+      "cat",
+      "%t"
+    ]
+  ],
+  "bumps_away": null,
+  "committed_date_utc": "2026-01-30T18:37:33+00:00",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "dialect_bucket": "Arc",
+  "dialect_bucket_unmerged": "include/circt/Dialect",
+  "diff": "diff --git a/include/circt/Dialect/Arc/Runtime/TraceEncoder.h b/include/circt/Dialect/Arc/Runtime/TraceEncoder.h\nindex 6f411571b..def7cc7c4 100644\n--- a/include/circt/Dialect/Arc/Runtime/TraceEncoder.h\n+++ b/include/circt/Dialect/Arc/Runtime/TraceEncoder.h\n@@ -112,6 +112,9 @@ public:\n   /// Stop tracing\n   void finish(const ArcState *state);\n \n+  /// Return the value of the internal step counter\n+  int64_t getTimeStep() const { return timeStep; }\n+\n   /// Number of trace buffers in rotation\n   const unsigned numBuffers;\n \ndiff --git a/lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp b/lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp\nindex 449d8ef47..c809e12ec 100644\n--- a/lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp\n+++ b/lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp\n@@ -287,17 +287,16 @@ void VCDTraceEncoder::encode(TraceBuffer &work) {\n \n void VCDTraceEncoder::windDownWorker() {\n   assert(workerOutBuffer.empty());\n-  // Terminate and flush the file\n-  workerStep++;\n-  writeTimestepToBuffer(workerStep, workerOutBuffer);\n-  outFile.write(workerOutBuffer.data(), workerOutBuffer.size());\n   outFile.flush();\n-  workerOutBuffer.clear();\n }\n \n void VCDTraceEncoder::finalize(const ArcState *state) {\n-  if (outFile.is_open())\n+  if (outFile.is_open()) {\n+    // Finalize the trace file\n+    assert(workerStep <= getTimeStep());\n+    outFile << '#' << getTimeStep() + 1 << '\\n';\n     outFile.close();\n+  }\n }\n \n } // namespace circt::arc::runtime::impl\n",
+  "entry_tool": "arcilator",
+  "llvm_pin": "b7c1a6f8b447fba6fff47d309eb7ba1bc22e8c53",
+  "parent_sha": "f5a6e9171ce7a66bfac208e38a40cdf3e473e88a",
+  "polarity": [
+    "expect_zero"
+  ],
+  "run_lines": [
+    "arcilator %s --run --jit-entry=main --jit-vcd-file=%t && cat %t | FileCheck %s --match-full-lines --check-prefix VCD"
+  ],
+  "sdk_exact": true,
+  "sdk_tag": "firtool-1.140.0",
+  "seed_sha": "2fdae8fcfef599681d18d6521a4f568f32f3006e",
+  "shape": [
+    "unsupported"
+  ],
+  "source_paths": [
+    "include/circt/Dialect/Arc/Runtime/TraceEncoder.h",
+    "lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp"
+  ],
+  "subject": "[ArcRuntime][VCDTrace] Fix final time step on empty trace buffer (#9554)",
+  "test_files": {
+    "integration_test/arcilator/JIT/runtime-vcd-nochange.mlir": "// RUN: arcilator %s --run --jit-entry=main --jit-vcd-file=%t && cat %t | FileCheck %s --match-full-lines --check-prefix VCD\n\nhw.module @dut(out dout : i136) {\n  %cst = hw.constant 0 : i136\n  hw.output %cst : i136\n}\n\nfunc.func @main() {\n  arc.sim.instantiate @dut as %model {\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n    arc.sim.step %model : !arc.sim.instance<@dut>\n  }\n  return\n}\n\n// VCD-LABEL: $version\n// VCD-NEXT:      Some cryptic ArcRuntime magic\n// VCD-NEXT:  $end\n// VCD-NEXT:  $timescale 1ns $end\n// VCD-NEXT:  $scope module dut $end\n// VCD-NEXT:   $var wire 136 ! dout $end\n// VCD-NEXT:  $upscope $end\n// VCD-NEXT:  $enddefinitions $end\n// VCD-NEXT:  #0\n// VCD-NEXT:  b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 !\n// VCD-NEXT:  #9\n"
+  },
+  "test_paths": [
+    "integration_test/arcilator/JIT/runtime-vcd-nochange.mlir"
+  ]
+}

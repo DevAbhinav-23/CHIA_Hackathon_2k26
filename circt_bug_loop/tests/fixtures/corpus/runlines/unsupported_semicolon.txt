@@ -1,0 +1,1 @@
+// RUN: circt-opt %s --arc-insert-runtime="trace-file=C:\tcf.abc extra-args='debug;bar'" --split-input-file | FileCheck %s --check-prefixes=CHECK,RTARGS

@@ -1,0 +1,52 @@
+{
+  "argv_template": [
+    [
+      "%s",
+      "-output-longest-path=-",
+      "-top",
+      "counter"
+    ],
+    [
+      "%s",
+      "-output-longest-path=-",
+      "-top",
+      "counter",
+      "-output-longest-path-json"
+    ]
+  ],
+  "bumps_away": 1,
+  "committed_date_utc": "2025-08-26T08:30:45+00:00",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "dialect_bucket": "CombToAIG",
+  "dialect_bucket_unmerged": "CombToAIG",
+  "diff": "diff --git a/lib/Conversion/CombToAIG/CombToAIG.cpp b/lib/Conversion/CombToAIG/CombToAIG.cpp\nindex 8bf93eb5d..e94a4e7fe 100644\n--- a/lib/Conversion/CombToAIG/CombToAIG.cpp\n+++ b/lib/Conversion/CombToAIG/CombToAIG.cpp\n@@ -499,7 +499,7 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n     // Sum bit 0 is just p[0] since carry_in = 0\n     results[width - 1] = p[0];\n \n-    // For remaining bits, sum_i = p_i XOR c_(i-1)\n+    // For remaining bits, sum_i = p_i XOR g_(i-1)\n     // The carry into position i is the group generate from position i-1\n     for (int64_t i = 1; i < width; ++i)\n       results[width - 1 - i] =\n@@ -523,6 +523,8 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n                                  SmallVector<Value> &pPrefix,\n                                  SmallVector<Value> &gPrefix) const {\n     auto width = op.getType().getIntOrFloatBitWidth();\n+    SmallVector<Value> pPrefixNew = pPrefix;\n+    SmallVector<Value> gPrefixNew = gPrefix;\n \n     // Kogge-Stone parallel prefix computation\n     for (int64_t stride = 1; stride < width; stride *= 2) {\n@@ -531,13 +533,15 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n         // Group generate: g_i OR (p_i AND g_j)\n         Value andPG =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], gPrefix[j]);\n-        gPrefix[i] =\n+        gPrefixNew[i] =\n             comb::OrOp::create(rewriter, op.getLoc(), gPrefix[i], andPG);\n \n         // Group propagate: p_i AND p_j\n-        pPrefix[i] =\n+        pPrefixNew[i] =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], pPrefix[j]);\n       }\n+      pPrefix = pPrefixNew;\n+      gPrefix = gPrefixNew;\n     }\n     LLVM_DEBUG({\n       int64_t stage = 0;\n@@ -569,7 +573,8 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n                                 SmallVector<Value> &pPrefix,\n                                 SmallVector<Value> &gPrefix) const {\n     auto width = op.getType().getIntOrFloatBitWidth();\n-\n+    SmallVector<Value> pPrefixNew = pPrefix;\n+    SmallVector<Value> gPrefixNew = gPrefix;\n     // Brent-Kung parallel prefix computation\n     // Forward phase\n     int64_t stride;\n@@ -580,13 +585,15 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n         // Group generate: g_i OR (p_i AND g_j)\n         Value andPG =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], gPrefix[j]);\n-        gPrefix[i] =\n+        gPrefixNew[i] =\n             comb::OrOp::create(rewriter, op.getLoc(), gPrefix[i], andPG);\n \n         // Group propagate: p_i AND p_j\n-        pPrefix[i] =\n+        pPrefixNew[i] =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], pPrefix[j]);\n       }\n+      pPrefix = pPrefixNew;\n+      gPrefix = gPrefixNew;\n     }\n \n     // Backward phase\n@@ -597,12 +604,14 @@ struct CombAddOpConversion : OpConversionPattern<AddOp> {\n         // Group generate: g_i OR (p_i AND g_j)\n         Value andPG =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], gPrefix[j]);\n-        gPrefix[i] = OrOp::create(rewriter, op.getLoc(), gPrefix[i], andPG);\n+        gPrefixNew[i] = OrOp::create(rewriter, op.getLoc(), gPrefix[i], andPG);\n \n         // Group propagate: p_i AND p_j\n-        pPrefix[i] =\n+        pPrefixNew[i] =\n             comb::AndOp::create(rewriter, op.getLoc(), pPrefix[i], pPrefix[j]);\n       }\n+      pPrefix = pPrefixNew;\n+      gPrefix = gPrefixNew;\n     }\n \n     LLVM_DEBUG({\n",
+  "entry_tool": "other",
+  "llvm_pin": "681ecae9133b0e54441529d1eb68fb3604333a93",
+  "parent_sha": "865f9f8fc53ca0a08abfcd7d6e5686e396f9df3d",
+  "polarity": [
+    "expect_zero",
+    "expect_zero"
+  ],
+  "run_lines": [
+    "circt-synth %s -output-longest-path=- -top counter | FileCheck %s",
+    "circt-synth %s -output-longest-path=- -top counter -output-longest-path-json | FileCheck %s --check-prefix JSON"
+  ],
+  "sdk_exact": false,
+  "sdk_tag": null,
+  "seed_sha": "a197d6e076c132b03b42a03f62c43bb66d905f2f",
+  "shape": [
+    "plain",
+    "plain"
+  ],
+  "source_paths": [
+    "lib/Conversion/CombToAIG/CombToAIG.cpp"
+  ],
+  "subject": "[circt-synth] Parallel Prefix Lowering Performance Bug Fix (#8881)",
+  "test_files": {
+    "test/circt-synth/path-e2e.mlir": "// RUN: circt-synth %s -output-longest-path=- -top counter | FileCheck %s\n// RUN: circt-synth %s -output-longest-path=- -top counter -output-longest-path-json | FileCheck %s --check-prefix JSON\n\n// CHECK-LABEL: # Longest Path Analysis result for \"counter\"\n// CHECK-NEXT: Found 288 paths\n// CHECK-NEXT: Found 32 unique fanout points\n// CHECK-NEXT: Maximum path delay: 42\n// Don't test detailed reports as they are not stable.\n\n// Make sure json is emitted.\n// JSON: {\"module_name\":\"counter\",\"timing_levels\":[\nhw.module @counter(in %a: i16, in %clk: !seq.clock, out result: i16) {\n    %reg = seq.compreg %add, %clk : i16\n    %add = comb.mul %reg, %a : i16\n    hw.output %reg : i16\n}\n"
+  },
+  "test_paths": [
+    "test/circt-synth/path-e2e.mlir"
+  ]
+}

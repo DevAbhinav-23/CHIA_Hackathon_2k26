@@ -1,0 +1,1 @@
+// RUN: circt-opt %s --arc-insert-runtime --split-input-file | FileCheck %s --check-prefixes=CHECK,NOARGS

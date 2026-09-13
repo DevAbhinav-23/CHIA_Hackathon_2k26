@@ -1,0 +1,2 @@
+// RUN: circt-verilog --ir-moore -mlir-print-debuginfo %s \
+// RUN:   | FileCheck %s --check-prefix=DEFAULT

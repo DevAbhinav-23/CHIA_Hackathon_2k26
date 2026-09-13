@@ -1,0 +1,85 @@
+{
+  "argv_template": [
+    [
+      "-export-verilog",
+      "%s"
+    ],
+    [
+      "-export-verilog",
+      "-verify-diagnostics",
+      "%s"
+    ],
+    [
+      "-rf",
+      "%t",
+      "&&",
+      "mkdir",
+      "-p",
+      "%t"
+    ],
+    [
+      "-export-split-verilog=dir-name=%t",
+      "%s"
+    ],
+    [
+      "-rf",
+      "%t",
+      "&&",
+      "mkdir",
+      "-p",
+      "%t"
+    ],
+    [
+      "-export-split-verilog=dir-name=%t",
+      "%s",
+      "--verify-diagnostics"
+    ]
+  ],
+  "bumps_away": null,
+  "committed_date_utc": "2026-03-19T16:32:57+00:00",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "dialect_bucket": "ExportVerilog",
+  "dialect_bucket_unmerged": "ExportVerilog",
+  "diff": "diff --git a/lib/Conversion/ExportVerilog/ExportVerilog.cpp b/lib/Conversion/ExportVerilog/ExportVerilog.cpp\nindex 19c53194f..83fbf242d 100644\n--- a/lib/Conversion/ExportVerilog/ExportVerilog.cpp\n+++ b/lib/Conversion/ExportVerilog/ExportVerilog.cpp\n@@ -267,8 +267,9 @@ bool ExportVerilog::isVerilogExpression(Operation *op) {\n \n // NOLINTBEGIN(misc-no-recursion)\n /// Push this type's dimension into a vector.\n-static void getTypeDims(SmallVectorImpl<Attribute> &dims, Type type,\n-                        Location loc) {\n+static void getTypeDims(\n+    SmallVectorImpl<Attribute> &dims, Type type, Location loc,\n+    llvm::function_ref<mlir::InFlightDiagnostic(Location)> errorHandler) {\n   if (auto integer = hw::type_dyn_cast<IntegerType>(type)) {\n     if (integer.getWidth() != 1)\n       dims.push_back(getInt32Attr(type.getContext(), integer.getWidth()));\n@@ -276,7 +277,7 @@ static void getTypeDims(SmallVectorImpl<Attribute> &dims, Type type,\n   }\n   if (auto array = hw::type_dyn_cast<ArrayType>(type)) {\n     dims.push_back(getInt32Attr(type.getContext(), array.getNumElements()));\n-    getTypeDims(dims, array.getElementType(), loc);\n+    getTypeDims(dims, array.getElementType(), loc, errorHandler);\n \n     return;\n   }\n@@ -286,26 +287,27 @@ static void getTypeDims(SmallVectorImpl<Attribute> &dims, Type type,\n   }\n \n   if (auto inout = hw::type_dyn_cast<InOutType>(type))\n-    return getTypeDims(dims, inout.getElementType(), loc);\n+    return getTypeDims(dims, inout.getElementType(), loc, errorHandler);\n   if (auto uarray = hw::type_dyn_cast<hw::UnpackedArrayType>(type))\n-    return getTypeDims(dims, uarray.getElementType(), loc);\n+    return getTypeDims(dims, uarray.getElementType(), loc, errorHandler);\n   if (auto uarray = hw::type_dyn_cast<sv::UnpackedOpenArrayType>(type))\n-    return getTypeDims(dims, uarray.getElementType(), loc);\n-\n+    return getTypeDims(dims, uarray.getElementType(), loc, errorHandler);\n   if (hw::type_isa<InterfaceType, StructType, EnumType, UnionType>(type))\n     return;\n \n-  mlir::emitError(loc, \"value has an unsupported verilog type \") << type;\n+  errorHandler(loc) << \"value has an unsupported verilog type \" << type;\n }\n // NOLINTEND(misc-no-recursion)\n \n /// True iff 'a' and 'b' have the same wire dims.\n-static bool haveMatchingDims(Type a, Type b, Location loc) {\n+static bool haveMatchingDims(\n+    Type a, Type b, Location loc,\n+    llvm::function_ref<mlir::InFlightDiagnostic(Location)> errorHandler) {\n   SmallVector<Attribute, 4> aDims;\n-  getTypeDims(aDims, a, loc);\n+  getTypeDims(aDims, a, loc, errorHandler);\n \n   SmallVector<Attribute, 4> bDims;\n-  getTypeDims(bDims, b, loc);\n+  getTypeDims(bDims, b, loc, errorHandler);\n \n   return aDims == bDims;\n }\n@@ -735,7 +737,8 @@ static bool isExpressionUnableToInline(Operation *op,\n                                        const LoweringOptions &options) {\n   if (auto cast = dyn_cast<BitcastOp>(op))\n     if (!haveMatchingDims(cast.getInput().getType(), cast.getResult().getType(),\n-                          op->getLoc())) {\n+                          op->getLoc(),\n+                          [&](Location loc) { return emitError(loc); })) {\n       // Even if dimentions don't match, we can inline when its user doesn't\n       // rely on the type.\n       if (op->hasOneUse() &&\n@@ -1113,6 +1116,11 @@ public:\n     return op->emitOpError(message);\n   }\n \n+  InFlightDiagnostic emitError(Location loc, const Twine &message = \"\") {\n+    state.encounteredError = true;\n+    return mlir::emitError(loc, message);\n+  }\n+\n   void emitLocationImpl(llvm::StringRef location) {\n     // Break so previous content is not impacted by following,\n     // but use a 'neverbreak' so it always fits.\n@@ -1636,7 +1644,7 @@ static void emitDim(Attribute width, raw_ostream &os, Location loc,\n   // attribute so it gets printed in canonical form.\n   auto typedAttr = dyn_cast<TypedAttr>(width);\n   if (!typedAttr) {\n-    mlir::emitError(loc, \"untyped dimension attribute \") << width;\n+    emitter.emitError(loc, \"untyped dimension attribute \") << width;\n     return;\n   }\n   auto negOne =\n@@ -1646,8 +1654,8 @@ static void emitDim(Attribute width, raw_ostream &os, Location loc,\n   os << '[';\n   if (!downTo)\n     os << \"0:\";\n-  emitter.printParamValue(width, os, [loc]() {\n-    return mlir::emitError(loc, \"invalid parameter in type\");\n+  emitter.printParamValue(width, os, [loc, &emitter]() {\n+    return emitter.emitError(loc, \"invalid parameter in type\");\n   });\n   if (downTo)\n     os << \":0\";\n@@ -1665,7 +1673,8 @@ static void emitDims(ArrayRef<Attribute> dims, raw_ostream &os, Location loc,\n /// Emit a type's packed dimensions.\n void ModuleEmitter::emitTypeDims(Type type, Location loc, raw_ostream &os) {\n   SmallVector<Attribute, 4> dims;\n-  getTypeDims(dims, type, loc);\n+  getTypeDims(dims, type, loc,\n+              [&](Location loc) { return this->emitError(loc); });\n   emitDims(dims, os, loc, *this);\n }\n \n@@ -1702,7 +1711,7 @@ static bool printPackedTypeImpl(Type type, raw_ostream &os, Location loc,\n                                 Type optionalAliasType = {},\n                                 bool emitAsTwoStateType = false) {\n   return TypeSwitch<Type, bool>(type)\n-      .Case<IntegerType>([&](IntegerType integerType) {\n+      .Case<IntegerType>([&](IntegerType integerType) -> bool {\n         if (emitAsTwoStateType && dims.empty()) {\n           auto typeName = getTwoStateIntegerAtomType(integerType.getWidth());\n           if (!typeName.empty()) {\n@@ -1840,18 +1849,18 @@ static bool printPackedTypeImpl(Type type, raw_ostream &os, Location loc,\n       .Case<InterfaceType>([](InterfaceType ifaceType) { return false; })\n       .Case<UnpackedArrayType>([&](UnpackedArrayType arrayType) {\n         os << \"<<unexpected unpacked array>>\";\n-        mlir::emitError(loc, \"Unexpected unpacked array in packed type \")\n+        emitter.emitError(loc, \"Unexpected unpacked array in packed type \")\n             << arrayType;\n         return true;\n       })\n       .Case<TypeAliasType>([&](TypeAliasType typeRef) {\n         auto typedecl = typeRef.getTypeDecl(emitter.state.symbolCache);\n         if (!typedecl) {\n-          mlir::emitError(loc, \"unresolvable type reference\");\n+          emitter.emitError(loc, \"unresolvable type reference\");\n           return false;\n         }\n         if (typedecl.getType() != typeRef.getInnerType()) {\n-          mlir::emitError(loc, \"declared type did not match aliased type\");\n+          emitter.emitError(loc, \"declared type did not match aliased type\");\n           return false;\n         }\n \n@@ -1861,7 +1870,8 @@ static bool printPackedTypeImpl(Type type, raw_ostream &os, Location loc,\n       })\n       .Default([&](Type type) {\n         os << \"<<invalid type '\" << type << \"'>>\";\n-        mlir::emitError(loc, \"value has an unsupported verilog type \") << type;\n+        emitter.emitError(loc, \"value has an unsupported verilog type \")\n+            << type;\n         return true;\n       });\n }\n@@ -2735,7 +2745,9 @@ SubExprInfo ExprEmitter::visitTypeOp(BitcastOp op) {\n   // their dimensions don't match. SystemVerilog uses the wire declaration to\n   // know what type this value is being casted to.\n   Type toType = op.getType();\n-  if (!haveMatchingDims(toType, op.getInput().getType(), op.getLoc())) {\n+  if (!haveMatchingDims(\n+          toType, op.getInput().getType(), op.getLoc(),\n+          [&](Location loc) { return emitter.emitError(loc, \"\"); })) {\n     ps << \"/*cast(bit\";\n     ps.invokeWithStringOS(\n         [&](auto &os) { emitter.emitTypeDims(toType, op.getLoc(), os); });\n@@ -7093,6 +7105,8 @@ void SharedEmitterState::emitOps(EmissionList &thingsToEmit,\n                               stringOrOp.verilogLocs);\n     emitOperation(state, op);\n     stringOrOp.setString(buffer);\n+    if (state.encounteredError)\n+      encounteredError = true;\n   });\n \n   // Finally emit each entry now that we know it is a string.\n@@ -7117,6 +7131,10 @@ void SharedEmitterState::emitOps(EmissionList &thingsToEmit,\n                               entry.verilogLocs);\n     emitOperation(state, op);\n     state.addVerilogLocToOps(0, fileName);\n+    if (state.encounteredError) {\n+      encounteredError = true;\n+      return;\n+    }\n   }\n }\n \n",
+  "entry_tool": "circt-opt",
+  "llvm_pin": "7cb3005ba22899b8ab7efe4fe43cba09cb7e12d4",
+  "parent_sha": "b78f480b9b97529a40f5999cbfaa68fc2bdb5164",
+  "polarity": [
+    "expect_nonzero",
+    "expect_zero",
+    "expect_zero",
+    "expect_nonzero",
+    "expect_zero",
+    "expect_zero"
+  ],
+  "run_lines": [
+    "not circt-opt -export-verilog %s",
+    "circt-opt -export-verilog -verify-diagnostics %s",
+    "rm -rf %t && mkdir -p %t",
+    "not circt-opt -export-split-verilog='dir-name=%t' %s",
+    "rm -rf %t && mkdir -p %t",
+    "circt-opt -export-split-verilog='dir-name=%t' %s --verify-diagnostics"
+  ],
+  "sdk_exact": true,
+  "sdk_tag": "firtool-1.143.0",
+  "seed_sha": "337c72727242ce4b646eb6e7613aa1e2e6f31f33",
+  "shape": [
+    "plain",
+    "plain",
+    "unsupported",
+    "plain",
+    "unsupported",
+    "plain"
+  ],
+  "source_paths": [
+    "lib/Conversion/ExportVerilog/ExportVerilog.cpp"
+  ],
+  "subject": "[ExportVerilog] Fix missing error propagation (#9976)",
+  "test_files": {
+    "test/Conversion/ExportVerilog/verilog-errors-prop.mlir": "\n// Make sure error is propagated to the pass failure when running `export-verilog`.\n// RUN: not circt-opt -export-verilog %s\n\n// Check diagnostics.\n// RUN: circt-opt -export-verilog -verify-diagnostics %s\n\n// Make sure error is propagated to the pass failure when running `export-split-verilog`.\n// RUN: rm -rf %t && mkdir -p %t\n// RUN: not circt-opt -export-split-verilog='dir-name=%t' %s\n\n// Check diagnostics for split verilog.\n// RUN: rm -rf %t && mkdir -p %t\n// RUN: circt-opt -export-split-verilog='dir-name=%t' %s --verify-diagnostics\n\n// expected-error @+1 {{value has an unsupported verilog type 'f32'}}\nhw.module @Top(in %out: f32) {\n}\n"
+  },
+  "test_paths": [
+    "test/Conversion/ExportVerilog/verilog-errors-prop.mlir"
+  ]
+}

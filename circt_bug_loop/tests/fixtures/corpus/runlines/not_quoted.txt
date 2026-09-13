@@ -1,0 +1,1 @@
+// RUN: not circt-opt -export-split-verilog='dir-name=%t' %s

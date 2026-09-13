@@ -1,0 +1,2682 @@
+{
+ "candidates": [
+  {
+   "bumps": 0,
+   "date": "2026-08-17T13:33:50+00:00",
+   "exact": true,
+   "sha": "cc71d34ab52f556fe58e85143b38a6432b3c3af2",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix out-of-bounds and aggregate moore.extract lowering (#10993)",
+   "tag": "firtool-1.156.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir",
+    "test/circt-verilog/roundtrip-oob-reads.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-08-13T05:29:34+00:00",
+   "exact": true,
+   "sha": "56f16468bccf61bfee69569439d1bea0aba3ae39",
+   "src": [
+    "lib/Dialect/OM/Transforms/ElaborateObject.cpp"
+   ],
+   "subject": "[OM] Fix OM evaluator assert w/ non-constant msg",
+   "tag": "firtool-1.156.0",
+   "test": [
+    "test/Dialect/OM/elaborate-object-errors-unevaluated.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-08-13T05:29:34+00:00",
+   "exact": true,
+   "sha": "4ac632ae7dd8bb9dcefe3db3092af577f4fbabda",
+   "src": [
+    "lib/Dialect/OM/Transforms/ElaborateObject.cpp"
+   ],
+   "subject": "[OM] Fix crash in assert w/ block arg message",
+   "tag": "firtool-1.156.0",
+   "test": [
+    "test/Dialect/OM/elaborate-object-errors-unevaluated.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-08-03T18:05:25+00:00",
+   "exact": true,
+   "sha": "08f97b29f1c7b9d690e0ee7d41002c6523f4d164",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Re-apply array handling fixes without unpacked array reversal (#10926)",
+   "tag": "firtool-1.155.0",
+   "test": [
+    "test/Conversion/ImportVerilog/array.sv",
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-28T22:22:29+00:00",
+   "exact": true,
+   "sha": "e2e5cca7355c1ffe3fae98284004331ee7cc437f",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Lower moore.null and handle comparisons to LLVM ptr ops (#10863)",
+   "tag": "firtool-1.154.0",
+   "test": [
+    "test/Conversion/MooreToCore/classes.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-22T18:23:57+00:00",
+   "exact": true,
+   "sha": "42d11d06acf738486f31a6455a8e884945bb63d3",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InferDomains.cpp"
+   ],
+   "subject": "[FIRRTL][InferDomain] Fix null pointer dereference (#10886)",
+   "tag": "firtool-1.154.0",
+   "test": [
+    "test/Dialect/FIRRTL/infer-domains-check-errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-21T17:22:55+00:00",
+   "exact": true,
+   "sha": "e7e3249173a23fa65818bf822e973091367a1f41",
+   "src": [
+    "include/circt/Dialect/Moore/MooreOps.h",
+    "include/circt/Dialect/Moore/MooreOps.td"
+   ],
+   "subject": "[ImportVerilog] Allow `assert`s inside functions",
+   "tag": "firtool-1.154.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-17T16:36:27+00:00",
+   "exact": true,
+   "sha": "a5f07baa45f032264a0436e8c571c37022e24f57",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix operand domain for real logical operators (#10842)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-15T23:33:13+00:00",
+   "exact": true,
+   "sha": "f1fe5740b35c12fcf16cb2a2bfcd9201548b2296",
+   "src": [
+    "lib/Conversion/ExportVerilog/ExportVerilog.cpp"
+   ],
+   "subject": "[ExportVerilog] Fix precedence of equality operators (#10833)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/ExportVerilog/verilog-basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-14T18:00:04+00:00",
+   "exact": true,
+   "sha": "dc54091c7728f7c08a6cc437e321f1ba16757962",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Legalize sim.queue as a target type to fix hierarchical queue refs (#10821)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-14T17:56:14+00:00",
+   "exact": true,
+   "sha": "a01b37c93c58a8db47cbdeea2b4535f8dda21cbd",
+   "src": [
+    "lib/Dialect/Moore/MooreOps.cpp"
+   ],
+   "subject": "[Moore] Fix VariableOp::getDefaultValue for non-integer types (#10827)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Dialect/Moore/mem2reg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-08T23:54:40+00:00",
+   "exact": true,
+   "sha": "3483195718eb5675a435ef9b080afcb54668df04",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix corrupted constant string materialization (#10776)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-06T22:22:45+00:00",
+   "exact": true,
+   "sha": "bb4d4f99f6eaf774cf1429b2a4471905a02ca5e5",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix bool cast lowering for packed aggregates (#10777)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-06T22:21:54+00:00",
+   "exact": true,
+   "sha": "a14ce3078b4c083e0db4e14a69d1cbf1b2532611",
+   "src": [
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix return type mismatch for functions returning string (#10775)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-07-06T22:20:22+00:00",
+   "exact": true,
+   "sha": "acbc74635c948e5eb6c3b6912aedaef106845762",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp",
+    "lib/Transforms/MapArithToComb.cpp"
+   ],
+   "subject": "[MooreToCore][Transforms] Fix always_comb lowering for string-typed signals (#10769)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir",
+    "test/Transforms/map-arith-to-comb.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-25T21:37:22+00:00",
+   "exact": true,
+   "sha": "0da0bde468335998c3325e369398c2de330079e7",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[Comb] Fix O(NM) extract-of-concat resolution (#10733)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Dialect/Comb/concat-canonicalize-scaling.py"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-24T22:01:26+00:00",
+   "exact": true,
+   "sha": "0fbfd5858034b3c4e21a0b592de65aa47636e0ea",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/ModuleInliner.cpp"
+   ],
+   "subject": "[FIRRTL][Inliner] Fix n^2/crash when cloning anno to multiple tops. (#10721)",
+   "tag": "firtool-1.151.0",
+   "test": [
+    "test/Dialect/FIRRTL/inliner.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-23T07:23:06+00:00",
+   "exact": true,
+   "sha": "23abfba6006b9581a537632ab31f162f0213d3dd",
+   "src": [
+    "include/circt/Dialect/DC/DCOps.td",
+    "lib/Dialect/DC/DCOps.cpp"
+   ],
+   "subject": "[DCToHW] Fix invalid ESI connections from Unpack(pack()) (#10649)",
+   "tag": "firtool-1.150.0",
+   "test": [
+    "test/Conversion/DCToHW/basic.mlir",
+    "test/Dialect/DC/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-20T02:35:17+00:00",
+   "exact": true,
+   "sha": "2aaa416d740d75af1344bf91912348971bbb084b",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/ExpandWhens.cpp"
+   ],
+   "subject": "[FIRRTL] Fix when flattening with layerblocks domination issue (#10650)",
+   "tag": "firtool-1.150.0",
+   "test": [
+    "test/Dialect/FIRRTL/expand-whens.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-17T06:02:56+00:00",
+   "exact": true,
+   "sha": "3f65acfd617bc2255c58bcb29b0097be81036f4f",
+   "src": [
+    "lib/Conversion/FIRRTLToHW/LowerToHW.cpp"
+   ],
+   "subject": "[FIRRTLToHW] Fix firrtl enum lowering (#10648)",
+   "tag": "firtool-1.150.0",
+   "test": [
+    "test/Conversion/FIRRTLToHW/lower-to-hw.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-11T18:37:07+00:00",
+   "exact": true,
+   "sha": "97129392af7ad6078ab4e8c136b5e8d3fab4def2",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix bit-vector builtins rejecting packed non-integer types (#10615)",
+   "tag": "firtool-1.150.0",
+   "test": [
+    "test/Conversion/ImportVerilog/builtins.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-07T22:00:48+00:00",
+   "exact": true,
+   "sha": "ce945f02fde104d2e67d14abefff94dcf2ac04ac",
+   "src": [
+    "lib/Dialect/Datapath/DatapathOps.cpp"
+   ],
+   "subject": "[CombToSynth] Assertion failure in CompressorTree construction for comb.mul lowering (#10598)",
+   "tag": "firtool-1.149.0",
+   "test": [
+    "test/Conversion/CombToSynth/comb-to-aig-arith.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-05T18:18:20+00:00",
+   "exact": true,
+   "sha": "6a3a01e415231148984ea1cdefd69c943550b55b",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InferDomains.cpp"
+   ],
+   "subject": "[FIRRTL] InferDomains: Fix domain casting for constants",
+   "tag": "firtool-1.149.0",
+   "test": [
+    "test/Dialect/FIRRTL/infer-domains-infer-all.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-06-04T18:16:15+00:00",
+   "exact": true,
+   "sha": "b645b96686fa7ced1ca2c7f7b3d24cb0a5340139",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/RemoveControlFlow.cpp"
+   ],
+   "subject": "[LLHD] Fix incorrect mux generation in remove-control-flow (#10566)",
+   "tag": "firtool-1.149.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/remove-control-flow.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-27T21:40:36+00:00",
+   "exact": true,
+   "sha": "38227a822425b5767f2406cd098ed2a0e2fc3c31",
+   "src": [
+    "lib/Support/TruthTable.cpp"
+   ],
+   "subject": "[Synth] Fix NPN input permutation mapping (#10543)",
+   "tag": "firtool-1.149.0",
+   "test": [
+    "integration_test/circt-synth/mapping-lec.mlir",
+    "test/Dialect/Synth/tech-mapper.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-23T22:43:13+00:00",
+   "exact": true,
+   "sha": "4ed926c3c177e106c5f89483fc40bc33d18dd831",
+   "src": [
+    "lib/Dialect/OM/OMOps.cpp"
+   ],
+   "subject": "[OM] Fix IntegerShlOp evaluation to allow arbitrary bitwidth (#10533)",
+   "tag": "firtool-1.148.0",
+   "test": [
+    "test/Dialect/OM/canonicalizers.mlir",
+    "test/Dialect/OM/elaborate-object.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-22T22:29:10+00:00",
+   "exact": true,
+   "sha": "20309db8b2070331c2f028b348c09dc13ee5a462",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLFolds.cpp"
+   ],
+   "subject": "[FIRRTL] Fix mux fold bug, 1 const, 2 SSA values (#10529)",
+   "tag": "firtool-1.148.0",
+   "test": [
+    "test/Dialect/FIRRTL/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-20T17:59:23+00:00",
+   "exact": true,
+   "sha": "793d63912b430df1db99ab1a9a14d2df517c86f7",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix unpacked string array initialization with concatenation (#10511)",
+   "tag": "firtool-1.148.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-15T15:44:35+00:00",
+   "exact": true,
+   "sha": "be870d5d5d54f3463b341b6adda295dd19de9f8d",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "Revert \"[ImportVerilog] Fix several bugs in the handling of arrays (#10444)\" (#10478)",
+   "tag": "firtool-1.147.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-05-13T18:09:03+00:00",
+   "exact": true,
+   "sha": "3daad646aa920859204345e9527013f2413dd306",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix several bugs in the handling of arrays (#10444)",
+   "tag": "firtool-1.147.0",
+   "test": [
+    "test/Conversion/ImportVerilog/array.sv",
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-30T16:54:06+00:00",
+   "exact": true,
+   "sha": "2cdbf0d17111489769d292ef95064ebbb27fa962",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/Mem2Reg.cpp"
+   ],
+   "subject": "[LLHD] Run Mem2Reg per slot to fix cubic scaling (#10321)",
+   "tag": "firtool-1.146.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir",
+    "test/Dialect/LLHD/Transforms/mem2reg-scaling.py",
+    "test/Dialect/LLHD/Transforms/mem2reg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-21T20:28:44+00:00",
+   "exact": true,
+   "sha": "bcc1685cdd2043432b55c60f5eeffe5379255767",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/Mem2Reg.cpp"
+   ],
+   "subject": "[LLHD] Run Mem2Reg per slot to fix cubic scaling (#10263)",
+   "tag": "firtool-1.145.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir",
+    "test/Dialect/LLHD/Transforms/mem2reg-scaling.py",
+    "test/Dialect/LLHD/Transforms/mem2reg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-17T19:41:23+00:00",
+   "exact": true,
+   "sha": "681992b3a872f25713b2778bc9f570fd973ac5e8",
+   "src": [
+    "lib/Conversion/SeqToSV/FirRegLowering.cpp"
+   ],
+   "subject": "[SeqToSV] Fix illegal IR in clock-typed register (#10260)",
+   "tag": "firtool-1.145.0",
+   "test": [
+    "test/Dialect/Seq/firreg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-16T19:23:25+00:00",
+   "exact": true,
+   "sha": "6a2571d0a6c4778613e8353d997b19aa4f8df1e5",
+   "src": [
+    "lib/Dialect/Synth/Transforms/FunctionalReduction.cpp"
+   ],
+   "subject": "[Synth][FunctionalReduction] Fix a SSA cycle (#10137)",
+   "tag": "firtool-1.145.0",
+   "test": [
+    "test/Dialect/Synth/functional-reduction.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-14T20:20:57+00:00",
+   "exact": true,
+   "sha": "02bb5593a1fc97cb1beba37764de896678a126e5",
+   "src": [
+    "lib/Dialect/Synth/Transforms/LowerWordToBits.cpp"
+   ],
+   "subject": "Replace array constants with map by block to fix constant defined outside of IsolatedAbove region (#10210)",
+   "tag": "firtool-1.145.0",
+   "test": [
+    "test/Dialect/Synth/lower-word-to-bits.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-09T22:39:16+00:00",
+   "exact": true,
+   "sha": "1ccf9cf310cbc3b0d9a6a8e4bf49766e05b999b6",
+   "src": [
+    "include/circt/Dialect/OM/OMOps.td"
+   ],
+   "subject": "[OM] Add property assert operation",
+   "tag": "firtool-1.145.0",
+   "test": [
+    "test/Dialect/OM/round-trip.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-06T23:06:41+00:00",
+   "exact": true,
+   "sha": "a4a4f74118eb8821f5522010f4caa53fb29bd98c",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InferDomains.cpp"
+   ],
+   "subject": "[FIRRTL] InferDomains: Fix wire updating",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/infer-domains-infer-all.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-04-06T02:19:40+00:00",
+   "exact": true,
+   "sha": "2867b37b5415f91bcff4e48da96ec4865b6eda77",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/FlattenMemory.cpp"
+   ],
+   "subject": "[FIRRTL] Fix mask repeat order in FlattenMemory (#10106)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/flatten-memory.mlir",
+    "test/firtool/memoryLowering.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-30T19:29:19+00:00",
+   "exact": true,
+   "sha": "4df5007fbcf22e2ccc099948098ab48f552f8e92",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerClasses.cpp"
+   ],
+   "subject": "[FIRRTL] Fix LowerClasses Objects not InstanceLike (#10081)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-classes.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-30T06:18:13+00:00",
+   "exact": true,
+   "sha": "738d5e09880f8d2635c10eaa3ceaa95f730dd7e5",
+   "src": [
+    "lib/Dialect/Synth/Analysis/ResourceUsageAnalysis.cpp"
+   ],
+   "subject": "[Synth][ResourceUsage] Fix misuse of InstanceGraphNode::getModule, report truth table total count (#10078)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/Synth/resource.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-27T23:08:53+00:00",
+   "exact": true,
+   "sha": "b15ee99dbe58d6aa36f5ef2d9b937f3d7c1ac36b",
+   "src": [
+    "lib/Conversion/ImportVerilog/ImportVerilogInternals.h",
+    "lib/Conversion/ImportVerilog/TimingControls.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix signal captures in timing controls (#10067)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-27T18:19:41+00:00",
+   "exact": true,
+   "sha": "838a8bb2910695c4b8b42eb0a20406c5fb6cf532",
+   "src": [
+    "lib/Conversion/CoreToFSM/CoreToFSM.cpp"
+   ],
+   "subject": "[NFC][CoreToFSM] Fix typo in error message (#10063)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/CoreToFSM/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-27T00:26:14+00:00",
+   "exact": true,
+   "sha": "c9b4ed95782c997cf2c90d5d97f4a66a8183b892",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLUtils.cpp"
+   ],
+   "subject": "[FIRParser] Fix a failure when the number of operands are missing on format string (#10044)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/parse-errors.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-26T22:03:02+00:00",
+   "exact": true,
+   "sha": "c14279dcbf73029dc470ae45d90e951fe2067c23",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[circt-reduce] Fix module-port-pruner crash on ports with uses (#10040)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/Reduction/module-port-pruner.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-24T23:18:57+00:00",
+   "exact": true,
+   "sha": "60a9ebf591009ae6461ca3143dc0e1a6ba402170",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InferDomains.cpp"
+   ],
+   "subject": "[FIRRTL] Fix use-before-def in InferDomains (#10029)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/infer-domains-infer-all.mlir",
+    "test/Dialect/FIRRTL/infer-domains-infer.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-24T18:26:48+00:00",
+   "exact": true,
+   "sha": "c80cfb9e29676b7ed5ea3d5e88ac7bfa7559a614",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerOpenAggs.cpp"
+   ],
+   "subject": "[FIRRTL][LOA] Fix bug dropping inner symbol within mapped type. (#10026)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-open-aggs.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T14:54:16+00:00",
+   "exact": true,
+   "sha": "88d9a5ad7a3a115c9a0d11b6e27467d6bb6c48fb",
+   "src": [
+    "lib/Support/InstanceGraph.cpp"
+   ],
+   "subject": "[InstanceGraph] Relax assertion failure condition (#10005)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/SV/sv-trace-iverilog-errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T04:15:11+00:00",
+   "exact": true,
+   "sha": "b59eca8f1e7b280e2e3a84fadaf767bd30e64855",
+   "src": [
+    "lib/Dialect/HW/HWOps.cpp"
+   ],
+   "subject": "[HW] Fix crash on self-referential hw.wire canonicalize",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/HW/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T04:15:11+00:00",
+   "exact": true,
+   "sha": "72acea92c1d1b24a20074942662545854bb940d5",
+   "src": [
+    "lib/Dialect/Moore/MooreOps.cpp"
+   ],
+   "subject": "[Moore] Fix crash on self-referential AssignedVariableOp canonicalize",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/Moore/canonicalizers.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T04:15:11+00:00",
+   "exact": true,
+   "sha": "1625085798f39deca636471785987a853981cd4d",
+   "src": [
+    "lib/Conversion/ImportVerilog/Structure.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash on instance with unconvertible port values",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T04:15:11+00:00",
+   "exact": true,
+   "sha": "9445def950482e9ed2d257217c7a89fb8c6d3dae",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash on array new with unsupported size expr",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-22T04:15:11+00:00",
+   "exact": true,
+   "sha": "b190784994203deb63d4c7dceff710161030a47e",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix queue pop conversions bypassing rewriter",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-21T21:35:19+00:00",
+   "exact": true,
+   "sha": "c3e2100d37ca7db24bb505a72035d811efe72584",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix crash on class new with unsupported member types (#10001)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/MooreToCore/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-21T06:52:55+00:00",
+   "exact": true,
+   "sha": "b3b407b37bb255aee5cfd559dc32988b88c6e43d",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix crash on dynamic array variable conversion (#9996)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/MooreToCore/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-21T02:47:59+00:00",
+   "exact": true,
+   "sha": "3ef31bc4848a6fe81a682e176ef1c8f859478454",
+   "src": [
+    "lib/Conversion/ImportVerilog/Structure.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash on continuous assign with rise/fall delay (#9994)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-21T01:06:10+00:00",
+   "exact": true,
+   "sha": "d636fb5d3f01106948d850f7e8d822ce406e7a0a",
+   "src": [
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash on repeat loop with real count (#9992)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-21T00:38:58+00:00",
+   "exact": true,
+   "sha": "564e07083c52f37b1e9aa4e13b734c5fd3699b1a",
+   "src": [
+    "lib/Dialect/Sim/SimOps.cpp"
+   ],
+   "subject": "[Sim] Fix null dereference in StringConcatOp::fold (#9990)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Dialect/Sim/dynamic-strings.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-20T23:41:40+00:00",
+   "exact": true,
+   "sha": "246aa011e7b96f71216ae05ad596468b0c9d1f9c",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash on enum traversal methods (#9988)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-19T16:32:57+00:00",
+   "exact": true,
+   "sha": "337c72727242ce4b646eb6e7613aa1e2e6f31f33",
+   "src": [
+    "lib/Conversion/ExportVerilog/ExportVerilog.cpp"
+   ],
+   "subject": "[ExportVerilog] Fix missing error propagation (#9976)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ExportVerilog/verilog-errors-prop.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-17T16:16:59+00:00",
+   "exact": true,
+   "sha": "a069e06e7cb908cbfb7e9344448e63acfc7f4019",
+   "src": [
+    "lib/Conversion/ImportVerilog/Structure.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix moore.conversion legalization failure on interface ports (#9927)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-16T17:16:02+00:00",
+   "exact": true,
+   "sha": "1dfc471304be0af21f37ab428efc11bb97829375",
+   "src": [
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix a fork-join stmt bug (#9951)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-16T15:11:21+00:00",
+   "exact": true,
+   "sha": "e915a39ed63dc80872ef69babd6a37662b4ef78a",
+   "src": [
+    "lib/Conversion/CoreToFSM/CoreToFSM.cpp"
+   ],
+   "subject": "[CoreToFSM] Fix concat-in-mux losing possible state values (#9952)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/CoreToFSM/concat-mux.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-16T11:10:41+00:00",
+   "exact": true,
+   "sha": "b6dea0f9d436da460eb6ae7e8d2bc67011f605b2",
+   "src": [
+    "lib/Conversion/CoreToFSM/CoreToFSM.cpp"
+   ],
+   "subject": "[CoreToFSM] Fix guard-constant folding replacing fsm.update variable operand (#9950)",
+   "tag": "firtool-1.143.0",
+   "test": [
+    "test/Conversion/CoreToFSM/action-guard-simplify.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-03-12T17:00:11+00:00",
+   "exact": false,
+   "sha": "d0cb91fbd7cc5d9e80f95b069df93a70e29d0bbf",
+   "src": [
+    "lib/Dialect/Moore/Transforms/CreateVTables.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix a segmentation fault (#9894)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-03-11T16:15:37+00:00",
+   "exact": false,
+   "sha": "10ca02433451b093130b0af82c6aefd879011de8",
+   "src": [
+    "lib/Conversion/CoreToFSM/CoreToFSM.cpp"
+   ],
+   "subject": "[CoreToFSM] Fix infinite loop in GuardConditionFoldPattern on constants (#9905)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/CoreToFSM/action-guard-simplify.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-03-11T10:17:20+00:00",
+   "exact": false,
+   "sha": "a0ce24f531570c7b4ca59403940f217c515e890c",
+   "src": [
+    "lib/Conversion/CoreToFSM/CoreToFSM.cpp"
+   ],
+   "subject": "[CoreToFSM] Fix crash on regs without resets (#9899)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/CoreToFSM/basic.mlir",
+    "test/Conversion/CoreToFSM/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-03-11T10:09:41+00:00",
+   "exact": false,
+   "sha": "01c8443a464ce672bd4cdf5962e538989ded3e9f",
+   "src": [
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[ImportVerilog] Support for `disable iff` in a clocked assertion (#9875)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-10T14:18:16+00:00",
+   "exact": true,
+   "sha": "fb5d04cc5ab8bef5a96a3721cbda354a59c9d048",
+   "src": [
+    "lib/Conversion/FSMToSMT/FSMToSMT.cpp"
+   ],
+   "subject": "[FSMToSMT] fix initial state management (#9893)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/FSMToSMT/diff_init_state.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-10T11:14:44+00:00",
+   "exact": true,
+   "sha": "33c4c09aebddf296dcb79886b4aaf95f6c01ce4a",
+   "src": [
+    "lib/Dialect/Seq/Transforms/RegOfVecToMem.cpp"
+   ],
+   "subject": "[Seq][RegOfVecToMem] Fix invalid address type for single element memories (#9827)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Dialect/Seq/reg-of-vec-to-mem.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-06T23:40:08+00:00",
+   "exact": true,
+   "sha": "a3e42c4e87c491dcc002a75d6e94eaa0b5512634",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix crash when using `$` in queue range selection (#9779)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-05T06:25:49+00:00",
+   "exact": true,
+   "sha": "f6d9f05b820fa946321cae6fb73a29f1b97821af",
+   "src": [
+    "lib/Dialect/Synth/Transforms/SOPBalancing.cpp"
+   ],
+   "subject": "[SOPBalancing] Fix non-determinism from duplicated value numbering (#9836)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Dialect/Synth/sop-balancing.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-04T17:31:56+00:00",
+   "exact": true,
+   "sha": "ca876e0b68d23b0e9f99bef63550cf5d6c3e8352",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/ModuleInliner.cpp"
+   ],
+   "subject": "[FIRRTL][Inliner] Fix NLA updates during flattening (#9810)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Dialect/FIRRTL/inliner.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-03T17:24:11+00:00",
+   "exact": true,
+   "sha": "016f7c0a1e228af443b5dbc7036a03e34ec0600a",
+   "src": [
+    "lib/Conversion/HWToBTOR2/HWToBTOR2.cpp"
+   ],
+   "subject": "[HWToBTOR2][NFC] Fix typo in multi-clock error (#9819)",
+   "tag": "firtool-1.142.0",
+   "test": [
+    "test/Conversion/HWToBTOR2/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-03-02T12:20:55+00:00",
+   "exact": true,
+   "sha": "115a3111e2cef1467f957269cfa4300af06c4014",
+   "src": [
+    "lib/Dialect/RTG/Transforms/ElaborationPass.cpp"
+   ],
+   "subject": "[RTG][Elaboration] Fix getUniformInRange (#9806)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/RTG/Transform/elaboration.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-26T08:56:44+00:00",
+   "exact": true,
+   "sha": "11cc66244cebb2577997c2f42a477e836e1c700f",
+   "src": [
+    "lib/Conversion/DatapathToComb/DatapathToComb.cpp"
+   ],
+   "subject": "[Datapath] Bug Fix for Sign-Extension Logic when Lowering Partial Products to Booth Arrays (#9726) (#9744)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Conversion/DatapathToComb/datapath-to-comb.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-26T06:30:32+00:00",
+   "exact": true,
+   "sha": "a0ddbccf04f51d2076beb7e75b7a9124b01c7b44",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLOps.cpp"
+   ],
+   "subject": "[FIRRTL] Fix domain info updates in cloneWithInsertedPorts (#9758)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-open-aggs.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-23T04:11:29+00:00",
+   "exact": true,
+   "sha": "c1ef24514cea6e59361394377bf28d3d52fee660",
+   "src": [
+    "include/circt/Dialect/Comb/CombOps.h"
+   ],
+   "subject": "[Comb] Fix SextMatcher crash on block arguments",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-22T06:48:33+00:00",
+   "exact": true,
+   "sha": "0e9f82038b32830fd5af0db76beaf8a1ad57718f",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerLayers.cpp"
+   ],
+   "subject": "[FIRRTL][LowerLayers] Fix instance input port capture",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-layers.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-21T15:18:39+00:00",
+   "exact": true,
+   "sha": "73e28e09a3b5ba17ab4eba999d5bbff7031b11ee",
+   "src": [
+    "lib/Conversion/CalyxToHW/CalyxToHW.cpp"
+   ],
+   "subject": "[CalyxToHW] Fix missing i1-to-clock conversion in convertPipelineOp (#9715)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Conversion/CalyxToHW/pipeline-clock.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-19T07:38:30+00:00",
+   "exact": true,
+   "sha": "b2ab3aff00ca81a69d4594ca03bc9100db372512",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/Dedup.cpp"
+   ],
+   "subject": "[FIRRTL] Dedup: fix non-deduplicatable public module handling (#9702)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/FIRRTL/dedup.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-19T00:00:59+00:00",
+   "exact": true,
+   "sha": "10fbfc9b17ac4f44683e1ce8b10564d2c260cb0c",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[FIRRTL][Reduce] Fix module-port-pruner crash with probe ports (#9694)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/FIRRTL/Reduction/module-port-pruner-probe.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-14T09:35:29+00:00",
+   "exact": true,
+   "sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
+   "src": [
+    "lib/Conversion/HandshakeToHW/HandshakeToHW.cpp"
+   ],
+   "subject": "[HandshakeToHW] Fix crashes when multiple `sync`s with different numbers of `none` inputs are used (#9587)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Conversion/HandshakeToHW/test_buffer.mlir",
+    "test/Conversion/HandshakeToHW/test_cmerge.mlir",
+    "test/Conversion/HandshakeToHW/test_cond_br.mlir",
+    "test/Conversion/HandshakeToHW/test_constant.mlir",
+    "test/Conversion/HandshakeToHW/test_fork.mlir",
+    "test/Conversion/HandshakeToHW/test_join.mlir",
+    "test/Conversion/HandshakeToHW/test_simple_loop.mlir",
+    "test/Conversion/HandshakeToHW/test_source.mlir",
+    "test/Conversion/HandshakeToHW/test_sync.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-09T21:51:11+00:00",
+   "exact": true,
+   "sha": "f9b8bd46511da71e47e2a11437fa49b55a2a7b29",
+   "src": [
+    "include/circt/Dialect/HW/HWAggregates.td",
+    "lib/Dialect/HW/HWOps.cpp"
+   ],
+   "subject": "[HW] Fix ArrayCreateOp verifier to support typealiases and add optional result type syntax (#9639)",
+   "tag": "firtool-1.141.0",
+   "test": [
+    "test/Dialect/HW/typedecls.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-03T18:52:24+00:00",
+   "exact": true,
+   "sha": "ef82ef1b1e33a8ec4d9a74a134e4ecfb4d8256a6",
+   "src": [
+    "include/circt/Dialect/FIRRTL/FIRRTLCanonicalization.td"
+   ],
+   "subject": "[FIRRTL] Fix canonicalizer infinite loop with const types (#9595)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-02T23:07:29+00:00",
+   "exact": true,
+   "sha": "db9b1154c4146971ff88c2e3d758d95a9768628c",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/RemoveUnusedPorts.cpp"
+   ],
+   "subject": "[circt-reduce] Fix firrtl-remove-unused-ports crash with probes",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/remove-unused-ports.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-02T23:07:29+00:00",
+   "exact": true,
+   "sha": "010d18b95ff2307ebd14933cb76dfc70eacdf39e",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[circt-reduce] Fix extmodule-instance-remover crash with strings",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/Reduction/extmodule-instance-remover.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-02T18:18:44+00:00",
+   "exact": true,
+   "sha": "0de87ef355e6cf86dd4c171480fe0629e6fe4df4",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[circt-reduce] Fix instance-stubber: ref/property",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/Reduction/instance-stubber.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-02T17:59:44+00:00",
+   "exact": true,
+   "sha": "b7d165dedca7b549424674bec3fd231dd93d5f46",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[circt-reduce] Fix module-name-sanitizer crash with objects (#9584)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/circt-reduce/name-sanitizer.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-02-02T04:09:12+00:00",
+   "exact": true,
+   "sha": "d3c93988fd681f771a59520938be417eb31a9ad2",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLReductions.cpp"
+   ],
+   "subject": "[circt-reduce] Fix connect-forwarder crash with layerblocks (#9581)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/Reduction/connect-forwarder.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-30T20:09:23+00:00",
+   "exact": true,
+   "sha": "e36f5695723e46a6d8463a521452dcda8aff2c4b",
+   "src": [
+    "include/circt/Dialect/FIRRTL/FIRRTLCanonicalization.td"
+   ],
+   "subject": "[FIRRTL] Fix canonicalizer crash on non-IntType inputs to cast patterns (#9550)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-30T19:15:45+00:00",
+   "exact": true,
+   "sha": "db50d3131cec54ad9fc19f8de2910e616caa704d",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/Mem2Reg.cpp"
+   ],
+   "subject": "[LLHD] Fix mem2reg to capture all live values across wait ops (#9552)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/mem2reg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-30T18:37:49+00:00",
+   "exact": true,
+   "sha": "89778e1bebd3751b1b0f729c320cfa09a13f7d7d",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix silent failure on unsupported system calls (#9556)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-30T18:37:33+00:00",
+   "exact": true,
+   "sha": "2fdae8fcfef599681d18d6521a4f568f32f3006e",
+   "src": [
+    "include/circt/Dialect/Arc/Runtime/TraceEncoder.h",
+    "lib/Dialect/Arc/Runtime/VCDTraceEncoder.cpp"
+   ],
+   "subject": "[ArcRuntime][VCDTrace] Fix final time step on empty trace buffer (#9554)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "integration_test/arcilator/JIT/runtime-vcd-nochange.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-01-29T19:03:47+00:00",
+   "exact": false,
+   "sha": "3086bac387d1d631c00db726bd7f4ad3b123859a",
+   "src": [
+    "lib/Conversion/ImportVerilog/AssertionExpr.cpp"
+   ],
+   "subject": "[ImportVerilog] Swap assertion calls to to_builtin_int (#9543)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Conversion/ImportVerilog/builtins.sv",
+    "test/Conversion/ImportVerilog/errors.sv"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-01-29T07:45:47+00:00",
+   "exact": false,
+   "sha": "b476431e74ec362343f27ebf8957db91764ffdfd",
+   "src": [
+    "include/circt/Dialect/Synth/Analysis/LongestPathAnalysis.h",
+    "lib/Dialect/Synth/Analysis/LongestPathAnalysis.cpp"
+   ],
+   "subject": "[Synth][LongestPathAnalysis] Fix an incorrect instanch path (#9536)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/Synth/longest-paths.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-01-26T06:35:59+00:00",
+   "exact": false,
+   "sha": "4c4a16553aa3bfffcc32f550cc4b4047d6fc93e7",
+   "src": [
+    "lib/Conversion/ImportVerilog/Structure.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix class method prototype resolution (#9508)",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Conversion/ImportVerilog/classes.sv"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-01-24T01:48:14+00:00",
+   "exact": false,
+   "sha": "142c02c65dcac7fe05d71af36399c85766d13ec8",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerDomains.cpp"
+   ],
+   "subject": "[FIRRTL] Fix LowerDomains for multi-use wires",
+   "tag": "firtool-1.140.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-domains.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2026-01-17T05:17:07+00:00",
+   "exact": false,
+   "sha": "380a44a69243306be724036806f6cae00aa21a51",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InferResets.cpp"
+   ],
+   "subject": "[FIRRTL][InferResets] Fix reset domain inference for multiple top-level modules (#9464)",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/FIRRTL/infer-resets-errors.mlir",
+    "test/Dialect/FIRRTL/infer-resets.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-12T16:11:54+00:00",
+   "exact": true,
+   "sha": "242b4a2959dca2918e850db64c41689e6eea320a",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/HoistSignals.cpp"
+   ],
+   "subject": "[LLHD] Fix multiply-driven signals being hoisted incorrectly (#9421)",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/hoist-signals.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2026-01-06T20:30:24+00:00",
+   "exact": true,
+   "sha": "9fe788f13100fe6f56bed446ad4fc960530e1ba1",
+   "src": [
+    "include/circt/Dialect/FIRRTL/FIRRTLOps.h"
+   ],
+   "subject": "Fix isSeqMem() check to allow externalization of memories with read-/write-latency >= 1 (#9419)",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-memory.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-29T21:04:46+00:00",
+   "exact": true,
+   "sha": "b79ae60f6c433bf6b1f04622738f06666b909330",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerSignatures.cpp"
+   ],
+   "subject": "[FIRRTL] Fix LowerSignatures to work with Domains",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-signatures.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-27T18:42:11+00:00",
+   "exact": true,
+   "sha": "db06bf66d7f649fff294f180394b3b0d8d289fc5",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/LowerTypes.cpp"
+   ],
+   "subject": "[FIRRTL] Fix LowerTypes so it works with Domains",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/FIRRTL/lower-types.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-16T03:52:04+00:00",
+   "exact": true,
+   "sha": "a0f3eb4086bc63736af219ec99697b4b89d6e598",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/HoistSignals.cpp"
+   ],
+   "subject": "[LLHD] Fix HoistSignals with non-uniform drive delays (#9349)",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/hoist-signals.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-15T22:08:36+00:00",
+   "exact": true,
+   "sha": "394cc2beb238407238b084b6102510a03e710112",
+   "src": [
+    "lib/Dialect/ESI/runtime/python/esiaccel/esiCppAccel.cpp"
+   ],
+   "subject": "[ESI][Runtime] Fix integration test",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "integration_test/Dialect/ESI/runtime/loopback.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-11T23:36:10+00:00",
+   "exact": true,
+   "sha": "ad277c6bdbffe8269f88ddb653e1e13bab60f2f1",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/Dedup.cpp"
+   ],
+   "subject": "[FIRRTL] Fix Dedup issue caused by name shadowing (#9336)",
+   "tag": "firtool-1.139.0",
+   "test": [
+    "test/Dialect/FIRRTL/dedup.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-05T20:55:17+00:00",
+   "exact": true,
+   "sha": "bf970671340c099008188c24f3ba8b2aada6c7e7",
+   "src": [
+    "lib/Conversion/ExportVerilog/ExportVerilog.cpp"
+   ],
+   "subject": "[ExportVerilog] Fix union emission error",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Conversion/ExportVerilog/hw-dialect.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-12-02T02:18:10+00:00",
+   "exact": true,
+   "sha": "3777d1550908e4c1ce3c26053e187b7df5ce0cd5",
+   "src": [
+    "lib/Dialect/HW/HWOps.cpp"
+   ],
+   "subject": "[HW] Fix array_create and struct_create folding with non-integer attributes.",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Dialect/HW/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-28T01:30:58+00:00",
+   "exact": true,
+   "sha": "dc45595e7e8031f78c91978bd31b9b90c88420f3",
+   "src": [
+    "lib/Dialect/Synth/SynthOps.cpp"
+   ],
+   "subject": "[Synth] Fix crash in AndInverterOp folding with non-integer operands",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Dialect/Synth/canonicalizer.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-27T23:34:22+00:00",
+   "exact": true,
+   "sha": "f5f5a6567ca532594df43f7d365c22879fecfbaa",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[CombFolds] Fix crash in folding with non-integer attribute operands (#9273)",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-27T11:42:00+00:00",
+   "exact": true,
+   "sha": "fa7eb12bf52d4433bf372801a598ade775a9e16c",
+   "src": [
+    "lib/Transforms/IndexSwitchToIf.cpp"
+   ],
+   "subject": "[SwitchToIf] support multi-result scf.index_switch + add regression test (#9245)",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Transforms/switch-to-if.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-24T12:36:57+00:00",
+   "exact": true,
+   "sha": "61b1c871234e947958e70e1e6e48944d48dbcd21",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Fix lowering of dynamic extracts of nested arrays (#9257)",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-20T02:48:31+00:00",
+   "exact": true,
+   "sha": "351189822e33cd4d1c1c0a780d9ede002feaf00b",
+   "src": [
+    "lib/Dialect/ESI/ESITypes.cpp"
+   ],
+   "subject": "[ESI] Window lowered type fix (#9243)",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "test/Dialect/ESI/windows.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-20T00:52:01+00:00",
+   "exact": true,
+   "sha": "76fc7146b8e93d743dbb38eb608a5810f7e60926",
+   "src": [
+    "lib/Dialect/ESI/runtime/python/esiaccel/codegen.py"
+   ],
+   "subject": "[ESI][Runtime] Fix a test and some source broken by 25f3ac8",
+   "tag": "firtool-1.138.0",
+   "test": [
+    "integration_test/Dialect/ESI/runtime/loopback.mlir.py"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-11-07T23:12:01+00:00",
+   "exact": true,
+   "sha": "91872b228b74931e77419e7b6c36a4bbf8cc0431",
+   "src": [
+    "include/circt/Dialect/SV/SVTypeDecl.td",
+    "lib/Conversion/FIRRTLToHW/LowerToHW.cpp"
+   ],
+   "subject": "Fix inout port lowering for sv.verbatim.module (#9209)",
+   "tag": "firtool-1.137.0",
+   "test": [
+    "test/Conversion/FIRRTLToHW/lower-to-hw-verbatim-blackbox.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2025-11-05T06:05:30+00:00",
+   "exact": false,
+   "sha": "7cf1c5cf263b85ef517533f86c0a33d401606948",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix LValue generation for ClassPropertySymbol",
+   "tag": "firtool-1.136.0",
+   "test": [
+    "test/Conversion/ImportVerilog/classes.sv"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2025-11-03T18:11:28+00:00",
+   "exact": false,
+   "sha": "baefacd3881f120f6fd4a4d37f4ef57e5763448f",
+   "src": [
+    "lib/Dialect/RTG/Transforms/ElaborationPass.cpp"
+   ],
+   "subject": "[RTG][Elaboration] Fix incorrect set equality (#9175)",
+   "tag": "firtool-1.136.0",
+   "test": [
+    "test/Dialect/RTG/Transform/elaboration.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-31T06:02:48+00:00",
+   "exact": true,
+   "sha": "6bfecf76581df8a9c5290f2c7e4a5c5d469511d0",
+   "src": [
+    "lib/Conversion/ImportVerilog/Structure.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix capture callback chaining",
+   "tag": "firtool-1.135.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-29T09:39:51+00:00",
+   "exact": true,
+   "sha": "9dfde5ef309fd967888d3b99f16cb49c82806c35",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[Comb] Fix another recursive mux canonicalizer (#9144)",
+   "tag": "firtool-1.135.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-21T06:01:57+00:00",
+   "exact": true,
+   "sha": "a509cfea3101f86240d35fbd50b96a97d3f20500",
+   "src": [
+    "include/circt/Dialect/Synth/Transforms/SynthPasses.td"
+   ],
+   "subject": "[Synth][LowerVariadic] Fix a dialect dependency (#9118)",
+   "tag": "firtool-1.134.0",
+   "test": [
+    "test/Dialect/Synth/lower-variadic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-20T19:18:01+00:00",
+   "exact": true,
+   "sha": "0fca2bd7f5350f7048f9484cf17406a50ec72899",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix dynamic part-select index typing and add test",
+   "tag": "firtool-1.134.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-17T18:01:32+00:00",
+   "exact": true,
+   "sha": "52e3074ff26ba47b9fad10e27d1bc6c72af4914c",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/Dedup.cpp"
+   ],
+   "subject": "[FIRRTL] Fix dedup looking up wrong op in inner ref target check (#9104)",
+   "tag": "firtool-1.134.0",
+   "test": [
+    "test/Dialect/FIRRTL/dedup-errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-16T00:18:03+00:00",
+   "exact": true,
+   "sha": "bdbbd4ba30322d0d1879507a3416c96e4fd98251",
+   "src": [
+    "lib/Dialect/Synth/Transforms/LowerVariadic.cpp",
+    "lib/Dialect/Synth/Transforms/SynthesisPipeline.cpp"
+   ],
+   "subject": "[Synth][LowerVariaidc] Fix UAF, topological ordering and a pass phase ordering (#9095)",
+   "tag": "firtool-1.134.0",
+   "test": [
+    "test/Dialect/Synth/lower-variadic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-10T09:29:23+00:00",
+   "exact": true,
+   "sha": "1bb65bd284155a2210a3b94d9ecd5f48cdcee6f4",
+   "src": [
+    "lib/Dialect/Synth/SynthOps.cpp"
+   ],
+   "subject": "[Synth] Fix an incorrect canonicalization",
+   "tag": "firtool-1.132.0",
+   "test": [
+    "test/Dialect/Synth/canonicalizer.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-10-09T00:02:59+00:00",
+   "exact": true,
+   "sha": "1286a6c3eca4daa544caa532f916db3aa45e081e",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[Comb] Fix mux canonicalizers for non-signless-ints (#9071)",
+   "tag": "firtool-1.132.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-09-20T21:31:11+00:00",
+   "exact": true,
+   "sha": "ffd1d5eb87e4a9f57f58562e3b07d1461137d240",
+   "src": [
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix single argument expressions in severity tasks (#8998)",
+   "tag": "firtool-1.132.0",
+   "test": [
+    "test/Conversion/ImportVerilog/builtins.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-09-18T20:33:28+00:00",
+   "exact": true,
+   "sha": "09f0bbe083a36fdd8cc7a0234931cfab7bb96c58",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[Moore] Fix missing RValue conversion for struct_create (#8988)",
+   "tag": "firtool-1.129.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-09-11T18:16:48+00:00",
+   "exact": true,
+   "sha": "978f392c2b69043d46441920d23834908f511bfb",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix edge case for single-bit pre- and post-increment (#8945)",
+   "tag": "firtool-1.129.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2025-08-27T10:27:53+00:00",
+   "exact": false,
+   "sha": "14511d96a67687d39b0bb698fed9cbe92d20ff11",
+   "src": [
+    "lib/Conversion/ExportVerilog/PrepareForEmission.cpp"
+   ],
+   "subject": "[ExportVerilog] Fix crash for variadic ops with a single operand (#8894)",
+   "tag": "firtool-1.129.0",
+   "test": [
+    "test/Conversion/ExportVerilog/prepare-for-emission.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2025-08-26T08:30:45+00:00",
+   "exact": false,
+   "sha": "a197d6e076c132b03b42a03f62c43bb66d905f2f",
+   "src": [
+    "lib/Conversion/CombToAIG/CombToAIG.cpp"
+   ],
+   "subject": "[circt-synth] Parallel Prefix Lowering Performance Bug Fix (#8881)",
+   "tag": "firtool-1.129.0",
+   "test": [
+    "test/circt-synth/path-e2e.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-08-18T16:29:55+00:00",
+   "exact": true,
+   "sha": "4d57dc9240721b4b2a1ffd22521e0ac10dd760c1",
+   "src": [
+    "lib/Conversion/HWToLLVM/HWToLLVM.cpp"
+   ],
+   "subject": "[HWToLLVM] Fix struct_inject lowering using pre-lowering operand (#8867)",
+   "tag": "firtool-1.128.0",
+   "test": [
+    "test/Conversion/HWToLLVM/convert_aggregates.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-08-14T23:04:31+00:00",
+   "exact": true,
+   "sha": "9f021153418e05376b4a53aa3ae66921d391e518",
+   "src": [
+    "lib/Conversion/ImportVerilog/ImportVerilog.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix Slang crash when loading same file twice",
+   "tag": "firtool-1.128.0",
+   "test": [
+    "test/circt-verilog/redundant-files.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-08-12T19:21:42+00:00",
+   "exact": true,
+   "sha": "765883a3939828b80d5de0c509f1f7b43656567b",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp",
+    "lib/Dialect/Moore/MooreOps.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix assignment to concat of packed arrays (#8841)",
+   "tag": "firtool-1.128.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-08-11T21:14:20+00:00",
+   "exact": true,
+   "sha": "4fa60bb1d2cf74163d26dacf0d2b4912f7293096",
+   "src": [
+    "lib/Conversion/ImportVerilog/ImportVerilog.cpp",
+    "lib/Conversion/ImportVerilog/ImportVerilogInternals.h"
+   ],
+   "subject": "[ImportVerilog] Fix file locations for auto-discovered files (#8840)",
+   "tag": "firtool-1.128.0",
+   "test": [
+    "test/circt-verilog/include/library_module.sv",
+    "test/circt-verilog/library-locations.sv",
+    "test/circt-verilog/preprocess-errors.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-08-06T22:21:38+00:00",
+   "exact": true,
+   "sha": "cb22826d27fb2af6fcc22472e904c894ec70311e",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/UnrollLoops.cpp"
+   ],
+   "subject": "[LLHD] Fix UnrollLoops crash on single-block regions",
+   "tag": "firtool-1.128.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/unroll-loops.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-25T14:57:07+00:00",
+   "exact": true,
+   "sha": "82a8af4acfeaaa20afd3d3545800595b876f5510",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[Comb] Fix more recursive mux folders (#8756)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-23T22:29:56+00:00",
+   "exact": true,
+   "sha": "237f744475155b056467c291ec7a355a4453b8ac",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLOps.cpp"
+   ],
+   "subject": "[FIRRTL] Fix TagExtractOp's type inference (#8766)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Dialect/FIRRTL/parse-basic.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-22T16:16:17+00:00",
+   "exact": true,
+   "sha": "e80a67d30db4301fa1b57b0e0ec27abdf08f5c68",
+   "src": [
+    "lib/Conversion/VerifToSMT/VerifToSMT.cpp"
+   ],
+   "subject": "[VerifToSMT] Fix lowering of no output, no result LEC op (#8763)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Conversion/VerifToSMT/verif-to-smt.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-21T16:27:07+00:00",
+   "exact": true,
+   "sha": "888e6787e4e2a43278891120da693627e25ab048",
+   "src": [
+    "lib/Conversion/FSMToSV/FSMToSV.cpp"
+   ],
+   "subject": "[FSMToSV] Fix bug of operations not being cloned in transition region (#8753)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Conversion/FSMToSV/test_basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-20T03:51:17+00:00",
+   "exact": true,
+   "sha": "dc524e9ea04f496cfbefbbdf505b414c9b164626",
+   "src": [
+    "lib/Dialect/AIG/Analysis/LongestPathAnalysis.cpp"
+   ],
+   "subject": "[AIG][LongestPathAnalysis] Fix a bug in deduplicatePathsImpl (#8746)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "integration_test/Bindings/Python/dialects/aig.py",
+    "test/Dialect/AIG/longest-paths.mlir",
+    "test/circt-synth/path-e2e.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-19T10:10:36+00:00",
+   "exact": true,
+   "sha": "24bd19e3cc12f242696e6e3565cb10d11eee37bf",
+   "src": [
+    "lib/Dialect/RTG/Transforms/ElaborationPass.cpp"
+   ],
+   "subject": "[RTG] Fix ValidateOp elaboration (#8743)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Dialect/RTG/Transform/elaboration.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-18T20:39:05+00:00",
+   "exact": true,
+   "sha": "47cf87cdcdd3e9811fb5f0654a87b77264aa0e4c",
+   "src": [
+    "lib/Firtool/Firtool.cpp"
+   ],
+   "subject": "[firtool] Fix argument passing to LowerAnnotations",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/firtool/annotation-unknown.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-17T22:50:53+00:00",
+   "exact": true,
+   "sha": "3e42dbce123a4210d6650e470b039d11815d9fb5",
+   "src": [
+    "lib/Dialect/ESI/ESIDialect.cpp",
+    "lib/Dialect/ESI/ESIFolds.cpp"
+   ],
+   "subject": "[ESI] Fix wrap op canonicalizers (#8730)",
+   "tag": "firtool-1.126.0",
+   "test": [
+    "test/Dialect/ESI/canonicalizers.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-12T00:30:48+00:00",
+   "exact": true,
+   "sha": "7df789c3ba70c66031ec6d6782dbf380785bd8de",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[Comb] Fix excessive const shifts causing crashes and invalid IR (#8696)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-11T11:52:59+00:00",
+   "exact": true,
+   "sha": "ece9412ddfe3a89afc3e44851fab343ae697eba0",
+   "src": [
+    "lib/Conversion/VerifToSMT/VerifToSMT.cpp"
+   ],
+   "subject": "[VerifToSMT] Fix lowering of initial integer values for BMC (#8689)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Conversion/VerifToSMT/verif-to-smt-errors.mlir",
+    "test/Conversion/VerifToSMT/verif-to-smt.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-09T22:30:42+00:00",
+   "exact": true,
+   "sha": "dfa0fe98e99cb22dc05ef4dc4399d2f23361d904",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InjectDUTHierarchy.cpp"
+   ],
+   "subject": "[FIRRTL] Fix inject-dut-hier deleting new top (#8678)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Dialect/FIRRTL/inject-dut-hierarchy.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-09T04:28:42+00:00",
+   "exact": true,
+   "sha": "3df813fd7e65fbca66ffd1fe83395b7c726b4b2a",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix range selects, unify lvalue/rvalue code paths",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-07-02T09:59:57+00:00",
+   "exact": true,
+   "sha": "d77bd7f21dbb705259085c3aa6eb350db553d92d",
+   "src": [
+    "lib/Dialect/AIG/Analysis/LongestPathAnalysis.cpp"
+   ],
+   "subject": "[AIG] Fix history's instance path update in LongestPathAnalysis (#8637)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Dialect/AIG/longest-paths.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-30T23:21:13+00:00",
+   "exact": true,
+   "sha": "81140f6a2c1e9785a8705e3d7a7dd327226f3634",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/GrandCentral.cpp"
+   ],
+   "subject": "[FIRRTL] Fix Grand Central companion not-in-design (#8625)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Dialect/FIRRTL/grand-central.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-28T21:29:05+00:00",
+   "exact": true,
+   "sha": "1b810c5d4aed68613a521c6e21ec959bb4ae20f9",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLFolds.cpp"
+   ],
+   "subject": "[FIRRTL] Fix cat canonicalization to handle mixed signed/unsigned operands (#8621)",
+   "tag": "firtool-1.123.0",
+   "test": [
+    "test/Dialect/FIRRTL/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-22T23:26:41+00:00",
+   "exact": true,
+   "sha": "09a701bb6577ae704706792f9f0b83ddd3445003",
+   "src": [
+    "lib/Conversion/ImportAIGER/ImportAIGER.cpp"
+   ],
+   "subject": "[AIG][ImportAIGER] Fix incorrect tokenization and simplify parser (#8588)",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Conversion/ImportAIGER/invalid-index.aig",
+    "test/Conversion/ImportAIGER/invalid-index.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-13T18:47:05+00:00",
+   "exact": true,
+   "sha": "ca84bb763f34f168ce4f5e3363b35fa0646492a4",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/InjectDUTHierarchy.cpp"
+   ],
+   "subject": "[FIRRTL] Fix public copying in inject-dut-hier",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Dialect/FIRRTL/inject-dut-hierarchy.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-06T00:20:22+00:00",
+   "exact": true,
+   "sha": "5da61416c3739234396efad0bd74c8e4c3549fec",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/CombineDrives.cpp"
+   ],
+   "subject": "[LLHD] Fix drive combining for single-element arrays and structs",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/combine-drives.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-04T23:28:05+00:00",
+   "exact": true,
+   "sha": "9be24fbb4939e409d2c7d4388d7f38c4168d06ba",
+   "src": [
+    "lib/Dialect/LLHD/IR/LLHDOps.cpp"
+   ],
+   "subject": "[LLHD] Fix canonicalizer crashing on empty processes with results",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Dialect/LLHD/Canonicalization/processes.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-03T18:47:34+00:00",
+   "exact": true,
+   "sha": "ce9146a64ab850a0d68470d85e026d1b10d1a309",
+   "src": [
+    "lib/Dialect/Comb/CombFolds.cpp"
+   ],
+   "subject": "[CombFolds] Fix comb.mul folder for i0",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Dialect/Comb/canonicalization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-06-02T16:33:42+00:00",
+   "exact": true,
+   "sha": "a1d66ba1349904ca867f957f3246ab86080c1d44",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/Deseq.cpp"
+   ],
+   "subject": "[LLHD] Fix deseq poisoning comb ops that don't depend on triggers (#8513)",
+   "tag": "firtool-1.121.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/deseq.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-05-23T09:09:07+00:00",
+   "exact": true,
+   "sha": "27fdf5525cdc5503df22cb1d7e7eb6d94a1d79a6",
+   "src": [
+    "lib/Dialect/Arc/Transforms/InlineArcs.cpp"
+   ],
+   "subject": "[Arc] Fix arc inliner deleting arcs that still have calls (#8510)",
+   "tag": "firtool-1.117.0",
+   "test": [
+    "test/Dialect/Arc/inline-arcs.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-05-21T20:47:33+00:00",
+   "exact": true,
+   "sha": "a49186699205898f66c3dfe4b5ca1535ef47e9c6",
+   "src": [
+    "include/circt/Dialect/LLHD/Transforms/LLHDPasses.td",
+    "lib/Dialect/LLHD/Transforms/Mem2Reg.cpp"
+   ],
+   "subject": "[LLHD] Fix handling of conditional drives (#8498)",
+   "tag": "firtool-1.117.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/mem2reg.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-04-19T02:26:28+00:00",
+   "exact": true,
+   "sha": "a1929a1878d4f37279684d87a5edf9b2f88787b6",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLOps.cpp"
+   ],
+   "subject": "[firrtl] Fix fprintf round trip issue",
+   "tag": "firtool-1.114.0",
+   "test": [
+    "test/Dialect/FIRRTL/round-trip.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-04-09T17:23:39+00:00",
+   "exact": true,
+   "sha": "bd6949339c410d700751050e505fbaf2b04bbb2d",
+   "src": [
+    "lib/Conversion/ImportVerilog/Expressions.cpp"
+   ],
+   "subject": "[ImportVerilog] Fix empty replications within concatenations",
+   "tag": "firtool-1.110.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-03-31T19:48:01+00:00",
+   "exact": true,
+   "sha": "475b936c55e8a4041a4cdafb38902e70b938f6f0",
+   "src": [
+    "lib/Dialect/FIRRTL/Import/FIRParser.cpp"
+   ],
+   "subject": "[FIRRTL] Fix: Enforce flat namespace for modules (#8345)",
+   "tag": "firtool-1.110.0",
+   "test": [
+    "test/Dialect/FIRRTL/parse-basic.fir",
+    "test/Dialect/FIRRTL/parse-errors.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-03-27T12:46:04+00:00",
+   "exact": true,
+   "sha": "ac1184031e209d444e4fd7acccf5f68e2aa53551",
+   "src": [
+    "lib/Dialect/Seq/Transforms/HWMemSimImpl.cpp"
+   ],
+   "subject": "[Seq] Fix width errors in HWMemSimImpl (#8351)",
+   "tag": "firtool-1.110.0",
+   "test": [
+    "test/Dialect/Seq/hw-memsim.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-03-20T01:50:22+00:00",
+   "exact": true,
+   "sha": "9570cdc98d19ff3866c2580c4eab9eae58ccbfc3",
+   "src": [
+    "include/circt/Dialect/FIRRTL/FIRRTLCanonicalization.td",
+    "lib/Dialect/FIRRTL/FIRRTLFolds.cpp"
+   ],
+   "subject": "[FIRRTL] Canonicalize Assert(clk, p, e) when p == e (#8320)",
+   "tag": "firtool-1.109.0",
+   "test": [
+    "test/Dialect/FIRRTL/canonicalization.mlir",
+    "test/firtool/extract-test-code.fir",
+    "test/firtool/layer-merge-across-inlined-submodule.fir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2025-03-06T19:52:59+00:00",
+   "exact": false,
+   "sha": "b08feee25e60deaad914f5bcce50c5b61662a971",
+   "src": [
+    "lib/Dialect/Verif/Transforms/LowerContracts.cpp"
+   ],
+   "subject": "[Verif] Add multiplier integration test, fix bug in lower contracts (#8300)",
+   "tag": "firtool-1.109.0",
+   "test": [
+    "integration_test/circt-test/contracts.mlir",
+    "test/Dialect/Verif/lower-contracts.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-02-27T22:31:57+00:00",
+   "exact": true,
+   "sha": "c7c7352daf11cd4d4dd20cc2a05e3c2e4758056a",
+   "src": [
+    "lib/Dialect/Calyx/Transforms/AffineParallelUnroll.cpp"
+   ],
+   "subject": "[AffineParallelUnroll] Fix empty map lookup; move canonicalization passes before `MemoryConflictResolver` (#8282)",
+   "tag": "firtool-1.107.0",
+   "test": [
+    "test/Dialect/Calyx/affine-parallel-unroll.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-02-26T03:18:07+00:00",
+   "exact": true,
+   "sha": "3f0aa622f0ca59877dececf8631bf7028b59b051",
+   "src": [
+    "lib/Dialect/ESI/Passes/ESILowerToHW.cpp"
+   ],
+   "subject": "[ESI] Fix assert on lower unwrap value from block arg",
+   "tag": "firtool-1.107.0",
+   "test": [
+    "test/Dialect/ESI/passes/lower_to_hw_errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-02-08T13:59:45+00:00",
+   "exact": true,
+   "sha": "6e93a0e8400d2e2f17725af096d470584713eda1",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore]Fix a crash caused by block args as observed values for llhd.wait. (#8210)",
+   "tag": "firtool-1.103.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-02-06T21:38:01+00:00",
+   "exact": true,
+   "sha": "8ba4ceaf3764c0ce755e02a9c01760a931a1acdd",
+   "src": [
+    "lib/Dialect/FIRRTL/FIRRTLOps.cpp"
+   ],
+   "subject": "[FIRRTL] Fix hasDontTouch crash on non-module block args (#8157)",
+   "tag": "firtool-1.103.0",
+   "test": [
+    "test/Dialect/FIRRTL/imdce.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-01-31T17:59:11+00:00",
+   "exact": true,
+   "sha": "671dec51619c13b0812614212ba77d5ae1746308",
+   "src": [
+    "lib/Dialect/RTG/Transforms/ElaborationPass.cpp"
+   ],
+   "subject": "[RTG][Elaboration] Support fixed and virtual registers (#8101)",
+   "tag": "firtool-1.103.0",
+   "test": [
+    "test/Dialect/RTG/Transform/elaboration.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-01-25T16:17:30+00:00",
+   "exact": true,
+   "sha": "0cea50e9e7d28044485a0e9547de013049b70ecd",
+   "src": [
+    "lib/Conversion/SCFToCalyx/SCFToCalyx.cpp"
+   ],
+   "subject": "[SCFToCalyx] Lower floating point comparison logic fix",
+   "tag": "firtool-1.103.0",
+   "test": [
+    "test/Conversion/SCFToCalyx/convert_simple.mlir",
+    "test/Conversion/SCFToCalyx/float_compare.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-01-15T02:10:32+00:00",
+   "exact": true,
+   "sha": "09790a726509c031cc8c299c9b9d54a719576b85",
+   "src": [
+    "lib/Conversion/SCFToCalyx/SCFToCalyx.cpp"
+   ],
+   "subject": "[SCFToCalyx] Fix lowering `scf.if` op when it yields nothing (#8079)",
+   "tag": "firtool-1.100.0",
+   "test": [
+    "test/Conversion/SCFToCalyx/convert_controlflow.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-01-07T12:41:06+00:00",
+   "exact": true,
+   "sha": "dcf6516ee06ba7b62057e8c5c59130c162bb74e8",
+   "src": [
+    "lib/Conversion/VerifToSMT/VerifToSMT.cpp"
+   ],
+   "subject": "[VerifToSMT] Fix incorrect loop region result indexing (#8006)",
+   "tag": "firtool-1.99.2",
+   "test": [
+    "test/Conversion/VerifToSMT/bmc-clock-not-first.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2025-01-04T21:14:21+00:00",
+   "exact": true,
+   "sha": "a15654cd5d518e844d7187d10d748a184e0ce282",
+   "src": [
+    "lib/Conversion/HWToBTOR2/HWToBTOR2.cpp"
+   ],
+   "subject": "[HWToBTOR2] Fix incorrect le/ge predicate name emission (#8028)",
+   "tag": "firtool-1.99.2",
+   "test": [
+    "test/Conversion/HWToBTOR2/comb.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-12-31T09:25:30+00:00",
+   "exact": true,
+   "sha": "afa566aabda8a7bcb2d30c971a2b2ebd3dff069f",
+   "src": [
+    "lib/Conversion/ArcToLLVM/CMakeLists.txt",
+    "lib/Conversion/ArcToLLVM/LowerArcToLLVM.cpp"
+   ],
+   "subject": "[Arc][ArcToLLVM] Fix seq.clock_gate lowering",
+   "tag": "firtool-1.99.2",
+   "test": [
+    "test/Conversion/ArcToLLVM/lower-arc-to-llvm.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-12-19T00:57:08+00:00",
+   "exact": true,
+   "sha": "99826b849987b38b8590ad70cc45efd02dce2c35",
+   "src": [
+    "lib/Conversion/HWArithToHW/HWArithToHW.cpp"
+   ],
+   "subject": "[HWArith] Fix lowering to HW with type aliases",
+   "tag": "firtool-1.99.0",
+   "test": [
+    "test/Conversion/HWArithToHW/test_basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-12-13T09:45:40+00:00",
+   "exact": true,
+   "sha": "54d3dd01a8b791ac09869bee678abe4a6e8b6d2d",
+   "src": [
+    "lib/Dialect/LLHD/Transforms/DesequentializationPass.cpp"
+   ],
+   "subject": "[LLHD] Fix misprint in llhd-desequentialize pass (#7985)",
+   "tag": "firtool-1.95.0",
+   "test": [
+    "test/Dialect/LLHD/Transforms/desequentialization.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-12-04T23:08:17+00:00",
+   "exact": true,
+   "sha": "79c2d41904cd71fd6a3904cde754b516a2a224c0",
+   "src": [
+    "lib/Conversion/ExportVerilog/ExportVerilog.cpp"
+   ],
+   "subject": "[ExportVerilog] Fix ifdef of macro w/ Verilog name",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/Conversion/ExportVerilog/verilog-basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-12-02T18:55:14+00:00",
+   "exact": true,
+   "sha": "dcd7c47a9fd0f500a4d6c83263021bce53c8ddef",
+   "src": [
+    "lib/Conversion/HandshakeToDC/HandshakeToDC.cpp"
+   ],
+   "subject": "[HandshakeToDC] Fix a bug in the sync conversion pattern",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/Conversion/HandshakeToDC/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-11-21T03:24:40+00:00",
+   "exact": true,
+   "sha": "0bf454fb46d982ae4528867eeff1db45da9a9eaf",
+   "src": [
+    "lib/Conversion/SCFToCalyx/SCFToCalyx.cpp"
+   ],
+   "subject": "[SCFToCalyx] fix https://github.com/llvm/circt/issues/7861 (#7862)",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/Conversion/SCFToCalyx/convert_simple.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-11-20T14:51:34+00:00",
+   "exact": true,
+   "sha": "c5f14f1c26e6ddca74a1e11eed376a740bfad2ad",
+   "src": [
+    "lib/Conversion/HWToBTOR2/HWToBTOR2.cpp"
+   ],
+   "subject": "[HWToBTOR2] Fix crashes on initial value corner cases (#7844)",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/Conversion/HWToBTOR2/errors.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-11-20T11:57:16+00:00",
+   "exact": true,
+   "sha": "9c3bbcfb27fb6c6b3ad856b65ffdc1cad562132e",
+   "src": [
+    "lib/Conversion/HWToBTOR2/HWToBTOR2.cpp"
+   ],
+   "subject": "[HWToBTOR2] Fix slice lowering argument meanings (#7842)",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/Conversion/HWToBTOR2/comb.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-11-16T01:34:20+00:00",
+   "exact": true,
+   "sha": "a50f19e8511eb98366561aa44b88500f41dbff36",
+   "src": [
+    "include/circt/Dialect/FIRRTL/FIRParser.h",
+    "lib/Dialect/FIRRTL/Import/FIRParser.cpp"
+   ],
+   "subject": "[FIRRTL] Update, fix parser versions (#7827)",
+   "tag": "firtool-1.92.0",
+   "test": [
+    "test/CAPI/firrtl.c",
+    "test/Dialect/FIRRTL/emit-basic.mlir",
+    "test/Dialect/FIRRTL/parse-basic.fir",
+    "test/Dialect/FIRRTL/parse-errors.fir",
+    "test/firtool/classes-dedupe.fir",
+    "test/firtool/instchoice.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-11-01T19:42:45+00:00",
+   "exact": true,
+   "sha": "a7bd275fb9f237c14b63bd330ff8c28f05f1b2b2",
+   "src": [
+    "lib/Dialect/FIRRTL/Transforms/ExpandWhens.cpp"
+   ],
+   "subject": "[FIRRTL] Fix folding of when conditions into LTL properties (#7760)",
+   "tag": "firtool-1.90.0",
+   "test": [
+    "test/Dialect/FIRRTL/expand-whens.mlir",
+    "test/firtool/verif-under-when.fir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-10-31T00:42:20+00:00",
+   "exact": true,
+   "sha": "31e4f9eaaede6da8d57f8c730f76eb291ed18ad9",
+   "src": [
+    "lib/Transforms/FlattenMemRefs.cpp"
+   ],
+   "subject": "fix memref flatten-load (#7298)",
+   "tag": "firtool-1.90.0",
+   "test": [
+    "test/Transforms/flatten_memref.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-10-21T22:35:42+00:00",
+   "exact": true,
+   "sha": "bcee76272eae995e12f9ab76c28180784e8730d2",
+   "src": [
+    "lib/Analysis/FIRRTLInstanceInfo.cpp"
+   ],
+   "subject": "[FIRRTL] Fix InstanceInfo top-is-DUT bug",
+   "tag": "firtool-1.90.0",
+   "test": [
+    "test/Analysis/firrtl-test-instance-info.mlir"
+   ]
+  },
+  {
+   "bumps": 0,
+   "date": "2024-10-02T14:45:58+00:00",
+   "exact": true,
+   "sha": "7fff704e9e84e35b4aa653b5424272bad1343138",
+   "src": [
+    "lib/Dialect/Arc/ArcFolds.cpp"
+   ],
+   "subject": "[Arc] Fix folding of initialized StateOp (#7653)",
+   "tag": "firtool-1.87.0",
+   "test": [
+    "test/Dialect/Arc/canonicalizers.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2024-09-25T08:43:09+00:00",
+   "exact": false,
+   "sha": "337dad583965ea03ddcef75d9da2b5f10c23ec8d",
+   "src": [
+    "lib/Conversion/MooreToCore/MooreToCore.cpp"
+   ],
+   "subject": "[MooreToCore] Alternative conditional lowering and type conversion fixes (#7625)",
+   "tag": "firtool-1.86.0",
+   "test": [
+    "test/Conversion/MooreToCore/basic.mlir"
+   ]
+  },
+  {
+   "bumps": 1,
+   "date": "2024-09-20T02:42:30+00:00",
+   "exact": false,
+   "sha": "d5314f79fe7a77fe4b2259c031c9f53448a02a27",
+   "src": [
+    "include/circt/Dialect/Moore/MooreOps.td",
+    "lib/Conversion/ImportVerilog/Statements.cpp"
+   ],
+   "subject": "[Moore] Add assert, assume, and conver ops. (#7589)",
+   "tag": "firtool-1.86.0",
+   "test": [
+    "test/Conversion/ImportVerilog/basic.sv"
+   ]
+  }
+ ],
+ "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+ "since": "2024-09-11"
+}
