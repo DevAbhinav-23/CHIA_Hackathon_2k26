@@ -1,0 +1,19 @@
+{
+  "amount": 17.9,
+  "arm": "mutation",
+  "contract_version": "2.0",
+  "entry_id": "c-stage1-01",
+  "metered": false,
+  "observed": {
+    "cost_usd": null,
+    "cpu_seconds": 2.0,
+    "tokens_in": null,
+    "tokens_out": null
+  },
+  "run_manifest_id": "run-01",
+  "scope": "stage",
+  "stage": "stage_1",
+  "stop_reason": null,
+  "timestamp_utc": "2026-09-20T05:00:00+00:00",
+  "unit": "wall_clock_seconds"
+}

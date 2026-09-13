@@ -1,0 +1,19 @@
+{
+  "amount": 18.4,
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "entry_id": "v-stage1-01",
+  "metered": true,
+  "observed": {
+    "cost_usd": 0.01187,
+    "cpu_seconds": 2.1,
+    "tokens_in": 9142,
+    "tokens_out": 1337
+  },
+  "run_manifest_id": "run-01",
+  "scope": "stage",
+  "stage": "stage_1",
+  "stop_reason": null,
+  "timestamp_utc": "2026-09-20T01:02:03+00:00",
+  "unit": "wall_clock_seconds"
+}

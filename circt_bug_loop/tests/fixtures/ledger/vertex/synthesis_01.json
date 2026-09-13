@@ -1,0 +1,19 @@
+{
+  "amount": 611.2,
+  "arm": "shared",
+  "contract_version": "2.0",
+  "entry_id": "v-shared-01",
+  "metered": true,
+  "observed": {
+    "cost_usd": 0.073395,
+    "cpu_seconds": 55.0,
+    "tokens_in": 48300,
+    "tokens_out": 9912
+  },
+  "run_manifest_id": "run-01",
+  "scope": "stage",
+  "stage": "synthesis",
+  "stop_reason": null,
+  "timestamp_utc": "2026-09-19T23:40:00+00:00",
+  "unit": "wall_clock_seconds"
+}
