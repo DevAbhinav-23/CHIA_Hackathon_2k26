@@ -608,3 +608,385 @@ def test_u_probe_49_the_imports_probe_task_is_allowed(tmp_path) -> None:
     assert "LoopStore" not in from_store
     source = Path(probe_task.__file__).read_text()
     assert "sqlite3" not in source and "loop.db" not in source
+
+
+# --- B5: the reducers, the script and the selection table -------------------
+
+REDUCTION = {"reduction_wall_seconds": 120, "reduction_sigkill_grace_seconds": 10}
+
+
+def _verdict(tmp_path: Path, name: str = "trace.txt", status: str = "crash", **over):
+    return _oracle(_build(status, name, tmp_path, **over), tmp_path)
+
+
+def _sv_spec(tool: str, tmp_path: Path, extra: list):
+    path = tmp_path / "input.sv"
+    return _spec(tool, [*extra, str(path)], tmp_path,
+                 input_filename="input.sv", input_path=str(path))
+
+
+@pytest.mark.t0
+def test_u_probe_31_the_five_reducer_branches(tmp_path) -> None:
+    """T-U-probe-31 (FR-09.9): every branch, with its lift and its own test argv.
+
+    Pass criterion: MLIR text reduces directly under the probe's own tool and
+    argv; `.fir` lifts with `firtool --ir-fir`; a `.sv` probe entering through
+    `circt-verilog` is tested by its own tool with `--format=mlir` prepended and
+    every other token of its argv kept, the seed's output-mode flag included; a
+    `.sv` probe entering through `circt-translate --import-verilog`, which has
+    no `--format=` at all, is tested by `circt-opt <candidate> -o /dev/null`;
+    everything else is textual.
+    """
+    mlir = _spec("circt-opt", [str(tmp_path / "input.mlir"), "--canonicalize"], tmp_path)
+    assert probe_task.select_reducer(mlir) == {
+        "reducer": "circt-reduce", "lift": None, "test_tool": "circt-opt",
+        "test_args": ["--canonicalize"]}
+
+    fir = _spec("firtool", [str(tmp_path / "input.fir"), "--ir-hw"], tmp_path,
+                input_filename="input.fir", input_path=str(tmp_path / "input.fir"))
+    assert probe_task.select_reducer(fir) == {
+        "reducer": "circt-reduce", "lift": "firtool --ir-fir",
+        "test_tool": "firtool", "test_args": ["--ir-hw"]}
+
+    verilog = _sv_spec("circt-verilog", tmp_path, ["--ir-moore", "-I", "/inc"])
+    assert probe_task.select_reducer(verilog) == {
+        "reducer": "circt-reduce", "lift": "circt-verilog --ir-moore",
+        "test_tool": "circt-verilog",
+        "test_args": ["--format=mlir", "--ir-moore", "-I", "/inc"]}
+
+    translate = _sv_spec("circt-translate", tmp_path, ["--import-verilog"])
+    assert probe_task.select_reducer(translate) == {
+        "reducer": "circt-reduce", "lift": "circt-verilog --ir-moore",
+        "test_tool": "circt-opt", "test_args": ["-o", "/dev/null"]}
+
+    other = _spec("circt-bmc", [str(tmp_path / "input.btor")], tmp_path,
+                  input_filename="input.btor", input_path=str(tmp_path / "input.btor"))
+    assert probe_task.select_reducer(other)["reducer"] == "textual-ddmin"
+    assert probe_task.select_reducer(other)["lift"] is None
+
+
+@pytest.mark.t0
+def test_u_probe_32_the_reducer_argv_and_its_binary(tmp_path, monkeypatch) -> None:
+    """T-U-probe-32 (FR-09.2, FR-06.1): the source-built binary, and no flags.
+
+    Pass criterion: `reduce_case` runs `circt-reduce` from the SOURCE tree, with
+    `--test=<script>`, `--keep-best` and `-o`, and never `--test-must-fail` and
+    never a `--test-arg`, so the candidate is the script's `$1`.
+    """
+    seen = {}
+
+    def _fake(input_path, script, out_path, **kwargs):
+        seen.update(kwargs, input_path=input_path, script=script, out=out_path)
+        Path(out_path).write_text("module {}\n")
+        return {"success": True, "returncode": 0, "wall_seconds": 0.1,
+                "output_valid": True, "log_tail": ""}
+
+    monkeypatch.setattr(probe_task, "_reduce_run",
+                        lambda i, s, o, limits, bin_dir: _fake(
+                            i, s, o, binary=os.path.join(bin_dir, "circt-reduce"),
+                            wall_seconds=limits["reduction_wall_seconds"]))
+    (tmp_path / "input.mlir").write_text("hw.module @T() {}\n")
+    spec = _spec("circt-opt", [str(tmp_path / "input.mlir")], tmp_path)
+    call_node(probe_task.reduce_case, spec, _verdict(tmp_path),
+              {**LIMITS, **REDUCTION}, str(tmp_path), bin_dir="/workspace/circt/build/bin")
+    assert seen["binary"] == "/workspace/circt/build/bin/circt-reduce"
+    assert seen["script"].endswith("interesting.sh")
+    assert seen["wall_seconds"] == 120
+    argv = probe_task.circt_reduce_run.__doc__
+    assert "--test-must-fail is never passed" in argv
+
+
+@pytest.mark.t0
+def test_u_probe_45_exactly_one_class_block_and_every_placeholder(tmp_path) -> None:
+    """T-U-probe-45 (FR-09.1, FR-09.2): one block, all placeholders bound.
+
+    Pass criterion: a written `interesting.sh` contains exactly one
+    `# --- class:` line, it names the candidate's own class, the other two
+    blocks are absent, no `@NAME@` survives anywhere in the file, and the three
+    class-specific values appear only in their own block. `sh -n` passing is
+    asserted as necessary and not sufficient: it passed on the earlier version
+    in which two of the three blocks were dead code below an `exit 0`.
+    """
+    import subprocess as sp
+    for name, klass, marker in (("trace.txt", "crash", "parseHWArray"),
+                                ("assert_cpp.txt", "assertion",
+                                 'c > 99 && "needs many args"'),
+                                ("llvm_error.txt", "fatal_error",
+                                 "unsupported lowering")):
+        verdict = _verdict(tmp_path, name, klass,
+                           signal="SIGABRT" if klass != "crash" else "SIGSEGV")
+        script = tmp_path / f"interesting_{klass}.sh"
+        text = probe_task.write_interestingness(
+            str(script), verdict, "/workspace/circt/build/bin/circt-opt",
+            ["--canonicalize"], {**LIMITS, **REDUCTION}, str(tmp_path / "calls"))
+        blocks = [line for line in text.splitlines() if line.startswith("# --- class:")]
+        assert len(blocks) == 1 and klass in blocks[0]
+        assert not re.search(r"@[A-Z_]+@", text), re.findall(r"@[A-Z_]+@", text)
+        for placeholder in probe_task._PLACEHOLDERS:
+            assert placeholder not in text
+        assert marker in text
+        # The flag is named in the header comment, which states the polarity,
+        # and appears on no executable line: the script IS the polarity.
+        assert all(line.lstrip().startswith("#")
+                   for line in text.splitlines() if "--test-must-fail" in line)
+        assert text.count("grep -qF") >= 2 and "grep -qE" not in text
+        assert sp.run(["sh", "-n", str(script)]).returncode == 0
+        assert os.access(script, os.X_OK)
+        # The other two classes' guards are absent, not merely unreachable.
+        for other, guard in (("assertion", "grep -qF 'c > 99"),
+                             ("fatal_error", "^LLVM ERROR:"),
+                             ("crash", '"$RC" -gt 128')):
+            if other != klass:
+                assert guard not in text or other == klass
+
+
+@pytest.mark.t0
+def test_u_probe_45b_the_top_frame_guard_is_the_fingerprint_frame(tmp_path) -> None:
+    """T-U-probe-45 (K3), the half that is a correction rather than a shape.
+
+    Pass criterion: `@TOP_FRAME@` binds to the function-name half of the
+    FINGERPRINT frame, not to the first resolved frame, which is
+    `llvm::sys::PrintStackTrace` for every crash in the campaign and would match
+    any crash at all; and a verdict with no fingerprint frame binds the empty
+    string rather than the four letters of "None".
+    """
+    verdict = _verdict(tmp_path)
+    assert verdict.fingerprint_frame == "parseHWArray HWTypes.cpp"
+    text = probe_task.write_interestingness(
+        str(tmp_path / "i.sh"), verdict, "/bin/true", [],
+        {**LIMITS, **REDUCTION}, str(tmp_path / "calls"))
+    assert "grep -qF parseHWArray " in text
+    assert "PrintStackTrace" not in text
+
+    import dataclasses
+    blind = dataclasses.replace(verdict, fingerprint_frame=None)
+    text = probe_task.write_interestingness(
+        str(tmp_path / "j.sh"), blind, "/bin/true", [],
+        {**LIMITS, **REDUCTION}, str(tmp_path / "calls"))
+    assert "grep -qF '' " in text and "None" not in text
+
+
+@pytest.mark.t0
+def test_u_probe_46_the_script_cds_and_keeps_its_stderr_quiet(tmp_path) -> None:
+    """T-U-probe-46 (FR-09.13): the working directory, and the subshell.
+
+    Pass criterion: the candidate is absolutised BEFORE the `cd`, because
+    `circt-reduce` passes it relative to its own cwd; the script then `cd`s into
+    its own `mktemp -d`, so anything the tool writes beside its input lands
+    there; and the subshell with its own stderr keeps the shell's
+    "Segmentation fault <command line>" out of `circt-reduce`'s stderr,
+    asserted by zero stderr bytes on an interesting candidate.
+
+    The tool is a stub that kills itself with SIGSEGV and prints the recorded
+    frame, so the crash block is exercised with no CIRCT present.
+    """
+    import subprocess as sp
+    stub = tmp_path / "crasher.sh"
+    stub.write_text("#!/bin/sh\n"
+                    "printf 'in parseHWArray at HWTypes.cpp\\n' >&2\n"
+                    "touch beside-the-input\n"
+                    "kill -SEGV $$\n")
+    stub.chmod(0o755)
+    verdict = _verdict(tmp_path)
+    script = tmp_path / "interesting.sh"
+    text = probe_task.write_interestingness(
+        str(script), verdict, str(stub), [], {**LIMITS, **REDUCTION},
+        str(tmp_path / "calls"))
+    assert 'CANDIDATE=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")' in text
+    assert text.index("CANDIDATE=") < text.index('cd "$WORK"')
+
+    candidate = tmp_path / "cand.mlir"
+    candidate.write_text("hw.module @T() {}\n")
+    done = sp.run([str(script), "cand.mlir"], cwd=str(tmp_path), capture_output=True)
+    assert done.returncode == 0, done.stderr
+    assert done.stderr == b"", done.stderr
+    assert not (tmp_path / "beside-the-input").exists()
+    assert (tmp_path / "calls").stat().st_size == 1
+
+    # A tool that exits cleanly is not the recorded crash.
+    quiet = tmp_path / "quiet.sh"
+    quiet.write_text("#!/bin/sh\nexit 0\n")
+    quiet.chmod(0o755)
+    probe_task.write_interestingness(str(script), verdict, str(quiet), [],
+                                     {**LIMITS, **REDUCTION}, str(tmp_path / "calls"))
+    assert sp.run([str(script), "cand.mlir"], cwd=str(tmp_path)).returncode == 1
+
+
+@pytest.mark.t0
+def test_u_probe_36_the_output_is_validated_after_the_exit(tmp_path) -> None:
+    """T-U-probe-36 (FR-09.13): a truncated `-o` output is discarded.
+
+    Pass criterion: the committed empty `reducer/truncated/reduced.mlir` fails
+    the post-exit validation on its first conjunct, non-emptiness, and the
+    validation is reached only once the reducer process has exited, which
+    `T-U-core-09` asserts on the call itself.
+    """
+    empty = FIXTURES / "reducer" / "truncated" / "reduced.mlir"
+    assert empty.stat().st_size == 0
+    assert probe_task._valid_output(empty, tmp_path / "absent.sh", "/nonexistent",
+                                    {**LIMITS, **REDUCTION}) is False
+
+
+@pytest.mark.t0
+def test_u_probe_34_an_input_the_oracle_never_fired_on(tmp_path) -> None:
+    """T-U-probe-34 (FR-09.12): `reduced=false` with the reason recorded.
+
+    Pass criterion: a verdict that did not fire yields `reducer="none"`,
+    `reduced=False` and a reason, the sizes equal, and no reducer is run; the
+    candidate still proceeds, which is what makes it countable.
+    """
+    (tmp_path / "input.mlir").write_text("hw.module @T() {}\n")
+    spec = _spec("circt-opt", [str(tmp_path / "input.mlir")], tmp_path)
+    case = call_node(probe_task.reduce_case, spec,
+                     _verdict(tmp_path, "clean.txt", "clean_exit", signal=None,
+                              exit_status=0),
+                     {**LIMITS, **REDUCTION}, str(tmp_path), bin_dir="/nonexistent")
+    assert case.reducer == "none" and case.reduced is False
+    assert case.reason == "oracle_did_not_fire"
+    assert case.size_before_bytes == case.size_after_bytes
+    assert case.interestingness_calls == 0
+
+
+def _stub_bin(tmp_path: Path, marker: str) -> Path:
+    """A tool directory: a stub that "crashes" on *marker*, beside the real tools.
+
+    The interestingness script's `@TOOL@` is whatever the branch names, so a
+    stub is enough to drive the REAL `circt-reduce` over REAL MLIR with a
+    firing that is reproducible by construction. `circt-opt` and `circt-reduce`
+    are linked in beside it because `reduce_case` resolves all three against the
+    same `bin_dir`.
+    """
+    binaries = tmp_path / "bin"
+    binaries.mkdir(exist_ok=True)
+    for name in ("circt-opt", "circt-reduce"):
+        link = binaries / name
+        if not link.exists():
+            link.symlink_to(BASSERT_G / name)
+    stub = binaries / "crasher.sh"
+    stub.write_text("#!/bin/sh\n"
+                    'for a in "$@"; do last=$a; done\n'
+                    f"if grep -q '{marker}' \"$last\"; then\n"
+                    "  printf 'in parseHWArray at HWTypes.cpp\\n' >&2\n"
+                    "  kill -SEGV $$\n"
+                    "fi\n"
+                    "exit 0\n")
+    stub.chmod(0o755)
+    return binaries
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_33_38_circt_reduce_shrinks_and_the_recheck_matches(
+        tmp_path, sdk_env) -> None:
+    """T-U-probe-33, -38 (FR-09.3, FR-09.5, FR-09.7, FR-09.11, NFR-02).
+
+    Pass criterion: the real source-built `circt-reduce` shrinks a real MLIR
+    input under §10.2's script; both size pairs are recorded with the after
+    values no larger than the before values; `fixpoint` and `budget_truncated`
+    are present; the `-o` output is validated after the exit; and the re-check
+    re-runs the oracle's rules on the reduced input and records a matching
+    class, which sets `recheck_matches`.
+    """
+    _needs_sdk()
+    binaries = _stub_bin(tmp_path, "comb.mul")
+    source = tmp_path / "input.mlir"
+    source.write_text(
+        "hw.module @top(in %a : i8, out b : i8) {\n"
+        "  %0 = comb.add %a, %a : i8\n"
+        "  %1 = comb.mul %0, %a : i8\n"
+        "  %2 = comb.and %1, %a : i8\n"
+        "  %3 = comb.or %2, %a : i8\n"
+        "  hw.output %3 : i8\n}\n")
+    spec = _spec("crasher.sh", [str(source)], tmp_path, input_path=str(source))
+    case = call_node(probe_task.reduce_case, spec, _verdict(tmp_path),
+                     {**LIMITS, **REDUCTION}, str(tmp_path / "probe"),
+                     bin_dir=str(binaries))
+    assert case.reducer == "circt-reduce" and case.lift is None
+    assert case.reduced is True and case.fixpoint is True
+    assert case.budget_truncated is False
+    assert case.size_after_bytes < case.size_before_bytes
+    assert case.size_after_ops <= case.size_before_ops
+    assert case.interestingness_calls > 1
+    assert "comb.mul" in Path(case.path).read_text()
+    assert case.recheck_class == "crash" and case.recheck_matches is True
+    assert case.recheck_assertion_text is None
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_33b_a_changed_failure_is_not_a_match(tmp_path, sdk_env) -> None:
+    """T-U-probe-33, -35 (FR-09.7): a re-check that disagrees sets no match.
+
+    Pass criterion: when the reduced case no longer reproduces the recorded
+    class, `recheck_matches` is False, which is what FR-09.7's
+    `reduction_changed_failure` is raised from.
+    """
+    _needs_sdk()
+    binaries = _stub_bin(tmp_path, "definitely-not-present")
+    source = tmp_path / "input.mlir"
+    source.write_text("hw.module @top(in %a : i8) {\n  hw.output\n}\n")
+    spec = _spec("crasher.sh", [str(source)], tmp_path, input_path=str(source))
+    case = call_node(probe_task.reduce_case, spec, _verdict(tmp_path),
+                     {**LIMITS, **REDUCTION}, str(tmp_path / "probe"),
+                     bin_dir=str(binaries))
+    assert case.recheck_class == "clean_exit"
+    assert case.recheck_matches is False
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_35_reducer_aborted_routes_to_the_textual_reducer(
+        tmp_path, sdk_env) -> None:
+    """T-U-probe-35 (FR-09.9, FR-09.12) and the W-08 real-crash demonstration.
+
+    A deeply nested `!hw.array` overflows CIRCT's own parser stack, and
+    `circt-reduce` parses the candidate with the same parser the candidate
+    overflows, so the REDUCER dies on it. That is a whole class of input
+    unreducible by `circt-reduce` by construction.
+
+    Pass criterion, end to end and all in one run: the probe classifies `crash`
+    with SIGSEGV; the oracle fires, symbolises per module, drops exactly the
+    four prologue frames and names a fingerprint frame in CIRCT's own
+    `HWTypes.cpp`; `circt-reduce` aborts by signal and the reason names it;
+    `textual-ddmin` then runs ON THE SAME RUN and strips the padding lines the
+    crash does not need; and the re-check reproduces the same class.
+    """
+    _needs_sdk()
+    probe = tmp_path / "probe"
+    probe.mkdir()
+    source = probe / "input.mlir"
+    padding = [f"hw.module @Pad{i}(in %p : i{i % 32 + 1}) {{}}" for i in range(200)]
+    padding.insert(100, nested_array(10000).strip())
+    source.write_text("\n".join(padding) + "\n")
+
+    tool = BASSERT_G / "circt-opt"
+    spec = _spec("circt-opt", [str(source), "-o", os.devnull], tmp_path,
+                 input_path=str(source))
+    out = call_node(probe_execute, spec, _image_spec(**{"circt-opt": _sha256(tool)}),
+                    {**LIMITS, **REDUCTION}, str(probe), bin_dir=str(BASSERT_G))
+    build = out["build_result"]
+    assert build.status == "crash" and build.signal == "SIGSEGV"
+    assert build.limit_hit is None and build.exit_status is None
+
+    verdict = _oracle(build, probe, symbolizer=str(SYMBOLIZER))
+    assert verdict.fired is True and verdict.oracle_class == "crash"
+    assert verdict.prologue_dropped == 4
+    assert len(verdict.frames) > 100
+    assert verdict.frames_with_location > 0
+    name, _space, basename = verdict.fingerprint_frame.rpartition(" ")
+    assert basename in ("HWTypes.cpp", "HWTypes.cpp.inc"), verdict.fingerprint_frame
+    assert name in ("parseHWArray", "circt::hw::ArrayType::parse",
+                    "generatedTypeParser"), verdict.fingerprint_frame
+    modules = {f.module for f in verdict.frames if f.shape == "module_offset"}
+    assert len(modules) >= 2, modules      # one symboliser call per module
+
+    case = call_node(probe_task.reduce_case, spec, verdict,
+                     {**LIMITS, **REDUCTION}, str(probe), bin_dir=str(BASSERT_G))
+    assert case.reason.startswith("reducer_aborted:"), case.reason
+    assert case.reducer == "textual-ddmin" and case.lift is None
+    assert case.reduced is True and case.fixpoint is True
+    assert case.size_after_ops < case.size_before_ops
+    assert case.size_after_bytes < case.size_before_bytes
+    assert case.interestingness_calls > 1
+    assert "!hw.array" in Path(case.path).read_text()
+    assert case.recheck_class == "crash" and case.recheck_matches is True
