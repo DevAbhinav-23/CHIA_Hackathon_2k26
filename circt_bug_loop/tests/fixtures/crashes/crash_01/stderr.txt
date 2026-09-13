@@ -1,0 +1,39 @@
+PLEASE submit a bug report to https://github.com/llvm/circt and include the crash backtrace.
+Stack dump:
+0.	Program arguments: /home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt /home/adi/.cache/chia-pin-smoke/w09/attempts/v1-simstrconcat/parent-p00/input.mlir --canonicalize
+ #0 0x00007fadc3608a18 llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x208a18)
+ #1 0x00007fadc3605ca5 llvm::sys::RunSignalHandlers() (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libLLVMSupport.so+0x205ca5)
+ #2 0x00007fadc3609831 SignalHandler(int, siginfo_t*, void*) Signals.cpp:0:0
+ #3 0x00007fadc2c44e70 (/usr/lib/libc.so.6+0x44e70)
+ #4 0x0000561553f7dfd5 getAbstractAttribute /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/AttributeSupport.h:177:12
+ #5 0x0000561553f7dfd5 getTypeID /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/Attributes.h:52:37
+ #6 0x0000561553f7dfd5 classof<mlir::Attribute> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/StorageUniquerSupport.h:113:16
+ #7 0x0000561553f7dfd5 isPossible /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/Attributes.h:388:14
+ #8 0x0000561553f7dfd5 isa<mlir::StringAttr, mlir::Attribute> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:548:11
+ #9 0x0000561553f7dfd5 cast<mlir::StringAttr, mlir::Attribute> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:560:10
+#10 0x0000561553f7dfd5 circt::sim::StringConcatOp::fold(circt::sim::StringConcatOpGenericAdaptor<llvm::ArrayRef<mlir::Attribute>>) /home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Dialect/Sim/SimOps.cpp:541:24
+#11 0x0000561553f729ee isNull /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/PointerUnion.h:136:33
+#12 0x0000561553f729ee operator bool /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/PointerUnion.h:138:44
+#13 0x0000561553f729ee llvm::LogicalResult mlir::Op<circt::sim::StringConcatOp, mlir::OpTrait::ZeroRegions, mlir::OpTrait::OneResult, mlir::OpTrait::OneTypedResult<circt::sim::DynamicStringType>::Impl, mlir::OpTrait::ZeroSuccessors, mlir::OpTrait::VariadicOperands, mlir::OpTrait::OpInvariants, mlir::ConditionallySpeculatable::Trait, mlir::OpTrait::AlwaysSpeculatableImplTrait, mlir::MemoryEffectOpInterface::Trait, mlir::InferTypeOpInterface::Trait>::foldSingleResultHook<circt::sim::StringConcatOp>(mlir::Operation*, llvm::ArrayRef<mlir::Attribute>, llvm::SmallVectorImpl<mlir::OpFoldResult>&) /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/OpDefinition.h:1923:10
+#14 0x0000561553f72090 asInt /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/PointerIntPair.h:41:5
+#15 0x0000561553f72090 operator long /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/PointerIntPair.h:45:48
+#16 0x0000561553f72090 getPointer /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/PointerIntPair.h:94:58
+#17 0x0000561553f72090 ~UniqueFunctionBase /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/ADT/FunctionExtras.h:274:32
+#18 0x0000561553f72090 mlir::RegisteredOperationName::Model<circt::sim::StringConcatOp>::foldHook(mlir::Operation*, llvm::ArrayRef<mlir::Attribute>, llvm::SmallVectorImpl<mlir::OpFoldResult>&) /home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/mlir/IR/OperationSupport.h:536:7
+#19 0x00007fadc3d877cf mlir::Operation::fold(llvm::ArrayRef<mlir::Attribute>, llvm::SmallVectorImpl<mlir::OpFoldResult>&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRIR.so+0x1417cf)
+#20 0x00007fadc3d87a5b mlir::Operation::fold(llvm::SmallVectorImpl<mlir::OpFoldResult>&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRIR.so+0x141a5b)
+#21 0x00007fadc5ef4844 (anonymous namespace)::GreedyPatternRewriteDriver::processWorklist() GreedyPatternRewriteDriver.cpp:0:0
+#22 0x00007fadc5ef2659 mlir::applyPatternsGreedily(mlir::Region&, mlir::FrozenRewritePatternSet const&, mlir::GreedyRewriteConfig, bool*) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRTransformUtils.so+0x47659)
+#23 0x00007fadc5f376d5 (anonymous namespace)::Canonicalizer::runOnOperation() Canonicalizer.cpp:0:0
+#24 0x00007fadc5c937c7 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x177c7)
+#25 0x00007fadc5c967e9 mlir::PassManager::run(mlir::Operation*) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRPass.so+0x1a7e9)
+#26 0x00007fadc74b2fba performActions(llvm::raw_ostream&, std::shared_ptr<llvm::SourceMgr> const&, mlir::MLIRContext*, mlir::MlirOptMainConfig const&) MlirOptMain.cpp:0:0
+#27 0x00007fadc74b210e llvm::LogicalResult llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>::callback_fn<mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_0>(long, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&) MlirOptMain.cpp:0:0
+#28 0x00007fadc47c5187 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>, llvm::raw_ostream&, llvm::StringRef, llvm::StringRef) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIRSupport.so+0x27187)
+#29 0x00007fadc74a8558 mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa558)
+#30 0x00007fadc74a8849 mlir::MlirOptMain(int, char**, llvm::StringRef, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xa849)
+#31 0x00007fadc74a8a7d mlir::MlirOptMain(int, char**, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/lib/libMLIROptLib.so+0xaa7d)
+#32 0x0000561552c10b46 main /home/adi/.cache/chia-pin-smoke/w09/wt143/tools/circt-opt/circt-opt.cpp:88:23
+#33 0x00007fadc2c27d0e (/usr/lib/libc.so.6+0x27d0e)
+#34 0x00007fadc2c27e4b __libc_start_main (/usr/lib/libc.so.6+0x27e4b)
+#35 0x0000561552c10225 _start (/home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt+0x125f225)

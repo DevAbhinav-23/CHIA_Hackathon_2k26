@@ -1,0 +1,16 @@
+{
+ "class": "crash",
+ "assertion_text": null,
+ "assertion_site": null,
+ "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+ "prologue_dropped": 4,
+ "top_frames": [
+  "getAbstractAttribute",
+  "getTypeID",
+  "classof<mlir::Attribute>",
+  "isPossible",
+  "isa<mlir::StringAttr, mlir::Attribute>"
+ ],
+ "exit_status": null,
+ "signal": "SIGSEGV"
+}
