@@ -267,7 +267,10 @@ def circt_symbolize(frames: list, *, tool_path: str = "",
                                     [out[i].get("offset", "") for i in indexes],
                                     timeout_seconds)
         for i, record in zip(indexes, records):
-            out[i].update(record)
+            # MERGE, never replace: LLVM prints a function name beside the
+            # module and offset on most frames, and a symboliser that resolves
+            # nothing must not delete the one name the trace already had.
+            out[i].update({key: value for key, value in record.items() if value})
     for frame in out:
         frame["in_circt_object"] = _in_circt_object(frame, tool_path, circt_roots)
     return out

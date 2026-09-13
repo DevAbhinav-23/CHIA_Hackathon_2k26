@@ -1,0 +1,4 @@
+LLVM ERROR: unsupported lowering for type '!hw.struct<a: i1>'
+PLEASE submit a bug report to https://github.com/llvm/circt and include the crash backtrace.
+Stack dump:
+0.	Program arguments: /workspace/circt/build/bin/circt-opt input.mlir -o /dev/null

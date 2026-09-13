@@ -70,6 +70,12 @@ def _code_of(name: str) -> str:
     return "\n".join(ast.unparse(stmt) for stmt in body)
 
 
+def _ray_session() -> bool:
+    """Whether this process is already inside a Ray session, without starting one."""
+    ray = sys.modules.get("ray")
+    return bool(ray is not None and ray.is_initialized())
+
+
 def _needs(path: Path) -> None:
     if not path.exists():
         pytest.skip(f"tier-1 resource absent: {path}")
@@ -460,10 +466,15 @@ def test_u_core_16_the_worker_identity_fields(tmp_path) -> None:
     deliberately: reading it would START a local Ray instance, and a unit test
     must not pay for one.
     """
+    before = _ray_session()
     out = _run("/bin/true", [], tmp_path)
     assert out["worker_hostname"]
     assert out["child_pid"] > 0
-    assert out["worker_node_id"] == ""
+    # Empty exactly when there is no session to ask, and asking started none:
+    # reading the id through ray.get_runtime_context() would START a local Ray
+    # instance, which a unit test must not pay for.
+    assert (out["worker_node_id"] == "") is not before
+    assert _ray_session() is before
     assert "ray.get_runtime_context().get_node_id()" in \
         Path(circt_core.__file__).read_text()
 

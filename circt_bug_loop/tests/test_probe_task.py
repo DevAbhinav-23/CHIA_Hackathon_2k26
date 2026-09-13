@@ -1,0 +1,610 @@
+"""`04-Test-Plan.md` §1.9: `probe_task.py` (B2, B3, B5), the seven statuses,
+the three oracle classes, the limits, the prologue strip and the reducers.
+
+**Every test calls its node through `conftest.call_node`**, which invokes the
+undecorated original CHIA stores on the wrapper as `_chia_original`; calling the
+wrapper itself routes through `chia.trace.profiler.get_profiler`, which starts a
+local Ray instance and raises a `FutureWarning` that `-W error` turns into an
+error. The nodes keep the decorators `03-LLD.md` §3.2's column gives them
+(architect's decision, 2026-09-14).
+
+Tiers follow what a test actually needs, which is §0.5's own rule that a test
+states the LOWEST tier at which it can run: `t0` where recorded stderr, a shell
+and this interpreter suffice, `t1` and `needs_sdk` where a CIRCT binary must
+run. §1.9's column is more conservative in seven rows; each is an erratum
+candidate and none is a silent relabelling.
+"""
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+import os
+import re
+from pathlib import Path
+
+import pytest
+
+from circt_bug_loop import probe_task
+from circt_bug_loop.contract import schema
+from circt_bug_loop.probe_task import (BinaryMismatch, _ASSERT_GLIBC,
+                                       _ASSERT_UNREACHABLE, _FATAL_ERROR, _FRAME,
+                                       classify_build, oracle_primary,
+                                       probe_execute, strip_prologue)
+from circt_bug_loop.store import BuildResult, Frame, ImageSpec
+from circt_bug_loop.tests.conftest import call_node
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+STDERR = FIXTURES / "stderr"
+SMOKE = Path.home() / ".cache" / "chia-pin-smoke"
+BASSERT_G = SMOKE / "bassert_g" / "bin"
+SDK_LIBS = f"{SMOKE / 'circt-sdk' / 'lib'}:{SMOKE / 'shim'}"
+SYMBOLIZER = SMOKE / "circt-sdk" / "bin" / "llvm-symbolizer"
+
+#: The roots the host build splits CIRCT across: sources in `src/`, generated
+#: `.inc` files under the build tree. The image has one root for both.
+HOST_ROOTS = (f"{SMOKE / 'src'}/", f"{SMOKE / 'bassert_g'}/")
+
+LIMITS = {"probe_wall_seconds": 60, "probe_address_space_bytes": 4 * 1024 ** 3,
+          "probe_cpu_seconds": 45, "probe_output_byte_cap": 1_000_000}
+
+
+def _stderr(name: str) -> str:
+    return (STDERR / name).read_text()
+
+
+def _sha256(path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _image_spec(**hashes) -> ImageSpec:
+    """An `ImageSpec` whose `tool_hashes` are the ones the test wants believed."""
+    return ImageSpec(
+        circt_sha="eade0de61bc5a0d2ba1b9da951b69efcab19f8ce", sdk_tag="firtool-1.159.0",
+        targets=["circt-opt"], flag_string="-O3 -UNDEBUG -gline-tables-only",
+        cmake_args=[], image_digest="sha256:" + "0" * 64,
+        image_tag="chia-circt-assert:test", verilator_version="5.020",
+        slang_enabled=True, lit_discovery_ok=True, lit_discovered_count=1390,
+        assertion_nonreferencing=[], tool_hashes=dict(hashes))
+
+
+def _spec(tool: str, argv: list, tmp_path: Path, **over):
+    """A minimal valid `ProbeSpec` on the seeded arm."""
+    fields = dict(
+        probe_id="p-0000000001", run_manifest_id="r" * 32, seed_sha="a" * 40,
+        arm="seeded", iteration=0, input_filename="input.mlir",
+        input_path=str(tmp_path / "input.mlir"), tool=tool, argv=argv,
+        polarity="expect_zero", shape="plain", expected_outcome="clean_exit",
+        turn_cost={"turn": "probe_write", "wall_seconds": 1.0, "tokens_in": 1,
+                   "tokens_out": 1, "cost_usd": 0.0, "metered": True})
+    fields.update(over)
+    spec = schema.ProbeSpec(**fields)
+    schema.validate(spec)
+    return spec
+
+
+def _execute(tool_path: str, argv: list, tmp_path: Path, **over):
+    """`probe_execute` against a real binary, with its hash believed."""
+    directory = tmp_path / "probe"
+    directory.mkdir(exist_ok=True)
+    tool = os.path.basename(tool_path)
+    return call_node(probe_execute,
+                     _spec(tool, argv, tmp_path),
+                     _image_spec(**{tool: _sha256(tool_path)}),
+                     {**LIMITS, **over}, str(directory),
+                     bin_dir=os.path.dirname(tool_path))
+
+
+def _build(status: str, stderr_name: str, tmp_path: Path, **over) -> BuildResult:
+    """A `BuildResult` over one recorded stderr, for driving B3 with no child."""
+    path = tmp_path / "stderr.txt"
+    path.write_text(_stderr(stderr_name))
+    fields = dict(
+        probe_id="p-0000000001", run_manifest_id="r" * 32, run_commit="c" * 40,
+        image_digest="sha256:" + "0" * 64, status=status,
+        binary_path=str(BASSERT_G / "circt-opt"), binary_sha256="d" * 64,
+        argv=["prlimit", "--as=1", "--cpu=1:6", "--nofile=1024", "--",
+              str(BASSERT_G / "circt-opt"), "nested.mlir", "-o", "/dev/null"],
+        exit_status=None, signal="SIGSEGV", limit_hit=None, cpu_seconds=0.1,
+        wall_seconds=0.2, peak_rss_bytes=1024, worker_hostname="h",
+        worker_node_id="", child_pid=1, stdout_path=str(tmp_path / "stdout.txt"),
+        stderr_path=str(path), stdout_bytes=0, stderr_bytes=path.stat().st_size,
+        truncated=False)
+    fields.update(over)
+    return BuildResult(**fields)
+
+
+def _oracle(build: BuildResult, tmp_path: Path, **over):
+    kwargs = dict(circt_roots=HOST_ROOTS, symbolizer=str(tmp_path / "absent"))
+    kwargs.update(over)
+    return call_node(oracle_primary, build, _image_spec(), str(tmp_path), **kwargs)
+
+
+@pytest.fixture
+def sdk_env(monkeypatch) -> None:
+    """Put the SDK's own libraries on the loader path for a tier-1 test.
+
+    The host build links `libz3.so.4`, which lives only in the smoke tree's
+    shim; inside the image the loader finds it without help, so this is a
+    property of the measurement host and not of the code under test.
+    """
+    monkeypatch.setenv("LD_LIBRARY_PATH", SDK_LIBS)
+
+
+def _needs_sdk() -> None:
+    if not (BASSERT_G / "circt-opt").exists():
+        pytest.skip(f"tier-1 resource absent: {BASSERT_G / 'circt-opt'}")
+
+
+def nested_array(depth: int) -> str:
+    """A `!hw.array` nested *depth* deep, which overflows CIRCT's parser stack.
+
+    Not a recorded fixture but a generator, because the file is 130 KB at the
+    depth that overflows reliably and its content is three lines of rule. The
+    RECORDED artefacts of the same crash are `stderr/trace.txt` and
+    `stderr/segv.txt`, which every tier-0 test here reads.
+    """
+    inner = "i8"
+    for _ in range(depth):
+        inner = "!hw.array<1x" + inner + ">"
+    return f"hw.module @T(in %a : {inner}) {{}}\n"
+
+
+# --- B2: the seven statuses -------------------------------------------------
+
+@pytest.mark.t0
+def test_u_probe_01_the_hash_check_runs_first(tmp_path) -> None:
+    """T-U-probe-01 (FR-06.1, FR-03.16): BinaryMismatch before anything runs.
+
+    Pass criterion: a binary whose SHA-256 differs from `ImageSpec.tool_hashes`
+    raises `BinaryMismatch(tool, expected, actual)` and the child is never
+    started, asserted by the absence of the streams the run would have written;
+    a tool the map does not name at all is refused the same way.
+    """
+    tool = tmp_path / "circt-opt"
+    tool.write_text("#!/bin/sh\ntouch ran\n")
+    tool.chmod(0o755)
+    directory = tmp_path / "probe"
+    directory.mkdir()
+    for hashes in ({"circt-opt": "b" * 64}, {}):
+        with pytest.raises(BinaryMismatch) as raised:
+            call_node(probe_execute, _spec("circt-opt", [], tmp_path),
+                      _image_spec(**hashes), LIMITS, str(directory),
+                      bin_dir=str(tmp_path))
+        assert raised.value.tool == "circt-opt"
+        assert raised.value.actual_sha == _sha256(tool)
+    assert not (directory / "stderr.txt").exists()
+    assert not (tmp_path / "ran").exists()
+
+
+@pytest.mark.t0
+@pytest.mark.parametrize("rc,signal,fixture,status,reason", [
+    (0, None, "clean.txt", "clean_exit", ""),
+    (1, None, "parse_error.txt", "parse_error", "tool_rejected_input"),
+    (None, "SIGABRT", "assert_glibc.txt", "assertion", "assertion_fired"),
+    (1, None, "llvm_error.txt", "fatal_error", "llvm_error"),
+    (None, "SIGSEGV", "segv.txt", "crash", "died_by_signal"),
+    (None, "SIGABRT", "bad_alloc.txt", "oom", "allocation_failure"),
+    (None, "SIGABRT", "oom_bare.txt", "oom", "allocation_failure"),
+    (None, "SIGABRT", "oom_llvm.txt", "oom", "allocation_failure"),
+    (1, None, "parse_error_argv.txt", "parse_error", "tool_rejected_argv"),
+])
+def test_u_probe_02_to_06_and_10_11_40_the_status_table(
+        rc, signal, fixture, status, reason) -> None:
+    """T-U-probe-02..06, -10, -11, -40 (FR-06.6, FR-06.7, FR-06.9, FR-07.2).
+
+    Pass criterion: each recorded stderr classifies into exactly the status and
+    `stopping_reason` §3.6's table gives it. `LLVM ERROR: out of memory`
+    classifies `oom` and not `fatal_error`, allocation evidence being tested
+    first; a rejected argv and a rejected input share the `parse_error` status
+    and differ only in the reason, FR-06.9's seven being closed.
+    """
+    assert classify_build(rc, signal, _stderr(fixture), None) == (status, reason)
+
+
+@pytest.mark.t0
+def test_u_probe_12_the_test_order_and_the_oom_second_conjunct() -> None:
+    """T-U-probe-12 (FR-06.7, FR-07.2): the order, and `oom`'s second conjunct.
+
+    Pass criterion: on one stderr carrying an assertion line **and**
+    `std::bad_alloc`, death by signal classifies `oom` and a clean non-zero exit
+    classifies `assertion`, because FR-06.7 reads "terminated by signal **and**
+    its stderr carries an allocation-failure line"; and the three `limit_hit`
+    values outrank every text rule.
+    """
+    both = _stderr("both.txt")
+    assert classify_build(None, "SIGABRT", both, None) == ("oom", "allocation_failure")
+    assert classify_build(1, None, both, None) == ("assertion", "assertion_fired")
+    assert classify_build(None, "SIGSEGV", both, "wall") == ("timeout", "wall_limit")
+    assert classify_build(None, "SIGXCPU", both, "cpu") == ("timeout", "cpu_limit")
+    assert classify_build(1, None, both, "address_space") == ("oom",
+                                                              "address_space_limit")
+
+
+@pytest.mark.t0
+def test_u_probe_07_09_a_timeout_carries_a_null_signal(tmp_path) -> None:
+    """T-U-probe-07, -09 (FR-06.4, FR-06.9, FR-07.8): killed at the wall limit.
+
+    Pass criterion: a probe the stage killed carries `timeout`, `limit_hit`
+    "wall" and a **null** signal on both the `BuildResult` and the
+    `ProbeResult`, so it can never be read back as a crash; and the primary
+    oracle does not fire on it.
+    """
+    out = _execute("/bin/sh", ["-c", "sleep 30"], tmp_path, probe_wall_seconds=1)
+    build, result = out["build_result"], out["probe_result"]
+    assert build.status == "timeout" and build.limit_hit == "wall"
+    assert build.signal is None and result.signal is None
+    assert result.stopping_reason == "wall_limit"
+    assert _oracle(build, tmp_path).fired is False
+
+
+@pytest.mark.t0
+def test_u_probe_08_oom_by_the_address_space_limit(tmp_path) -> None:
+    """T-U-probe-08 (FR-06.7): `limit_hit == "address_space"` is `oom`.
+
+    Pass criterion: a child allocating past the limit is `oom` with a non-zero
+    exit status and no signal, because `RLIMIT_AS` makes allocation fail rather
+    than killing; the oracle does not fire and the parent survives.
+    """
+    out = _execute("/bin/sh",
+                   ["-c", f"exec {os.sys.executable} -c "
+                          "'b = bytearray(500 * 1024 * 1024)'"],
+                   tmp_path, probe_address_space_bytes=104857600)
+    build = out["build_result"]
+    assert build.status == "oom" and build.limit_hit == "address_space"
+    assert build.signal is None and build.exit_status != 0
+    assert _oracle(build, tmp_path).fired is False
+
+
+@pytest.mark.t0
+def test_u_probe_13_14_no_shell_and_the_exact_prlimit_prefix(tmp_path) -> None:
+    """T-U-probe-13, -14 (FR-06.1, FR-06.2): an argument list, and its shape.
+
+    Pass criterion: the recorded `argv.json` is exactly ["prlimit",
+    "--as=<bytes>", "--cpu=<soft>:<soft+5>", "--nofile=1024", "--", <abs tool>,
+    *spec.argv]; long spellings only, `--rss` never, and a source walk finds no
+    `shell=True` and no command string in either module on the measured path.
+    """
+    out = _execute("/bin/true", ["--flag"], tmp_path)
+    recorded = json.loads((tmp_path / "probe" / "argv.json").read_text())
+    assert recorded == out["build_result"].argv
+    assert recorded == ["prlimit", f"--as={LIMITS['probe_address_space_bytes']}",
+                        "--cpu=45:50", "--nofile=1024", "--", "/bin/true", "--flag"]
+    assert probe_task.PROBE_NOFILE == 1024
+    assert "--rss" not in " ".join(recorded)
+    for module in (probe_task, __import__("circt_bug_loop.circt_core",
+                                          fromlist=["x"])):
+        tree = ast.parse(Path(module.__file__).read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                assert not any(kw.arg == "shell" for kw in node.keywords)
+
+
+@pytest.mark.t0
+def test_u_probe_15_streams_are_captured_and_capped(tmp_path) -> None:
+    """T-U-probe-15 (FR-06.4, FR-17.7): stdout.txt, stderr.txt and the cap.
+
+    Pass criterion: both streams land in the probe directory, are truncated at
+    `probe_output_byte_cap` with `truncated=True` recorded, and the byte counts
+    on the `BuildResult` are the bytes actually kept. The `ProbeResult`'s two
+    capped text fields are None at this stage: `reduced_text` is B5's and
+    `assertion_text` is B3's, so `contract.bound_text` has nothing to bound
+    here (erratum candidate against §3.6's step 4).
+    """
+    out = _execute("/bin/sh", ["-c", "printf 'o%.0s' $(seq 1 5000); "
+                                     "printf 'e%.0s' $(seq 1 5000) >&2"],
+                   tmp_path, probe_output_byte_cap=1000)
+    build, result = out["build_result"], out["probe_result"]
+    assert build.truncated is True
+    assert build.stdout_bytes == 1000 and build.stderr_bytes == 1000
+    assert Path(build.stdout_path).read_text() == "o" * 1000
+    assert Path(build.stderr_path).read_text() == "e" * 1000
+    assert result.reduced_text is None and result.assertion_text is None
+
+
+@pytest.mark.t0
+def test_u_probe_41_42_43_the_fields_no_other_module_writes(tmp_path) -> None:
+    """T-U-probe-41, -42, -43 (FR-06.2, FR-06.4, FR-13.2, NFR-02).
+
+    Pass criterion: `limit_hit` is written by `circt_exec_probe` and by no other
+    module, asserted by a source search; `peak_rss_bytes` reaches the
+    `BuildResult` from `ru_maxrss * 1024`; and `worker_hostname`,
+    `worker_node_id` and `child_pid` all reach it, without which FR-13.2's
+    recorded pair for the original run has no source.
+    """
+    out = _execute("/bin/true", [], tmp_path)
+    build = out["build_result"]
+    assert build.peak_rss_bytes and build.peak_rss_bytes > 0
+    assert build.worker_hostname and build.child_pid > 0
+    assert isinstance(build.worker_node_id, str)
+    assert build.cpu_seconds >= 0.0
+    flow = Path(probe_task.__file__).parent
+    writers = [path.name for path in flow.glob("*.py")
+               if re.search(r'"limit_hit":', path.read_text())]
+    assert writers == ["circt_core.py"], writers
+
+
+# --- B3: the three firing patterns and the oracle ---------------------------
+
+@pytest.mark.t0
+def test_u_probe_16_39_the_glibc_pattern_takes_cpp_names() -> None:
+    """T-U-probe-16, -39 (FR-07.1, FR-07.3): `func` is `.+?` and not `[^:]+`.
+
+    Pass criterion: the compiled C++ sample and the C control both match; the
+    whole signature lands in `func`, including its `::`, and the whole condition
+    in `expr`, including the `&& "..."` tail. The old `[^:]+` matched only the
+    control, whose function name has no `::`, so it would have classified no
+    CIRCT assertion at all.
+    """
+    c = _ASSERT_GLIBC.match(_stderr("assert_glibc.txt").strip()).groupdict()
+    assert c == {"file": "a.c", "line": "2", "func": "main",
+                 "expr": 'c>99 && "needs many args"'}
+    cpp = _ASSERT_GLIBC.match(_stderr("assert_cpp.txt").strip()).groupdict()
+    assert cpp == {"file": "b.cpp", "line": "2",
+                   "func": "int circt::Foo::get(int) const",
+                   "expr": 'c > 99 && "needs many args"'}
+    circt = _ASSERT_GLIBC.match(
+        "/workspace/circt/build/bin/circt-opt: /workspace/circt/lib/Dialect/Comb/"
+        "CombFolds.cpp:1234: mlir::OpFoldResult circt::comb::ExtractOp::fold("
+        "FoldAdaptor): Assertion `lo + width <= inputWidth && \"extract out of "
+        "range\"' failed.").groupdict()
+    assert circt["file"] == "/workspace/circt/lib/Dialect/Comb/CombFolds.cpp"
+    assert circt["line"] == "1234"
+    assert circt["func"] == "mlir::OpFoldResult circt::comb::ExtractOp::fold(FoldAdaptor)"
+    assert circt["expr"] == 'lo + width <= inputWidth && "extract out of range"'
+
+
+@pytest.mark.t0
+def test_u_probe_17_the_unreachable_pattern_reads_the_preceding_line(tmp_path) -> None:
+    """T-U-probe-17 (FR-07.1, FR-07.3): no `msg` group, two-line extraction.
+
+    Pass criterion: the pattern is anchored, has no `msg` group, and matches
+    with and without the ` at <file>:<line>` tail; `assertion_text` is the
+    preceding stderr line, a newline, and the matched line with its trailing `!`
+    removed; `assertion_site` is `<file>:<line>` when the location matched and
+    None otherwise, in which case the fingerprint falls to the frame basis.
+    """
+    assert "msg" not in _ASSERT_UNREACHABLE.groupindex
+    assert _ASSERT_UNREACHABLE.match("UNREACHABLE executed!").groupdict() == \
+        {"file": None, "line": None}
+    assert _ASSERT_UNREACHABLE.match(
+        "UNREACHABLE executed at F.cpp:7!").groupdict() == {"file": "F.cpp", "line": "7"}
+    assert _ASSERT_UNREACHABLE.match("prefix UNREACHABLE executed!") is None
+
+    text, site = probe_task._extract_assertion(_stderr("unreachable_two_line.txt"))
+    assert text == ("Unhandled dialect in HWOps lowering\nUNREACHABLE executed at "
+                    "/workspace/circt/lib/Dialect/HW/HWOps.cpp:1234")
+    assert site == "/workspace/circt/lib/Dialect/HW/HWOps.cpp:1234"
+
+    text, site = probe_task._extract_assertion(_stderr("unreachable_bare.txt"))
+    assert text == "UNREACHABLE executed" and site is None
+    text, site = probe_task._extract_assertion(_stderr("unreachable_located.txt"))
+    assert text == "UNREACHABLE executed at F.cpp:7" and site == "F.cpp:7"
+
+
+@pytest.mark.t0
+def test_u_probe_18_21_the_fatal_error_pattern() -> None:
+    """T-U-probe-18, -21 (FR-07.1, FR-07.2): `LLVM ERROR: ` and what follows it.
+
+    Pass criterion: the pattern matches a line beginning `LLVM ERROR: ` and the
+    captured message is exactly the text after it.
+    """
+    found = probe_task._first_match(_FATAL_ERROR, _stderr("llvm_error.txt"))
+    assert found[0] == 0
+    assert found[1].group("message") == \
+        "unsupported lowering for type '!hw.struct<a: i1>'"
+    assert _FATAL_ERROR.match("an LLVM ERROR: x") is None
+
+
+@pytest.mark.t0
+@pytest.mark.parametrize("status,fires", [
+    ("crash", True), ("assertion", True), ("fatal_error", True),
+    ("clean_exit", False), ("parse_error", False), ("timeout", False), ("oom", False)])
+def test_u_probe_19_fired_for_exactly_three_statuses(status, fires, tmp_path) -> None:
+    """T-U-probe-19 (FR-07.1, FR-07.8): fired is true for three and no other.
+
+    Pass criterion: the oracle fires for exactly `crash`, `assertion` and
+    `fatal_error`, and `oracle_class` is non-null exactly when it fires.
+    """
+    verdict = _oracle(_build(status, "segv.txt", tmp_path), tmp_path)
+    assert verdict.fired is fires
+    assert (verdict.oracle_class is not None) is fires
+    assert (verdict.oracle_class == status) is fires
+
+
+@pytest.mark.t0
+def test_u_probe_20_assertion_text_and_site_are_verbatim(tmp_path) -> None:
+    """T-U-probe-20 (FR-07.3): character for character, and non-empty.
+
+    Pass criterion: for a glibc assertion the verdict's `assertion_text` is the
+    `expr` group and its `assertion_site` is `<file>:<line>`, both substrings of
+    the recorded stderr; for a `fatal_error` the `fatal_message` is exactly the
+    text after `LLVM ERROR: ` and both assertion fields are None.
+    """
+    stderr = _stderr("assert_cpp.txt")
+    verdict = _oracle(_build("assertion", "assert_cpp.txt", tmp_path,
+                             signal="SIGABRT"), tmp_path)
+    assert verdict.assertion_text == 'c > 99 && "needs many args"'
+    assert verdict.assertion_site == "b.cpp:2"
+    assert verdict.assertion_text in stderr and verdict.assertion_site in stderr
+    assert verdict.fatal_message is None
+
+    fatal = _oracle(_build("fatal_error", "llvm_error.txt", tmp_path), tmp_path)
+    assert fatal.fatal_message == "unsupported lowering for type '!hw.struct<a: i1>'"
+    assert fatal.assertion_text is None and fatal.assertion_site is None
+
+
+@pytest.mark.t0
+def test_u_probe_22_the_frame_pattern_parses_both_shapes() -> None:
+    """T-U-probe-22 (FR-07.4): `module_offset` and `attributed`, both recorded.
+
+    Pass criterion: both shapes occur in the one recorded trace with a non-zero
+    count each; the parenthesised form yields `module` and `offset` and no file,
+    the print-time-symbolised form yields `file` and `line` and no module; every
+    `#<n> 0x...` line of the trace is matched, so no frame is lost.
+    """
+    trace = _stderr("trace.txt")
+    frames = probe_task._parse_frames(trace)
+    shapes = [f.shape for f in frames]
+    assert shapes.count("module_offset") > 0 and shapes.count("attributed") > 0
+    assert len(frames) == len([line for line in trace.splitlines()
+                               if re.match(r"^\s*#\d+\s+0x", line)])
+    module_offset = next(f for f in frames if f.shape == "module_offset")
+    assert module_offset.module.endswith("libLLVMSupport.so")
+    assert module_offset.offset == "0x23cceb"
+    assert module_offset.file == "" and module_offset.line == 0
+    attributed = next(f for f in frames if f.shape == "attributed")
+    assert attributed.module == "" and attributed.offset == ""
+    assert attributed.file and attributed.line >= 0
+    lambda_frame = next(f for f in frames if "(lambda at" in f.function)
+    assert lambda_frame.file.endswith("OpImplementation.h")
+    # The pattern is anchored at both ends, so the trace's own prose is not a
+    # frame and neither is the "Stack dump without symbol names" shape LLVM
+    # prints when it cannot find llvm-symbolizer at all (§3.6.2).
+    for prose in ("Stack dump:", "1.\tMLIR Parser: custom op parser 'hw.module' ",
+                  "0x00007fe04683cceb llvm::sys::PrintStackTrace"):
+        assert _FRAME.match(prose) is None
+
+
+@pytest.mark.t0
+def test_u_probe_44_strip_prologue(tmp_path) -> None:
+    """T-U-probe-44 (FR-07.5, FR-10.1): exactly four frames, and which four.
+
+    Pass criterion: the strip drops the leading frames whose normalised name is
+    one of §3.7.1's ten, and the leading unresolved libc frame, and stops at the
+    first survivor: on the recorded trace exactly four go, and they are
+    PrintStackTrace, RunSignalHandlers, SignalHandler and the libc frame.
+    `prologue_dropped` records the count, so the strip is auditable from the row.
+
+    §3.7.1 measured 466 frames and 462 survivors on ITS capture of this crash;
+    the committed capture has 470 and 466. A stack overflow's depth is not
+    reproducible and the strip's count is, which is the property under test.
+    """
+    frames = probe_task._parse_frames(_stderr("trace.txt"))
+    stripped = strip_prologue(frames)
+    assert len(frames) - len(stripped) == 4
+    assert [probe_task._normalise_function(f.function) for f in frames[:3]] == \
+        ["llvm::sys::PrintStackTrace", "llvm::sys::RunSignalHandlers", "SignalHandler"]
+    assert frames[3].function == "" and frames[3].module == "/usr/lib/libc.so.6"
+    assert stripped[0] is frames[4]
+
+    verdict = _oracle(_build("crash", "trace.txt", tmp_path), tmp_path)
+    assert verdict.prologue_dropped == 4
+    assert len(verdict.frames) == len(frames)       # the record keeps the prologue
+
+    # The strip stops at the first survivor: a later `abort` is kept.
+    deep = [Frame(index=0, address="0x0", shape="attributed", module="", offset="",
+                  function="abort", file="a.c", line=1, in_circt_object=False),
+            Frame(index=1, address="0x1", shape="attributed", module="", offset="",
+                  function="circt::run()", file="b.cpp", line=2, in_circt_object=True),
+            Frame(index=2, address="0x2", shape="attributed", module="", offset="",
+                  function="abort", file="c.c", line=3, in_circt_object=False)]
+    assert len(strip_prologue(deep)) == 2
+
+
+@pytest.mark.t0
+def test_u_probe_23_24_the_two_counts_and_the_scope_root(tmp_path) -> None:
+    """T-U-probe-23, -24 (FR-07.4, FR-07.5): what each count means, and when.
+
+    Pass criterion: `frames_resolved` counts a non-empty function name, which an
+    SDK module supplies; `frames_with_location` counts `line > 0 AND
+    in_circt_object`, so a frame resolved inside an SDK `.so` raises the first
+    and not the second. `out_of_scope_root` is computed **after** the strip:
+    unstripped the first frame is `llvm::sys::PrintStackTrace` in
+    `libLLVMSupport.so` for every crash, so every candidate would be out of
+    scope and F-12 would never run.
+    """
+    verdict = _oracle(_build("crash", "trace.txt", tmp_path), tmp_path)
+    assert verdict.frames_resolved > verdict.frames_with_location > 0
+    assert verdict.frames_resolved == sum(1 for f in verdict.frames if f.function)
+    assert verdict.frames_with_location == sum(
+        1 for f in verdict.frames if f.line > 0 and f.in_circt_object)
+    assert all(not f.in_circt_object for f in verdict.frames
+               if "circt-sdk/lib/" in f.module)
+
+    # This crash roots in MLIR's own parser, so the field is true; the control is
+    # that it would be true for every crash if the strip were skipped.
+    assert verdict.out_of_scope_root is True
+    assert verdict.frames[0].in_circt_object is False
+    in_scope = strip_prologue(verdict.frames)
+    assert any(f.in_circt_object for f in in_scope), "the trace does reach CIRCT"
+    assert verdict.fingerprint_frame == "parseHWArray HWTypes.cpp"
+
+
+@pytest.mark.t0
+def test_u_probe_24b_a_circt_rooted_crash_is_in_scope(tmp_path) -> None:
+    """T-U-probe-24 (FR-07.5), the other side: a crash whose root IS CIRCT's.
+
+    Pass criterion: on the recorded `crash_01` fixture, whose first stripped
+    frames are SDK header inlines and whose first CIRCT frame is the folder that
+    dereferenced null, the fingerprint frame is the folder and the top-five
+    evidence tuple is the one the fixture recorded.
+    """
+    crash = FIXTURES / "crashes" / "crash_01"
+    expected = json.loads((crash / "expected.json").read_text())
+    roots = (f"{SMOKE / 'w09' / 'wt143'}/", f"{SMOKE / 'w09' / 'b143'}/")
+    build = _build("crash", "clean.txt", tmp_path,
+                   binary_path=str(SMOKE / "w09" / "b143" / "bin" / "circt-opt"),
+                   stderr_path=str(crash / "stderr.txt"))
+    verdict = _oracle(build, tmp_path, circt_roots=roots)
+    assert verdict.prologue_dropped == expected["prologue_dropped"]
+    assert verdict.fingerprint_frame == expected["fingerprint_frame"]
+    stripped = strip_prologue(verdict.frames)
+    assert [probe_task._normalise_function(f.function) for f in stripped[:5]] == \
+        expected["top_frames"]
+    assert verdict.oracle_class == expected["class"]
+
+
+@pytest.mark.t0
+def test_u_probe_25_the_repro_command_drops_the_prlimit_prefix(tmp_path) -> None:
+    """T-U-probe-25 (FR-07.6): one shlex.join line a maintainer can paste.
+
+    Pass criterion: the line names the absolute binary path and the probe's own
+    argv and carries **no** `prlimit` prefix, the limits being the loop's
+    concern and not the report's; it is written to `repro.sh`, executable.
+    """
+    verdict = _oracle(_build("crash", "segv.txt", tmp_path), tmp_path)
+    assert verdict.repro_command == \
+        f"{BASSERT_G / 'circt-opt'} nested.mlir -o /dev/null"
+    assert "prlimit" not in verdict.repro_command
+    script = tmp_path / "repro.sh"
+    assert verdict.repro_command in script.read_text()
+    assert os.access(script, os.X_OK)
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_26_the_flag_state_and_the_version(tmp_path, sdk_env) -> None:
+    """T-U-probe-26 (FR-07.7, FR-03.11): `-UNDEBUG`, and "Optimized build.".
+
+    Pass criterion: the verdict carries the literal `-UNDEBUG` in its flag
+    string and the tool's own `--version` output, which still reads
+    "Optimized build." — which is why a report must state the flag rather than
+    the version.
+    """
+    _needs_sdk()
+    build = _build("crash", "segv.txt", tmp_path)
+    verdict = _oracle(build, tmp_path)
+    assert "-UNDEBUG" in verdict.flag_string
+    assert "Optimized build." in verdict.tool_version_output
+    assert "CIRCT" in verdict.tool_version_output
+
+
+@pytest.mark.t0
+def test_u_probe_49_the_imports_probe_task_is_allowed(tmp_path) -> None:
+    """T-U-probe-49 (FR-16.1, FR-17.3): the record dataclasses, never LoopStore.
+
+    Pass criterion: an import walk shows the record names imported from `store`
+    and `LoopStore` imported nowhere; the module opens no `sqlite3` connection
+    and names no `loop.db`.
+    """
+    tree = ast.parse(Path(probe_task.__file__).read_text())
+    from_store = {alias.name for node in ast.walk(tree)
+                  if isinstance(node, ast.ImportFrom) and node.module
+                  and node.module.endswith("store")
+                  for alias in node.names}
+    assert from_store <= {"BuildResult", "OracleVerdict", "Frame",
+                          "DifferentialVerdict", "ReducedCase", "ImageSpec"}
+    assert "LoopStore" not in from_store
+    source = Path(probe_task.__file__).read_text()
+    assert "sqlite3" not in source and "loop.db" not in source

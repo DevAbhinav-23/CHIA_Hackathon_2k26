@@ -1,0 +1,1 @@
+b_assert: b.cpp:2: int circt::Foo::get(int) const: Assertion `c > 99 && "needs many args"' failed.

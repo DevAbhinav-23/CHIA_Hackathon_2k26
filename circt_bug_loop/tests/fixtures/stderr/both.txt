@@ -1,0 +1,3 @@
+terminate called after throwing an instance of 'std::bad_alloc'
+  what():  std::bad_alloc
+a_assert: a.c:2: main: Assertion `c>99 && "needs many args"' failed.

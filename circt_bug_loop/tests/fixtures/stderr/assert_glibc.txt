@@ -1,0 +1,1 @@
+a_assert: a.c:2: main: Assertion `c>99 && "needs many args"' failed.

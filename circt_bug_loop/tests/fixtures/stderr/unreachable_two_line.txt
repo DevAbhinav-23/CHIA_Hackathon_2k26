@@ -1,0 +1,2 @@
+Unhandled dialect in HWOps lowering
+UNREACHABLE executed at /workspace/circt/lib/Dialect/HW/HWOps.cpp:1234!
