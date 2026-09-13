@@ -1,0 +1,13 @@
+# T-U-core-10: the module-and-offset recipe, measured 2026-09-14.
+# Columns, tab separated: <root key>  <path under the root>  <offset>  <expected
+# FunctionName>  <expected FileName, relative to the root or empty>  <expected Line>.
+# The root keys are resolved by the test against ~/.cache/chia-pin-smoke and the
+# test skips when the root is absent (04-Test-Plan.md 0.5, needs_sdk).
+#
+# Both offsets are frames of tests/fixtures/stderr/trace.txt, each fed to the
+# module it actually lies in. The SDK's prebuilt shared libraries carry no debug
+# information, so a name resolves and a location never does, which is exactly
+# FR-07.4's amended criterion.
+sdk	lib/libMLIRAsmParser.so	0x361b5	mlir::detail::Parser::parseOptionalInteger(llvm::APInt&)		0
+sdk	lib/libLLVMSupport.so	0x23cceb	llvm::sys::PrintStackTrace(llvm::raw_ostream&, int)		0
+sdk	lib/libLLVMSupport.so	0x239ee5	llvm::sys::RunSignalHandlers()		0

@@ -1,0 +1,6 @@
+# T-U-core-13: the SAME address in the build without -g. The name resolves from
+# .symtab and the location does not, which is the "??:0:0" the measurement
+# recorded; the symbol the address lands in differs between the two builds,
+# which is the point: without line tables the answer is whichever function's
+# range contains the address.
+bassert	bin/circt-opt	0x3365f30	circt::LoweringOptions::parse(llvm::StringRef, llvm::function_ref<void (llvm::Twine)>)		0

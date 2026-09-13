@@ -18,6 +18,24 @@ FIXTURES = Path(schema.__file__).resolve().parent / "fixtures"
 _INTERLOCK = "BUGLOOP_ALLOW_LIVE_MODEL"
 
 
+def call_node(fn, *args, **kwargs):
+    """Call a `@ChiaFunction`-decorated node's undecorated original, with no Ray.
+
+    `04-Test-Plan.md` §0.4 calls the wrapper itself, which routes through
+    `chia.trace.profiler.get_profiler` (`chia:chia/base/ChiaFunction.py:110-120`);
+    `get_profiler` starts a local Ray instance, which is slow and which raises a
+    `FutureWarning` that `-W error` turns into an error. CHIA stores the
+    undecorated function on the wrapper as `_chia_original`
+    (`chia:chia/base/ChiaFunction.py:129`), so a unit test calls that and every
+    node keeps the decorator `03-LLD.md` §3.2's column gives it. The placement
+    the decorator declares is asserted statically instead, off `_chia_options`.
+
+    A plain function passes through unchanged, so a test need not know whether
+    what it is calling is a node. (Architect's decision, 2026-09-14.)
+    """
+    return getattr(fn, "_chia_original", fn)(*args, **kwargs)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def no_live_model() -> None:
     """Refuse to run T0 to T2 with the live-model interlock set (04-Test-Plan.md 0.5).

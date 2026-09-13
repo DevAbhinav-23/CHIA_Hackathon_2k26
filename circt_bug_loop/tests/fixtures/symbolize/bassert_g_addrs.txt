@@ -1,0 +1,4 @@
+# T-U-core-12: one CIRCT address in the -gline-tables-only build (measurement M2).
+# Same columns as module_offsets.txt. The location resolves because FR-03.4's
+# flag emits line tables for CIRCT's own objects.
+bassert_g	bin/circt-opt	0x3365f30	circt::chooseName(llvm::StringRef, llvm::StringRef)	src/lib/Support/Naming.cpp	47
