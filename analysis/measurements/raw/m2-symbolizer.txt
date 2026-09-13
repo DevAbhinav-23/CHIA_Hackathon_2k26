@@ -1,0 +1,24 @@
+=== pick a symbol via nm ===
+0000000001f13a00 T getSummary(circt::firrtl::MemOp)
+0000000002f5ac40 T getIntWidth(mlir::Operation*, circt::calyx::CellInterface&, bool)
+0000000002028e30 W llvm::SmallVector<circt::handshake::MemLoadInterface, 1u> getLoadPorts<circt::handshake::ExternalMemoryOp>(circt::handshake::ExternalMemoryOp)
+chosen: 0000000003365f30 T _ZN5circt10chooseNameEN4llvm9StringRefES1_
+addr=0x0000000003365f30 name=_ZN5circt10chooseNameEN4llvm9StringRefES1_
+=== llvm-symbolizer (SDK) ===
+llvm-symbolizer
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+circt::chooseName(llvm::StringRef, llvm::StringRef)
+/home/adi/.cache/chia-pin-smoke/src/lib/Support/Naming.cpp:47:0
+
+=== same address against the no -g build (bassert) for contrast ===
+circt::chooseName(llvm::StringRef, llvm::StringRef)
+??:0:0
+
+=== D-13 check: does a slang-less circt-translate offer --import-verilog? ===
+0
+(SDK circt-translate, slang ON:)
+1
+=== bassert_g circt-verilog present? ===
+ls: cannot access '/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-verilog': No such file or directory

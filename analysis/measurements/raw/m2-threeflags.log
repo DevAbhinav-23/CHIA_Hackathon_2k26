@@ -1,0 +1,33 @@
+commit 5056ff04450bc9f27a9ff0460702aee1f1afdd3f ; SDK firtool-1.157.0 ; jobs=12 ; 2026-09-13T20:05:59+05:30
+compiler: clang version 23.0.0git (https://github.com/llvm/llvm-project.git d4148a8476dfb63291ca3c63bc92a3bd8a19b773)
+=== bassert_n : CMAKE_CXX_FLAGS_RELEASE='-O3 -DNDEBUG' ===
+  configure rc=0 wall=4s
+  build rc=0 wall=621s  edges=1082
+  du -sb build: 441075357  (425M)
+  circt-opt              59249008 bytes
+  firtool                26410704 bytes
+  circt-translate        15334272 bytes
+  arcilator              10327504 bytes
+  circt-reduce           26243344 bytes
+  readelf -S bin/circt-opt | grep -c debug_line: 0
+  nm -u bin/circt-opt | grep -c __assert_fail: 0
+=== bassert_u : CMAKE_CXX_FLAGS_RELEASE='-O3 -UNDEBUG' ===
+  configure rc=0 wall=4s
+  build rc=0 wall=676s  edges=1082
+  du -sb build: 612299950  (588M)
+  circt-opt              76316792 bytes
+  firtool                34153216 bytes
+  circt-translate        21442016 bytes
+  arcilator              14247008 bytes
+  circt-reduce           36806584 bytes
+  readelf -S bin/circt-opt | grep -c debug_line: 0
+  nm -u bin/circt-opt | grep -c __assert_fail: 1
+=== already built: bassert_g (-O3 -UNDEBUG -gline-tables-only) ===
+  du -sb: 1362790328
+  circt-opt             200343024 bytes
+  firtool                89204048 bytes
+  circt-translate        68826840 bytes
+  arcilator              45663872 bytes
+  circt-reduce          118362200 bytes
+  nm -u bin/circt-opt | grep -c __assert_fail: 1
+THREEFLAGS DONE 2026-09-13T20:27:44+05:30

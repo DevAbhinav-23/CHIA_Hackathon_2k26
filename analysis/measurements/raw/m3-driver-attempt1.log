@@ -1,0 +1,19 @@
+gate paths (22): test/Analysis test/arcilator test/circt-as-dis test/circt-opt test/circt-reduce test/circt-synth test/circt-test test/circt-translate test/circt-verilog test/Conversion test/Dialect test/firld test/firtool test/hlstool test/kanagawatool test/lib test/om-linker test/Scheduling test/Target test/Tools test/Transforms test/Unit
+### commit: 5056ff04450bc9f27a9ff0460702aee1f1afdd3f
+### lit: lit 23.1.1
+=== lit on /home/adi/.cache/chia-pin-smoke/bassert_g (bassert_g) start 2026-09-13T19:57:01+05:30 ===
+lit rc=2 wall=0s
+--- summary (bassert_g) ---
+failing entries: 0
+=== building the same five targets in the assertions-OFF build 2026-09-13T19:57:01+05:30 ===
+ndebug build rc=0 wall=401s
+edges run: 1082
+=== lit on /home/adi/.cache/chia-pin-smoke/src/build (ndebug) start 2026-09-13T20:03:42+05:30 ===
+lit rc=2 wall=0s
+--- summary (ndebug) ---
+failing entries: 0
+=== difference ===
+fail on BOTH (missing-binary / pre-existing): 0
+fail ONLY with assertions ON  (= assertion false positives): 0
+fail ONLY with assertions OFF: 0
+M3 DONE

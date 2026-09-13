@@ -1,0 +1,53 @@
+-- Using MLIRConfig.cmake in: /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/mlir
+-- Using LLVMConfig.cmake in: /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm
+-- Building with -fPIC
+CMake Warning (policy) at /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm/HandleLLVMOptions.cmake:945 (CHECK_C_SOURCE_COMPILES):
+  Policy CMP0219 is not set: Macro invocations preserve backslashes in
+  arguments.  Run "cmake --help-policy CMP0219" for policy details.  Use the
+  cmake_policy command to set the policy and suppress this warning.
+
+  Command "CHECK_C_SOURCE_COMPILES" called with arguments containing
+  backslashes.
+
+  Since the policy is not set, backslashes in the arguments:
+
+   "// \\\n//\nint main(void) {return 0;}"
+
+  will be interpreted as escape sequences for compatibility.
+
+  Set the policy to NEW to instead pass
+
+   "// \\\\\\n//\\nint main(void) {return 0;}"
+
+  so that argument parsing will preserve the original values.
+Call Stack (most recent call first):
+  CMakeLists.txt:63 (include)
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+-- Precompiled headers enabled.
+CMake Warning at CMakeLists.txt:105 (message):
+  Skipping unittests since LLVM install does not include gtest headers and
+  libraries
+
+
+-- Version generation is disabled. To enable the version generation, please set CIRCT_RELEASE_TAG_ENABLED CMake variable
+-- Found Verilator at /usr/bin/verilator.
+-- Did not find vivado.
+-- Setting clang-tidy path to /home/adi/Projects/Honours/MLIR/llvm-project/build/bin.
+-- Did NOT find systemc headers.
+-- Did not find Quartus.
+-- Did not find Questa.
+-- Did not find yosys.
+-- Found iverilog at /usr/bin/iverilog.
+-- Could NOT find ortools (missing: ortools_DIR)
+-- Z3 identified as a logical backend.
+-- Found z3 at /home/adi/.local/bin.
+-- CIRCT Python bindings are disabled.
+-- Found python at /home/adi/.local/bin/python3.12
+-- Did not find SymbiYosys.
+-- PyCDE project is disabled
+-- PyRTG project is disabled
+-- Configuring done (0.7s)
+-- Generating done (0.6s)
+-- Build files have been written to: /home/adi/.cache/chia-pin-smoke/bassert_g

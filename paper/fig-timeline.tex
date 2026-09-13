@@ -1,0 +1,49 @@
+% fig-timeline.tex -- single-column timeline explaining release-pinned main.
+% Canvas: x 0..8.7, y 0.5..3.2 (cm).
+\begin{tikzpicture}[x=1cm,y=1cm, font=\sffamily,
+  tiny/.style={font=\sffamily\fontsize{6}{6.8}\selectfont, color=dgrey},
+  tick/.style={line width=0.5pt, draw=black!45},
+  ]
+
+% === legend row
+\draw[line width=0.5pt, draw=rbB] (0.30,2.98) -- (0.30,3.16);
+\fill[rbB] (0.30,3.16) -- (0.60,3.07) -- (0.30,2.98) -- cycle;
+\node[tiny, anchor=west] at (0.66,3.07) {\texttt{firtool} release (a prebuilt LLVM SDK)};
+\draw[tick] (5.10,2.94) -- (5.10,3.20);
+\node[tiny, anchor=west] at (5.20,3.07) {LLVM pin change};
+
+% === window with no release yet
+\fill[black!7] (6.30,1.55) rectangle (8.45,2.86);
+\node[tiny, anchor=north west, text width=2.00cm, align=left] at (6.38,2.80)
+  {no release for this pin yet};
+
+% === the branch, one colour per pin window
+\draw[line width=2.6pt, draw=rbF] (0.30,1.80) -- (2.10,1.80);
+\draw[line width=2.6pt, draw=rbF] (2.10,1.80) -- (4.30,1.80);
+\draw[line width=2.6pt, draw=rbF] (4.30,1.80) -- (6.30,1.80);
+\draw[line width=2.6pt, draw=dsF] (6.30,1.80) -- (8.45,1.80);
+\draw[-{Latex[length=3.4pt,width=3pt]}, line width=0.5pt, draw=black!70]
+  (8.45,1.80) -- (8.62,1.80);
+\node[tiny, anchor=north west] at (0.30,1.52) {CIRCT \texttt{main}, oldest to newest};
+
+% === pin changes
+\foreach \x in {2.10,4.30,6.30} {\draw[tick] (\x,1.55) -- (\x,2.05);}
+
+% === releases
+\foreach \x in {1.10,2.95,3.95,5.40} {
+  \draw[line width=0.5pt, draw=rbB] (\x,1.90) -- (\x,2.42);
+  \fill[rbB] (\x,2.42) -- (\x+0.30,2.33) -- (\x,2.24) -- cycle;}
+
+% === build point and head
+\fill[black!80] (6.26,1.80) circle (2.2pt);
+\node[tiny, anchor=north, text width=2.3cm, align=center] at (6.26,1.46)
+  {\textbf{build point}\\release-pinned \texttt{main}};
+\draw[line width=1.0pt, draw=black!80] (8.45,1.62) -- (8.45,1.98);
+\node[tiny, anchor=north east] at (8.38,2.22) {head of \texttt{main}};
+
+% === lag
+\draw[{Latex[length=3pt,width=2.6pt]}-{Latex[length=3pt,width=2.6pt]},
+      line width=0.5pt, draw=rbB] (6.26,0.72) -- (8.45,0.72);
+\node[tiny, color=rbB, fill=white, inner sep=1pt] at (7.36,0.72) {lag};
+
+\end{tikzpicture}

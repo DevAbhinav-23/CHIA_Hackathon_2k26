@@ -1,0 +1,20 @@
+# secrets and local env
+api.md
+*.env
+.env*
+# paper build products
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/main.pdf
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+# loop runtime state (never commit)
+loop.db
+loop.db-*
+issues.db*
+artefacts/

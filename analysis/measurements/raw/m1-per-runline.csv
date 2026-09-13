@@ -1,0 +1,332 @@
+sha,date,test_file,lang,entry_tool,reducibility,lead_not,pipe,pct_t,pct_S,pct_brace,split_file,split_input_file,verify_diagnostics,shell_and,redirect,run_line
+cc71d34ab52f,2026-08-17,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+cc71d34ab52f,2026-08-17,test/circt-verilog/roundtrip-oob-reads.sv,.sv,circt-verilog,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-verilog -Wno-error=range-oob %s | circt-opt --test-apply-lowering-options='options=emittedLineLength=0' --export-verilog -o /dev/null | FileCheck %s
+56f16468bccf,2026-08-13,test/Dialect/OM/elaborate-object-errors-unevaluated.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt -om-elaborate-object='all-public-classes=true allow-unevaluated=true' %s -verify-diagnostics -split-input-file -allow-unregistered-dialect
+4ac632ae7dd8,2026-08-13,test/Dialect/OM/elaborate-object-errors-unevaluated.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt -om-elaborate-object='all-public-classes=true allow-unevaluated=true' %s -verify-diagnostics -split-input-file
+08f97b29f1c7,2026-08-03,test/Conversion/ImportVerilog/array.sv,.sv,circt-verilog,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s | FileCheck %s
+08f97b29f1c7,2026-08-03,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+08f97b29f1c7,2026-08-03,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+e2e5cca7355c,2026-07-28,test/Conversion/MooreToCore/classes.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+42d11d06acf7,2026-07-22,test/Dialect/FIRRTL/infer-domains-check-errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,0,1,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-domains{mode=check}))' %s --verify-diagnostics
+e7e3249173a2,2026-07-21,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+e7e3249173a2,2026-07-21,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+a5f07baa45f0,2026-07-17,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+a5f07baa45f0,2026-07-17,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+f1fe5740b35c,2026-07-15,test/Conversion/ExportVerilog/verilog-basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s -test-apply-lowering-options='options=emitBindComments' -export-verilog -verify-diagnostics | FileCheck %s --strict-whitespace
+dc54091c7728,2026-07-14,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+a01b37c93c58,2026-07-14,test/Dialect/Moore/mem2reg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt --mem2reg --verify-diagnostics %s | FileCheck %s
+3483195718eb,2026-07-08,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+3483195718eb,2026-07-08,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+bb4d4f99f6ea,2026-07-06,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+a14ce3078b4c,2026-07-06,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+a14ce3078b4c,2026-07-06,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+acbc74635c94,2026-07-06,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+acbc74635c94,2026-07-06,test/Transforms/map-arith-to-comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --split-input-file --verify-diagnostics --map-arith-to-comb=enable-best-effort-lowering %s | FileCheck %s
+0fbfd5858034,2026-06-24,test/Dialect/FIRRTL/inliner.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(firrtl-inliner))' -allow-unregistered-dialect %s | FileCheck %s
+23abfba6006b,2026-06-23,test/Conversion/DCToHW/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --lower-dc-to-hw %s | FileCheck %s
+23abfba6006b,2026-06-23,test/Dialect/DC/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --canonicalize --cse --canonicalize | FileCheck %s
+2aaa416d740d,2026-06-20,test/Dialect/FIRRTL/expand-whens.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(any(firrtl-expand-whens)))' %s | FileCheck %s
+3f65acfd617b,2026-06-17,test/Conversion/FIRRTLToHW/lower-to-hw.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,"circt-opt -pass-pipeline=""builtin.module(lower-firrtl-to-hw)"" -verify-diagnostics %s --split-input-file | FileCheck %s"
+97129392af7a,2026-06-11,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+97129392af7a,2026-06-11,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+ce945f02fde1,2026-06-07,test/Conversion/CombToSynth/comb-to-aig-arith.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-comb-to-synth{additional-legal-ops=comb.xor,comb.or,comb.and,comb.mux},cse))"" | FileCheck %s"
+ce945f02fde1,2026-06-07,test/Conversion/CombToSynth/comb-to-aig-arith.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-comb-to-synth{additional-legal-ops=comb.xor,comb.or,comb.and,comb.mux,comb.add},cse))"" | FileCheck %s --check-prefix=ALLOW_ADD"
+ce945f02fde1,2026-06-07,test/Conversion/CombToSynth/comb-to-aig-arith.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-comb-to-synth{additional-legal-ops=comb.xor,comb.or,comb.and,comb.mux,comb.icmp}))"" | FileCheck %s --check-prefix=ALLOW_ICMP"
+6a3a01e41523,2026-06-05,test/Dialect/FIRRTL/infer-domains-infer-all.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-domains{mode=infer-all}))' %s | FileCheck %s
+b645b96686fa,2026-06-04,test/Dialect/LLHD/Transforms/remove-control-flow.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-remove-control-flow %s | FileCheck %s
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-synth,direct,0,0,1,0,0,0,0,0,0,0,circt-synth %s -o %t1.mlir
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,cat %t1.mlir | FileCheck %s
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-lec,direct,0,1,1,0,0,0,0,0,0,0,circt-lec %t1.mlir %s -c1=mul -c2=mul --shared-libs=%libz3 | FileCheck %s --check-prefix=COMB_MUL_TECHMAP
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-lec,direct,0,1,1,0,0,0,0,0,0,0,circt-lec %t1.mlir %s -c1=dot_test -c2=dot_test --shared-libs=%libz3 | FileCheck %s --check-prefix=TECHMAP_PERMUTATION
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-synth,direct,0,0,1,0,0,0,0,0,0,0,circt-synth %s -o %t.lut.mlir --top mul --lower-to-k-lut 6
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,cat %t.lut.mlir | FileCheck %s --check-prefix=LUT
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt -lower-comb %t.lut.mlir -o %t2.mlir
+38227a822425,2026-05-27,integration_test/circt-synth/mapping-lec.mlir,.mlir,circt-lec,direct,0,1,1,0,0,0,0,0,0,0,circt-lec %t2.mlir %s -c1=mul -c2=mul --shared-libs=%libz3 | FileCheck %s --check-prefix=COMB_MUL_LUT
+38227a822425,2026-05-27,test/Dialect/Synth/tech-mapper.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt --pass-pipeline='builtin.module(synth-tech-mapper{strategy=area test=true max-cuts-per-root=8})' %s | FileCheck %s --check-prefixes CHECK,AREA"
+38227a822425,2026-05-27,test/Dialect/Synth/tech-mapper.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt --pass-pipeline='builtin.module(synth-tech-mapper{strategy=timing test=true max-cuts-per-root=8})' %s | FileCheck %s --check-prefixes CHECK,TIMING"
+4ed926c3c177,2026-05-23,test/Dialect/OM/canonicalizers.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --cse --canonicalize %s | FileCheck %s
+4ed926c3c177,2026-05-23,test/Dialect/OM/elaborate-object.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -om-elaborate-object='target-class=Top' %s | FileCheck %s --check-prefix=TOP
+4ed926c3c177,2026-05-23,test/Dialect/OM/elaborate-object.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -om-elaborate-object='target-class=UseExtern' %s | FileCheck %s --check-prefix=STRICT-EXTERN
+4ed926c3c177,2026-05-23,test/Dialect/OM/elaborate-object.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -om-elaborate-object='all-public-classes=true allow-unevaluated=true' %s | FileCheck %s --check-prefixes=CHECK,PUBLIC"
+20309db8b207,2026-05-22,test/Dialect/FIRRTL/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+793d63912b43,2026-05-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+793d63912b43,2026-05-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+be870d5d5d54,2026-05-15,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+be870d5d5d54,2026-05-15,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+3daad646aa92,2026-05-13,test/Conversion/ImportVerilog/array.sv,.sv,circt-verilog,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s | FileCheck %s
+3daad646aa92,2026-05-13,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+3daad646aa92,2026-05-13,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py   10 > %t.1.mlir
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py  100 > %t.2.mlir
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py  200 > %t.3.mlir
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py 1000 > %t.4.mlir
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.1.mlir -o /dev/null
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.2.mlir -o /dev/null
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.3.mlir -o /dev/null
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.4.mlir -o /dev/null
+2cdbf0d17111,2026-04-30,test/Dialect/LLHD/Transforms/mem2reg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %s | FileCheck %s
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py   10 > %t.1.mlir
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py  100 > %t.2.mlir
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py  200 > %t.3.mlir
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,other,direct,0,0,1,1,0,0,0,0,0,1,%python %S/mem2reg-scaling.py 1000 > %t.4.mlir
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.1.mlir -o /dev/null
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.2.mlir -o /dev/null
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.3.mlir -o /dev/null
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %t.4.mlir -o /dev/null
+bcc1685cdd20,2026-04-21,test/Dialect/LLHD/Transforms/mem2reg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %s | FileCheck %s
+681992b3a872,2026-04-17,test/Dialect/Seq/firreg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,"circt-opt %s -verify-diagnostics --lower-seq-to-sv | FileCheck %s --check-prefixes=CHECK,COMMON,RANDOM"
+681992b3a872,2026-04-17,test/Dialect/Seq/firreg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,"circt-opt %s -verify-diagnostics --pass-pipeline=""builtin.module(lower-seq-to-sv{disable-reg-randomization})"" | FileCheck %s --check-prefixes=COMMON,DISABLED"
+681992b3a872,2026-04-17,test/Dialect/Seq/firreg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,"circt-opt %s -verify-diagnostics --pass-pipeline=""builtin.module(lower-seq-to-sv{emit-separate-always-blocks})"" | FileCheck %s --check-prefixes=SEPARATE"
+6a2571d0a6c4,2026-04-16,test/Dialect/Synth/functional-reduction.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --synth-functional-reduction=test-transformation | FileCheck %s
+02bb5593a1fc,2026-04-14,test/Dialect/Synth/lower-word-to-bits.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --synth-lower-word-to-bits | FileCheck %s
+1ccf9cf310cb,2026-04-09,test/Dialect/OM/round-trip.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s -verify-diagnostics --mlir-print-local-scope --mlir-print-debuginfo | circt-opt --mlir-print-local-scope --mlir-print-debuginfo -verify-diagnostics | FileCheck %s
+a4a4f74118eb,2026-04-06,test/Dialect/FIRRTL/infer-domains-infer-all.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-domains{mode=infer-all}))' %s | FileCheck %s
+2867b37b5415,2026-04-06,test/Dialect/FIRRTL/flatten-memory.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl.module(firrtl-flatten-memory)))' %s | FileCheck  %s
+2867b37b5415,2026-04-06,test/firtool/memoryLowering.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,1,0,0,0,"firtool %s -repl-seq-mem -repl-seq-mem-file=""test.conf"" -split-input-file |  FileCheck %s"
+4df5007fbcf2,2026-03-30,test/Dialect/FIRRTL/lower-classes.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -firrtl-lower-classes %s | FileCheck %s
+738d5e09880f,2026-03-30,test/Dialect/Synth/resource.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt --synth-print-resource-usage-analysis='output-file=""-""' %s | FileCheck %s"
+738d5e09880f,2026-03-30,test/Dialect/Synth/resource.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt --synth-print-resource-usage-analysis='top-module-name=top output-file=""-"" emit-json=true' %s | FileCheck %s --check-prefix=JSON"
+738d5e09880f,2026-03-30,test/Dialect/Synth/resource.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt --synth-print-resource-usage-analysis='top-module-name=nested output-file=""-"" emit-json=true' %s | FileCheck %s --check-prefix=JSON-NESTED"
+b15ee99dbe58,2026-03-27,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+b15ee99dbe58,2026-03-27,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+838a8bb29106,2026-03-27,test/Conversion/CoreToFSM/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt -convert-core-to-fsm -verify-diagnostics -split-input-file %s
+c9b4ed95782c,2026-03-27,test/Dialect/FIRRTL/parse-errors.fir,.fir,circt-translate,lift-firtool,0,0,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics --split-input-file %s
+c14279dcbf73,2026-03-26,test/Dialect/FIRRTL/Reduction/module-port-pruner.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --test /usr/bin/env --test-arg true --keep-best=0 --include module-port-pruner | FileCheck %s
+60a9ebf59100,2026-03-24,test/Dialect/FIRRTL/infer-domains-infer-all.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-domains{mode=infer-all}))' %s | FileCheck %s
+60a9ebf59100,2026-03-24,test/Dialect/FIRRTL/infer-domains-infer.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-domains{mode=infer}))' %s | FileCheck %s
+c80cfb9e2967,2026-03-24,test/Dialect/FIRRTL/lower-open-aggs.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,"circt-opt --pass-pipeline=""builtin.module(firrtl.circuit(firrtl-lower-open-aggs))"" %s --split-input-file | FileCheck %s --implicit-check-not=openvector --implicit-check-not=openbundle --implicit-check-not=opensub"
+88d9a5ad7a3a,2026-03-22,test/Dialect/SV/sv-trace-iverilog-errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,0,1,0,0,circt-opt --sv-trace-iverilog %s -verify-diagnostics
+b59eca8f1e7b,2026-03-22,test/Dialect/HW/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+72acea92c1d1,2026-03-22,test/Dialect/Moore/canonicalizers.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --canonicalize %s | FileCheck %s
+1625085798f3,2026-03-22,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+9445def95048,2026-03-22,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+b19078499420,2026-03-22,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+c3e2100d37ca,2026-03-21,test/Conversion/MooreToCore/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --convert-moore-to-core --split-input-file --verify-diagnostics
+b3b407b37bb2,2026-03-21,test/Conversion/MooreToCore/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --convert-moore-to-core --split-input-file --verify-diagnostics
+3ef31bc4848a,2026-03-21,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+d636fb5d3f01,2026-03-21,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+d636fb5d3f01,2026-03-21,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+564e07083c52,2026-03-21,test/Dialect/Sim/dynamic-strings.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --canonicalize | FileCheck --strict-whitespace %s
+246aa011e7b9,2026-03-20,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,circt-opt,direct,1,0,0,0,0,0,0,0,0,0,not circt-opt -export-verilog %s
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,0,1,0,0,circt-opt -export-verilog -verify-diagnostics %s
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,1,0,rm -rf %t && mkdir -p %t
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,circt-opt,direct,1,0,1,0,0,0,0,0,0,0,not circt-opt -export-split-verilog='dir-name=%t' %s
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,1,0,rm -rf %t && mkdir -p %t
+337c72727242,2026-03-19,test/Conversion/ExportVerilog/verilog-errors-prop.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,1,0,0,circt-opt -export-split-verilog='dir-name=%t' %s --verify-diagnostics
+a069e06e7cb9,2026-03-17,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+a069e06e7cb9,2026-03-17,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+1dfc471304be,2026-03-16,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+1dfc471304be,2026-03-16,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+e915a39ed63d,2026-03-16,test/Conversion/CoreToFSM/concat-mux.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -convert-core-to-fsm %s | FileCheck %s
+b6dea0f9d436,2026-03-16,test/Conversion/CoreToFSM/action-guard-simplify.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -convert-core-to-fsm %s | FileCheck %s
+d0cb91fbd7cc,2026-03-12,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+d0cb91fbd7cc,2026-03-12,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+10ca02433451,2026-03-11,test/Conversion/CoreToFSM/action-guard-simplify.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -convert-core-to-fsm %s | FileCheck %s
+a0ce24f53157,2026-03-11,test/Conversion/CoreToFSM/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -convert-core-to-fsm %s | FileCheck %s
+a0ce24f53157,2026-03-11,test/Conversion/CoreToFSM/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt -convert-core-to-fsm -verify-diagnostics -split-input-file %s
+01c8443a464c,2026-03-11,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+01c8443a464c,2026-03-11,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+fb5d04cc5ab8,2026-03-10,test/Conversion/FSMToSMT/diff_init_state.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -convert-fsm-to-smt %s | FileCheck %s
+33c4c09aebdd,2026-03-10,test/Dialect/Seq/reg-of-vec-to-mem.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --seq-reg-of-vec-to-mem | FileCheck %s
+a3e42c4e87c4,2026-03-06,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+a3e42c4e87c4,2026-03-06,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+f6d9f05b820f,2026-03-05,test/Dialect/Synth/sop-balancing.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --pass-pipeline='builtin.module(hw.module(synth-sop-balancing{max-cut-input-size=6}))' %s | FileCheck %s
+ca876e0b68d2,2026-03-04,test/Dialect/FIRRTL/inliner.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(firrtl-inliner))' -allow-unregistered-dialect %s | FileCheck %s
+016f7c0a1e22,2026-03-03,test/Conversion/HWToBTOR2/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --convert-hw-to-btor2 --verify-diagnostics --split-input-file -o /dev/null
+115a3111e2ce,2026-03-02,test/Dialect/RTG/Transform/elaboration.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --rtg-elaborate=seed=0 --split-input-file --verify-diagnostics --mlir-print-debuginfo --mlir-print-local-scope %s | FileCheck %s
+11cc66244ceb,2026-02-26,test/Conversion/DatapathToComb/datapath-to-comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-datapath-to-comb))"" | FileCheck %s"
+11cc66244ceb,2026-02-26,test/Conversion/DatapathToComb/datapath-to-comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-datapath-to-comb{lower-compress-to-add=true}))"" | FileCheck %s --check-prefix=TO-ADD"
+11cc66244ceb,2026-02-26,test/Conversion/DatapathToComb/datapath-to-comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-datapath-to-comb{lower-partial-product-to-booth=true}, canonicalize))"" | FileCheck %s --check-prefix=FORCE-BOOTH"
+11cc66244ceb,2026-02-26,test/Conversion/DatapathToComb/datapath-to-comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --pass-pipeline=""builtin.module(hw.module(convert-datapath-to-comb{timing-aware=true}))"" | FileCheck %s --check-prefix=TIMING"
+a0ddbccf04f5,2026-02-26,test/Dialect/FIRRTL/lower-open-aggs.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,"circt-opt --pass-pipeline=""builtin.module(firrtl.circuit(firrtl-lower-open-aggs))"" %s --split-input-file | FileCheck %s --implicit-check-not=openvector --implicit-check-not=openbundle --implicit-check-not=opensub"
+c1ef24514cea,2026-02-23,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+0e9f82038b32,2026-02-22,test/Dialect/FIRRTL/lower-layers.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -firrtl-lower-layers -split-input-file %s | FileCheck %s
+73e28e09a3b5,2026-02-21,test/Conversion/CalyxToHW/pipeline-clock.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt --split-input-file -lower-calyx-to-hw %s | FileCheck %s
+b2ab3aff00ca,2026-02-19,test/Dialect/FIRRTL/dedup.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --firrtl-dedup %s | FileCheck %s
+10fbfc9b17ac,2026-02-19,test/Dialect/FIRRTL/Reduction/module-port-pruner-probe.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --test /usr/bin/env --test-arg true --keep-best=0 --include module-port-pruner | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_buffer.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw --split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_cmerge.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_cond_br.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -split-input-file -lower-handshake-to-hw %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_constant.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_fork.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_join.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_simple_loop.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_source.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -lower-handshake-to-hw %s | FileCheck %s
+3b30c823b829,2026-02-14,test/Conversion/HandshakeToHW/test_sync.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -lower-handshake-to-hw -split-input-file %s | FileCheck %s
+f9b8bd46511d,2026-02-09,test/Dialect/HW/typedecls.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s | circt-opt | FileCheck %s
+ef82ef1b1e33,2026-02-03,test/Dialect/FIRRTL/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+db9b1154c414,2026-02-02,test/Dialect/FIRRTL/remove-unused-ports.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-remove-unused-ports))' %s -split-input-file | FileCheck %s
+010d18b95ff2,2026-02-02,test/Dialect/FIRRTL/Reduction/extmodule-instance-remover.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --test /usr/bin/env --test-arg true --keep-best=0 --include extmodule-instance-remover | FileCheck %s
+0de87ef355e6,2026-02-02,test/Dialect/FIRRTL/Reduction/instance-stubber.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --test /usr/bin/true --include instance-stubber | FileCheck %s
+b7d165dedca7,2026-02-02,test/circt-reduce/name-sanitizer.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --include=module-internal-name-sanitizer --include=module-name-sanitizer --test /usr/bin/env --test-arg true --keep-best=0 | FileCheck %s
+d3c93988fd68,2026-02-02,test/Dialect/FIRRTL/Reduction/connect-forwarder.mlir,.mlir,circt-reduce,direct,0,1,0,0,0,0,0,0,0,0,circt-reduce %s --test /usr/bin/env --test-arg true --keep-best=0 --include connect-forwarder | FileCheck %s
+e36f5695723e,2026-01-30,test/Dialect/FIRRTL/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+db50d3131cec,2026-01-30,test/Dialect/LLHD/Transforms/mem2reg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %s | FileCheck %s
+89778e1bebd3,2026-01-30,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+2fdae8fcfef5,2026-01-30,integration_test/arcilator/JIT/runtime-vcd-nochange.mlir,.mlir,arcilator,direct,0,1,1,0,0,0,0,0,1,0,arcilator %s --run --jit-entry=main --jit-vcd-file=%t && cat %t | FileCheck %s --match-full-lines --check-prefix VCD
+3086bac387d1,2026-01-29,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+3086bac387d1,2026-01-29,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+3086bac387d1,2026-01-29,test/Conversion/ImportVerilog/errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate --import-verilog --verify-diagnostics --split-input-file %s
+b476431e74ec,2026-01-29,test/Dialect/Synth/longest-paths.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --split-input-file --pass-pipeline='builtin.module(synth-print-longest-path-analysis{test=true})' --verify-diagnostics
+4c4a16553aa3,2026-01-26,test/Conversion/ImportVerilog/classes.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+4c4a16553aa3,2026-01-26,test/Conversion/ImportVerilog/classes.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+142c02c65dca,2026-01-24,test/Dialect/FIRRTL/lower-domains.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-domains))' --split-input-file %s | FileCheck --implicit-check-not firrtl.domain --implicit-check-not unrealized_conversion_cast %s
+380a44a69243,2026-01-17,test/Dialect/FIRRTL/infer-resets-errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-resets))' --verify-diagnostics --split-input-file %s
+380a44a69243,2026-01-17,test/Dialect/FIRRTL/infer-resets.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(firrtl-infer-resets))' --verify-diagnostics --split-input-file %s | FileCheck %s
+242b4a2959dc,2026-01-12,test/Dialect/LLHD/Transforms/hoist-signals.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-hoist-signals %s | FileCheck %s
+9fe788f13100,2026-01-06,test/Dialect/FIRRTL/lower-memory.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -firrtl-lower-memory %s | FileCheck %s
+b79ae60f6c43,2025-12-29,test/Dialect/FIRRTL/lower-signatures.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-signatures))' %s | FileCheck --check-prefixes=CHECK %s
+b79ae60f6c43,2025-12-29,test/Dialect/FIRRTL/lower-signatures.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-signatures))' --mlir-print-debuginfo %s | FileCheck --check-prefixes=CHECK-LOC %s
+db06bf66d7f6,2025-12-27,test/Dialect/FIRRTL/lower-types.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-types))' --allow-unregistered-dialect %s | FileCheck --check-prefixes=CHECK,LT,COMMON %s"
+db06bf66d7f6,2025-12-27,test/Dialect/FIRRTL/lower-types.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-types{preserve-aggregate=all}))' --allow-unregistered-dialect %s | FileCheck --check-prefixes=AGGREGATE,LT,COMMON %s"
+db06bf66d7f6,2025-12-27,test/Dialect/FIRRTL/lower-types.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-lower-signatures))' --allow-unregistered-dialect %s | FileCheck --check-prefixes=SIG,COMMON %s"
+a0f3eb4086bc,2025-12-16,test/Dialect/LLHD/Transforms/hoist-signals.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-hoist-signals %s | FileCheck %s
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,1,0,rm -rf %t6 && mkdir %t6 && cd %t6
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,0,0,0,0,0,0,1,0,mkdir hw && cd hw
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,circt-opt,direct,0,0,1,0,0,0,0,0,0,0,circt-opt %s --esi-connect-services --esi-appid-hier=top=top --esi-build-manifest=top=top --esi-clean-metadata --lower-esi-to-physical --lower-esi-bundles --lower-esi-ports --lower-esi-to-hw=platform=cosim --lower-seq-to-sv --lower-hwarith-to-hw --canonicalize --export-split-verilog -o %t3.mlir
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,0,0,0,0,0,0,0,0,cd ..
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,esiquery trace w:%t6/hw/esi_system_manifest.json info | FileCheck %s --check-prefix=QUERY-INFO
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,esiquery trace w:%t6/hw/esi_system_manifest.json hier | FileCheck %s --check-prefix=QUERY-HIER
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,cp %esi_prims %t6/hw
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,esi-cosim.py --source %t6/hw --top top -- %python %s.py cosim env
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,%python -m esiaccel.codegen --file %t6/hw/esi_system_manifest.json --output-dir %t6/include/loopback/
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,%host_cxx -I %t6/include %s.cpp -o %t6/test
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,%t6/test | FileCheck %s --check-prefix=CPP-TEST
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,FileCheck %s --check-prefix=LOOPBACK-H --input-file %t6/include/loopback/LoopbackIP.h
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,esi-cosim.py --source %t6 --top top -- %python -m esiaccel.codegen --platform cosim --connection env --output-dir %t6/include/loopback/
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,0,1,0,0,0,0,0,0,0,%host_cxx -I %t6/include %s.cpp -o %t6/test
+394cc2beb238,2025-12-15,integration_test/Dialect/ESI/runtime/loopback.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,%t6/test | FileCheck %s --check-prefix=CPP-TEST
+ad277c6bdbff,2025-12-11,test/Dialect/FIRRTL/dedup.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --firrtl-dedup %s | FileCheck %s
+bf970671340c,2025-12-05,test/Conversion/ExportVerilog/hw-dialect.mlir,.mlir,circt-opt,direct,0,1,1,0,0,0,0,1,0,0,"circt-opt %s --test-apply-lowering-options='options=emittedLineLength=100,emitBindComments' -export-verilog -verify-diagnostics -o %t.mlir | FileCheck %s"
+3777d1550908,2025-12-02,test/Dialect/HW/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+dc45595e7e80,2025-11-28,test/Dialect/Synth/canonicalizer.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --canonicalize | FileCheck %s
+f5f5a6567ca5,2025-11-27,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+fa7eb12bf52d,2025-11-27,test/Transforms/switch-to-if.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -split-input-file --switch-to-if %s | FileCheck %s
+61b1c871234e,2025-11-24,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+351189822e33,2025-11-20,test/Dialect/ESI/windows.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --verify-roundtrip | FileCheck %s
+351189822e33,2025-11-20,test/Dialect/ESI/windows.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s  --lower-esi-ports --lower-esi-to-hw --lower-esi-types --verify-roundtrip | FileCheck %s --check-prefix=LOW
+91872b228b74,2025-11-07,test/Conversion/FIRRTLToHW/lower-to-hw-verbatim-blackbox.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt -lower-firrtl-to-hw %s -verify-diagnostics | FileCheck %s
+7cf1c5cf263b,2025-11-05,test/Conversion/ImportVerilog/classes.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+7cf1c5cf263b,2025-11-05,test/Conversion/ImportVerilog/classes.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+baefacd3881f,2025-11-03,test/Dialect/RTG/Transform/elaboration.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --rtg-elaborate=seed=0 --split-input-file --verify-diagnostics %s | FileCheck %s
+6bfecf76581d,2025-10-31,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+6bfecf76581d,2025-10-31,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+9dfde5ef309f,2025-10-29,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+a509cfea3101,2025-10-21,test/Dialect/Synth/lower-variadic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,"circt-opt %s --synth-lower-variadic --split-input-file | FileCheck %s --check-prefixes=COMMON,TIMING"
+a509cfea3101,2025-10-21,test/Dialect/Synth/lower-variadic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,"circt-opt %s --synth-lower-variadic=timing-aware=false --split-input-file | FileCheck %s --check-prefixes=COMMON,NO-TIMING"
+0fca2bd7f535,2025-10-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+0fca2bd7f535,2025-10-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+52e3074ff26b,2025-10-17,test/Dialect/FIRRTL/dedup-errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt --allow-unregistered-dialect -verify-diagnostics -split-input-file -pass-pipeline='builtin.module(firrtl.circuit(firrtl-dedup))' %s
+bdbbd4ba3032,2025-10-16,test/Dialect/Synth/lower-variadic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --synth-lower-variadic | FileCheck %s --check-prefixes=COMMON,TIMING"
+bdbbd4ba3032,2025-10-16,test/Dialect/Synth/lower-variadic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --synth-lower-variadic=timing-aware=false | FileCheck %s --check-prefixes=COMMON,NO-TIMING"
+1bb65bd28415,2025-10-10,test/Dialect/Synth/canonicalizer.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --canonicalize | FileCheck %s
+1286a6c3eca4,2025-10-09,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+ffd1d5eb87e4,2025-09-20,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+ffd1d5eb87e4,2025-09-20,test/Conversion/ImportVerilog/builtins.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+09f0bbe083a3,2025-09-18,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+09f0bbe083a3,2025-09-18,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+978f392c2b69,2025-09-11,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+978f392c2b69,2025-09-11,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+14511d96a676,2025-08-27,test/Conversion/ExportVerilog/prepare-for-emission.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt %s --pass-pipeline='builtin.module(any(prepare-for-emission))' --split-input-file -verify-diagnostics | FileCheck %s
+14511d96a676,2025-08-27,test/Conversion/ExportVerilog/prepare-for-emission.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,0,0,0,circt-opt %s --lower-verif-to-sv -export-verilog -split-input-file
+a197d6e076c1,2025-08-26,test/circt-synth/path-e2e.mlir,.mlir,circt-synth,direct,0,1,0,0,0,0,0,0,0,0,circt-synth %s -output-longest-path=- -top counter | FileCheck %s
+a197d6e076c1,2025-08-26,test/circt-synth/path-e2e.mlir,.mlir,circt-synth,direct,0,1,0,0,0,0,0,0,0,0,circt-synth %s -output-longest-path=- -top counter -output-longest-path-json | FileCheck %s --check-prefix JSON
+4d57dc924072,2025-08-18,test/Conversion/HWToLLVM/convert_aggregates.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --convert-hw-to-llvm --reconcile-unrealized-casts | FileCheck %s
+9f021153418e,2025-08-14,test/circt-verilog/redundant-files.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog %s %s
+765883a39398,2025-08-12,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+765883a39398,2025-08-12,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+4fa60bb1d2cf,2025-08-11,test/circt-verilog/include/library_module.sv,.sv,other,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,
+4fa60bb1d2cf,2025-08-11,test/circt-verilog/library-locations.sv,.sv,circt-verilog,lift-circt-verilog,0,1,0,1,0,0,0,0,0,0,circt-verilog -y %S/include --mlir-print-debuginfo %s | FileCheck %s
+4fa60bb1d2cf,2025-08-11,test/circt-verilog/preprocess-errors.sv,.sv,circt-translate,lift-circt-verilog,0,0,0,0,0,0,1,1,0,0,circt-translate %s --import-verilog --verify-diagnostics --split-input-file
+cb22826d27fb,2025-08-06,test/Dialect/LLHD/Transforms/unroll-loops.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-unroll-loops %s | FileCheck %s
+82a8af4acfea,2025-07-25,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+237f74447515,2025-07-23,test/Dialect/FIRRTL/parse-basic.fir,.fir,circt-translate,lift-firtool,0,1,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics -split-input-file %s | circt-opt | FileCheck %s
+e80a67d30db4,2025-07-22,test/Conversion/VerifToSMT/verif-to-smt.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --convert-verif-to-smt --reconcile-unrealized-casts -allow-unregistered-dialect --split-input-file | FileCheck %s
+e80a67d30db4,2025-07-22,test/Conversion/VerifToSMT/verif-to-smt.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --convert-verif-to-smt=""rising-clocks-only=true"" --reconcile-unrealized-casts -allow-unregistered-dialect | FileCheck %s --check-prefix=CHECK1"
+888e6787e4e2,2025-07-21,test/Conversion/FSMToSV/test_basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -split-input-file -convert-fsm-to-sv %s | FileCheck %s
+dc524e9ea04f,2025-07-20,integration_test/Bindings/Python/dialects/aig.py,other:.py,other,textual-only,0,1,0,0,0,0,0,0,0,0,%PYTHON% %s | FileCheck %s
+dc524e9ea04f,2025-07-20,test/Dialect/AIG/longest-paths.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --split-input-file --pass-pipeline='builtin.module(aig-print-longest-path-analysis{test=true})' --verify-diagnostics
+dc524e9ea04f,2025-07-20,test/circt-synth/path-e2e.mlir,.mlir,circt-synth,direct,0,1,0,0,0,0,0,0,0,0,circt-synth %s -output-longest-path=- -top counter | FileCheck %s
+dc524e9ea04f,2025-07-20,test/circt-synth/path-e2e.mlir,.mlir,circt-synth,direct,0,1,0,0,0,0,0,0,0,0,circt-synth %s -output-longest-path=- -top counter -output-longest-path-json | FileCheck %s --check-prefix JSON
+24bd19e3cc12,2025-07-19,test/Dialect/RTG/Transform/elaboration.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --rtg-elaborate=seed=0 --split-input-file --verify-diagnostics %s | FileCheck %s
+47cf87cdcdd3,2025-07-18,test/firtool/annotation-unknown.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool -disable-annotation-unknown %s | FileCheck %s
+3e42dbce123a,2025-07-17,test/Dialect/ESI/canonicalizers.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --canonicalize | FileCheck %s
+7df789c3ba70,2025-07-12,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+ece9412ddfe3,2025-07-11,test/Conversion/VerifToSMT/verif-to-smt-errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --convert-verif-to-smt --split-input-file --verify-diagnostics
+ece9412ddfe3,2025-07-11,test/Conversion/VerifToSMT/verif-to-smt.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --convert-verif-to-smt --reconcile-unrealized-casts -allow-unregistered-dialect --split-input-file | FileCheck %s
+ece9412ddfe3,2025-07-11,test/Conversion/VerifToSMT/verif-to-smt.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt %s --convert-verif-to-smt=""rising-clocks-only=true"" --reconcile-unrealized-casts -allow-unregistered-dialect | FileCheck %s --check-prefix=CHECK1"
+dfa0fe98e99c,2025-07-09,test/Dialect/FIRRTL/inject-dut-hierarchy.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-inject-dut-hier))' -split-input-file %s | FileCheck %s
+3df813fd7e65,2025-07-09,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+3df813fd7e65,2025-07-09,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+d77bd7f21dbb,2025-07-02,test/Dialect/AIG/longest-paths.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --split-input-file --pass-pipeline='builtin.module(aig-print-longest-path-analysis{test=true})' --verify-diagnostics
+81140f6a2c1e,2025-06-30,test/Dialect/FIRRTL/grand-central.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,"circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-grand-central,symbol-dce))' -split-input-file %s | FileCheck %s"
+1b810c5d4aed,2025-06-28,test/Dialect/FIRRTL/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+09a701bb6577,2025-06-22,test/Conversion/ImportAIGER/invalid-index.mlir,.mlir,circt-translate,direct,0,1,0,1,0,0,0,0,0,0,circt-translate --import-aiger %S/invalid-index.aig | FileCheck %s
+ca84bb763f34,2025-06-13,test/Dialect/FIRRTL/inject-dut-hierarchy.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -pass-pipeline='builtin.module(firrtl.circuit(firrtl-inject-dut-hier))' -split-input-file %s | FileCheck %s
+5da61416c373,2025-06-06,test/Dialect/LLHD/Transforms/combine-drives.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-combine-drives %s | FileCheck %s
+9be24fbb4939,2025-06-04,test/Dialect/LLHD/Canonicalization/processes.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize | FileCheck %s
+ce9146a64ab8,2025-06-03,test/Dialect/Comb/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s -canonicalize='top-down=true region-simplify=disabled' --allow-unregistered-dialect | FileCheck %s
+a1d66ba13499,2025-06-02,test/Dialect/LLHD/Transforms/deseq.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-deseq %s | FileCheck %s
+27fdf5525cdc,2025-05-23,test/Dialect/Arc/inline-arcs.mlir,.mlir,other,direct,0,0,1,0,0,1,0,0,0,0,split-file %s %t
+27fdf5525cdc,2025-05-23,test/Dialect/Arc/inline-arcs.mlir,.mlir,circt-opt,direct,0,1,1,0,0,0,0,0,0,0,circt-opt %t/default --arc-inline | FileCheck %t/default
+27fdf5525cdc,2025-05-23,test/Dialect/Arc/inline-arcs.mlir,.mlir,circt-opt,direct,0,1,1,0,0,0,0,0,0,0,circt-opt %t/onlyIntoArcs --arc-inline=into-arcs-only=1 | FileCheck %t/onlyIntoArcs
+a49186699205,2025-05-21,test/Dialect/LLHD/Transforms/mem2reg.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-mem2reg %s | FileCheck %s
+a1929a1878d4,2025-04-19,test/Dialect/FIRRTL/round-trip.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --verify-roundtrip %s | FileCheck %s
+bd6949339c41,2025-04-09,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+bd6949339c41,2025-04-09,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s
+475b936c55e8,2025-03-31,test/Dialect/FIRRTL/parse-basic.fir,.fir,circt-translate,lift-firtool,0,1,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics -split-input-file %s | circt-opt | FileCheck %s
+475b936c55e8,2025-03-31,test/Dialect/FIRRTL/parse-errors.fir,.fir,circt-translate,lift-firtool,0,0,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics --split-input-file %s
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -hw-memory-sim %s | FileCheck %s --check-prefix COMMON --implicit-check-not sv.attributes
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{read-enable-mode=ignore})"" %s | FileCheck %s --check-prefixes=COMMON,IGNORE"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{read-enable-mode=zero})"" %s | FileCheck %s --check-prefixes=COMMON,ZERO"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{add-mux-pragmas})"" %s | FileCheck %s --check-prefixes=COMMON,PRAMGAS"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{disable-mem-randomization})"" %s | FileCheck %s --check-prefix COMMON --check-prefix NO-RAND-MEM"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{disable-reg-randomization})"" %s | FileCheck %s --check-prefix COMMON --check-prefix NO-RAND-REG"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{disable-mem-randomization disable-reg-randomization})"" %s | FileCheck %s --check-prefixes NO-RAND-MEM,NO-RAND-REG"
+ac1184031e20,2025-03-27,test/Dialect/Seq/hw-memsim.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,"circt-opt -pass-pipeline=""builtin.module(hw-memory-sim{add-vivado-ram-address-conflict-synthesis-bug-workaround})"" %s | FileCheck %s --check-prefixes=CHECK,COMMON,VIVADO"
+9570cdc98d19,2025-03-20,test/Dialect/FIRRTL/canonicalization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt -canonicalize='top-down=true region-simplify=aggressive' %s | FileCheck %s
+9570cdc98d19,2025-03-20,test/firtool/extract-test-code.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s -extract-test-code | FileCheck %s
+9570cdc98d19,2025-03-20,test/firtool/extract-test-code.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s -extract-test-code -etc-disable-instance-extraction | FileCheck %s --check-prefix=DISABLEINSTANCE
+9570cdc98d19,2025-03-20,test/firtool/extract-test-code.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s -extract-test-code -etc-disable-module-inlining | FileCheck %s --check-prefix=DISABLEMODULE
+9570cdc98d19,2025-03-20,test/firtool/layer-merge-across-inlined-submodule.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s | FileCheck %s
+b08feee25e60,2025-03-06,integration_test/circt-test/contracts.mlir,.mlir,other,direct,0,0,0,0,0,0,0,0,0,0,true
+b08feee25e60,2025-03-06,test/Dialect/Verif/lower-contracts.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --lower-contracts --simplify-assume-eq --canonicalize --cse %s | FileCheck %s
+c7c7352daf11,2025-02-27,test/Dialect/Calyx/affine-parallel-unroll.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --affine-parallel-unroll --split-input-file --verify-diagnostics %s | FileCheck %s
+3f0aa622f0ca,2025-02-26,test/Dialect/ESI/passes/lower_to_hw_errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt --lower-esi-to-hw %s --verify-diagnostics --split-input-file
+6e93a0e8400d,2025-02-08,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+8ba4ceaf3764,2025-02-06,test/Dialect/FIRRTL/imdce.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt -pass-pipeline='builtin.module(firrtl-imdeadcodeelim)' --split-input-file --verify-diagnostics --allow-unregistered-dialect %s | FileCheck %s
+671dec51619c,2025-01-31,test/Dialect/RTG/Transform/elaboration.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,1,0,0,circt-opt --rtg-elaborate=seed=0 --split-input-file --verify-diagnostics %s | FileCheck %s
+0cea50e9e7d2,2025-01-25,test/Conversion/SCFToCalyx/convert_simple.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --lower-scf-to-calyx -canonicalize -split-input-file | FileCheck %s
+0cea50e9e7d2,2025-01-25,test/Conversion/SCFToCalyx/float_compare.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --lower-scf-to-calyx -canonicalize -split-input-file | FileCheck %s
+09790a726509,2025-01-15,test/Conversion/SCFToCalyx/convert_controlflow.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --lower-scf-to-calyx -canonicalize -split-input-file | FileCheck %s
+dcf6516ee06b,2025-01-07,test/Conversion/VerifToSMT/bmc-clock-not-first.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --convert-verif-to-smt --reconcile-unrealized-casts -allow-unregistered-dialect | FileCheck %s
+a15654cd5d51,2025-01-04,test/Conversion/HWToBTOR2/comb.mlir,.mlir,circt-opt,direct,0,1,1,0,0,0,0,0,0,0,circt-opt %s --convert-hw-to-btor2 -o %t | FileCheck %s
+afa566aabda8,2024-12-31,test/Conversion/ArcToLLVM/lower-arc-to-llvm.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --lower-arc-to-llvm | FileCheck %s
+99826b849987,2024-12-19,test/Conversion/HWArithToHW/test_basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -split-input-file -lower-hwarith-to-hw %s | FileCheck %s
+54d3dd01a8b7,2024-12-13,test/Dialect/LLHD/Transforms/desequentialization.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --llhd-desequentialize -canonicalize %s | FileCheck %s
+79c2d41904cd,2024-12-04,test/Conversion/ExportVerilog/verilog-basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s -test-apply-lowering-options='options=emitBindComments' -export-verilog -verify-diagnostics | FileCheck %s --strict-whitespace
+dcd7c47a9fd0,2024-12-02,test/Conversion/HandshakeToDC/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --lower-handshake-to-dc | FileCheck %s
+0bf454fb46d9,2024-11-21,test/Conversion/SCFToCalyx/convert_simple.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt %s --lower-scf-to-calyx -canonicalize -split-input-file | FileCheck %s
+c5f14f1c26e6,2024-11-20,test/Conversion/HWToBTOR2/errors.mlir,.mlir,circt-opt,direct,0,0,0,0,0,0,1,1,0,0,circt-opt %s --convert-hw-to-btor2 --verify-diagnostics --split-input-file -o tmp.mlir
+9c3bbcfb27fb,2024-11-20,test/Conversion/HWToBTOR2/comb.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt %s --convert-hw-to-btor2 -o tmp.mlir | FileCheck %s
+a50f19e8511e,2024-11-16,test/CAPI/firrtl.c,other:.c,circt-capi-firrtl-test 2>&1 ,textual-only,0,1,0,0,0,0,0,0,0,1,circt-capi-firrtl-test 2>&1 | FileCheck %s
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,0,1,0,0,0,0,1,0,0,circt-translate --export-firrtl --verify-diagnostics %s -o %t
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,other,direct,0,1,1,0,0,0,0,0,0,0,cat %t | FileCheck %s --strict-whitespace
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,1,1,0,0,0,0,0,0,0,circt-translate --import-firrtl %t --mlir-print-debuginfo | circt-translate --export-firrtl | diff - %t
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,1,1,0,0,0,0,0,0,0,circt-translate --export-firrtl %s --target-line-length=10 | circt-translate --import-firrtl --mlir-print-debuginfo | circt-translate --export-firrtl | diff - %t
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,1,1,0,0,0,0,0,0,0,circt-translate --export-firrtl %s --target-line-length=1000 | circt-translate --import-firrtl --mlir-print-debuginfo | circt-translate --export-firrtl | diff - %t
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,1,0,0,0,0,0,0,0,0,"circt-translate --export-firrtl %s --target-line-length=1000 | FileCheck %s --implicit-check-not ""{{,$}}"" --check-prefix PRETTY"
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/emit-basic.mlir,.mlir,circt-translate,direct,0,1,0,0,0,0,0,0,0,0,"circt-translate --export-firrtl %s --target-line-length=10 | sed -e 's/ @\[.*\]//' | FileCheck %s --implicit-check-not ""{{^(.{50})}}"" --check-prefix PRETTY"
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/parse-basic.fir,.fir,circt-translate,lift-firtool,0,1,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics -split-input-file %s | circt-opt | FileCheck %s
+a50f19e8511e,2024-11-16,test/Dialect/FIRRTL/parse-errors.fir,.fir,circt-translate,lift-firtool,0,0,0,0,0,0,1,1,0,0,circt-translate -import-firrtl -verify-diagnostics --split-input-file %s
+a50f19e8511e,2024-11-16,test/firtool/classes-dedupe.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s -ir-verilog | FileCheck %s
+a50f19e8511e,2024-11-16,test/firtool/instchoice.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s --parse-only | FileCheck %s
+a7bd275fb9f2,2024-11-01,test/Dialect/FIRRTL/expand-whens.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --pass-pipeline='builtin.module(firrtl.circuit(any(firrtl-expand-whens)))' %s | FileCheck %s
+a7bd275fb9f2,2024-11-01,test/firtool/verif-under-when.fir,.fir,firtool,lift-firtool,0,1,0,0,0,0,0,0,0,0,firtool %s | FileCheck %s
+31e4f9eaaede,2024-10-31,test/Transforms/flatten_memref.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,0,circt-opt -split-input-file --flatten-memref %s | FileCheck %s
+bcee76272eae,2024-10-21,test/Analysis/firrtl-test-instance-info.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,1,0,0,1,circt-opt %s -test-firrtl-instance-info -split-input-file 2>&1 | FileCheck %s
+7fff704e9e84,2024-10-02,test/Dialect/Arc/canonicalizers.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,0,0,0,circt-opt --canonicalize %s | FileCheck %s
+337dad583965,2024-09-25,test/Conversion/MooreToCore/basic.mlir,.mlir,circt-opt,direct,0,1,0,0,0,0,0,1,0,0,circt-opt %s --convert-moore-to-core --verify-diagnostics | FileCheck %s
+d5314f79fe7a,2024-09-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-translate,lift-circt-verilog,0,1,0,0,0,0,0,0,0,0,circt-translate --import-verilog %s | FileCheck %s
+d5314f79fe7a,2024-09-20,test/Conversion/ImportVerilog/basic.sv,.sv,circt-verilog,lift-circt-verilog,0,0,0,0,0,0,0,0,0,0,circt-verilog --ir-moore %s

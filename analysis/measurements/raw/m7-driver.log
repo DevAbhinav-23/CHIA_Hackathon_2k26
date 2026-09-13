@@ -1,0 +1,33 @@
+host: Linux 7.2.3-1-cachyos x86_64  nproc=20  jobs=8  2026-09-13T21:01:11+05:30
+src commit: 5056ff04450bc9f27a9ff0460702aee1f1afdd3f
+compiler: clang version 23.0.0git (https://github.com/llvm/llvm-project.git d4148a8476dfb63291ca3c63bc92a3bd8a19b773)
+               total        used        free      shared  buff/cache   available
+Mem:              15           8           4           0           3           6
+=== configure start 2026-09-13T21:01:11+05:30 ===
+configure rc=0 wall=19s
+111:-- slang Verilog frontend is enabled
+112:-- Building slang from source
+113:-- slang version: 11.0.0+0
+136:-- Installing slang dependency fmt
+137:-- Installing slang dependency boost_unordered
+155:-- Build files have been written to: /home/adi/.cache/chia-pin-smoke/bslang
+=== ninja dry-run edge count ===
+556
+=== build start 2026-09-13T21:01:30+05:30 (-j8) ===
+build rc=0 wall=841s  end 2026-09-13T21:15:31+05:30
+=== sizes ===
+du -sh  /home/adi/.cache/chia-pin-smoke/bslang : 1.4G   du -sb: 1434197304
+du -sh  _deps (slang etc): 211M
+  circt-verilog          71310864 bytes
+  circt-translate       120014768 bytes
+  circt-opt             200331232 bytes
+=== frontend present? ===
+$ circt-translate --help | grep -i verilog
+      --import-verilog                                    - import Verilog or SystemVerilog
+$ circt-verilog --version
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT 5056ff0
+slang version 11.0.0+0
+M7 BUILD DONE 2026-09-13T21:15:31+05:30

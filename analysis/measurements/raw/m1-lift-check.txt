@@ -1,0 +1,16 @@
+### SDK firtool/circt-verilog/circt-reduce, versions:
+CIRCT firtool-1.157.0
+### lift .fir -> MLIR
+  firtool --parse-only rc=0
+module {
+  firrtl.circuit "Top" {
+### lift .sv -> MLIR
+  circt-verilog --ir-moore rc=0
+module {
+  moore.module @Top(in %clock : !moore.l1, in %a : !moore.l8, in %b : !moore.l8, out o : !moore.l8) {
+### does circt-reduce accept the lifted MLIR? (C-17 said it rejects the raw .fir/.sv)
+  raw/lift-tiny-fir.mlir -> Reading input Testing input with `/bin/true` Initial module has size 634 
+  raw/lift-tiny-sv.mlir -> Reading input Testing input with `/bin/true` Initial module has size 765 
+### and the raw ones, for contrast
+  tiny.fir -> Reading input loc("/home/adi/Projects/chia-hackathon/analysis/probe/tiny.fir":1:1): error: custom op 'FIRRTL' is unknown (tried 'builtin.FIR
+  tiny.sv -> Reading input loc("/home/adi/Projects/chia-hackathon/analysis/probe/tiny.sv":4:1): error: unexpected character 

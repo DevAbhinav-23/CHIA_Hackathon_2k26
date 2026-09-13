@@ -1,0 +1,29 @@
+=== M7 size comparison against M2's bassert_g (same flags, no slang) ===
+  circt-opt        bassert_g=   200343024  bslang=   200331232  delta=-11792
+  circt-translate  bassert_g=    68826840  bslang=   120014768  delta=+51187928
+  circt-verilog    bassert_g=           0  bslang=    71310864  delta=+71310864
+  bassert_g du -sb: 1362790328 (5 targets, no slang)
+  bslang    du -sb: 1434197304 (3 targets, slang)
+  bslang    _deps du -sb: 215699596
+
+=== lit gate: slang_frontend_enabled in the two builds ===
+  bassert_g: config.slang_frontend_enabled=0
+  bslang: config.slang_frontend_enabled=1
+
+=== circt-translate --help | grep -i verilog, both builds ===
+  bassert_g: 0 verilog lines
+  bslang:    0 verilog lines
+=== with LD_LIBRARY_PATH set (SDK lib + z3 shim) ===
+--- bassert_g (no slang): circt-translate --help | grep -i verilog ---
+  (matches: 0)
+--- bslang (slang): circt-translate --help | grep -i verilog ---
+      --import-verilog                                    - import Verilog or SystemVerilog
+  (matches: 1)
+--- bslang: circt-verilog --version ---
+LLVM (http://llvm.org/):
+  LLVM version 24.0.0git
+  Optimized build.
+CIRCT 5056ff0
+slang version 11.0.0+0
+--- bassert_g: does circt-verilog exist? ---
+ls: cannot access '/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-verilog': No such file or directory

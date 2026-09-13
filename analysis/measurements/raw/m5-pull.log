@@ -1,0 +1,54 @@
+latest: Pulling from ucb-bar/chia-circt
+44136fa355b3: Download complete
+2cfe776fbce1: Pulling fs layer
+cd78dde9cb5b: Pulling fs layer
+cb259a83ac3d: Pulling fs layer
+3e37798b2f14: Pulling fs layer
+0e3a9ad97e85: Pulling fs layer
+b556b38daeed: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+a53691de9133: Pulling fs layer
+30bc6cc7f815: Pulling fs layer
+4757fec52494: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+681fa53e167f: Pulling fs layer
+2587969505c1: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+7b656f40ea52: Pulling fs layer
+6929c1403124: Pulling fs layer
+eb384f3029db: Pulling fs layer
+0c4b75af4283: Download complete
+cb259a83ac3d: Download complete
+cb259a83ac3d: Pull complete
+cd78dde9cb5b: Download complete
+0e3a9ad97e85: Download complete
+b556b38daeed: Download complete
+3e37798b2f14: Download complete
+a53691de9133: Download complete
+4f4fb700ef54: Download complete
+681fa53e167f: Download complete
+30bc6cc7f815: Download complete
+2587969505c1: Download complete
+2cfe776fbce1: Download complete
+7b656f40ea52: Download complete
+2cfe776fbce1: Pull complete
+b556b38daeed: Pull complete
+eb384f3029db: Download complete
+6929c1403124: Download complete
+4757fec52494: Download complete
+6929c1403124: Pull complete
+a53691de9133: Pull complete
+cd78dde9cb5b: Pull complete
+4f4fb700ef54: Pull complete
+0e3a9ad97e85: Pull complete
+30bc6cc7f815: Pull complete
+4757fec52494: Pull complete
+3e37798b2f14: Pull complete
+681fa53e167f: Pull complete
+2587969505c1: Pull complete
+7b656f40ea52: Pull complete
+eb384f3029db: Pull complete
+Digest: sha256:866aa160d6e40b05a9df538e7fd7e1d914229618b73e82759d7db4879f97b939
+Status: Downloaded newer image for ghcr.io/ucb-bar/chia-circt:latest
+ghcr.io/ucb-bar/chia-circt:latest
+pull rc=0

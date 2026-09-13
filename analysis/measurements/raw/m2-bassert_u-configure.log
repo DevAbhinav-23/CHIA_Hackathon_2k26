@@ -1,0 +1,128 @@
+-- The CXX compiler identification is Clang 23.0.0
+-- The C compiler identification is Clang 23.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /home/adi/Projects/Honours/MLIR/llvm-project/build/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /home/adi/Projects/Honours/MLIR/llvm-project/build/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Found ZLIB: /usr/lib/libz.so (found version "1.3.1")
+-- Found LibXml2: /usr/lib/libxml2.so (found version "2.15.4")
+-- Using MLIRConfig.cmake in: /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/mlir
+-- Using LLVMConfig.cmake in: /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm
+-- Linker detection: LLD
+-- Performing Test LLVM_LIBSTDCXX_MIN
+-- Performing Test LLVM_LIBSTDCXX_MIN - Success
+-- Performing Test LLVM_LIBSTDCXX_SOFT_ERROR
+-- Performing Test LLVM_LIBSTDCXX_SOFT_ERROR - Success
+-- Performing Test LLVM_USES_LIBSTDCXX
+-- Performing Test LLVM_USES_LIBSTDCXX - Success
+-- Performing Test LLVM_DEFAULT_TO_GLIBCXX_USE_CXX11_ABI
+-- Performing Test LLVM_DEFAULT_TO_GLIBCXX_USE_CXX11_ABI - Success
+-- Performing Test _CAN_LINK_EXECUTABLE
+-- Performing Test _CAN_LINK_EXECUTABLE - Success
+-- Performing Test CXX_SUPPORTS_CUSTOM_LINKER
+-- Performing Test CXX_SUPPORTS_CUSTOM_LINKER - Success
+-- Performing Test C_SUPPORTS_FPIC
+-- Performing Test C_SUPPORTS_FPIC - Success
+-- Performing Test CXX_SUPPORTS_FPIC
+-- Performing Test CXX_SUPPORTS_FPIC - Success
+-- Building with -fPIC
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test C_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Success
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION
+-- Performing Test CXX_SUPPORTS_FNO_SEMANTIC_INTERPOSITION - Success
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG
+-- Performing Test SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG - Success
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG
+-- Performing Test CXX_SUPPORTS_SUGGEST_OVERRIDE_FLAG - Success
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL
+-- Performing Test CXX_WSUGGEST_OVERRIDE_ALLOWS_ONLY_FINAL - Success
+CMake Warning (policy) at /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm/HandleLLVMOptions.cmake:945 (CHECK_C_SOURCE_COMPILES):
+  Policy CMP0219 is not set: Macro invocations preserve backslashes in
+  arguments.  Run "cmake --help-policy CMP0219" for policy details.  Use the
+  cmake_policy command to set the policy and suppress this warning.
+
+  Command "CHECK_C_SOURCE_COMPILES" called with arguments containing
+  backslashes.
+
+  Since the policy is not set, backslashes in the arguments:
+
+   "// \\\n//\nint main(void) {return 0;}"
+
+  will be interpreted as escape sequences for compatibility.
+
+  Set the policy to NEW to instead pass
+
+   "// \\\\\\n//\\nint main(void) {return 0;}"
+
+  so that argument parsing will preserve the original values.
+Call Stack (most recent call first):
+  CMakeLists.txt:63 (include)
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP
+-- Performing Test C_WCOMMENT_ALLOWS_LINE_WRAP - Success
+-- Performing Test C_SUPPORTS_MISLEADING_INDENTATION_FLAG
+-- Performing Test C_SUPPORTS_MISLEADING_INDENTATION_FLAG - Success
+-- Performing Test CXX_SUPPORTS_MISLEADING_INDENTATION_FLAG
+-- Performing Test CXX_SUPPORTS_MISLEADING_INDENTATION_FLAG - Success
+-- Performing Test C_SUPPORTS_CTAD_MAYBE_UNSUPPORTED_FLAG
+-- Performing Test C_SUPPORTS_CTAD_MAYBE_UNSUPPORTED_FLAG - Success
+-- Performing Test CXX_SUPPORTS_CTAD_MAYBE_UNSUPPORTED_FLAG
+-- Performing Test CXX_SUPPORTS_CTAD_MAYBE_UNSUPPORTED_FLAG - Success
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS
+-- Performing Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS - Success
+-- Precompiled headers enabled.
+-- Looking for os_signpost_interval_begin
+-- Looking for os_signpost_interval_begin - not found
+-- Looking for flock
+-- Looking for flock - found
+CMake Warning at CMakeLists.txt:105 (message):
+  Skipping unittests since LLVM install does not include gtest headers and
+  libraries
+
+
+-- Version generation is disabled. To enable the version generation, please set CIRCT_RELEASE_TAG_ENABLED CMake variable
+-- Found Verilator at /usr/bin/verilator.
+-- Did not find vivado.
+-- Found clang-tidy at /home/adi/Projects/Honours/MLIR/llvm-project/build/bin.
+-- Did NOT find systemc headers.
+-- Did not find Quartus.
+-- Did not find Questa.
+-- Did not find yosys.
+-- Found iverilog at /usr/bin/iverilog.
+-- Could NOT find ortools (missing: ortools_DIR)
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Found Z3: /usr/lib/libz3.so (found version "4.16.0")
+-- Z3 identified as a logical backend.
+-- Found z3 at /home/adi/.local/bin.
+-- CIRCT Python bindings are disabled.
+-- Found Python3: /home/adi/.local/bin/python3.12 (found version "3.12.14") found components: Interpreter
+-- Found python at /home/adi/.local/bin/python3.12
+-- Did not find SymbiYosys.
+-- Performing Test LLVM_LINKER_SUPPORTS_B_SYMBOLIC_FUNCTIONS
+-- Performing Test LLVM_LINKER_SUPPORTS_B_SYMBOLIC_FUNCTIONS - Success
+-- Found Git: /usr/bin/git (found version "2.55.0")
+-- PyCDE project is disabled
+-- PyRTG project is disabled
+CMake Warning at /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm/AddLLVM.cmake:2188 (message):
+  LLVM_EXTERNAL_LIT set to
+  /home/adi/.cache/chia-pin-smoke/circt-sdk/bin/llvm-lit, but the path does
+  not exist.
+Call Stack (most recent call first):
+  /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm/AddLLVM.cmake:2233 (get_llvm_lit_path)
+  /home/adi/.cache/chia-pin-smoke/circt-sdk/lib/cmake/llvm/AddLLVM.cmake:2326 (add_lit_target)
+  test/CMakeLists.txt:62 (add_lit_testsuite)
+
+
+-- Configuring done (2.8s)
+-- Generating done (0.7s)
+-- Build files have been written to: /home/adi/.cache/chia-pin-smoke/bassert_u

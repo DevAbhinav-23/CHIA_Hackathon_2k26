@@ -1,0 +1,69 @@
+=== M8 2026-09-13T21:01:19+05:30 ===
+--- is ubuntu:24.04 already local? ---
+
+Error response from daemon: No such image: ubuntu:24.04
+--- docker pull ubuntu:24.04 (records download size) ---
+24.04: Pulling from library/ubuntu
+e51aee9c82ec: Pulling fs layer
+f4d4b3771f0a: Download complete
+e51aee9c82ec: Download complete
+e51aee9c82ec: Pull complete
+Digest: sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254
+Status: Downloaded newer image for ubuntu:24.04
+docker.io/library/ubuntu:24.04
+--- docker image inspect ---
+digest=ubuntu@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 size=29772417 created=2026-09-07T06:58:04.874726458Z
+--- apt-cache policy verilator (packaged version) ---
+verilator:
+  Installed: (none)
+  Candidate: 5.020-1
+  Version table:
+     5.020-1 500
+--- HOST verilator ---
+Verilator 5.052 2026-09-05 rev v5.052
+host flag presence (verilator --help):
+  --x-initial : 2
+  --x-assign : 1
+  --binary : 2
+  --timing : 1
+host flag help lines:
+        verilator --binary -j 0 [options] [source_files.v]... [opt_c_files.cpp/c/cc/a/o/so]
+        --binary                    Build model binary
+        --timing                    Enable timing support
+        --x-assign <mode>           Assign non-initial Xs to this value
+        --x-initial <mode>          Assign initial Xs to this value
+        --x-initial-edge            Enable initial X->0 and X->1 edge triggers
+--- PACKAGED verilator 5.020-1 inside throwaway ubuntu:24.04 container ---
+verilator --version: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+  --x-initial : 2
+  --x-assign : 1
+  --binary : 2
+  --timing : 1
+packaged flag help lines:
+    verilator --binary -j 0 [options] [source_files.v]... [opt_c_files.cpp/c/cc/a/o/so]
+    --binary                    Build model binary
+    --timing                    Enable timing support
+    --x-assign <mode>           Assign non-initial Xs to this value
+    --x-initial <mode>          Assign initial Xs to this value
+    --x-initial-edge            Enable initial X->0 and X->1 edge triggers
+--- apt install footprint of verilator in ubuntu:24.04 (D-09 cost) ---
+Conf libjs-sphinxdoc (7.2.6-6 Ubuntu:24.04/noble [all])
+Conf sphinx-rtd-theme-common (2.0.0+dfsg-1 Ubuntu:24.04/noble [all])
+Conf verilator (5.020-1 Ubuntu:24.04/noble [amd64])
+---with recommends---
+Conf libsystemc-dev (2.3.4-3build1 Ubuntu:24.04/noble [amd64])
+Conf sphinx-rtd-theme-common (2.0.0+dfsg-1 Ubuntu:24.04/noble [all])
+Conf verilator (5.020-1 Ubuntu:24.04/noble [amd64])
+--- docker system df (images) ---
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          4         1         5.295GB   4.92GB (92%)
+Containers      2         0         2.572MB   2.572MB (100%)
+--- apt footprint lines ---
+[no-install-recommends] 
+0 upgraded, 26 newly installed, 0 to remove and 3 not upgraded.
+[default/with recommends] 
+0 upgraded, 31 newly installed, 0 to remove and 3 not upgraded.
+--- real apt install size lines ---
+0 upgraded, 26 newly installed, 0 to remove and 3 not upgraded.
+Need to get 27.4 MB of archives.
+After this operation, 123 MB of additional disk space will be used.

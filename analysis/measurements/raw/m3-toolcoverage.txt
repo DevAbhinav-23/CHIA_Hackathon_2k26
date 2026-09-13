@@ -1,0 +1,24 @@
+tests parsed from the lit log: 1127
+  tests naming >=1 from-source tool (assertions ON): 1050
+  tests naming only SDK-resolved tools (assertions OFF): 75
+  tests naming no recognised tool / unreadable: 2
+
+tool mentions across discovered tests:
+  circt-opt                      790   BUILT
+  firtool                        143   BUILT
+  circt-translate                 70   BUILT
+  circt-reduce                    54   BUILT
+  circt-verilog                   49   from SDK
+  circt-test                      11   from SDK
+  circt-verilog-lsp-server         9   from SDK
+  circt-synth                      8   from SDK
+  arcilator                        6   BUILT
+  circt-lec                        6   from SDK
+  firld                            5   from SDK
+  circt-bmc                        3   from SDK
+  circt-as                         3   from SDK
+  om-linker                        3   from SDK
+  domaintool                       2   from SDK
+  circt-dis                        2   from SDK
+  kanagawatool                     2   from SDK
+  hlstool                          1   from SDK

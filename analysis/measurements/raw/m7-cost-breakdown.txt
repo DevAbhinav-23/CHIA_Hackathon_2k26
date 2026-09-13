@@ -1,0 +1,22 @@
+bslang .ninja_log: 1913 output lines, 1339 distinct edges (ninja displayed 1339)
+bucket                  edges  cpu-seconds  % of cpu
+rest of CIRCT            1050       5444.9     83.2%
+slang + fmt (_deps)       275        889.4     13.6%
+CIRCTImportVerilog         12        195.3      3.0%
+circt-verilog tool          2         11.7      0.2%
+TOTAL                    1339       6541.3    100.0%
+
+slang front end (all three non-'rest' buckets): 289 edges, 1096.3 cpu-s, 16.8% of this build's cpu
+at the -j8 parallelism actually achieved (7.8x), that is ~141 s of the 840 s wall
+
+10 longest edges:
+    101.3s  _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxRewriter.cpp.o
+     83.7s  lib/Conversion/MooreToCore/CMakeFiles/obj.CIRCTMooreToCore.dir/MooreToCore.cpp.o
+     81.2s  lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLOps.cpp.o
+     69.6s  lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreOps.cpp.o
+     65.5s  lib/Dialect/SV/CMakeFiles/obj.CIRCTSV.dir/SVOps.cpp.o
+     50.2s  lib/Conversion/FIRRTLToHW/CMakeFiles/obj.CIRCTFIRRTLToHW.dir/LowerToHW.cpp.o
+     50.1s  lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreDialect.cpp.o
+     49.7s  lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLDialect.cpp.o
+     48.1s  lib/Dialect/Sim/CMakeFiles/obj.CIRCTSim.dir/SimOps.cpp.o
+     40.6s  lib/Dialect/Calyx/CMakeFiles/obj.CIRCTCalyx.dir/CalyxOps.cpp.o

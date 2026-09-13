@@ -1,0 +1,158 @@
+% fig-loop.tex -- full-width figure: the attrition ribbon.
+% Absolute coordinates in cm. Canvas: x 0.00..18.10, y 1.10..11.15.
+% The ribbon's top edge is constant at y=5.50. Its thickness drops at each gate
+% and the lost slice peels away downward onto the floor at y=1.95.
+\begin{tikzpicture}[x=1cm,y=1cm,
+  font=\sffamily,
+  card/.style={draw=agB, fill=white, line width=0.5pt, rounded corners=2pt,
+               anchor=north west, align=left, inner xsep=3.4pt, inner ysep=3.4pt},
+  blk/.style={anchor=north, align=center, inner sep=1pt},
+  txt/.style={anchor=north west, align=left, inner sep=0pt},
+  hair/.style={line width=0.5pt, draw=black!45},
+  rail/.style={line width=0.5pt, draw=rbB},
+  arr/.style={-{Latex[length=3.2pt,width=2.8pt]}, line width=0.5pt, draw=black!70},
+  rarr/.style={-{Latex[length=3.2pt,width=2.8pt]}, line width=0.5pt, draw=rbB},
+  gatemark/.style={line width=1.0pt, draw=black!78},
+  ]
+
+% === type helpers
+\newcommand{\ct}[1]{{\sffamily\bfseries\fontsize{7}{7.9}\selectfont #1\par}}
+\newcommand{\cd}[1]{{\sffamily\fontsize{6}{6.9}\selectfont\color{dgrey}#1\par}}
+\newcommand{\cm}[1]{{\ttfamily\fontsize{6}{6.9}\selectfont\color{fgrey}#1\par}}
+\newcommand{\hdr}[1]{{\sffamily\bfseries\fontsize{6.2}{7.2}\selectfont\textls[110]{#1}}}
+\newcommand{\lab}[1]{{\sffamily\fontsize{6}{6.9}\selectfont #1}}
+\newcommand{\rlab}[1]{{\sffamily\fontsize{6}{6.9}\selectfont\color{rbB!70!black}#1}}
+\newcommand{\nm}[2]{\tikz[baseline=(n.base)]{\node[circle,fill=#2,inner sep=0pt,
+   minimum size=7.4pt,anchor=base](n){\textcolor{white}{\sffamily\bfseries
+   \fontsize{6}{6}\selectfont\raisebox{-0.4pt}{#1}}};}}
+\newcommand{\fx}[4]{\node[txt, text width=3.60cm]
+  at (#1,#2) {\cd{\textbf{#3}\ #4}};}
+
+% =============================================== where the agent reaches the flow
+% funnel: stage 2 pours generated inputs into the ribbon
+\fill[agF, draw=agB, line width=0.5pt]
+  (4.80,8.32) -- (5.40,8.32) -- (5.55,5.50) -- (4.15,5.50) -- cycle;
+% shaft: the flow rises into stage 6 and comes back down
+\fill[agF] (12.05,5.50) rectangle (13.10,8.32);
+
+% ================================================================== agent band
+\draw[fill=agF, draw=agB, line width=0.5pt, rounded corners=2pt]
+  (1.60,8.32) rectangle (13.75,11.15);
+\node[anchor=base west] at (1.80,10.88)
+  {{\color{agB}\hdr{AGENT}}\;{\sffamily\fontsize{6.2}{7.2}\selectfont
+   \color{dgrey}proposes and writes; judges nothing}};
+
+\node[card, text width=2.24cm, minimum height=2.20cm] at (1.75,10.72)
+  {\ct{\nm{1}{agB}\; Read the seed}\cd{States the root-cause class the fix
+   corrected and names sibling sites.}};
+\node[card, text width=2.96cm, minimum height=2.20cm] at (4.52,10.72)
+  {\ct{\nm{2}{agB}\; Write probing inputs}\cd{For those sites, in the seed's own language.}\cm{circt-opt}\cm{firtool}};
+\node[card, text width=2.58cm, minimum height=2.20cm] at (10.78,10.72)
+  {\ct{\nm{6}{agB}\; Triage and report}\cd{Groups duplicates, checks the issue
+   tracker, writes the report.}};
+
+\draw[arr] (4.25,9.62) -- (4.50,9.62);
+
+\node[anchor=center, text width=2.42cm, align=center, color=agB,
+      font=\sffamily\itshape\fontsize{6.2}{7.4}\selectfont] at (9.25,9.62)
+  {Between stage 2 and stage 6 the agent does not act. The stages on the ribbon
+   are fixed tools, so no number in the result comes from the model.};
+
+% ================================================================= seed corpus
+\foreach \i in {0,1,2}
+  {\draw[fill=white, draw=dsB, line width=0.5pt, rounded corners=2pt]
+     (0.05+0.09*\i,9.13+0.10*\i) rectangle +(1.20,1.42);}
+\node[txt, text width=0.98cm] at (0.33,10.66)
+  {\cd{A past CIRCT fix: diff and test}};
+\node[txt, text width=1.62cm] at (0.05,9.00)
+  {\cd{\textbf{Seed corpus:} 187 mined CIRCT fixes}};
+\draw[arr] (1.47,9.90) -- (1.73,9.90);
+
+% ================================================================= return rail
+\draw[rail] (13.57,7.62) -- (3.30,7.62);
+\draw[rarr] (3.30,7.62) -- (3.30,8.32);
+\node[anchor=south east, color=rbB,
+      font=\sffamily\itshape\fontsize{6}{7}\selectfont] at (11.90,7.68)
+  {reasons, verdicts and reduced cases return to the agent};
+
+% ============================================================ apparatus stages
+\node[blk, text width=1.58cm] at (6.55,7.28)
+  {\ct{\nm{3}{rbB}\; Build}\cd{CIRCT at the seed's commit, assertions on}};
+\node[blk, text width=1.58cm] at (8.55,7.28)
+  {\ct{\nm{4}{rbB}\; Judge}\cd{A crash, or an assertion that fired}};
+\node[blk, text width=1.58cm] at (10.55,7.28)
+  {\ct{\nm{5}{rbB}\; Reduce}\cd{Shrink the failing input}\cm{circt-reduce}};
+\node[blk, text width=1.58cm] at (14.56,7.28)
+  {\ct{\nm{7}{rbB}\; Repair}\cd{CHIA's phases; a failure still reports}};
+
+\foreach \x in {6.55,8.55,10.55,14.56}
+  {\draw[line width=0.5pt, draw=black!38, densely dotted] (\x,6.22) -- (\x,5.52);}
+
+% ======================================================================= ribbon
+% segment: from, to, thickness below the constant top edge y=5.50
+\foreach \a/\b/\h in {4.15/7.55/1.55, 7.55/9.55/1.34, 9.55/11.55/0.50,
+                      11.55/13.57/0.36, 13.57/15.55/0.18}
+  {\fill[rbF] (\a,5.50) rectangle (\b,5.50-\h);
+   \draw[line width=0.5pt, draw=rbB] (\a,5.50) -- (\b,5.50);
+   \draw[line width=0.5pt, draw=rbB] (\a,5.50-\h) -- (\b,5.50-\h);}
+\draw[line width=0.5pt, draw=rbB] (4.15,5.50) -- (4.15,3.95);
+
+% what is in flight, named where the ribbon is tall enough to hold the words
+\node[anchor=center, inner sep=0pt] at (5.85,4.72) {\rlab{generated inputs}};
+\node[anchor=center, inner sep=0pt] at (10.55,5.25) {\rlab{failing inputs}};
+
+% stage 6: the flow rises into the agent and comes back
+\draw[arr, preaction={draw, line width=2.2pt, agF}] (12.35,5.52) -- (12.35,8.30);
+\draw[arr, preaction={draw, line width=2.2pt, agF}] (12.80,8.30) -- (12.80,5.52);
+
+% ======================================================== gates and what they shed
+% gate x, ribbon bottom before, ribbon bottom after, the question
+\foreach \g/\bo/\bn/\q in {7.55/3.95/4.16/builds?, 9.55/4.16/5.00/fails?,
+                           11.55/5.00/5.14/minimal?, 13.57/5.14/5.32/new?}
+  {\fill[dsF, draw=dsB, line width=0.5pt]
+     (\g,\bn) .. controls (\g+0.50,\bn) and (\g+0.45,1.95+\bn-\bo) ..
+     (\g+0.95,1.95+\bn-\bo) -- (\g+1.80,1.95+\bn-\bo) -- (\g+1.80,1.95)
+     -- (\g+0.95,1.95) .. controls (\g+0.45,1.95) and (\g+0.50,\bo) ..
+     (\g,\bo) -- cycle;
+   \draw[gatemark] (\g,\bo-0.10) -- (\g,5.56);
+   \node[anchor=south, inner sep=0.7pt, fill=white] at (\g,5.58) {\lab{\q}};
+   \draw[rarr] (\g,5.92) -- (\g,7.62);}
+
+\foreach \g/\l in {7.55/does not build, 9.55/no failure,
+                   11.55/not minimal, 13.57/duplicate or known}
+  {\node[txt, text width=1.50cm] at (\g+0.95,1.85)
+     {\cd{\l}};}
+
+% ======================================================== fixed outside the loop
+\node[anchor=base west, color=dgrey] at (0.05,7.30) {\hdr{FIXED OUTSIDE THE LOOP}};
+\draw[hair] (0.05,7.16) -- (3.65,7.16);
+\fx{0.05}{7.02}{Build point}{CIRCT at release-pinned main, prebuilt SDK}
+\fx{0.05}{6.07}{Build image}{CIRCT's own assertions compiled back in}
+\fx{0.05}{5.12}{Issue tracker}{open and closed issues, read only}
+\fx{0.05}{4.17}{Budget file}{compute, input and filing caps, set before the run}
+
+% ======================================================================== floor
+\draw[hair] (0.05,1.95) -- (18.05,1.95);
+\node[anchor=base west, color=dgrey] at (0.05,2.80) {\hdr{WHAT THE GATES DISCARD}};
+\draw[hair] (0.05,2.66) -- (3.65,2.66);
+\node[txt, text width=3.60cm] at (0.05,2.52)
+  {\cd{A no answer ends the iteration and sends its reason back up the rail.}};
+
+% =================================================================== human gate
+\draw[fill=hgB, draw=hgB, line width=0.5pt, rounded corners=2pt]
+  (15.55,3.95) rectangle (18.05,6.70);
+\fill[white] (16.80,6.42) circle (0.135);
+\fill[white] (16.58,6.08) arc[start angle=180, end angle=0, radius=0.22] -- cycle;
+\node[anchor=north, text width=2.22cm, align=center, color=white] at (16.80,5.94)
+  {\hdr{HUMAN GATE}};
+\node[anchor=north, text width=2.22cm, align=center, color=white] at (16.80,5.66)
+  {{\sffamily\fontsize{6}{6.9}\selectfont A named author approves each filing,
+   under a cap on filings per day. Nothing is filed by default.\par}};
+
+\draw[arr, draw=hgB] (16.80,3.95) -- (16.80,2.12);
+\fill[hgB] (16.20,1.95) rectangle (17.45,2.05);
+\node[txt, text width=1.85cm] at (16.20,1.85)
+  {{\sffamily\fontsize{6}{6.9}\selectfont\color{hgB}\textbf{Filed.} One report,
+   with its patch.\par}};
+
+\end{tikzpicture}

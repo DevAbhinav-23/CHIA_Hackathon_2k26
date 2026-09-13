@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed, generate, reduce, repair, gate: a closed CIRCT bug loop</title>
+<style>
+  /* Self-contained: no webfont import; system fallbacks match the template's stacks. */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.30;
+    color: #111;
+    background: #fff;
+    padding: 0;
+  }
+
+  .page {
+    width: 8.5in;
+    min-height: 11in;
+    margin: 0 auto;
+    padding: 0.55in 0.6in 0.5in 0.6in;
+    background: #fff;
+  }
+
+  code { font-family: 'Source Code Pro', 'DejaVu Sans Mono', monospace; font-size: 0.92em; }
+
+  /* ── HEADER ── */
+  .paper-title {
+    font-size: 13.5pt;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.25;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .authors {
+    text-align: center;
+    font-size: 9pt;
+    margin-bottom: 2px;
+    color: #222;
+  }
+  .affil {
+    text-align: center;
+    font-size: 8.5pt;
+    color: #444;
+    margin-bottom: 7px;
+  }
+  hr.divider {
+    border: none;
+    border-top: 1.5px solid #1a3a6b;
+    margin-bottom: 7px;
+  }
+
+  /* ── SECTION HEADERS ── */
+  .section-head {
+    background: #1a3a6b;
+    color: #fff;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2.5px 7px;
+    margin-bottom: 5px;
+    margin-top: 7px;
+  }
+
+  /* ── TWO-COLUMN LAYOUT ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 18px;
+  }
+  .col { }
+
+  /* ── BODY TEXT ── */
+  p { margin-bottom: 4px; text-align: justify; }
+
+  /* ── LOOP DIAGRAM (7 stages) ── */
+  .loop-wrap {
+    margin: 5px 0 4px 0;
+  }
+  .loop-steps {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    justify-content: space-between;
+  }
+  .step-box {
+    background: #1a3a6b;
+    color: #fff;
+    border-radius: 3px;
+    padding: 4px 3px 4px 3px;
+    text-align: center;
+    min-width: 0;
+    flex: 1 1 0;
+    position: relative;
+  }
+  .step-num {
+    display: inline-block;
+    background: #fff;
+    color: #1a3a6b;
+    border-radius: 50%;
+    width: 13px;
+    height: 13px;
+    font-size: 7pt;
+    font-weight: 700;
+    line-height: 13px;
+    text-align: center;
+    margin-bottom: 1px;
+  }
+  .step-title {
+    font-size: 7.3pt;
+    font-weight: 700;
+    display: block;
+    line-height: 1.15;
+  }
+  .step-sub {
+    font-size: 6.2pt;
+    opacity: 0.88;
+    display: block;
+    line-height: 1.2;
+    margin-top: 1px;
+  }
+  .arrow {
+    color: #1a3a6b;
+    font-size: 10pt;
+    padding: 0;
+    flex: 0 0 9px;
+    text-align: center;
+    line-height: 1;
+    align-self: center;
+  }
+  .loop-feedback {
+    font-size: 7pt;
+    color: #555;
+    text-align: right;
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  /* ── INNOVATIONS ── */
+  .innovation-list { list-style: none; padding: 0; margin: 0; }
+  .innovation-list li {
+    padding-left: 10px;
+    position: relative;
+    margin-bottom: 3px;
+    font-size: 8.2pt;
+    line-height: 1.28;
+  }
+  .innovation-list li::before {
+    content: "▶";
+    position: absolute;
+    left: 0;
+    color: #1a3a6b;
+    font-size: 6pt;
+    top: 2px;
+  }
+  .innov-label {
+    font-weight: 700;
+  }
+
+  /* ── EXEC PLAN TABLE ── */
+  .exec-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.7pt;
+    margin-top: 4px;
+  }
+  .exec-table thead tr {
+    background: #1a3a6b;
+    color: #fff;
+  }
+  .exec-table thead th {
+    padding: 3px 6px;
+    text-align: left;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .exec-table tbody tr:nth-child(odd)  { background: #eef1f7; }
+  .exec-table tbody tr:nth-child(even) { background: #fff; }
+  .exec-table td {
+    padding: 3px 6px;
+    vertical-align: top;
+    line-height: 1.26;
+  }
+  .exec-table td:first-child {
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 92px;
+    color: #1a3a6b;
+  }
+
+  /* ── RELATION TABLE ── */
+  .rel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.1pt;
+    margin-top: 5px;
+  }
+  .rel-table thead tr { background: #1a3a6b; color: #fff; }
+  .rel-table thead th { padding: 2px 4px; text-align: left; font-weight: 700; }
+  .rel-table tbody tr:nth-child(odd)  { background: #eef1f7; }
+  .rel-table tbody tr:nth-child(even) { background: #fff; }
+  .rel-table td { padding: 2px 4px; vertical-align: top; line-height: 1.2; white-space: nowrap; }
+  .rel-table td:first-child { font-weight: 700; color: #1a3a6b; white-space: nowrap; }
+
+  /* ── RESULTS BULLETS ── */
+  .results-list { list-style: none; padding: 0; margin: 0; }
+  .results-list li {
+    padding-left: 10px;
+    position: relative;
+    margin-bottom: 3px;
+    font-size: 8.2pt;
+    line-height: 1.28;
+  }
+  .results-list li::before {
+    content: "•";
+    position: absolute;
+    left: 1px;
+    color: #1a3a6b;
+    font-size: 9pt;
+    top: 0;
+  }
+  .result-label { font-weight: 700; }
+
+  /* ── COST TABLE ── */
+  .cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    margin-top: 4px;
+  }
+  .cost-table thead tr {
+    background: #1a3a6b;
+    color: #fff;
+  }
+  .cost-table thead th {
+    padding: 3px 6px;
+    text-align: left;
+    font-weight: 700;
+  }
+  .cost-table thead th:last-child { text-align: right; }
+  .cost-table tbody tr:nth-child(odd)  { background: #eef1f7; }
+  .cost-table tbody tr:nth-child(even) { background: #fff; }
+  .cost-table td { padding: 2.5px 6px; vertical-align: top; line-height: 1.26; }
+  .cost-table td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+  .cost-table .details { font-size: 7.3pt; color: #444; }
+  .cost-table tfoot td {
+    font-weight: 700;
+    border-top: 1.5px solid #1a3a6b;
+    background: #d6dff0;
+    padding: 3.5px 6px;
+    font-size: 8.5pt;
+  }
+  .cost-table tfoot td:last-child { text-align: right; }
+  .cost-note { font-size: 7pt; color: #555; margin-top: 3px; font-style: italic; line-height: 1.22; }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    font-size: 7.6pt;
+    color: #555;
+    margin-top: 5px;
+    border-top: 1px solid #ccc;
+    padding-top: 3px;
+    font-style: italic;
+  }
+
+  @page { size: letter; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .page { margin: 0; padding: 0.5in 0.55in; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TITLE BLOCK -->
+  <div class="paper-title">
+    Seed, generate, reduce, repair, gate:<br>
+    a closed CIRCT bug loop
+  </div>
+  <div class="authors">
+    Abhinav Venkata Kota, Adithya Jillellamudi and Priyesh Shukla, IIIT Hyderabad
+  </div>
+  <div class="affil">
+    (abhinav.kota@students.iiit.ac.in, adithya.jillellamudi@students.iiit.ac.in and priyesh.shukla@iiit.ac.in)
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 1: TASK OVERVIEW -->
+  <div class="section-head">1. Task Overview</div>
+  <p>
+    Supply is not scarce in LLVM/CIRCT: 82 <code>label:bug</code> issues filed in a year, 65 closed; the backlog is 101 open, median age
+    911 days. Attention, not supply, binds. Yet every past fix names a root-cause class with latent siblings, in a compiler with no
+    in-tree fuzzing infrastructure — and CHIA's <code>circt_issue_solver</code> today consumes open issues and only reads.
+  </p>
+  <p>
+    We mine that history into seeds: 187 bug-subject fix commits over 24 months, 171 rebuildable from an exact prebuilt LLVM SDK. Each
+    seed's lit <code>RUN:</code> line fixes the language of the inputs generated from it, and the assertions CHIA's image compiles out
+    become the oracle.
+    <strong>A CHIA loop seeded with 187 mined CIRCT fix commits, 171 with an exact prebuilt SDK: it generates inputs in each seed's own
+    language, catches them with assertions CHIA's image compiles out, reduces, repairs, gates every filing.</strong>
+  </p>
+
+  <!-- SECTION 2: METHODOLOGY -->
+  <div class="section-head">2. Methodology</div>
+
+  <!-- Loop Diagram: 7 stages -->
+  <div class="loop-wrap">
+    <div class="loop-steps">
+      <div class="step-box">
+        <span class="step-num">1</span>
+        <span class="step-title">Seed</span>
+        <span class="step-sub">187 mined fixes;<br>input language<br>follows the seed</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">2</span>
+        <span class="step-title">Generate</span>
+        <span class="step-sub">agent: root-cause<br>class → sibling<br>sites</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">3</span>
+        <span class="step-title">Oracle</span>
+        <span class="step-sub">crash / CIRCT<br>assertion; arcilator<br>vs Verilator 2nd</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">4</span>
+        <span class="step-title">Reduce</span>
+        <span class="step-sub"><code>circt-reduce</code>,<br>oracle-driven</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">5</span>
+        <span class="step-title">Triage</span>
+        <span class="step-sub">agent: dedup,<br>classify, report</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">6</span>
+        <span class="step-title">Repair</span>
+        <span class="step-sub">CHIA <code>circt_issue_<br>solver</code>, local-report<br>entry</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step-box">
+        <span class="step-num">7</span>
+        <span class="step-title">Gate</span>
+        <span class="step-sub">report /<br>report+patch /<br>nothing</span>
+      </div>
+    </div>
+    <div class="loop-feedback">no reproduction at the run's commit, no minimality, or a duplicate: nothing filed &nbsp;|&nbsp; root cause in MLIR/LLVM core, or a simulator divergence: report-only, no patch</div>
+  </div>
+
+  <div class="two-col">
+    <div class="col">
+      <!-- Key Architectural Innovations -->
+      <strong style="font-size:8.8pt;">Key Architectural Innovations</strong>
+      <ul class="innovation-list" style="margin-top:4px;">
+        <li>
+          <span class="innov-label">Seeded generation:</span>
+          AFuzz's method on a pin-verified corpus. Per seed the agent reads the diff and test, states the root-cause class, names sibling
+          sites. Input language follows the seed — its lit <code>RUN:</code> line is the template: <code>circt-opt</code> plus a pass
+          pipeline, <code>firtool</code>, or <code>circt-verilog</code>.
+        </li>
+        <li>
+          <span class="innov-label">Assertions restored:</span>
+          Under CHIA's flags 620/620 CIRCT object compile commands carry <code>-DNDEBUG</code>. <code>-UNDEBUG</code> restores them:
+          605/605 targets link, 495/513 objects reference <code>__assert_fail</code>. MLIR/LLVM-core assertions stay off; a segfault
+          rooted there is report-only.
+        </li>
+        <li>
+          <span class="innov-label">Release-pinned main + image family:</span>
+          Runs on the newest <code>main</code> whose LLVM pin has a release SDK: 171 of 187 seeds exact, 38 images. One bump off is a hard
+          tblgen failure. Lag: 16 of 63 windows never released, worst 100 commits / 16 d, median release latency 3.3 d.
+        </li>
+        <li>
+          <span class="innov-label">Gate + head-to-head evaluation:</span>
+          Only maintainer-confirmed bugs count. The budget is pre-registered by a commit to the loop repository before the campaign. Two
+          arms, equal budget, identical tools, oracles and gate: seeded agent versus mutation fuzzer. Gate precision = accepted / filed.
+          Zero is reportable.
+        </li>
+      </ul>
+    </div>
+    <div class="col">
+      <!-- Execution Plan -->
+      <strong style="font-size:8.8pt;">Execution Plan (Sep 12 – Sep 24)</strong>
+      <table class="exec-table" style="margin-top:4px;">
+        <thead>
+          <tr><th>Phase</th><th>Focus</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Phase 1<br>(Sep 12 – 15)</td>
+            <td>Build the release-pinned-main image: <code>-UNDEBUG</code>, z3, Verilator, <code>lit</code>. Seed loader over the
+                171 exact-SDK tasks. Oracle and <code>circt-reduce</code> driver scripts. Local-report entry into CHIA.</td>
+          </tr>
+          <tr>
+            <td>Phase 2<br>(Sep 16 – 20)</td>
+            <td>Generator agent plus the mutation-fuzzer baseline arm. Triage and dedup. Gate. Commit the pre-registered
+                budget file — GPU-hours, input cap, filing cap. First campaign.</td>
+          </tr>
+          <tr>
+            <td>Phase 3<br>(Sep 21 – 24)</td>
+            <td>Run the campaign to budget; file gated reports with human approval; repairs through the unchanged phase chain;
+                4-page paper; open-source the loop as composable CHIA blocks.</td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="rel-table">
+        <thead>
+          <tr><th>Stage</th><th>CHIA today</th><th>This loop</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Supply</td><td><code>GithubIssuesNode</code></td><td><strong>added</strong> local-report node</td></tr>
+          <tr><td>Oracle</td><td><code>repro.sh</code>, exit 0 iff fixed</td><td><strong>added</strong> <code>-UNDEBUG</code> assertions</td></tr>
+          <tr><td>Minimize</td><td>—</td><td><strong>added</strong> <code>circt-reduce</code></td></tr>
+          <tr><td>Repair</td><td>assess → … → repair</td><td><strong>reused</strong>; new entry only</td></tr>
+          <tr><td>Filing</td><td>no GitHub writes</td><td><strong>added</strong> gated write</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECTIONS 3 & 4 side by side -->
+  <div class="two-col">
+
+    <!-- Section 3: Expected Results -->
+    <div class="col">
+      <div class="section-head">3. Expected Results</div>
+      <ul class="results-list">
+        <li><span class="result-label">Headline metric:</span> distinct, maintainer-confirmed bugs within the pre-registered budget, seeded arm versus mutation arm. Confirmed = maintainer label, comment or upstream fix; oracle agreement alone = candidate.</li>
+        <li><span class="result-label">Secondaries:</span> candidates before and after dedup, reports filed, gate precision = maintainer-accepted reports / reports filed, repairs merged; seeded-bug validation reported separately.</li>
+        <li><span class="result-label">Instrument:</span> 171 buildable tasks, 38 images, and the assertions-on image — mergeable into CHIA's Dockerfile.</li>
+        <li><span class="result-label">Composable CHIA blocks:</span> report-supply node, assertions-on image builder, reduce block, gate block, open-sourced.</li>
+        <li><span class="result-label">Honest scope:</span> zero is reportable; arcilator-versus-Verilator divergences are report-only; no filing at volume; nothing has run end to end yet.</li>
+      </ul>
+    </div>
+
+    <!-- Section 4: Cost Estimate -->
+    <div class="col">
+      <div class="section-head">4. Cost Estimate</div>
+      <table class="cost-table">
+        <thead>
+          <tr><th>Item</th><th>Details</th><th>Cost</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Gemini API<br>(agents)</td>
+            <td class="details">Generator, triage and repair agents via Google credits; spillover and retries billed directly</td>
+            <td>$500</td>
+          </tr>
+          <tr>
+            <td>CPU compute<br>(campaigns, images)</td>
+            <td class="details">Oracle campaigns, <code>circt-reduce</code> sweeps, <code>lit</code> gates, <code>-UNDEBUG</code> image builds</td>
+            <td>$450</td>
+          </tr>
+          <tr>
+            <td>Artifact storage / CI</td>
+            <td class="details">Image registry, reduced test cases, per-run logs and transcripts, CI for the loop repo</td>
+            <td>$150</td>
+          </tr>
+          <tr>
+            <td>Contingency</td>
+            <td class="details">Rebuilds after a pin bump, re-runs of both arms, preempted jobs, on-demand fallback</td>
+            <td>$200</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2">Total</td><td>$1,300</td></tr>
+        </tfoot>
+      </table>
+      <div class="cost-note">Estimates. The authoritative budget (GPU-hours, input cap, filing cap) is the pre-registered file committed to the loop repository before the campaign.</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Every figure is sourced in problem-statement-FINAL.md, Appendix A (2026-09-12).
+  </div>
+
+</div>
+</body>
+</html>

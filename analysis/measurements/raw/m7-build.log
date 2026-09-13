@@ -1,0 +1,1373 @@
+ninja: Entering directory `/home/adi/.cache/chia-pin-smoke/bslang'
+[1/1339] Building FIRRTLEnums.h.inc...
+[2/1339] Building FIRRTLEnums.cpp.inc...
+[3/1339] Building RTGEnums.h.inc...
+[4/1339] Building HWAttributes.h.inc...
+[5/1339] Building RTGEnums.cpp.inc...
+[6/1339] Building HWAttributes.cpp.inc...
+[7/1339] Building RTGOpInterfaces.h.inc...
+[8/1339] Building RTGOpInterfaces.cpp.inc...
+[9/1339] Building FIRRTLAttributes.cpp.inc...
+[10/1339] Building FIRRTLAttributes.h.inc...
+[11/1339] Building HWEnums.cpp.inc...
+[12/1339] Building Passes.h.inc...
+[13/1339] Building HWEnums.h.inc...
+[14/1339] Building RTGTypeInterfaces.cpp.inc...
+[15/1339] Building RTGTypeInterfaces.h.inc...
+[16/1339] Building ArcPasses.h.inc...
+[17/1339] Building ArcPassesEnums.cpp.inc...
+[18/1339] Building ArcPassesEnums.h.inc...
+[19/1339] Building ESIPasses.h.inc...
+[20/1339] Building FIRRTLCanonicalization.h.inc...
+[21/1339] Building HandshakeEnums.cpp.inc...
+[22/1339] Building HandshakeEnums.h.inc...
+[23/1339] Building Passes.h.inc...
+[24/1339] Building OMAttributes.cpp.inc...
+[25/1339] Building OMAttributes.h.inc...
+[26/1339] Building OMEnums.cpp.inc...
+[27/1339] Building OMEnums.h.inc...
+[28/1339] Building RTGAttrInterfaces.cpp.inc...
+[29/1339] Building RTGAttrInterfaces.h.inc...
+[30/1339] Building SeqEnums.cpp.inc...
+[31/1339] Building SeqEnums.h.inc...
+[32/1339] Building VerifEnums.cpp.inc...
+[33/1339] Building VerifEnums.h.inc...
+[34/1339] Building ArcEnums.cpp.inc...
+[35/1339] Building ArcEnums.h.inc...
+[36/1339] Building ESIEnums.cpp.inc...
+[37/1339] Building ESIEnums.h.inc...
+[38/1339] Building FIRRTLOpInterfaces.cpp.inc...
+[39/1339] Building FIRRTLOpInterfaces.h.inc...
+[40/1339] Building HandshakeInterfaces.cpp.inc...
+[41/1339] Building HandshakeInterfaces.h.inc...
+[42/1339] Building HandshakeAttributes.cpp.inc...
+[43/1339] Building HandshakeAttributes.h.inc...
+[44/1339] Building HWCanonicalization.cpp.inc...
+[45/1339] Building LLHDEnums.cpp.inc...
+[46/1339] Building LLHDEnums.h.inc...
+[47/1339] Building OMOpInterfaces.cpp.inc...
+[48/1339] Building OMOpInterfaces.h.inc...
+[49/1339] Building KanagawaPasses.h.inc...
+[50/1339] Building RTGISAAssemblyAttrInterfaces.cpp.inc...
+[51/1339] Building RTGISAAssemblyAttrInterfaces.h.inc...
+[52/1339] Building SeqAttributes.cpp.inc...
+[53/1339] Building SeqAttributes.h.inc...
+[54/1339] Building SimOpInterfaces.cpp.inc...
+[55/1339] Building SimOpInterfaces.h.inc...
+[56/1339] Building SynthOpInterfaces.cpp.inc...
+[57/1339] Building SynthOpInterfaces.h.inc...
+[58/1339] Building SystemCEnums.cpp.inc...
+[59/1339] Building SystemCEnums.h.inc...
+[60/1339] Building VerifOpInterfaces.cpp.inc...
+[61/1339] Building VerifOpInterfaces.h.inc...
+[62/1339] Building InstanceGraphInterface.cpp.inc...
+[63/1339] Building InstanceGraphInterface.h.inc...
+[64/1339] Building ArcAttributes.cpp.inc...
+[65/1339] Building ArcAttributes.h.inc...
+[66/1339] Building AXI4Enums.cpp.inc...
+[67/1339] Building AXI4Enums.h.inc...
+[68/1339] Building CalyxEnums.cpp.inc...
+[69/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/circt-tblgen.cpp.o
+[70/1339] Building CalyxEnums.h.inc...
+[71/1339] Building ESIAttributes.cpp.inc...
+[72/1339] Building ESIAttributes.h.inc...
+[73/1339] Building FIRRTLTypeInterfaces.cpp.inc...
+[74/1339] Building FIRRTLTypeInterfaces.h.inc...
+[75/1339] Building HandshakeCanonicalization.h.inc...
+[76/1339] Building HWOpInterfaces.cpp.inc...
+[77/1339] Building HWOpInterfaces.h.inc...
+[78/1339] Building HWArithEnums.cpp.inc...
+[79/1339] Building HWArithEnums.h.inc...
+[80/1339] Building LLHDAttributes.cpp.inc...
+[81/1339] Building LLHDAttributes.h.inc...
+[82/1339] Building LTLEnums.cpp.inc...
+[83/1339] Building LTLEnums.h.inc...
+[84/1339] Building MooreEnums.cpp.inc...
+[85/1339] Building MooreEnums.h.inc...
+[86/1339] Building KanagawaInterfaces.h.inc...
+[87/1339] Building KanagawaInterfaces.cpp.inc...
+[88/1339] Building RTGISAAssemblyTypeInterfaces.h.inc...
+[89/1339] Building RTGISAAssemblyTypeInterfaces.cpp.inc...
+[90/1339] Building SeqPasses.h.inc...
+[91/1339] Building SimEnums.cpp.inc...
+[92/1339] Building SimEnums.h.inc...
+[93/1339] Building SVEnums.cpp.inc...
+[94/1339] Building SVEnums.h.inc...
+[95/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/FIRRTLIntrinsicsGen.cpp.o
+[96/1339] Building SynthEnums.cpp.inc...
+[97/1339] Building SynthEnums.h.inc...
+[98/1339] Building SystemCAttributes.cpp.inc...
+[99/1339] Building SystemCAttributes.h.inc...
+[100/1339] Generating Version.cpp
+-- Determining version with `git rev-parse --short HEAD`
+-- CIRCT version: 5056ff0
+[101/1339] Building Arc.cpp.inc...
+[102/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/RTGInstructionMethodsGen.cpp.o
+[103/1339] Building ArcDialect.cpp.inc...
+[104/1339] Building Arc.h.inc...
+[105/1339] Building ArcDialect.h.inc...
+[106/1339] Building ArcTypes.cpp.inc...
+[107/1339] Building ArcInterfaces.cpp.inc...
+[108/1339] Building ArcTypes.h.inc...
+[109/1339] Building ArcInterfaces.h.inc...
+[110/1339] Building AXI4.h.inc...
+[111/1339] Building AXI4.cpp.inc...
+[112/1339] Building AXI4Dialect.cpp.inc...
+[113/1339] Building AXI4Dialect.h.inc...
+[114/1339] Building AXI4Types.cpp.inc...
+[115/1339] Building AXI4Types.h.inc...
+[116/1339] Building AXI4Attributes.cpp.inc...
+[117/1339] Building AXI4Attributes.h.inc...
+[118/1339] Building CalyxDialect.cpp.inc...
+[119/1339] Building Calyx.cpp.inc...
+[120/1339] Building Calyx.h.inc...
+[121/1339] Building CalyxDialect.h.inc...
+[122/1339] Building CalyxTypes.cpp.inc...
+[123/1339] Building CalyxInterfaces.cpp.inc...
+[124/1339] Building CalyxTypes.h.inc...
+[125/1339] Building CalyxInterfaces.h.inc...
+[126/1339] Building CombDialect.h.inc...
+[127/1339] Building CombDialect.cpp.inc...
+[128/1339] Building Comb.cpp.inc...
+[129/1339] Building CombEnums.cpp.inc...
+[130/1339] Building CombTypes.h.inc...
+[131/1339] Building CombTypes.cpp.inc...
+[132/1339] Building Comb.h.inc...
+[133/1339] Building CombEnums.h.inc...
+[134/1339] Building Datapath.cpp.inc...
+[135/1339] Building Datapath.h.inc...
+[136/1339] Building DatapathDialect.cpp.inc...
+[137/1339] Building DatapathTypes.h.inc...
+[138/1339] Building DatapathDialect.h.inc...
+[139/1339] Building DatapathTypes.cpp.inc...
+[140/1339] Building DC.cpp.inc...
+[141/1339] Building DCDialect.cpp.inc...
+[142/1339] Building DCDialect.h.inc...
+[143/1339] Building DC.h.inc...
+[144/1339] Building DCTypes.cpp.inc...
+[145/1339] Building DCTypes.h.inc...
+[146/1339] Building Debug.cpp.inc...
+[147/1339] Building Debug.h.inc...
+[148/1339] Building DebugDialect.cpp.inc...
+[149/1339] Building DebugDialect.h.inc...
+[150/1339] Building DebugTypes.cpp.inc...
+[151/1339] Building DebugTypes.h.inc...
+[152/1339] Building Emit.cpp.inc...
+[153/1339] Building Emit.h.inc...
+[154/1339] Building EmitDialect.cpp.inc...
+[155/1339] Building EmitDialect.h.inc...
+[156/1339] Building EmitTypes.cpp.inc...
+[157/1339] Building EmitOpInterfaces.cpp.inc...
+[158/1339] Building EmitTypes.h.inc...
+[159/1339] Building EmitOpInterfaces.h.inc...
+[160/1339] Building ESIDialect.h.inc...
+[161/1339] Building ESI.cpp.inc...
+[162/1339] Building ESIDialect.cpp.inc...
+[163/1339] Building ESI.h.inc...
+[164/1339] Building ESITypes.cpp.inc...
+[165/1339] Building ESIInterfaces.cpp.inc...
+[166/1339] Building ESIInterfaces.h.inc...
+[167/1339] Building ESITypes.h.inc...
+[168/1339] Building FSM.h.inc...
+[169/1339] Building FSM.cpp.inc...
+[170/1339] Building FSMDialect.h.inc...
+[171/1339] Building FSMDialect.cpp.inc...
+[172/1339] Building FSMTypes.h.inc...
+[173/1339] Building FSMTypes.cpp.inc...
+[174/1339] Building Handshake.cpp.inc...
+[175/1339] Building HandshakeDialect.h.inc...
+[176/1339] Building HandshakeDialect.cpp.inc...
+[177/1339] Building Handshake.h.inc...
+[178/1339] Building HandshakeTypes.cpp.inc...
+[179/1339] Building HandshakePasses.h.inc...
+[180/1339] Building HandshakeTypes.h.inc...
+[181/1339] Building HWDialect.cpp.inc...
+[182/1339] Building HW.cpp.inc...
+[183/1339] Building HW.h.inc...
+[184/1339] Building HWDialect.h.inc...
+[185/1339] Building HWTypeInterfaces.cpp.inc...
+[186/1339] Building HWTypes.cpp.inc...
+[187/1339] Building HWTypeInterfaces.h.inc...
+[188/1339] Building HWTypes.h.inc...
+[189/1339] Building HWArith.cpp.inc...
+[190/1339] Building HWArithDialect.cpp.inc...
+[191/1339] Building HWArithDialect.h.inc...
+[192/1339] Building HWArith.h.inc...
+[193/1339] Building HWArithTypes.h.inc...
+[194/1339] Building HWArithTypes.cpp.inc...
+[195/1339] Building HWArithCanonicalizations.h.inc...
+[196/1339] Building Interop.cpp.inc...
+[197/1339] Building InteropDialect.cpp.inc...
+[198/1339] Building Interop.h.inc...
+[199/1339] Building InteropDialect.h.inc...
+[200/1339] Building InteropTypes.cpp.inc...
+[201/1339] Building InteropTypes.h.inc...
+[202/1339] Building InteropEnums.cpp.inc...
+[203/1339] Building InteropEnums.h.inc...
+[204/1339] Building LLHD.cpp.inc...
+[205/1339] Building LLHDDialect.cpp.inc...
+[206/1339] Building LLHDDialect.h.inc...
+[207/1339] Building LLHD.h.inc...
+[208/1339] Building LLHDPasses.h.inc...
+[209/1339] Building LLHDTypes.cpp.inc...
+[210/1339] Building LLHDTypes.h.inc...
+[211/1339] Building LoopSchedule.cpp.inc...
+[212/1339] Building LoopScheduleDialect.cpp.inc...
+[213/1339] Building LoopScheduleDialect.h.inc...
+[214/1339] Building LoopSchedule.h.inc...
+[215/1339] Building LoopScheduleTypes.cpp.inc...
+[216/1339] Building LoopScheduleTypes.h.inc...
+[217/1339] Building LTL.cpp.inc...
+[218/1339] Building LTL.h.inc...
+[219/1339] Building LTLDialect.cpp.inc...
+[220/1339] Building LTLDialect.h.inc...
+[221/1339] Building LTLFolds.cpp.inc...
+[222/1339] Building LTLTypes.cpp.inc...
+[223/1339] Building LTLTypes.h.inc...
+[224/1339] Building MooreDialect.cpp.inc...
+[225/1339] Building MooreDialect.h.inc...
+[226/1339] Building MooreTypes.cpp.inc...
+[227/1339] Building MooreTypes.h.inc...
+[228/1339] Building Moore.cpp.inc...
+[229/1339] Building MooreAttributes.cpp.inc...
+[230/1339] Building Moore.h.inc...
+[231/1339] Building MooreAttributes.h.inc...
+[232/1339] Building MSFT.cpp.inc...
+[233/1339] Building MSFT.h.inc...
+[234/1339] Building MSFTDialect.cpp.inc...
+[235/1339] Building MSFTTypes.cpp.inc...
+[236/1339] Building MSFTDialect.h.inc...
+[237/1339] Building MSFTTypes.h.inc...
+[238/1339] Building MSFTAttributes.cpp.inc...
+[239/1339] Building MSFTEnums.cpp.inc...
+[240/1339] Building MSFTAttributes.h.inc...
+[241/1339] Building MSFTEnums.h.inc...
+[242/1339] Building MSFTOpInterfaces.h.inc...
+[243/1339] Building MSFTOpInterfaces.cpp.inc...
+[244/1339] Building OMDialect.cpp.inc...
+[245/1339] Building OM.cpp.inc...
+[246/1339] Building OMDialect.h.inc...
+[247/1339] Building OM.h.inc...
+[248/1339] Building OMTypes.cpp.inc...
+[249/1339] Building OMTypes.h.inc...
+[250/1339] Building Pipeline.h.inc...
+[251/1339] Building Pipeline.cpp.inc...
+[252/1339] Building PipelineDialect.cpp.inc...
+[253/1339] Building PipelineDialect.h.inc...
+[254/1339] Building PipelineTypes.cpp.inc...
+[255/1339] Building PipelineTypes.h.inc...
+[256/1339] Building Probe.cpp.inc...
+[257/1339] Building ProbeDialect.cpp.inc...
+[258/1339] Building ProbeDialect.h.inc...
+[259/1339] Building Probe.h.inc...
+[260/1339] Building ProbeTypes.h.inc...
+[261/1339] Building ProbeTypes.cpp.inc...
+[262/1339] Building KanagawaDialect.cpp.inc...
+[263/1339] Building KanagawaDialect.h.inc...
+[264/1339] Building Kanagawa.cpp.inc...
+[265/1339] Building Kanagawa.h.inc...
+[266/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/RTGInstructionFormat.cpp.o
+[267/1339] Building KanagawaTypes.h.inc...
+[268/1339] Building KanagawaTypes.cpp.inc...
+[269/1339] Building KanagawaAttributes.cpp.inc...
+[270/1339] Building KanagawaAttributes.h.inc...
+[271/1339] Building KanagawaEnums.cpp.inc...
+[272/1339] Building KanagawaEnums.h.inc...
+[273/1339] Building RTGDialect.cpp.inc...
+[274/1339] Building RTGDialect.h.inc...
+[275/1339] Building RTG.h.inc...
+[276/1339] Building RTGTypes.cpp.inc...
+[277/1339] Building RTGTypes.h.inc...
+[278/1339] Building RTGISAAssemblyOpInterfaces.cpp.inc...
+[279/1339] Building RTG.cpp.inc...
+[280/1339] Building RTGISAAssemblyOpInterfaces.h.inc...
+[281/1339] Building RTGTestDialect.cpp.inc...
+[282/1339] Building RTGTestDialect.h.inc...
+[283/1339] Building RTGTest.h.inc...
+[284/1339] Building RTGTestTypes.cpp.inc...
+[285/1339] Building RTGTest.cpp.inc...
+[286/1339] Building RTGTestTypes.h.inc...
+[287/1339] Building SeqDialect.cpp.inc...
+[288/1339] Building Seq.cpp.inc...
+[289/1339] Building Seq.h.inc...
+[290/1339] Building SeqDialect.h.inc...
+[291/1339] Building SeqTypes.cpp.inc...
+[292/1339] Building SeqOpInterfaces.cpp.inc...
+[293/1339] Building SeqOpInterfaces.h.inc...
+[294/1339] Building SeqTypes.h.inc...
+[295/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/RTGInstructionUtils.cpp.o
+[296/1339] Building SimDialect.cpp.inc...
+[297/1339] Building SimTypes.cpp.inc...
+[298/1339] Building SimDialect.h.inc...
+[299/1339] Building SimPasses.h.inc...
+[300/1339] Building SimTypes.h.inc...
+[301/1339] Building Sim.cpp.inc...
+[302/1339] Building Sim.h.inc...
+[303/1339] Building SSP.cpp.inc...
+[304/1339] Building SSPDialect.h.inc...
+[305/1339] Building SSP.h.inc...
+[306/1339] Building SSPDialect.cpp.inc...
+[307/1339] Building SSPTypes.cpp.inc...
+[308/1339] Building SSPTypes.h.inc...
+[309/1339] Building SSPAttributes.cpp.inc...
+[310/1339] Building SSPAttributes.h.inc...
+[311/1339] Building SVDialect.cpp.inc...
+[312/1339] Building SVDialect.h.inc...
+[313/1339] Building SVTypes.cpp.inc...
+[314/1339] Building SVTypes.h.inc...
+[315/1339] Building SVAttributes.h.inc...
+[316/1339] Building SVAttributes.cpp.inc...
+[317/1339] Building SV.h.inc...
+[318/1339] Building Synth.h.inc...
+[319/1339] Building Synth.cpp.inc...
+[320/1339] Building SV.cpp.inc...
+[321/1339] Building SynthDialect.cpp.inc...
+[322/1339] Building SynthDialect.h.inc...
+[323/1339] Building SynthTypes.h.inc...
+[324/1339] Building SynthAttributes.cpp.inc...
+[325/1339] Building SynthTypes.cpp.inc...
+[326/1339] Building SynthAttributes.h.inc...
+[327/1339] Building SystemCDialect.h.inc...
+[328/1339] Building SystemC.cpp.inc...
+[329/1339] Building SystemCTypes.cpp.inc...
+[330/1339] Building SystemCDialect.cpp.inc...
+[331/1339] Building SystemC.h.inc...
+[332/1339] Building SystemCTypes.h.inc...
+[333/1339] Building SystemCOpInterfaces.cpp.inc...
+[334/1339] Building SystemCOpInterfaces.h.inc...
+[335/1339] Building Verif.h.inc...
+[336/1339] Building VerifDialect.h.inc...
+[337/1339] Building VerifDialect.cpp.inc...
+[338/1339] Building Verif.cpp.inc...
+[339/1339] Building VerifTypes.h.inc...
+[340/1339] Building VerifTypes.cpp.inc...
+[341/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/APInt.cpp.o
+[342/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/FIRRTLAnnotationsGen.cpp.o
+[343/1339] Building CXX object tools/circt-tblgen/CMakeFiles/circt-tblgen.dir/RTGInstructionPythonWrappers.cpp.o
+[344/1339] Linking CXX executable bin/circt-tblgen
+[345/1339] Building FIRRTLAnnotationDetails.h.inc...
+[346/1339] Building FIRRTLAnnotationRecords.h.inc...
+[347/1339] Building _home_adi__cache_chia_pin_smoke_bslang_docs_Dialects_FIRRTLAnnotations_md...
+[348/1339] Building FIRRTLIntrinsics.cpp.inc...
+[349/1339] Generating ../../../../docs/Dialects/FIRRTLAnnotations.md
+[350/1339] Building CHIRRTL.cpp.inc...
+[351/1339] Building CHIRRTL.h.inc...
+[352/1339] Building CHIRRTLDialect.cpp.inc...
+[353/1339] Building CHIRRTLDialect.h.inc...
+[354/1339] Building CHIRRTLTypes.cpp.inc...
+[355/1339] Building CHIRRTLTypes.h.inc...
+[356/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/FieldRef.cpp.o
+[357/1339] Building FIRRTL.cpp.inc...
+[358/1339] Building FIRRTL.h.inc...
+[359/1339] Building FIRRTLDialect.cpp.inc...
+[360/1339] Building FIRRTLDialect.h.inc...
+[361/1339] Building FIRRTLTypes.cpp.inc...
+[362/1339] Building FIRRTLTypes.h.inc...
+[363/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Debug.cpp.o
+[364/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/FVInt.cpp.o
+[365/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/JSON.cpp.o
+[366/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/CustomDirectiveImpl.cpp.o
+[367/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Naming.cpp.o
+[368/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/PrettyPrinter.cpp.o
+[369/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/LoweringOptions.cpp.o
+[370/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Path.cpp.o
+[371/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/PrettyPrinterHelpers.cpp.o
+[372/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/ParsingUtils.cpp.o
+[373/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/InstanceGraph.cpp.o
+[374/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/BackedgeBuilder.cpp.o
+[375/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/SATSolver.cpp.o
+[376/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Version.cpp.o
+[377/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/ProceduralRegionTrait.cpp.o
+[378/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/TruthTable.cpp.o
+[379/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/Passes.cpp.o
+[380/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/ValueMapper.cpp.o
+[381/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/CustomDirectiveImpl.cpp.o
+[382/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWEnums.cpp.o
+[383/1339] Building CXX object lib/Support/CMakeFiles/obj.CIRCTSupport.dir/SymCache.cpp.o
+[384/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/ConversionPatterns.cpp.o
+[385/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HierPathCache.cpp.o
+[386/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWInstanceGraph.cpp.o
+[387/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWTypeInterfaces.cpp.o
+[388/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWModuleOpInterface.cpp.o
+[389/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWOpInterfaces.cpp.o
+[390/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWAttributes.cpp.o
+[391/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/ModuleImplementation.cpp.o
+[392/1339] Linking CXX static library lib/libCIRCTSupport.a
+[393/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/InnerSymbolTable.cpp.o
+[394/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWInstanceImplementation.cpp.o
+[395/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWDialect.cpp.o
+[396/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWTypes.cpp.o
+[397/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/PortConverter.cpp.o
+[398/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/InferIntRangeInterfaceImpls.cpp.o
+[399/1339] Building CXX object lib/Dialect/Comb/CMakeFiles/obj.CIRCTComb.dir/CombAnalysis.cpp.o
+[400/1339] Building CXX object lib/Dialect/Emit/CMakeFiles/obj.CIRCTEmit.dir/EmitOpInterfaces.cpp.o
+[401/1339] Building CXX object lib/Dialect/Comb/CMakeFiles/obj.CIRCTComb.dir/InferIntRangeInterfaceImpls.cpp.o
+[402/1339] Building CXX object lib/Dialect/Emit/CMakeFiles/obj.CIRCTEmit.dir/EmitDialect.cpp.o
+[403/1339] Building CXX object lib/Dialect/Comb/CMakeFiles/obj.CIRCTComb.dir/CombFolds.cpp.o
+[404/1339] Building CXX object lib/Dialect/Emit/CMakeFiles/obj.CIRCTEmit.dir/EmitOps.cpp.o
+[405/1339] Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o
+[406/1339] Building CXX object lib/Dialect/HW/CMakeFiles/obj.CIRCTHW.dir/HWOps.cpp.o
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:807:3: warning: 'modifyModulePorts' is deprecated [-Wdeprecated-declarations]
+  807 |   modifyModulePorts(*this, insertInputs, insertOutputs, eraseInputs,
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:697:3: note: 'modifyModulePorts' has been explicitly marked deprecated here
+  697 | [[deprecated]] static void
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:859:3: warning: 'modifyModulePorts' is deprecated [-Wdeprecated-declarations]
+  859 |   modifyModulePorts(*this, insertInputs, insertOutputs, eraseInputs,
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:697:3: note: 'modifyModulePorts' has been explicitly marked deprecated here
+  697 | [[deprecated]] static void
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:898:3: warning: 'modifyModulePorts' is deprecated [-Wdeprecated-declarations]
+  898 |   modifyModulePorts(*this, insertInputs, insertOutputs, eraseInputs,
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:697:3: note: 'modifyModulePorts' has been explicitly marked deprecated here
+  697 | [[deprecated]] static void
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:1188:3: warning: 'modifyModulePorts' is deprecated [-Wdeprecated-declarations]
+ 1188 |   modifyModulePorts(getOperation(), {std::make_pair(index, port)}, {}, {}, {},
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:697:3: note: 'modifyModulePorts' has been explicitly marked deprecated here
+  697 | [[deprecated]] static void
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:1210:3: warning: 'modifyModulePorts' is deprecated [-Wdeprecated-declarations]
+ 1210 |   modifyModulePorts(getOperation(), {}, indexedNewPorts, {}, {},
+      |   ^
+/home/adi/.cache/chia-pin-smoke/src/lib/Dialect/HW/HWOps.cpp:697:3: note: 'modifyModulePorts' has been explicitly marked deprecated here
+  697 | [[deprecated]] static void
+      |   ^
+5 warnings generated.
+[407/1339] Linking CXX static library lib/libCIRCTHW.a
+[408/1339] Linking CXX static library lib/libCIRCTEmit.a
+[409/1339] Building CXX object lib/Dialect/Comb/CMakeFiles/obj.CIRCTComb.dir/CombOps.cpp.o
+[410/1339] Building CXX object lib/Dialect/LTL/CMakeFiles/obj.CIRCTLTL.dir/LTLFolds.cpp.o
+[411/1339] Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o
+[412/1339] Building CXX object lib/Dialect/LTL/CMakeFiles/obj.CIRCTLTL.dir/LTLDialect.cpp.o
+[413/1339] Building CXX object lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqAttributes.cpp.o
+[414/1339] Building CXX object lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqTypes.cpp.o
+[415/1339] Building CXX object lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqOpInterfaces.cpp.o
+[416/1339] Building CXX object lib/Dialect/LTL/CMakeFiles/obj.CIRCTLTL.dir/LTLOps.cpp.o
+[417/1339] Linking CXX static library _deps/slang-build/lib/libfmt.a
+[418/1339] Building MSFTPasses.h.inc...
+[419/1339] Building CXX object lib/Dialect/Comb/CMakeFiles/obj.CIRCTComb.dir/CombDialect.cpp.o
+[420/1339] Linking CXX static library lib/libCIRCTComb.a
+[421/1339] Linking CXX static library lib/libCIRCTLTL.a
+[422/1339] Building CXX object lib/Dialect/SV/CMakeFiles/obj.CIRCTSV.dir/SVAttributes.cpp.o
+[423/1339] Building CXX object lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqDialect.cpp.o
+[424/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/MSFTAttributes.cpp.o
+[425/1339] Building CXX object lib/Dialect/SV/CMakeFiles/obj.CIRCTSV.dir/SVTypes.cpp.o
+[426/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/DeviceDB.cpp.o
+[427/1339] Generating syntax
+[428/1339] Generating diagnostics
+[429/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/MSFTOpInterfaces.cpp.o
+[430/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/MSFTDialect.cpp.o
+[431/1339] Building CXX object lib/Dialect/Seq/CMakeFiles/obj.CIRCTSeq.dir/SeqOps.cpp.o
+[432/1339] Linking CXX static library lib/libCIRCTSeq.a
+[433/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/ExportQuartusTcl.cpp.o
+[434/1339] Building CXX object lib/Dialect/MSFT/Transforms/CMakeFiles/obj.CIRCTMSFTTransforms.dir/MSFTExportTcl.cpp.o
+[435/1339] Building CXX object lib/Dialect/MSFT/CMakeFiles/obj.CIRCTMSFT.dir/MSFTOps.cpp.o
+[436/1339] Building CXX object lib/Dialect/MSFT/Transforms/CMakeFiles/obj.CIRCTMSFTTransforms.dir/MSFTLowerInstances.cpp.o
+[437/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMAttributes.cpp.o
+[438/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMOpInterfaces.cpp.o
+[439/1339] Building CXX object lib/Dialect/SV/CMakeFiles/obj.CIRCTSV.dir/SVDialect.cpp.o
+[440/1339] Building CXX object lib/Dialect/MSFT/Transforms/CMakeFiles/obj.CIRCTMSFTTransforms.dir/PassCommon.cpp.o
+[441/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/AllSyntax.cpp for CXX dependencies
+[442/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/SyntaxClone.cpp for CXX dependencies
+[443/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/TokenKind.cpp for CXX dependencies
+[444/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/KnownSystemName.cpp for CXX dependencies
+[445/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/DiagCode.cpp for CXX dependencies
+[446/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMUtils.cpp.o
+[447/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-build/source/VersionInfo.cpp for CXX dependencies
+[448/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/AbstractFlowAnalysis.cpp for CXX dependencies
+[449/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/AnalyzedAssertion.cpp for CXX dependencies
+[450/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/AnalysisManager.cpp for CXX dependencies
+[451/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/CaseDecisionDag.cpp for CXX dependencies
+[452/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/AnalyzedProcedure.cpp for CXX dependencies
+[453/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/ClockInference.cpp for CXX dependencies
+[454/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/DFAResults.cpp for CXX dependencies
+[455/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/DataFlowAnalysis.cpp for CXX dependencies
+[456/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/DriverTracker.cpp for CXX dependencies
+[457/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/analysis/ValueDriver.cpp for CXX dependencies
+[458/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/DiagnosticEngine.cpp for CXX dependencies
+[459/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/DiagnosticClient.cpp for CXX dependencies
+[460/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/Diagnostics.cpp for CXX dependencies
+[461/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/JsonDiagnosticClient.cpp for CXX dependencies
+[462/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/TextDiagnosticClient.cpp for CXX dependencies
+[463/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/driver/CompatSettings.cpp for CXX dependencies
+[464/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/diagnostics/WaiverManager.cpp for CXX dependencies
+[465/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/driver/Driver.cpp for CXX dependencies
+[466/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/driver/MemoryStats.cpp for CXX dependencies
+[467/1339] Building CXX object lib/Dialect/MSFT/Transforms/CMakeFiles/obj.CIRCTMSFTTransforms.dir/MSFTLowerConstructs.cpp.o
+[468/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/driver/SourceLoader.cpp for CXX dependencies
+[469/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/driver/UserDefinedSubroutine.cpp for CXX dependencies
+[470/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/numeric/ConstantValue.cpp for CXX dependencies
+[471/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/numeric/Time.cpp for CXX dependencies
+[472/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Lexer.cpp for CXX dependencies
+[473/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/LexerFacts.cpp for CXX dependencies
+[474/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/numeric/SVInt.cpp for CXX dependencies
+[475/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/NumberParser.cpp for CXX dependencies
+[476/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMTypes.cpp.o
+[477/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Parser.cpp for CXX dependencies
+[478/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Parser_statements.cpp for CXX dependencies
+[479/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Parser_members.cpp for CXX dependencies
+[480/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/ParserBase.cpp for CXX dependencies
+[481/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Parser_expressions.cpp for CXX dependencies
+[482/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/ParserMetadata.cpp for CXX dependencies
+[483/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Preprocessor.cpp for CXX dependencies
+[484/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Preprocessor_macros.cpp for CXX dependencies
+[485/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Preprocessor_pragmas.cpp for CXX dependencies
+[486/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/CSTSerializer.cpp for CXX dependencies
+[487/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/parsing/Token.cpp for CXX dependencies
+[488/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/SyntaxFacts.cpp for CXX dependencies
+[489/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/SyntaxNode.cpp for CXX dependencies
+[490/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/SyntaxPrinter.cpp for CXX dependencies
+[491/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/text/CharInfo.cpp for CXX dependencies
+[492/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/SyntaxTree.cpp for CXX dependencies
+[493/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/text/Glob.cpp for CXX dependencies
+[494/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/syntax/SyntaxRewriter.cpp for CXX dependencies
+[495/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/text/Json.cpp for CXX dependencies
+[496/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/BumpAllocator.cpp for CXX dependencies
+[497/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/text/SourceManager.cpp for CXX dependencies
+[498/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/IntervalMap.cpp for CXX dependencies
+[499/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/text/SourceLocation.cpp for CXX dependencies
+[500/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/CommandLine.cpp for CXX dependencies
+[501/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/ThreadPool.cpp for CXX dependencies
+[502/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/SmallVector.cpp for CXX dependencies
+[503/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/OS.cpp for CXX dependencies
+[504/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/String.cpp for CXX dependencies
+[505/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/Util.cpp for CXX dependencies
+[506/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/ArrayMethods.cpp for CXX dependencies
+[507/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/util/TimeTrace.cpp for CXX dependencies
+[508/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/ConversionFuncs.cpp for CXX dependencies
+[509/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/CoverageFuncs.cpp for CXX dependencies
+[510/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/EnumMethods.cpp for CXX dependencies
+[511/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/GateTypes.cpp for CXX dependencies
+[512/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/NonConstFuncs.cpp for CXX dependencies
+[513/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/QueryFuncs.cpp for CXX dependencies
+[514/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/MathFuncs.cpp for CXX dependencies
+[515/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/StdPackage.cpp for CXX dependencies
+[516/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/MiscSystemFuncs.cpp for CXX dependencies
+[517/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/StringMethods.cpp for CXX dependencies
+[518/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/builtins/SystemTasks.cpp for CXX dependencies
+[519/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/AssertionExpr.cpp for CXX dependencies
+[520/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/AssignmentExpressions.cpp for CXX dependencies
+[521/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/CallExpression.cpp for CXX dependencies
+[522/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/ConversionExpression.cpp for CXX dependencies
+[523/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/LiteralExpressions.cpp for CXX dependencies
+[524/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/MiscExpressions.cpp for CXX dependencies
+[525/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/Operator.cpp for CXX dependencies
+[526/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/SelectExpressions.cpp for CXX dependencies
+[527/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/statements/ConditionalStatements.cpp for CXX dependencies
+[528/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/expressions/OperatorExpressions.cpp for CXX dependencies
+[529/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/statements/LoopStatements.cpp for CXX dependencies
+[530/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/AttributeSymbol.cpp for CXX dependencies
+[531/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/BlockSymbols.cpp for CXX dependencies
+[532/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/statements/MiscStatements.cpp for CXX dependencies
+[533/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/CheckerSymbols.cpp for CXX dependencies
+[534/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/ClassSymbols.cpp for CXX dependencies
+[535/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/CompilationUnitSymbols.cpp for CXX dependencies
+[536/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/CoverSymbols.cpp for CXX dependencies
+[537/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/MemberSymbols.cpp for CXX dependencies
+[538/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/ParameterBuilder.cpp for CXX dependencies
+[539/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/InstanceSymbols.cpp for CXX dependencies
+[540/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/ParameterSymbols.cpp for CXX dependencies
+[541/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/PortSymbols.cpp for CXX dependencies
+[542/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/SpecifySymbols.cpp for CXX dependencies
+[543/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/SubroutineSymbols.cpp for CXX dependencies
+[544/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/SymbolBuilders.cpp for CXX dependencies
+[545/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/ValueSymbol.cpp for CXX dependencies
+[546/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/symbols/VariableSymbols.cpp for CXX dependencies
+[547/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/types/AllTypes.cpp for CXX dependencies
+[548/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/types/DeclaredType.cpp for CXX dependencies
+[549/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/types/NetType.cpp for CXX dependencies
+[550/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/types/TypePrinter.cpp for CXX dependencies
+[551/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/types/Type.cpp for CXX dependencies
+[552/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/ASTDiagMap.cpp for CXX dependencies
+[553/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/ASTContext.cpp for CXX dependencies
+[554/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Bitstream.cpp for CXX dependencies
+[555/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/ASTSerializer.cpp for CXX dependencies
+[556/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Constraints.cpp for CXX dependencies
+[557/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Compilation.cpp for CXX dependencies
+[558/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/DefParamResolver.cpp for CXX dependencies
+[559/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/EvalContext.cpp for CXX dependencies
+[560/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/HierarchicalReference.cpp for CXX dependencies
+[561/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Expression.cpp for CXX dependencies
+[562/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/FmtHelpers.cpp for CXX dependencies
+[563/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/InstanceCacheKey.cpp for CXX dependencies
+[564/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/LValue.cpp for CXX dependencies
+[565/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Lookup.cpp for CXX dependencies
+[566/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/OpaqueInstancePath.cpp for CXX dependencies
+[567/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Patterns.cpp for CXX dependencies
+[568/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Scope.cpp for CXX dependencies
+[569/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/ScriptSession.cpp for CXX dependencies
+[570/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/SFormat.cpp for CXX dependencies
+[571/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Statement.cpp for CXX dependencies
+[572/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/SemanticFacts.cpp for CXX dependencies
+[573/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/Symbol.cpp for CXX dependencies
+[574/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/SystemSubroutine.cpp for CXX dependencies
+[575/1339] Building Conversion.capi.cpp.inc...
+[576/1339] Building Conversion.capi.h.inc...
+[577/1339] Building Passes.h.inc...
+[578/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/TimingControl.cpp for CXX dependencies
+[579/1339] Building SynthPasses.h.inc...
+[580/1339] Building RTGTestInstructionMethods.cpp.inc...
+[581/1339] Building Passes.h.inc...
+[582/1339] Building Transforms.capi.cpp.inc...
+[583/1339] Building Transforms.capi.h.inc...
+[584/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/TypeProvider.cpp for CXX dependencies
+[585/1339] Scanning /home/adi/.cache/chia-pin-smoke/bslang/_deps/slang-src/source/ast/ValuePath.cpp for CXX dependencies
+[586/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMDialect.cpp.o
+[587/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTOpCountAnalysis.dir/OpCountAnalysis.cpp.o
+[588/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIFolds.cpp.o
+[589/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIAttributes.cpp.o
+[590/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/AppID.cpp.o
+[591/1339] Building CXX object lib/Dialect/OM/CMakeFiles/obj.CIRCTOM.dir/OMOps.cpp.o
+[592/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIPasses.cpp.o
+[593/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIStdServices.cpp.o
+[594/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESITypes.cpp.o
+[595/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIDialect.cpp.o
+[596/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIServices.cpp.o
+[597/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESILowerPhysical.cpp.o
+[598/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESILowerBundles.cpp.o
+[599/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESILowerPorts.cpp.o
+[600/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESILowerTypes.cpp.o
+[601/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESICleanMetadata.cpp.o
+[602/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESILowerToHW.cpp.o
+[603/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/ESIOps.cpp.o
+[604/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESIVerifyConnections.cpp.o
+[605/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESIAppIDHier.cpp.o
+[606/1339] Building CXX object lib/Dialect/ESI/CMakeFiles/obj.CIRCTESI.dir/Passes/ESIBuildManifest.cpp.o
+[607/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/CHIRRTLTypes.cpp.o
+[608/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/CHIRRTLDialect.cpp.o
+[609/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLAttributes.cpp.o
+[610/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FieldRefCache.cpp.o
+[611/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLAnnotations.cpp.o
+[612/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLAnnotationHelper.cpp.o
+[613/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLFieldSource.cpp.o
+[614/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLInstanceImplementation.cpp.o
+[615/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLInstanceGraph.cpp.o
+[616/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLOpInterfaces.cpp.o
+[617/1339] Building CXX object lib/Dialect/SV/CMakeFiles/obj.CIRCTSV.dir/SVOps.cpp.o
+[618/1339] Linking CXX static library lib/libCIRCTSV.a
+[619/1339] Linking CXX static library lib/libCIRCTMSFT.a
+[620/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLIntrinsics.cpp.o
+[621/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/NLATable.cpp.o
+[622/1339] Building CXX object lib/Dialect/FSM/CMakeFiles/obj.CIRCTFSM.dir/FSMDialect.cpp.o
+[623/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLTypes.cpp.o
+[624/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/GatedClockConversion.cpp.o
+[625/1339] Linking CXX static library lib/libCIRCTMSFTTransforms.a
+[626/1339] Linking CXX static library lib/libCIRCTOM.a
+[627/1339] Building CXX object lib/Dialect/FSM/CMakeFiles/obj.CIRCTFSM.dir/FSMGraph.cpp.o
+[628/1339] Building CXX object lib/Dialect/Synth/CMakeFiles/obj.CIRCTSynth.dir/SynthAttributes.cpp.o
+[629/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLUtils.cpp.o
+[630/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLFolds.cpp.o
+[631/1339] Generating CXX dyndep file _deps/slang-build/source/CMakeFiles/slang_slang.dir/CXX.dd
+[632/1339] Building CalyxPasses.h.inc...
+[633/1339] Building Passes.h.inc...
+[634/1339] Building DatapathPasses.h.inc...
+[635/1339] Building DCPasses.h.inc...
+[636/1339] Building MoorePasses.h.inc...
+[637/1339] Building RTGAttributes.cpp.inc...
+[638/1339] Building RTGAttributes.h.inc...
+[639/1339] Building RTGTestEnums.cpp.inc...
+[640/1339] Building RTGTestEnums.h.inc...
+[641/1339] Building CXX object lib/Dialect/FSM/CMakeFiles/obj.CIRCTFSM.dir/FSMTypes.cpp.o
+[642/1339] Linking CXX static library lib/libCIRCTOpCountAnalysis.a
+[643/1339] Building CXX object lib/Dialect/Synth/CMakeFiles/obj.CIRCTSynth.dir/SynthOpInterfaces.cpp.o
+[644/1339] Building CXX object lib/Dialect/FSM/CMakeFiles/obj.CIRCTFSM.dir/FSMOps.cpp.o
+[645/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTDependenceAnalysis.dir/DependenceAnalysis.cpp.o
+[646/1339] Building CXX object lib/Dialect/Synth/CMakeFiles/obj.CIRCTSynth.dir/SynthDialect.cpp.o
+[647/1339] Building CXX object lib/Dialect/Datapath/CMakeFiles/obj.CIRCTDatapath.dir/DatapathDialect.cpp.o
+[648/1339] Building CXX object lib/Dialect/Synth/CMakeFiles/obj.CIRCTSynth.dir/SynthOps.cpp.o
+[649/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTFIRRTLAnalysis.dir/FIRRTLInstanceInfo.cpp.o
+[650/1339] Building CXX object lib/Dialect/Datapath/CMakeFiles/obj.CIRCTDatapath.dir/DatapathFolds.cpp.o
+[651/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLDialect.cpp.o
+[652/1339] Building CXX object lib/Dialect/DC/CMakeFiles/obj.CIRCTDC.dir/DCTypes.cpp.o
+[653/1339] Building CXX object lib/Dialect/Datapath/CMakeFiles/obj.CIRCTDatapath.dir/DatapathOps.cpp.o
+[654/1339] Building CXX object lib/Dialect/Debug/CMakeFiles/obj.CIRCTDebug.dir/DebugDialect.cpp.o
+[655/1339] Linking CXX static library lib/libCIRCTESI.a
+[656/1339] Linking CXX static library lib/libCIRCTFSM.a
+[657/1339] Building CXX object lib/Dialect/DC/CMakeFiles/obj.CIRCTDC.dir/DCDialect.cpp.o
+[658/1339] Building CXX object lib/Dialect/DC/CMakeFiles/obj.CIRCTDC.dir/DCOps.cpp.o
+[659/1339] Building CXX object lib/Dialect/Debug/CMakeFiles/obj.CIRCTDebug.dir/DebugOps.cpp.o
+[660/1339] Building CXX object lib/Dialect/Debug/CMakeFiles/obj.CIRCTDebug.dir/DebugTypes.cpp.o
+[661/1339] Building CXX object lib/Dialect/Handshake/CMakeFiles/obj.CIRCTHandshake.dir/HandshakeExecutableOps.cpp.o
+[662/1339] Building CXX object lib/Dialect/Calyx/CMakeFiles/obj.CIRCTCalyx.dir/CalyxDialect.cpp.o
+[663/1339] Building CXX object lib/Dialect/Handshake/CMakeFiles/obj.CIRCTHandshake.dir/HandshakeUtils.cpp.o
+[664/1339] Building CXX object lib/Dialect/LLHD/IR/CMakeFiles/obj.CIRCTLLHD.dir/LLHDTypes.cpp.o
+[665/1339] Building CXX object lib/Dialect/Handshake/CMakeFiles/obj.CIRCTHandshake.dir/HandshakeDialect.cpp.o
+[666/1339] Building CXX object lib/Dialect/LLHD/IR/CMakeFiles/obj.CIRCTLLHD.dir/LLHDDialect.cpp.o
+[667/1339] Building CXX object lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreAttributes.cpp.o
+[668/1339] Building CXX object lib/Dialect/Handshake/CMakeFiles/obj.CIRCTHandshake.dir/HandshakeOps.cpp.o
+[669/1339] Building CXX object lib/Dialect/Calyx/CMakeFiles/obj.CIRCTCalyx.dir/CalyxOps.cpp.o
+[670/1339] Building CXX object lib/Dialect/LLHD/IR/CMakeFiles/obj.CIRCTLLHD.dir/LLHDOps.cpp.o
+[671/1339] Building CXX object lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreTypes.cpp.o
+[672/1339] Linking CXX static library lib/libCIRCTSynth.a
+[673/1339] Building CXX object lib/Dialect/Sim/CMakeFiles/obj.CIRCTSim.dir/SimTypes.cpp.o
+[674/1339] Building CXX object lib/Dialect/Pipeline/CMakeFiles/obj.CIRCTPipelineOps.dir/PipelineOps.cpp.o
+[675/1339] Building CXX object lib/Dialect/Synth/Analysis/CMakeFiles/obj.CIRCTSynthAnalysis.dir/PrintLongestPathAnalysis.cpp.o
+[676/1339] Building CXX object lib/Dialect/FIRRTL/CMakeFiles/obj.CIRCTFIRRTL.dir/FIRRTLOps.cpp.o
+[677/1339] Linking CXX static library lib/libCIRCTFIRRTL.a
+[678/1339] Building CXX object lib/Dialect/Synth/Analysis/CMakeFiles/obj.CIRCTSynthAnalysis.dir/ResourceUsageAnalysis.cpp.o
+[679/1339] Building CXX object lib/Dialect/Synth/Analysis/CMakeFiles/obj.CIRCTSynthAnalysis.dir/LongestPathAnalysis.cpp.o
+[680/1339] Building CXX object lib/Dialect/Verif/CMakeFiles/obj.CIRCTVerif.dir/VerifOpInterfaces.cpp.o
+[681/1339] Building CXX object lib/Scheduling/CMakeFiles/obj.CIRCTScheduling.dir/ASAPScheduler.cpp.o
+[682/1339] Building CXX object lib/Dialect/Sim/CMakeFiles/obj.CIRCTSim.dir/SimDialect.cpp.o
+[683/1339] Building CXX object lib/Scheduling/CMakeFiles/obj.CIRCTScheduling.dir/ChainingSupport.cpp.o
+[684/1339] Building CXX object lib/Dialect/Verif/CMakeFiles/obj.CIRCTVerif.dir/VerifDialect.cpp.o
+[685/1339] Building CXX object lib/Scheduling/CMakeFiles/obj.CIRCTScheduling.dir/Utilities.cpp.o
+[686/1339] Building CXX object lib/Scheduling/CMakeFiles/obj.CIRCTScheduling.dir/Problems.cpp.o
+[687/1339] Building CXX object lib/Scheduling/CMakeFiles/obj.CIRCTScheduling.dir/SimplexSchedulers.cpp.o
+[688/1339] Building CXX object lib/Dialect/Verif/CMakeFiles/obj.CIRCTVerif.dir/VerifOps.cpp.o
+[689/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/IndexSwitchToIf.cpp.o
+[690/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/CellIFT.cpp.o
+[691/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/HierarchicalRunner.cpp.o
+[692/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/InsertMergeBlocks.cpp.o
+[693/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/FlattenMemRefs.cpp.o
+[694/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/ConvertIndexToUInt.cpp.o
+[695/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/MaximizeSSA.cpp.o
+[696/1339] Building CXX object lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreDialect.cpp.o
+[697/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/PrintOpCount.cpp.o
+[698/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/MapArithToComb.cpp.o
+[699/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/StripDebugInfoWithPred.cpp.o
+[700/1339] Building CXX object lib/Transforms/CMakeFiles/obj.CIRCTTransforms.dir/MemoryBanking.cpp.o
+[701/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/TokenKind.cpp.o
+[702/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/VersionInfo.cpp.o
+[703/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/KnownSystemName.cpp.o
+[704/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/DiagCode.cpp.o
+[705/1339] Building CXX object lib/Dialect/Sim/CMakeFiles/obj.CIRCTSim.dir/SimOps.cpp.o
+[706/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/AbstractFlowAnalysis.cpp.o
+[707/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/AnalyzedAssertion.cpp.o
+[708/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/CaseDecisionDag.cpp.o
+[709/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/AnalyzedProcedure.cpp.o
+[710/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/DFAResults.cpp.o
+[711/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/SyntaxClone.cpp.o
+[712/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/DataFlowAnalysis.cpp.o
+[713/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/ClockInference.cpp.o
+[714/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/ValueDriver.cpp.o
+[715/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/DiagnosticClient.cpp.o
+[716/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/AnalysisManager.cpp.o
+[717/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/JsonDiagnosticClient.cpp.o
+[718/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/Diagnostics.cpp.o
+[719/1339] Building CXX object lib/Dialect/Moore/CMakeFiles/obj.CIRCTMoore.dir/MooreOps.cpp.o
+[720/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/TextDiagnosticClient.cpp.o
+[721/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/analysis/DriverTracker.cpp.o
+[722/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/DiagnosticEngine.cpp.o
+[723/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/driver/CompatSettings.cpp.o
+[724/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/AllSyntax.cpp.o
+[725/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/numeric/Time.cpp.o
+[726/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/numeric/ConstantValue.cpp.o
+[727/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/driver/UserDefinedSubroutine.cpp.o
+[728/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/LexerFacts.cpp.o
+[729/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/driver/SourceLoader.cpp.o
+[730/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/numeric/SVInt.cpp.o
+[731/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/diagnostics/WaiverManager.cpp.o
+[732/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/NumberParser.cpp.o
+[733/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/ParserBase.cpp.o
+[734/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Parser.cpp.o
+[735/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Lexer.cpp.o
+[736/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/driver/Driver.cpp.o
+[737/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Parser_statements.cpp.o
+[738/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Parser_expressions.cpp.o
+[739/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/ParserMetadata.cpp.o
+[740/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Token.cpp.o
+[741/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Preprocessor_pragmas.cpp.o
+[742/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxFacts.cpp.o
+[743/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Parser_members.cpp.o
+[744/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Preprocessor_macros.cpp.o
+[745/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/text/CharInfo.cpp.o
+[746/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxNode.cpp.o
+[747/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/parsing/Preprocessor.cpp.o
+[748/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxPrinter.cpp.o
+[749/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/text/Glob.cpp.o
+[750/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxTree.cpp.o
+[751/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/BumpAllocator.cpp.o
+[752/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/text/SourceLocation.cpp.o
+[753/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/IntervalMap.cpp.o
+[754/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/text/Json.cpp.o
+[755/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/SmallVector.cpp.o
+[756/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/ThreadPool.cpp.o
+[757/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/OS.cpp.o
+[758/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/String.cpp.o
+[759/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/Util.cpp.o
+[760/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/text/SourceManager.cpp.o
+[761/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/CommandLine.cpp.o
+[762/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/util/TimeTrace.cpp.o
+[763/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/CSTSerializer.cpp.o
+[764/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/ConversionFuncs.cpp.o
+[765/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/CoverageFuncs.cpp.o
+[766/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/EnumMethods.cpp.o
+[767/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/GateTypes.cpp.o
+[768/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/MathFuncs.cpp.o
+[769/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/ArrayMethods.cpp.o
+[770/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/MiscSystemFuncs.cpp.o
+[771/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/StdPackage.cpp.o
+[772/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/QueryFuncs.cpp.o
+[773/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/NonConstFuncs.cpp.o
+[774/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/StringMethods.cpp.o
+[775/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/driver/MemoryStats.cpp.o
+[776/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/builtins/SystemTasks.cpp.o
+[777/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/AssertionExpr.cpp.o
+[778/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/LiteralExpressions.cpp.o
+[779/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/ConversionExpression.cpp.o
+[780/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/AssignmentExpressions.cpp.o
+[781/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/Operator.cpp.o
+[782/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/MiscExpressions.cpp.o
+[783/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/SelectExpressions.cpp.o
+[784/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/statements/ConditionalStatements.cpp.o
+[785/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/CallExpression.cpp.o
+[786/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/expressions/OperatorExpressions.cpp.o
+[787/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/AttributeSymbol.cpp.o
+[788/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/statements/LoopStatements.cpp.o
+[789/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/statements/MiscStatements.cpp.o
+[790/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/CoverSymbols.cpp.o
+[791/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/CompilationUnitSymbols.cpp.o
+[792/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/CheckerSymbols.cpp.o
+[793/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/BlockSymbols.cpp.o
+[794/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/ClassSymbols.cpp.o
+[795/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/InstanceSymbols.cpp.o
+[796/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/ParameterBuilder.cpp.o
+[797/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/ParameterSymbols.cpp.o
+[798/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/SymbolBuilders.cpp.o
+[799/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/MemberSymbols.cpp.o
+[800/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/PortSymbols.cpp.o
+[801/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/SubroutineSymbols.cpp.o
+[802/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/ValueSymbol.cpp.o
+[803/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/types/DeclaredType.cpp.o
+[804/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/types/NetType.cpp.o
+[805/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/VariableSymbols.cpp.o
+[806/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/types/AllTypes.cpp.o
+[807/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/symbols/SpecifySymbols.cpp.o
+[808/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/types/Type.cpp.o
+[809/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/ASTDiagMap.cpp.o
+[810/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/ASTContext.cpp.o
+[811/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/types/TypePrinter.cpp.o
+[812/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Bitstream.cpp.o
+[813/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/EvalContext.cpp.o
+[814/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/FmtHelpers.cpp.o
+[815/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/HierarchicalReference.cpp.o
+[816/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Expression.cpp.o
+[817/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/ASTSerializer.cpp.o
+[818/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/DefParamResolver.cpp.o
+[819/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/InstanceCacheKey.cpp.o
+[820/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/LValue.cpp.o
+[821/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Constraints.cpp.o
+[822/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/OpaqueInstancePath.cpp.o
+[823/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Patterns.cpp.o
+[824/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Lookup.cpp.o
+[825/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/ScriptSession.cpp.o
+[826/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/SemanticFacts.cpp.o
+[827/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/SFormat.cpp.o
+[828/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Statement.cpp.o
+[829/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Scope.cpp.o
+[830/1339] Building EmitPasses.h.inc...
+[831/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/SystemSubroutine.cpp.o
+[832/1339] Building Passes.h.inc...
+[833/1339] Building OMPasses.h.inc...
+[834/1339] Building PipelinePasses.h.inc...
+[835/1339] Building RTGPasses.capi.cpp.inc...
+[836/1339] Building RTGPasses.capi.h.inc...
+[837/1339] Building RTGPasses.h.inc...
+[838/1339] Building RTGTestAttributes.cpp.inc...
+[839/1339] Building RTGTestAttributes.h.inc...
+[840/1339] Building SSPPasses.h.inc...
+[841/1339] Building SVPasses.h.inc...
+[842/1339] Building Passes.h.inc...
+[843/1339] Building Passes.h.inc...
+[844/1339] Building BMCTransforms.capi.cpp.inc...
+[845/1339] Building BMCTransforms.capi.h.inc...
+[846/1339] Building Passes.h.inc...
+[847/1339] Building LECTransforms.capi.cpp.inc...
+[848/1339] Building LECTransforms.capi.h.inc...
+[849/1339] Building Passes.h.inc...
+[850/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Compilation.cpp.o
+[851/1339] Linking CXX static library lib/libCIRCTDependenceAnalysis.a
+[852/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/Symbol.cpp.o
+[853/1339] Linking CXX static library lib/libCIRCTFIRRTLAnalysis.a
+[854/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/TypeProvider.cpp.o
+[855/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/TimingControl.cpp.o
+[856/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/ast/ValuePath.cpp.o
+[857/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTDebugAnalysis.dir/DebugAnalysis.cpp.o
+[858/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTDebugAnalysis.dir/DebugInfo.cpp.o
+[859/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTSchedulingAnalysis.dir/SchedulingAnalysis.cpp.o
+[860/1339] Building CXX object lib/Conversion/CombToArith/CMakeFiles/obj.CIRCTCombToArith.dir/CombToArith.cpp.o
+[861/1339] Building CXX object lib/Conversion/CombToDatapath/CMakeFiles/obj.CIRCTCombToDatapath.dir/CombToDatapath.cpp.o
+[862/1339] Building CXX object lib/Conversion/DatapathToComb/CMakeFiles/obj.CIRCTDatapathToComb.dir/DatapathToComb.cpp.o
+[863/1339] Building CXX object lib/Conversion/CombToLLVM/CMakeFiles/obj.CIRCTCombToLLVM.dir/CombToLLVM.cpp.o
+[864/1339] Building CXX object lib/Conversion/CombToSynth/CMakeFiles/obj.CIRCTCombToSynth.dir/CombToSynth.cpp.o
+[865/1339] Building CXX object lib/Conversion/ExportAIGER/CMakeFiles/obj.CIRCTExportAIGER.dir/ExportAIGER.cpp.o
+[866/1339] Building CXX object lib/Conversion/CFToHandshake/CMakeFiles/obj.CIRCTCFToHandshake.dir/CFToHandshake.cpp.o
+[867/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcAttributes.cpp.o
+[868/1339] Building CXX object lib/Conversion/Utils/CMakeFiles/obj.CIRCTSVLoweringUtils.dir/SVLoweringUtils.cpp.o
+[869/1339] Building CXX object lib/Conversion/HandshakeToDC/CMakeFiles/obj.CIRCTHandshakeToDC.dir/HandshakeToDC.cpp.o
+[870/1339] Building CXX object lib/Conversion/HWToLLVM/CMakeFiles/obj.CIRCTHWToLLVM.dir/HWToLLVM.cpp.o
+[871/1339] Building CXX object lib/Conversion/HWToSMT/CMakeFiles/obj.CIRCTHWToSMT.dir/HWToSMT.cpp.o
+[872/1339] Building CXX object lib/Conversion/ImportAIGER/CMakeFiles/obj.CIRCTImportAIGER.dir/ImportAIGER.cpp.o
+[873/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcFolds.cpp.o
+[874/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcCostModel.cpp.o
+[875/1339] Linking CXX static library lib/libCIRCTCalyx.a
+[876/1339] Building CXX object _deps/slang-build/source/CMakeFiles/slang_slang.dir/syntax/SyntaxRewriter.cpp.o
+[877/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcTypes.cpp.o
+[878/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ModelInfo.cpp.o
+[879/1339] Building CXX object lib/Dialect/Arc/Interfaces/CMakeFiles/obj.CIRCTArcExternalInterfaces.dir/RuntimeCostEstimateInterfaceImpl.cpp.o
+[880/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/GICM.cpp.o
+[881/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/GoInsertion.cpp.o
+[882/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/CompileControl.cpp.o
+[883/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcDialect.cpp.o
+[884/1339] Building CXX object lib/Dialect/Calyx/Export/CMakeFiles/obj.CIRCTExportCalyx.dir/CalyxEmitter.cpp.o
+[885/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/CalyxHelpers.cpp.o
+[886/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/RemoveGroups.cpp.o
+[887/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/RemoveCombGroups.cpp.o
+[888/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/ClkResetInsertion.cpp.o
+[889/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/AffineParallelUnroll.cpp.o
+[890/1339] Building CXX object lib/Dialect/Arc/CMakeFiles/obj.CIRCTArc.dir/ArcOps.cpp.o
+[891/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/LowerComb.cpp.o
+[892/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/AffineToSCF.cpp.o
+[893/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/AffinePloopUnparallelize.cpp.o
+[894/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/CalyxLoweringUtils.cpp.o
+[895/1339] Linking CXX static library lib/libCIRCTDatapath.a
+[896/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/IntRangeOptimizations.cpp.o
+[897/1339] Linking CXX static library lib/libCIRCTDC.a
+[898/1339] Building CXX object lib/Dialect/Calyx/Transforms/CMakeFiles/obj.CIRCTCalyxTransforms.dir/ExcludeExecuteRegionCanonicalize.cpp.o
+[899/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/IntRangeAnnotations.cpp.o
+[900/1339] Linking CXX static library lib/libCIRCTDebug.a
+[901/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/BalanceMux.cpp.o
+[902/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/SimplifyTruthTable.cpp.o
+[903/1339] Building CXX object lib/Dialect/Comb/Transforms/CMakeFiles/obj.CIRCTCombTransforms.dir/AssumeTwoValued.cpp.o
+[904/1339] Building CXX object lib/Dialect/Datapath/Transforms/CMakeFiles/obj.CIRCTDatapathTransforms.dir/ReduceDelay.cpp.o
+[905/1339] Building CXX object lib/Dialect/DC/Transforms/CMakeFiles/obj.CIRCTDCTransforms.dir/DCMaterialization.cpp.o
+[906/1339] Building CXX object lib/Dialect/DC/Transforms/CMakeFiles/obj.CIRCTDCTransforms.dir/DCPrintDot.cpp.o
+[907/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/AnnotateInputOnlyModules.cpp.o
+[908/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/AssignOutputDirs.cpp.o
+[909/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/PopulateInstanceChoiceSymbols.cpp.o
+[910/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/BlackBoxReader.cpp.o
+[911/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/CheckLayers.cpp.o
+[912/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/AddSeqMemPorts.cpp.o
+[913/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/CheckCombLoops.cpp.o
+[914/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/CheckRecursiveInstantiation.cpp.o
+[915/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/DropConst.cpp.o
+[916/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/CreateSiFiveMetadata.cpp.o
+[917/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/Dedup.cpp.o
+[918/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/EliminateWires.cpp.o
+[919/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/DropName.cpp.o
+[920/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ExpandWhens.cpp.o
+[921/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/FinalizeIR.cpp.o
+[922/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/FlattenMemory.cpp.o
+[923/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ExtractInstances.cpp.o
+[924/1339] Building CXX object lib/Conversion/MooreToCore/CMakeFiles/obj.CIRCTMooreToCore.dir/MooreToCore.cpp.o
+[925/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/FullReset.cpp.o
+[926/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/IMConstProp.cpp.o
+[927/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/IMDeadCodeElim.cpp.o
+[928/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InferResets.cpp.o
+[929/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/GrandCentral.cpp.o
+[930/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InjectDUTHierarchy.cpp.o
+[931/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LegacyWiring.cpp.o
+[932/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InferWidths.cpp.o
+[933/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InferReadWrite.cpp.o
+[934/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InnerSymbolDCE.cpp.o
+[935/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/InferDomains.cpp.o
+[936/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/Lint.cpp.o
+[937/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LayerMerge.cpp.o
+[938/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LinkCircuits.cpp.o
+[939/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LayerSink.cpp.o
+[940/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerAnnotations.cpp.o
+[941/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerCHIRRTL.cpp.o
+[942/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerDPI.cpp.o
+[943/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerIntrinsics.cpp.o
+[944/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerIntmodules.cpp.o
+[945/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerMatches.cpp.o
+[946/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerLayers.cpp.o
+[947/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerDomains.cpp.o
+[948/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerMemory.cpp.o
+[949/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerClasses.cpp.o
+[950/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerSignatures.cpp.o
+[951/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerOpenAggs.cpp.o
+[952/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/MaterializeDebugInfo.cpp.o
+[953/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerTypes.cpp.o
+[954/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ModuleSummary.cpp.o
+[955/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/LowerXMR.cpp.o
+[956/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/PrintFIRRTLFieldSource.cpp.o
+[957/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/MergeConnections.cpp.o
+[958/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/PrintInstanceGraph.cpp.o
+[959/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ModuleInliner.cpp.o
+[960/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/PassiveWires.cpp.o
+[961/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/RandomizeRegisterInit.cpp.o
+[962/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/PrintNLATable.cpp.o
+[963/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ResolvePaths.cpp.o
+[964/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/SFCCompat.cpp.o
+[965/1339] Linking CXX static library lib/libCIRCTHandshake.a
+[966/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ProbesToSignals.cpp.o
+[967/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/ResolveTraces.cpp.o
+[968/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/RegisterOptimizer.cpp.o
+[969/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWBypassInnerSymbols.cpp.o
+[970/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/SpecializeOption.cpp.o
+[971/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWConvertBitcasts.cpp.o
+[972/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWAggregateToComb.cpp.o
+[973/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWIMDeadCodeElim.cpp.o
+[974/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWPrintInstanceGraph.cpp.o
+[975/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/SpecializeLayers.cpp.o
+[976/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/VBToBV.cpp.o
+[977/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWParameterizeConstantPorts.cpp.o
+[978/1339] Building CXX object lib/Dialect/FIRRTL/Transforms/CMakeFiles/obj.CIRCTFIRRTLTransforms.dir/Vectorization.cpp.o
+[979/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWSpecialize.cpp.o
+[980/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/PrintHWModuleGraph.cpp.o
+[981/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/VerifyInnerRefNamespace.cpp.o
+[982/1339] Building CXX object lib/Dialect/HWArith/CMakeFiles/obj.CIRCTHWArith.dir/HWArithDialect.cpp.o
+[983/1339] Building CXX object lib/Dialect/HWArith/CMakeFiles/obj.CIRCTHWArith.dir/HWArithTypes.cpp.o
+[984/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/HWVectorization.cpp.o
+[985/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/FlattenModules.cpp.o
+[986/1339] Linking CXX static library lib/libCIRCTLLHD.a
+[987/1339] Building CXX object lib/Dialect/Kanagawa/CMakeFiles/obj.CIRCTKanagawa.dir/KanagawaTypes.cpp.o
+[988/1339] Building CXX object lib/Dialect/Interop/CMakeFiles/obj.CIRCTInteropDialect.dir/InteropDialect.cpp.o
+[989/1339] Building CXX object lib/Dialect/HW/Transforms/CMakeFiles/obj.CIRCTHWTransforms.dir/FlattenIO.cpp.o
+[990/1339] Building CXX object lib/Dialect/HWArith/CMakeFiles/obj.CIRCTHWArith.dir/HWArithOps.cpp.o
+[991/1339] Building CXX object lib/Dialect/Interop/CMakeFiles/obj.CIRCTInteropDialect.dir/InteropOps.cpp.o
+[992/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/DeseqUtils.cpp.o
+[993/1339] Building CXX object lib/Dialect/Kanagawa/CMakeFiles/obj.CIRCTKanagawa.dir/KanagawaDialect.cpp.o
+[994/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/InlineCalls.cpp.o
+[995/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/CombineDrives.cpp.o
+[996/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/LowerProcesses.cpp.o
+[997/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/HoistSignals.cpp.o
+[998/1339] Building CXX object lib/Dialect/Kanagawa/CMakeFiles/obj.CIRCTKanagawa.dir/KanagawaOps.cpp.o
+[999/1339] Linking CXX static library lib/libCIRCTMoore.a
+[1000/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/Deseq.cpp.o
+[1001/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/Sig2RegPass.cpp.o
+[1002/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/RemoveControlFlow.cpp.o
+[1003/1339] Linking CXX static library lib/libCIRCTPipelineOps.a
+[1004/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/WrapProceduralOps.cpp.o
+[1005/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGAttrInterfaces.cpp.o
+[1006/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/Mem2Reg.cpp.o
+[1007/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyAttrInterfaces.cpp.o
+[1008/1339] Building CXX object lib/Dialect/LLHD/Transforms/CMakeFiles/obj.CIRCTLLHDTransforms.dir/UnrollLoops.cpp.o
+[1009/1339] Building CXX object lib/Dialect/LoopSchedule/CMakeFiles/obj.CIRCTLoopSchedule.dir/LoopScheduleOps.cpp.o
+[1010/1339] Building CXX object lib/Dialect/Moore/Transforms/CMakeFiles/obj.CIRCTMooreTransforms.dir/SimplifyProcedures.cpp.o
+[1011/1339] Building CXX object lib/Dialect/Moore/Transforms/CMakeFiles/obj.CIRCTMooreTransforms.dir/CreateVTables.cpp.o
+[1012/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGAttributes.cpp.o
+[1013/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyTypeInterfaces.cpp.o
+[1014/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGISAAssemblyOpInterfaces.cpp.o
+[1015/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGTypeInterfaces.cpp.o
+[1016/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGOpInterfaces.cpp.o
+[1017/1339] Building CXX object lib/Dialect/Moore/Transforms/CMakeFiles/obj.CIRCTMooreTransforms.dir/SimplifyRefs.cpp.o
+[1018/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGTypes.cpp.o
+[1019/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/ExternalizeClockGate.cpp.o
+[1020/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/RegOfVecToMem.cpp.o
+[1021/1339] Linking CXX static library lib/libCIRCTSim.a
+[1022/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/LowerSeqCompRegCE.cpp.o
+[1023/1339] Building CXX object lib/Dialect/SSP/CMakeFiles/obj.CIRCTSSP.dir/SSPAttributes.cpp.o
+[1024/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGDialect.cpp.o
+[1025/1339] Linking CXX static library lib/libCIRCTSynthAnalysis.a
+[1026/1339] Building CXX object lib/Dialect/SSP/CMakeFiles/obj.CIRCTSSP.dir/SSPDialect.cpp.o
+[1027/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/LowerSeqHLMem.cpp.o
+[1028/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/LowerSeqFIFO.cpp.o
+[1029/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/LowerSeqShiftReg.cpp.o
+[1030/1339] Building CXX object lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCAttributes.cpp.o
+[1031/1339] Linking CXX static library lib/libCIRCTVerif.a
+[1032/1339] Linking CXX static library lib/libCIRCTScheduling.a
+[1033/1339] Linking CXX static library lib/libCIRCTTransforms.a
+[1034/1339] Linking CXX static library _deps/slang-build/lib/libsvlang.a
+[1035/1339] Linking CXX static library lib/libCIRCTDebugAnalysis.a
+[1036/1339] Linking CXX static library lib/libCIRCTSchedulingAnalysis.a
+[1037/1339] Building CXX object lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCOpInterfaces.cpp.o
+[1038/1339] Building CXX object lib/Dialect/Seq/Transforms/CMakeFiles/obj.CIRCTSeqTransforms.dir/HWMemSimImpl.cpp.o
+[1039/1339] Building CXX object lib/Dialect/SSP/CMakeFiles/obj.CIRCTSSP.dir/SSPOps.cpp.o
+[1040/1339] Building CXX object lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCTypes.cpp.o
+[1041/1339] Building CXX object lib/Dialect/RTG/IR/CMakeFiles/obj.CIRCTRTGDialect.dir/RTGOps.cpp.o
+[1042/1339] Building CXX object lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCDialect.cpp.o
+[1043/1339] Building CXX object lib/Conversion/CalyxNative/CMakeFiles/obj.CIRCTCalyxNative.dir/CalyxNative.cpp.o
+[1044/1339] Building CXX object lib/Conversion/CalyxToFSM/CMakeFiles/obj.CIRCTCalyxToFSM.dir/CalyxToFSM.cpp.o
+[1045/1339] Linking CXX static library lib/libCIRCTCFToHandshake.a
+[1046/1339] Linking CXX static library lib/libCIRCTCombToArith.a
+[1047/1339] Linking CXX static library lib/libCIRCTCombToDatapath.a
+[1048/1339] Linking CXX static library lib/libCIRCTCombToLLVM.a
+[1049/1339] Building CXX object lib/Conversion/AffineToLoopSchedule/CMakeFiles/obj.CIRCTAffineToLoopSchedule.dir/AffineToLoopSchedule.cpp.o
+[1050/1339] Linking CXX static library lib/libCIRCTCombToSynth.a
+[1051/1339] Building CXX object lib/Analysis/CMakeFiles/obj.CIRCTAnalysisTestPasses.dir/TestPasses.cpp.o
+[1052/1339] Building CXX object lib/Dialect/SystemC/CMakeFiles/obj.CIRCTSystemC.dir/SystemCOps.cpp.o
+[1053/1339] Building CXX object lib/Conversion/CalyxToFSM/CMakeFiles/obj.CIRCTCalyxToFSM.dir/MaterializeFSM.cpp.o
+[1054/1339] Linking CXX static library lib/libCIRCTDatapathToComb.a
+[1055/1339] Building CXX object lib/Conversion/CalyxToFSM/CMakeFiles/obj.CIRCTCalyxToFSM.dir/RemoveGroupsFromFSM.cpp.o
+[1056/1339] Building CXX object lib/Conversion/CalyxToHW/CMakeFiles/obj.CIRCTCalyxToHW.dir/CalyxToHW.cpp.o
+[1057/1339] Linking CXX static library lib/libCIRCTExportAIGER.a
+[1058/1339] Building CXX object lib/Conversion/CombToSMT/CMakeFiles/obj.CIRCTCombToSMT.dir/CombToSMT.cpp.o
+[1059/1339] Building CXX object lib/Conversion/DatapathToSMT/CMakeFiles/obj.CIRCTDatapathToSMT.dir/DatapathToSMT.cpp.o
+[1060/1339] Building CXX object lib/Conversion/ArcToLLVM/CMakeFiles/obj.CIRCTArcToLLVM.dir/LowerArcToLLVM.cpp.o
+[1061/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/ApplyLoweringOptions.cpp.o
+[1062/1339] Building CXX object lib/Conversion/CoreToFSM/CMakeFiles/obj.CIRCTCoreToFSM.dir/CoreToFSM.cpp.o
+[1063/1339] Building CXX object lib/Conversion/DCToHW/CMakeFiles/obj.CIRCTDCToHW.dir/DCToHW.cpp.o
+[1064/1339] Building CXX object lib/Conversion/ConvertToLLVM/CMakeFiles/obj.CIRCTConvertToLLVM.dir/ConvertToLLVM.cpp.o
+[1065/1339] Building CXX object lib/Conversion/ConvertToArcs/CMakeFiles/obj.CIRCTConvertToArcs.dir/ConvertToArcs.cpp.o
+[1066/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/LegalizeNames.cpp.o
+[1067/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/LegalizeAnonEnums.cpp.o
+[1068/1339] Linking CXX static library lib/libCIRCTHandshakeToDC.a
+[1069/1339] Building CXX object lib/Conversion/FSMToCore/CMakeFiles/obj.CIRCTFSMToCore.dir/FSMToCore.cpp.o
+[1070/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/PrepareForEmission.cpp.o
+[1071/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/PruneZeroValuedLogic.cpp.o
+[1072/1339] Linking CXX static library lib/libCIRCTHWToLLVM.a
+[1073/1339] Linking CXX static library lib/libCIRCTHWToSMT.a
+[1074/1339] Building CXX object lib/Conversion/FSMToSMT/CMakeFiles/obj.CIRCTFSMToSMT.dir/FSMToSMT.cpp.o
+[1075/1339] Building CXX object lib/Conversion/FSMToSV/CMakeFiles/obj.CIRCTFSMToSV.dir/FSMToSV.cpp.o
+[1076/1339] Linking CXX static library lib/libCIRCTImportAIGER.a
+[1077/1339] Building CXX object lib/Conversion/HWArithToHW/CMakeFiles/obj.CIRCTHWArithToHW.dir/HWArithToHW.cpp.o
+[1078/1339] Building CXX object lib/Conversion/HWToSV/CMakeFiles/obj.CIRCTHWToSV.dir/HWToSV.cpp.o
+[1079/1339] Building CXX object lib/Conversion/HWToSystemC/CMakeFiles/obj.CIRCTHWToSystemC.dir/HWToSystemC.cpp.o
+[1080/1339] Linking CXX static library lib/libCIRCTMooreToCore.a
+[1081/1339] Building CXX object lib/Conversion/HWToBTOR2/CMakeFiles/obj.CIRCTHWToBTOR2.dir/HWToBTOR2.cpp.o
+[1082/1339] Building CXX object lib/Conversion/ImportLiberty/CMakeFiles/obj.CIRCTImportLiberty.dir/ImportLiberty.cpp.o
+[1083/1339] Building CXX object lib/Conversion/ExportVerilog/CMakeFiles/obj.CIRCTExportVerilog.dir/ExportVerilog.cpp.o
+[1084/1339] Building CXX object lib/Conversion/HandshakeToHW/CMakeFiles/obj.CIRCTHandshakeToHW.dir/HandshakeToHW.cpp.o
+[1085/1339] Building CXX object lib/Conversion/PipelineToHW/CMakeFiles/obj.CIRCTPipelineToHW.dir/PipelineToHW.cpp.o
+[1086/1339] Building CXX object lib/Conversion/SeqToSV/CMakeFiles/obj.CIRCTSeqToSV.dir/FirMemLowering.cpp.o
+[1087/1339] Building CXX object lib/Conversion/SeqToSV/CMakeFiles/obj.CIRCTSeqToSV.dir/LowerFirMem.cpp.o
+[1088/1339] Building CXX object lib/Conversion/LoopScheduleToCalyx/CMakeFiles/obj.CIRCTLoopScheduleToCalyx.dir/LoopScheduleToCalyx.cpp.o
+[1089/1339] Building CXX object lib/Conversion/LTLToCore/CMakeFiles/obj.CIRCTLTLToCore.dir/LTLToCore.cpp.o
+[1090/1339] Linking CXX static library lib/libCIRCTSVLoweringUtils.a
+[1091/1339] Building CXX object lib/Conversion/SeqToSV/CMakeFiles/obj.CIRCTSeqToSV.dir/FirRegLowering.cpp.o
+[1092/1339] Building CXX object lib/Conversion/SynthToComb/CMakeFiles/obj.CIRCTSynthToComb.dir/SynthToComb.cpp.o
+[1093/1339] Building CXX object lib/Conversion/SimToSV/CMakeFiles/obj.CIRCTSimToSV.dir/SimToSV.cpp.o
+[1094/1339] Building CXX object lib/Conversion/VerifToSV/CMakeFiles/obj.CIRCTVerifToSV.dir/VerifToSV.cpp.o
+[1095/1339] Building CXX object lib/Conversion/FIRRTLToHW/CMakeFiles/obj.CIRCTFIRRTLToHW.dir/LowerToHW.cpp.o
+[1096/1339] Building CXX object lib/Conversion/VerifToSMT/CMakeFiles/obj.CIRCTVerifToSMT.dir/VerifToSMT.cpp.o
+[1097/1339] Building CXX object lib/Conversion/SCFToCalyx/CMakeFiles/obj.CIRCTSCFToCalyx.dir/SCFToCalyx.cpp.o
+[1098/1339] Building CXX object lib/Conversion/SeqToSV/CMakeFiles/obj.CIRCTSeqToSV.dir/SeqToSV.cpp.o
+[1099/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/CaptureAnalysis.cpp.o
+[1100/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/FormatStrings.cpp.o
+[1101/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/ScanStrings.cpp.o
+[1102/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/AssertionExpr.cpp.o
+[1103/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/HierarchicalNames.cpp.o
+[1104/1339] Linking CXX static library lib/libCIRCTArc.a
+[1105/1339] Building CXX object lib/Conversion/SMTToZ3LLVM/CMakeFiles/obj.CIRCTSMTToZ3LLVM.dir/LowerSMTToZ3LLVM.cpp.o
+[1106/1339] Linking CXX static library lib/libCIRCTArcExternalInterfaces.a
+[1107/1339] Building CXX object lib/Dialect/Arc/Export/CMakeFiles/obj.CIRCTExportArc.dir/ModelInfoExport.cpp.o
+[1108/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/Expressions.cpp.o
+[1109/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/Statements.cpp.o
+[1110/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/ImportVerilog.cpp.o
+[1111/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/TimingControls.cpp.o
+[1112/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/Types.cpp.o
+[1113/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/AllocateState.cpp.o
+[1114/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/AddTaps.cpp.o
+[1115/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/FindInitialVectors.cpp.o
+[1116/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/Dedup.cpp.o
+[1117/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/ArcCanonicalizer.cpp.o
+[1118/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/InferContext.cpp.o
+[1119/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/InferMemories.cpp.o
+[1120/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/InferStateProperties.cpp.o
+[1121/1339] Building CXX object lib/Conversion/ImportVerilog/CMakeFiles/obj.CIRCTImportVerilog.dir/Structure.cpp.o
+[1122/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/GenerateDriver.cpp.o
+[1123/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/InlineArcs.cpp.o
+[1124/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LatencyRetiming.cpp.o
+[1125/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerClocksToFuncs.cpp.o
+[1126/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerLUT.cpp.o
+[1127/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/InsertRuntime.cpp.o
+[1128/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerArrays.cpp.o
+[1129/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerProcesses.cpp.o
+[1130/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerCoroutines.cpp.o
+[1131/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/MakeTables.cpp.o
+[1132/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/MergeTaps.cpp.o
+[1133/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerVerifSimulations.cpp.o
+[1134/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/MergeIfs.cpp.o
+[1135/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerVectorizations.cpp.o
+[1136/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/MuxToControlFlow.cpp.o
+[1137/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerArcsToFuncs.cpp.o
+[1138/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/PrintCostModel.cpp.o
+[1139/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/RemoveI0Types.cpp.o
+[1140/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/LowerState.cpp.o
+[1141/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/ResolveXMRRef.cpp.o
+[1142/1339] Building CXX object lib/Dialect/AXI4/CMakeFiles/obj.CIRCTAXI4.dir/AXI4Attributes.cpp.o
+[1143/1339] Linking CXX static library lib/libCIRCTExportCalyx.a
+[1144/1339] Linking CXX static library lib/libCIRCTCalyxTransforms.a
+[1145/1339] Linking CXX static library lib/libCIRCTCombTransforms.a
+[1146/1339] Linking CXX static library lib/libCIRCTDatapathTransforms.a
+[1147/1339] Linking CXX static library lib/libCIRCTDCTransforms.a
+[1148/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/SimplifyVariadicOps.cpp.o
+[1149/1339] Building CXX object lib/Dialect/AXI4/CMakeFiles/obj.CIRCTAXI4.dir/AXI4Dialect.cpp.o
+[1150/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/SplitFuncs.cpp.o
+[1151/1339] Building CXX object lib/Dialect/AXI4/CMakeFiles/obj.CIRCTAXI4.dir/AXI4Ops.cpp.o
+[1152/1339] Building CXX object lib/Dialect/FIRRTL/Import/CMakeFiles/obj.CIRCTImportFIRFile.dir/FIRAnnotations.cpp.o
+[1153/1339] Linking CXX static library lib/libCIRCTFIRRTLTransforms.a
+[1154/1339] Building CXX object lib/Dialect/Emit/Transforms/CMakeFiles/obj.CIRCTEmitTransforms.dir/StripEmit.cpp.o
+[1155/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/StripSV.cpp.o
+[1156/1339] Building CXX object lib/Dialect/FIRRTL/Import/CMakeFiles/obj.CIRCTImportFIRFile.dir/FIRLexer.cpp.o
+[1157/1339] Building CXX object lib/Dialect/AXI4/CMakeFiles/obj.CIRCTAXI4.dir/AXI4Types.cpp.o
+[1158/1339] Building CXX object lib/Dialect/Arc/Transforms/CMakeFiles/obj.CIRCTArcTransforms.dir/SplitLoops.cpp.o
+[1159/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/LockFunctions.cpp.o
+[1160/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/Buffers.cpp.o
+[1161/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/LegalizeMemrefs.cpp.o
+[1162/1339] Linking CXX static library lib/libCIRCTHWTransforms.a
+[1163/1339] Linking CXX static library lib/libCIRCTHWArith.a
+[1164/1339] Linking CXX static library lib/libCIRCTKanagawa.a
+[1165/1339] Building CXX object lib/Dialect/FSM/Transforms/CMakeFiles/obj.CIRCTFSMTransforms.dir/PrintFSMGraph.cpp.o
+[1166/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/Analysis.cpp.o
+[1167/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/SplitMerges.cpp.o
+[1168/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/Materialization.cpp.o
+[1169/1339] Building CXX object lib/Dialect/FIRRTL/Export/CMakeFiles/obj.CIRCTExportFIRRTL.dir/FIREmitter.cpp.o
+[1170/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaContainerize.cpp.o
+[1171/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaCallPrep.cpp.o
+[1172/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaTunneling.cpp.o
+[1173/1339] Building CXX object lib/Dialect/FIRRTL/Import/CMakeFiles/obj.CIRCTImportFIRFile.dir/FIRParser.cpp.o
+[1174/1339] Building CXX object lib/Dialect/Handshake/Transforms/CMakeFiles/obj.CIRCTHandshakeTransforms.dir/LowerExtmemToHW.cpp.o
+[1175/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaPortrefLowering.cpp.o
+[1176/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaArgifyBlocksPass.cpp.o
+[1177/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaCleanSelfdrivers.cpp.o
+[1178/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaPassPipelines.cpp.o
+[1179/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaInlineSBlocksPass.cpp.o
+[1180/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaContainersToHW.cpp.o
+[1181/1339] Linking CXX static library lib/libCIRCTInteropDialect.a
+[1182/1339] Linking CXX static library lib/libCIRCTLLHDTransforms.a
+[1183/1339] Linking CXX static library lib/libCIRCTLoopSchedule.a
+[1184/1339] Linking CXX static library lib/libCIRCTMooreTransforms.a
+[1185/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaConvertCFToHandshake.cpp.o
+[1186/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaMethodsToContainers.cpp.o
+[1187/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaConvertHandshakeToDC.cpp.o
+[1188/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaReblockPass.cpp.o
+[1189/1339] Building CXX object lib/Dialect/OM/Transforms/CMakeFiles/obj.CIRCTOMTransforms.dir/ElaborateObject.cpp.o
+[1190/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaPrepareScheduling.cpp.o
+[1191/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaEliminateRedundantOps.cpp.o
+[1192/1339] Building CXX object lib/Dialect/Kanagawa/Transforms/CMakeFiles/obj.CIRCTKanagawaTransforms.dir/KanagawaAddOperatorLibrary.cpp.o
+[1193/1339] Building CXX object lib/Dialect/OM/Transforms/CMakeFiles/obj.CIRCTOMTransforms.dir/FreezePaths.cpp.o
+[1194/1339] Linking CXX static library lib/libCIRCTRTGDialect.a
+[1195/1339] Building CXX object lib/Dialect/OM/Transforms/CMakeFiles/obj.CIRCTOMTransforms.dir/StripOM.cpp.o
+[1196/1339] Building CXX object lib/Dialect/Pipeline/Transforms/CMakeFiles/obj.CIRCTPipelineTransforms.dir/ExplicitRegs.cpp.o
+[1197/1339] Building CXX object lib/Dialect/Probe/CMakeFiles/obj.CIRCTProbe.dir/ProbeDialect.cpp.o
+[1198/1339] Building CXX object lib/Dialect/OM/Transforms/CMakeFiles/obj.CIRCTOMTransforms.dir/LinkModules.cpp.o
+[1199/1339] Building CXX object lib/Dialect/Probe/CMakeFiles/obj.CIRCTProbe.dir/ProbeTypes.cpp.o
+[1200/1339] Building CXX object lib/Dialect/Probe/CMakeFiles/obj.CIRCTProbe.dir/ProbeOps.cpp.o
+[1201/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/EmbedValidationValuesPass.cpp.o
+[1202/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/LowerUniqueLabelsPass.cpp.o
+[1203/1339] Building CXX object lib/Dialect/Pipeline/Transforms/CMakeFiles/obj.CIRCTPipelineTransforms.dir/ScheduleLinearPipeline.cpp.o
+[1204/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/EmitRTGISAAssemblyPass.cpp.o
+[1205/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/InsertTestToFileMappingPass.cpp.o
+[1206/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/InlineSequencesPass.cpp.o
+[1207/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/LinearScanRegisterAllocationPass.cpp.o
+[1208/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/MaterializeConstraintsPass.cpp.o
+[1209/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/LowerValidateToLabelsPass.cpp.o
+[1210/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/MemoryAllocationPass.cpp.o
+[1211/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/SimpleTestInlinerPass.cpp.o
+[1212/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/UniqueValidateOpsPass.cpp.o
+[1213/1339] Linking CXX static library lib/libCIRCTSeqTransforms.a
+[1214/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/RTGPassPipelines.cpp.o
+[1215/1339] Building CXX object lib/Dialect/RTGTest/IR/CMakeFiles/obj.CIRCTRTGTestDialect.dir/RTGTestAttributes.cpp.o
+[1216/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/PrintTestNamesPass.cpp.o
+[1217/1339] Building CXX object lib/Dialect/RTGTest/IR/CMakeFiles/obj.CIRCTRTGTestDialect.dir/RTGTestTypes.cpp.o
+[1218/1339] Linking CXX static library lib/libCIRCTSSP.a
+[1219/1339] Building CXX object lib/Dialect/Sim/Transforms/CMakeFiles/obj.CIRCTSimTransforms.dir/FoldValueFormatters.cpp.o
+[1220/1339] Building CXX object lib/Dialect/RTGTest/IR/CMakeFiles/obj.CIRCTRTGTestDialect.dir/RTGTestDialect.cpp.o
+[1221/1339] Building CXX object lib/Dialect/RTG/Transforms/CMakeFiles/obj.CIRCTRTGTransforms.dir/ElaborationPass.cpp.o
+[1222/1339] Building CXX object lib/Dialect/Sim/Transforms/CMakeFiles/obj.CIRCTSimTransforms.dir/SquashSimTriggered.cpp.o
+[1223/1339] Building CXX object lib/Dialect/RTGTest/IR/CMakeFiles/obj.CIRCTRTGTestDialect.dir/RTGTestOps.cpp.o
+[1224/1339] Building CXX object lib/Dialect/SSP/Transforms/CMakeFiles/obj.CIRCTSSPTransforms.dir/Print.cpp.o
+[1225/1339] Building CXX object lib/Dialect/Sim/Transforms/CMakeFiles/obj.CIRCTSimTransforms.dir/ProceduralizeSim.cpp.o
+[1226/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/GeneratorCallout.cpp.o
+[1227/1339] Building CXX object lib/Dialect/SSP/Transforms/CMakeFiles/obj.CIRCTSSPTransforms.dir/Roundtrip.cpp.o
+[1228/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/HWStubExternalModules.cpp.o
+[1229/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/HWCleanup.cpp.o
+[1230/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/HWLegalizeModules.cpp.o
+[1231/1339] Building CXX object lib/Dialect/Sim/Transforms/CMakeFiles/obj.CIRCTSimTransforms.dir/LowerDPIFunc.cpp.o
+[1232/1339] Building CXX object lib/Dialect/SSP/Transforms/CMakeFiles/obj.CIRCTSSPTransforms.dir/Schedule.cpp.o
+[1233/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/SVMaskNonSynthesizable.cpp.o
+[1234/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/PrettifyVerilog.cpp.o
+[1235/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/HWExportModuleHierarchy.cpp.o
+[1236/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/SVTraceIVerilog.cpp.o
+[1237/1339] Building CXX object lib/Dialect/SV/Transforms/CMakeFiles/obj.CIRCTSVTransforms.dir/HWEliminateInOutPorts.cpp.o
+[1238/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/AIGERRunner.cpp.o
+[1239/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/GenericLUTMapper.cpp.o
+[1240/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/MaximumAndCover.cpp.o
+[1241/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/ExactSynthesis.cpp.o
+[1242/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/LowerWordToBits.cpp.o
+[1243/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/CutRewriter.cpp.o
+[1244/1339] Linking CXX static library lib/libCIRCTSystemC.a
+[1245/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/FunctionalReduction.cpp.o
+[1246/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/SOPBalancing.cpp.o
+[1247/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/LowerVariadic.cpp.o
+[1248/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/StructuralHash.cpp.o
+[1249/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/TestPriorityCuts.cpp.o
+[1250/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/TechMapper.cpp.o
+[1251/1339] Building CXX object lib/Dialect/Synth/Transforms/CMakeFiles/obj.CIRCTSynthTransforms.dir/SynthesisPipeline.cpp.o
+[1252/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/CombineAssertLike.cpp.o
+[1253/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/FoldAssume.cpp.o
+[1254/1339] Building CXX object lib/Dialect/SystemC/Transforms/CMakeFiles/obj.CIRCTSystemCTransforms.dir/SystemCLowerInstanceInterop.cpp.o
+[1255/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/LowerContracts.cpp.o
+[1256/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/PrepareForFormal.cpp.o
+[1257/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/StripContracts.cpp.o
+[1258/1339] Building CXX object lib/Target/DebugInfo/CMakeFiles/obj.CIRCTTargetDebugInfo.dir/DumpDebugInfo.cpp.o
+[1259/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/LowerSymbolicValues.cpp.o
+[1260/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/SimplifyAssumeEq.cpp.o
+[1261/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/VerifyClockedAssertLike.cpp.o
+[1262/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/EmissionPrinter.cpp.o
+[1263/1339] Building CXX object lib/Dialect/Verif/Transforms/CMakeFiles/obj.CIRCTVerifTransforms.dir/LowerTests.cpp.o
+[1264/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/Patterns/BuiltinEmissionPatterns.cpp.o
+[1265/1339] Building CXX object lib/Target/DebugInfo/CMakeFiles/obj.CIRCTTargetDebugInfo.dir/TranslateRegistration.cpp.o
+[1266/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/Patterns/HWEmissionPatterns.cpp.o
+[1267/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/Patterns/EmitCEmissionPatterns.cpp.o
+[1268/1339] Building CXX object lib/Target/DebugInfo/CMakeFiles/obj.CIRCTTargetDebugInfo.dir/EmitHGLDD.cpp.o
+[1269/1339] Linking CXX static library lib/libCIRCTAnalysisTestPasses.a
+[1270/1339] Linking CXX static library lib/libCIRCTAffineToLoopSchedule.a
+[1271/1339] Linking CXX static library lib/libCIRCTArcToLLVM.a
+[1272/1339] Linking CXX static library lib/libCIRCTCalyxNative.a
+[1273/1339] Linking CXX static library lib/libCIRCTCalyxToFSM.a
+[1274/1339] Linking CXX static library lib/libCIRCTCalyxToHW.a
+[1275/1339] Linking CXX static library lib/libCIRCTCombToSMT.a
+[1276/1339] Linking CXX static library lib/libCIRCTConvertToArcs.a
+[1277/1339] Linking CXX static library lib/libCIRCTConvertToLLVM.a
+[1278/1339] Linking CXX static library lib/libCIRCTCoreToFSM.a
+[1279/1339] Linking CXX static library lib/libCIRCTDatapathToSMT.a
+[1280/1339] Linking CXX static library lib/libCIRCTDCToHW.a
+[1281/1339] Linking CXX static library lib/libCIRCTExportVerilog.a
+[1282/1339] Linking CXX static library lib/libCIRCTFIRRTLToHW.a
+[1283/1339] Linking CXX static library lib/libCIRCTFSMToCore.a
+[1284/1339] Linking CXX static library lib/libCIRCTFSMToSV.a
+[1285/1339] Linking CXX static library lib/libCIRCTFSMToSMT.a
+[1286/1339] Linking CXX static library lib/libCIRCTHandshakeToHW.a
+[1287/1339] Linking CXX static library lib/libCIRCTHWArithToHW.a
+[1288/1339] Linking CXX static library lib/libCIRCTHWToBTOR2.a
+[1289/1339] Linking CXX static library lib/libCIRCTHWToSV.a
+[1290/1339] Linking CXX static library lib/libCIRCTHWToSystemC.a
+[1291/1339] Linking CXX static library lib/libCIRCTImportLiberty.a
+[1292/1339] Linking CXX static library lib/libCIRCTLoopScheduleToCalyx.a
+[1293/1339] Linking CXX static library lib/libCIRCTLTLToCore.a
+[1294/1339] Linking CXX static library lib/libCIRCTPipelineToHW.a
+[1295/1339] Linking CXX static library lib/libCIRCTSCFToCalyx.a
+[1296/1339] Linking CXX static library lib/libCIRCTSeqToSV.a
+[1297/1339] Linking CXX static library lib/libCIRCTSimToSV.a
+[1298/1339] Linking CXX static library lib/libCIRCTSMTToZ3LLVM.a
+[1299/1339] Linking CXX static library lib/libCIRCTSynthToComb.a
+[1300/1339] Linking CXX static library lib/libCIRCTVerifToSMT.a
+[1301/1339] Linking CXX static library lib/libCIRCTVerifToSV.a
+[1302/1339] Linking CXX static library lib/libCIRCTImportVerilog.a
+[1303/1339] Linking CXX static library lib/libCIRCTExportArc.a
+[1304/1339] Linking CXX static library lib/libCIRCTArcTransforms.a
+[1305/1339] Linking CXX static library lib/libCIRCTAXI4.a
+[1306/1339] Linking CXX static library lib/libCIRCTEmitTransforms.a
+[1307/1339] Linking CXX static library lib/libCIRCTExportFIRRTL.a
+[1308/1339] Linking CXX static library lib/libCIRCTImportFIRFile.a
+[1309/1339] Linking CXX static library lib/libCIRCTFSMTransforms.a
+[1310/1339] Linking CXX static library lib/libCIRCTHandshakeTransforms.a
+[1311/1339] Linking CXX static library lib/libCIRCTKanagawaTransforms.a
+[1312/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/ExportSystemC.cpp.o
+[1313/1339] Linking CXX static library lib/libCIRCTOMTransforms.a
+[1314/1339] Linking CXX static library lib/libCIRCTPipelineTransforms.a
+[1315/1339] Linking CXX static library lib/libCIRCTProbe.a
+[1316/1339] Linking CXX static library lib/libCIRCTRTGTransforms.a
+[1317/1339] Linking CXX static library lib/libCIRCTRTGTestDialect.a
+[1318/1339] Linking CXX static library lib/libCIRCTSimTransforms.a
+[1319/1339] Linking CXX static library lib/libCIRCTSSPTransforms.a
+[1320/1339] Linking CXX static library lib/libCIRCTSVTransforms.a
+[1321/1339] Linking CXX static library lib/libCIRCTSynthTransforms.a
+[1322/1339] Linking CXX static library lib/libCIRCTSystemCTransforms.a
+[1323/1339] Linking CXX static library lib/libCIRCTVerifTransforms.a
+[1324/1339] Linking CXX static library lib/libCIRCTTargetDebugInfo.a
+[1325/1339] Building CXX object lib/Tools/circt-bmc/CMakeFiles/obj.CIRCTBMCTransforms.dir/MaterializeDebugVariables.cpp.o
+[1326/1339] Building CXX object lib/Tools/circt-bmc/CMakeFiles/obj.CIRCTBMCTransforms.dir/PrepareForBMC.cpp.o
+[1327/1339] Building CXX object tools/circt-translate/CMakeFiles/circt-translate.dir/circt-translate.cpp.o
+[1328/1339] Building CXX object lib/Tools/circt-bmc/CMakeFiles/obj.CIRCTBMCTransforms.dir/ExternalizeRegisters.cpp.o
+[1329/1339] Building CXX object lib/Target/ExportSystemC/CMakeFiles/obj.CIRCTExportSystemC.dir/Patterns/SystemCEmissionPatterns.cpp.o
+[1330/1339] Linking CXX static library lib/libCIRCTExportSystemC.a
+[1331/1339] Linking CXX executable bin/circt-translate
+[1332/1339] Building CXX object lib/Tools/circt-bmc/CMakeFiles/obj.CIRCTBMCTransforms.dir/LowerToBMC.cpp.o
+[1333/1339] Linking CXX static library lib/libCIRCTBMCTransforms.a
+[1334/1339] Building CXX object lib/Tools/circt-lec/CMakeFiles/obj.CIRCTLECTransforms.dir/ConstructLEC.cpp.o
+[1335/1339] Linking CXX static library lib/libCIRCTLECTransforms.a
+[1336/1339] Building CXX object tools/circt-verilog/CMakeFiles/circt-verilog.dir/circt-verilog.cpp.o
+[1337/1339] Linking CXX executable bin/circt-verilog
+[1338/1339] Building CXX object tools/circt-opt/CMakeFiles/circt-opt.dir/circt-opt.cpp.o
+[1339/1339] Linking CXX executable bin/circt-opt

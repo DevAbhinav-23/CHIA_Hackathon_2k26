@@ -1,0 +1,7 @@
+timestamp: 2026-09-13T21:00:38+05:30
+closed total_count: 487
+open   total_count: 101
+closed incomplete_results: False
+open incomplete_results: False
+rate-limit message present (closed): 0
+rate-limit message present (open): 0

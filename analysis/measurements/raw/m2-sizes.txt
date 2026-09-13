@@ -1,0 +1,44 @@
+=== du -sh build dirs ===
+1.3G	/home/adi/.cache/chia-pin-smoke/bassert_g
+494M	/home/adi/.cache/chia-pin-smoke/bassert
+355M	/home/adi/.cache/chia-pin-smoke/src/build
+=== binaries in bassert_g ===
+                                         
+arcilator                        45663872
+arcilator-header-cpp.py             11012
+arcilator-runtime.h                  4522
+circt-cocotb-driver.py               6044
+circt-opt                       200343024
+circt-reduce                    118362200
+circt-rtl-sim.py                    10560
+circt-tblgen                       826768
+circt-translate                  68826840
+firtool                          89204048
+py-split-input-file.py                862
+=== human sizes ===
+circt-opt          192M
+firtool            86M
+circt-translate    66M
+arcilator          44M
+circt-reduce       113M
+=== reference: bassert (-O3 -UNDEBUG, no -g) circt-opt ===
+76322264
+73M	/home/adi/.cache/chia-pin-smoke/bassert/bin/circt-opt
+=== reference: src/build (-O3 -DNDEBUG) circt-opt ===
+62084272
+60M	/home/adi/.cache/chia-pin-smoke/src/build/bin/circt-opt
+=== readelf -S | grep -c debug_line ===
+2
+=== readelf debug sections (bassert_g) ===
+      1 .debug_abbrev
+      1 .debug_addr
+      1 .debug_info
+      1 .debug_line
+      1 .debug_line_str
+      1 .debug_rnglists
+      1 .debug_str
+      1 .debug_str_o
+=== readelf debug sections (bassert, no -g) ===
+0
+0
+=== ccache delta ===

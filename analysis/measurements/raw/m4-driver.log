@@ -1,0 +1,15 @@
+RUN: git -C /home/adi/.cache/chia-pin-smoke/circt log --first-parent -p --unified=0 --no-renames --format=__C__ %H %cI --since 2024-09-20T02:42:30+00:00 -- ... (109 paths)
+git log -p: 488.2s, 7498223 bytes
+M4 symbol-level contamination, 187 seeds, clone HEAD b792c772819df723628d1fe6073269b85a8ade5d
+  distinct seed source files                 109
+  first-parent commits parsed (since 2024-09-20)  1650
+  seeds whose own hunks yielded no ctx symbol 16
+
+Horizon: seed date -> clone HEAD (2026-09-11)
+  FILE-level contaminated  (>=1 later first-parent commit touches a seed source file)    180/187   96.3%
+  SYMBOL-level, ctx rule   (>=1 later commit touches a function the seed's hunks named)  144/187   77.0%
+  SYMBOL-level, crude rule (red team's ^[+-].*\b(\w+)\s*\( rule, keywords removed)      148/187   79.1%
+
+Horizon: 730 days after the seed (comparable to the red team's 86.1%)
+  FILE-level contaminated    180/187   96.3%
+  SYMBOL-level, ctx rule     144/187   77.0%

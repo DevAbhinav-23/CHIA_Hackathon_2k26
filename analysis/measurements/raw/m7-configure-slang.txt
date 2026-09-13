@@ -1,0 +1,6 @@
+111:-- slang Verilog frontend is enabled
+112:-- Building slang from source
+113:-- slang version: 11.0.0+0
+136:-- Installing slang dependency fmt
+137:-- Installing slang dependency boost_unordered
+155:-- Build files have been written to: /home/adi/.cache/chia-pin-smoke/bslang

@@ -1,0 +1,34 @@
+seed: /home/adi/Projects/chia-hackathon/analysis/measurements/raw/m7-seed.sv (26 lines)
+=== sdk : /home/adi/.cache/chia-pin-smoke/circt-sdk/bin/circt-verilog ===
+  rc=1  stdout_bytes=0  stderr_bytes=457
+  moore.module count: 0
+  first 3 stdout lines:
+  first 5 stderr lines:
+    analysis/measurements/raw/m7-seed.sv:8:16: error: cannot select range of [3:-1] from 'bit[1:0]' [-Wrange-oob]
+      assign o = i[3:-1];
+                   ^
+    analysis/measurements/raw/m7-seed.sv:16:16: error: cannot select range of [3:-1] from 'bit[1:0][1:0]' [-Wrange-oob]
+      assign o = i[3:-1];
+=== bslang : /home/adi/.cache/chia-pin-smoke/bslang/bin/circt-verilog ===
+  rc=1  stdout_bytes=0  stderr_bytes=457
+  moore.module count: 0
+  first 3 stdout lines:
+  first 5 stderr lines:
+    analysis/measurements/raw/m7-seed.sv:8:16: error: cannot select range of [3:-1] from 'bit[1:0]' [-Wrange-oob]
+      assign o = i[3:-1];
+                   ^
+    analysis/measurements/raw/m7-seed.sv:16:16: error: cannot select range of [3:-1] from 'bit[1:0][1:0]' [-Wrange-oob]
+      assign o = i[3:-1];
+=== diff of the two Moore IRs ===
+M7 COMPARE DONE 2026-09-13T21:15:48+05:30
+=== stderr byte-comparison of the two default runs ===
+  byte-identical stderr
+
+=== rerun with the seed RUN line's own flag: -Wno-error=range-oob ===
+sdk: rc=0 stdout_bytes=682 stderr_bytes=385 moore.module=3
+bslang: rc=0 stdout_bytes=682 stderr_bytes=385 moore.module=3
+diff of the two Moore IRs:
+  byte-identical
+versions:
+  sdk:    LLVM (http://llvm.org/):   LLVM version 24.0.0git   Optimized build. CIRCT firtool-1.157.0 slang version 11.0.0+0 
+  bslang: LLVM (http://llvm.org/):   LLVM version 24.0.0git   Optimized build. CIRCT 5056ff0 slang version 11.0.0+0 

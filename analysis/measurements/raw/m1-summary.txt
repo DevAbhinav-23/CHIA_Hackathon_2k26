@@ -1,0 +1,79 @@
+M1 seeds=187  test files=228  RUN: lines=331  missing blobs=0
+clone HEAD=b792c772819df723628d1fe6073269b85a8ade5d
+
+Seeds per entry tool (a seed may use several)
+---------------------------------------------
+  circt-opt                            136  ( 72.7% of 187 seeds)
+  circt-translate                       39  ( 20.9% of 187 seeds)
+  circt-verilog                         31  ( 16.6% of 187 seeds)
+  other                                 10  (  5.3% of 187 seeds)
+  circt-reduce                           6  (  3.2% of 187 seeds)
+  firtool                                5  (  2.7% of 187 seeds)
+  circt-synth                            3  (  1.6% of 187 seeds)
+  circt-lec                              1  (  0.5% of 187 seeds)
+  arcilator                              1  (  0.5% of 187 seeds)
+  circt-capi-firrtl-test 2>&1            1  (  0.5% of 187 seeds)
+
+Seeds per input language (of the touched test files)
+----------------------------------------------------
+  .mlir                                146  ( 78.1% of 187 seeds)
+  .sv                                   36  ( 19.3% of 187 seeds)
+  .fir                                   8  (  4.3% of 187 seeds)
+  other:.py                              5  (  2.7% of 187 seeds)
+  other:.aig                             1  (  0.5% of 187 seeds)
+  other:.c                               1  (  0.5% of 187 seeds)
+
+Seeds per circt-reduce reachability class
+-----------------------------------------
+  direct                               146  ( 78.1% of 187 seeds)
+  lift-circt-verilog                    36  ( 19.3% of 187 seeds)
+  lift-firtool                           8  (  4.3% of 187 seeds)
+  textual-only                           7  (  3.7% of 187 seeds)
+
+RUN-line shape features, seeds with >=1 such line
+-------------------------------------------------
+  pipe                                 164  ( 87.7% of 187 seeds)
+  split_input_file                      56  ( 29.9% of 187 seeds)
+  verify_diagnostics                    53  ( 28.3% of 187 seeds)
+  pct_t                                 10  (  5.3% of 187 seeds)
+  pct_S                                  4  (  2.1% of 187 seeds)
+  redirect                               4  (  2.1% of 187 seeds)
+  shell_and                              3  (  1.6% of 187 seeds)
+  lead_not                               1  (  0.5% of 187 seeds)
+  split_file                             1  (  0.5% of 187 seeds)
+
+D-13 cross-check: which seeds need a slang-enabled build
+  seeds touching an ImportVerilog/Moore/MooreToCore source file          48
+  seeds touching a .sv test file                                         36
+  seeds with >=1 RUN line entering via circt-verilog                     31
+  seeds with >=1 RUN line entering via circt-translate --import-verilog   34
+  union of the two slang entry points                                    36
+  union of slang entry points with .sv-test seeds                        36
+  slang-entry seeds whose source files are NOT in the .sv region          0
+
+RUN-line shape features, raw line counts (of 331 lines)
+  pipe                                 234  ( 70.7%)
+  split_input_file                      70  ( 21.1%)
+  verify_diagnostics                    61  ( 18.4%)
+  pct_t                                 52  ( 15.7%)
+  pct_S                                 10  (  3.0%)
+  redirect                              10  (  3.0%)
+  shell_and                              5  (  1.5%)
+  lead_not                               2  (  0.6%)
+  split_file                             1  (  0.3%)
+
+RUN-line cross tab (entry tool x test-file language)
+  circt-opt                  .mlir          193
+  circt-translate            .sv             35
+  circt-verilog              .sv             33
+  other                      .mlir           29
+  firtool                    .fir             9
+  circt-translate            .mlir            7
+  circt-synth                .mlir            6
+  circt-translate            .fir             6
+  circt-reduce               .mlir            6
+  circt-lec                  .mlir            3
+  arcilator                  .mlir            1
+  other                      .sv              1
+  other                      other:.py        1
+  circt-capi-firrtl-test 2>&1  other:.c         1

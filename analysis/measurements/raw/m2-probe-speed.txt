@@ -1,0 +1,14 @@
+### large synthetic probe: 4000 comb ops, circt-opt --canonicalize --cse
+-O3 -DNDEBUG                       bench-big.mlir       best-of-9    29633 us
+-O3 -UNDEBUG                       bench-big.mlir       best-of-9    29748 us
+-O3 -UNDEBUG -gline-tables-only    bench-big.mlir       best-of-9    30647 us
+
+### small real probe: analysis/probe/big.mlir (67 lines), circt-opt --canonicalize
+-O3 -DNDEBUG                       big.mlir             best-of-15    18174 us
+-O3 -UNDEBUG                       big.mlir             best-of-15    18224 us
+-O3 -UNDEBUG -gline-tables-only    big.mlir             best-of-15    18881 us
+
+### start-up only: circt-opt --version
+  bassert_n    best-of-15     5898 us
+  bassert_u    best-of-15     6181 us
+  bassert_g    best-of-15     5989 us

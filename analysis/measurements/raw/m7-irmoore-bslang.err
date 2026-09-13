@@ -1,0 +1,9 @@
+analysis/measurements/raw/m7-seed.sv:8:16: error: cannot select range of [3:-1] from 'bit[1:0]' [-Wrange-oob]
+  assign o = i[3:-1];
+               ^
+analysis/measurements/raw/m7-seed.sv:16:16: error: cannot select range of [3:-1] from 'bit[1:0][1:0]' [-Wrange-oob]
+  assign o = i[3:-1];
+               ^
+analysis/measurements/raw/m7-seed.sv:25:16: error: cannot select range of [3:-1] from 'pair_t[1:0]' [-Wrange-oob]
+  assign o = i[3:-1];
+               ^

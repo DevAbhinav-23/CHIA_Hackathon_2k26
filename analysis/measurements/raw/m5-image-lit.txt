@@ -1,0 +1,14 @@
+--- image lit.site.cfg.py ---
+config.llvm_obj_root = "/opt/circt-sdk"
+config.mlir_src_root = ""
+config.circt_src_root = "/workspace/circt"
+config.verilator_path = ""
+config.slang_frontend_enabled = 0
+--- does the resolver candidate exist? ---
+ls: cannot access '/workspace/mlir/include/mlir/IR/OpBase.td': No such file or directory
+ls: cannot access '/workspace/circt/llvm/mlir/include/mlir/IR/OpBase.td': No such file or directory
+/opt/circt-sdk/include/mlir/IR/OpBase.td
+--- is the tblgen lit.local.cfg present at this commit? ---
+ls: cannot access '/workspace/circt/test/Tools/circt-tblgen/lit.local.cfg': No such file or directory
+--- lit installed? ---
+ls: cannot access '/home/ray/anaconda3/envs/*/bin/lit': No such file or directory

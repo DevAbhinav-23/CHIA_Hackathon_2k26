@@ -1,0 +1,40 @@
+### image: ghcr.io/ucb-bar/chia-circt:latest
+id=sha256:866aa160d6e40b05a9df538e7fd7e1d914229618b73e82759d7db4879f97b939
+created=2026-09-01T01:15:56.990079711Z
+size_bytes=1092058003
+arch=amd64/linux
+### digest
+Digest: sha256:866aa160d6e40b05a9df538e7fd7e1d914229618b73e82759d7db4879f97b939
+=== A-10: does the published image's circt-opt still reference __assert_fail? ===
++ ls -l /workspace/circt/build/bin/circt-opt
+-rwxrwxrwx 1 root root 64970464 Jun 26 21:26 /workspace/circt/build/bin/circt-opt
++ nm -u /workspace/circt/build/bin/circt-opt
++ grep -c __assert_fail
+0
++ grep -c NDEBUG /workspace/circt/build/compile_commands.json
+606
++ set +x
+--- context ---
+    606 -DNDEBUG
+--- CMAKE_CXX_FLAGS_RELEASE in the cache ---
+CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
+LLVM_ENABLE_ASSERTIONS:UNINITIALIZED=ON
+CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL=1
+--- circt commit in the image ---
+5dc7f103d714aa40e13cae4fcf7ab98a1912f845 2026-05-24T17:14:51-07:00 [Synth] Move three-input op boilerplate to ODS (#10540)
+--- version string ---
+LLVM (http://llvm.org/):
+  LLVM version 23.0.0git
+  Optimized build.
+CIRCT 5dc7f10
+--- SDK assertions ---
+set(LLVM_ENABLE_ASSERTIONS OFF)
+--- which binaries are built from source ---
+arcilator-header-cpp.py
+arcilator-runtime.h
+circt-cocotb-driver.py
+circt-opt
+circt-rtl-sim.py
+circt-tblgen
+py-split-input-file.py
