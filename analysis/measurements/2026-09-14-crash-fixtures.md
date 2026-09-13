@@ -36,6 +36,71 @@ below are `crashes/`, so this set is self-consistent and the `<class>_<nn>` half
 name is the plan's; the rename to `oracle/`, or the plan's amendment, is a one-line
 decision for whoever owns `04-Test-Plan.md` and is **not** made here.
 
+## 1. The attempts
+
+Candidates come from Source A only (`04-Test-Plan.md` §5.1): the committed 187-seed corpus
+`circt_bug_loop/tests/fixtures/corpus/filtered_187.json`, filtered to the seeds whose
+subject names a crash, an assertion, a segfault, an `UNREACHABLE`, a verifier failure or a
+null/invalid-access fix, ranked newest first, preferring `circt-opt` on a `.mlir` test with
+an exact SDK pin. `w09_select.py` is that filter and that ranking; its tool, argv and shape
+come from `corpus.normalise_run_line`, so a candidate it calls usable is one the runner
+will execute identically. Source B (closed `label:bug` issues) was **not** needed: Source A
+reached six confirmations and all three classes.
+
+An attempt is confirmed when the seed's own test input, run through its own normalised
+`RUN:` line, fires the primary oracle at the seed's **first parent** and does **not** fire
+at the seed. Both runs are recorded either way.
+
+| # | Attempt | Seed | Parent | Tag | Tool | Configure | Parent build | Seed build | Result |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `v1-simstrconcat` | `564e07083c52` `[Sim] Fix null dereference in StringConcatOp::fold` | `2f46bdfae165` | 1.143.0 | `circt-opt --canonicalize` | b143, 1 configure for all of 1 to 4 | 14 s / 6 edges | 13 s / 6 | **confirmed** `crash_01` |
+| 2 | `v2-dynarray` | `b3b407b37bb2` `[MooreToCore] Fix crash on dynamic array variable conversion` | `87f131c0af7f` | 1.143.0 | `circt-opt --convert-moore-to-core` | reused | 68 s / 42 | 24 s / 6 | **confirmed** `assertion_01` (piece 1 of 9) |
+| 3 | `v3-classnew` | `c3e2100d37ca` `[MooreToCore] Fix crash on class new with unsupported member types` | `6fc9ee90ddad` | 1.143.0 | `circt-opt --convert-moore-to-core` | reused | 601 s / 567 | 38 s / 6 | **confirmed** `fatal_error_01` (piece 8 of 19) |
+| 4 | `v4-instancegraph` | `88d9a5ad7a3a` `[InstanceGraph] Relax assertion failure condition` | `5481d1901ca0` | 1.143.0 | `circt-opt --sv-trace-iverilog` | reused | 59 s / 16 | 5 s / 5 | **confirmed** `assertion_02` |
+| 5 | `v5-mooreextract` | `cc71d34ab52f` `[MooreToCore] Fix out-of-bounds and aggregate moore.extract lowering` | `454f38652dea` | 1.156.0 | `circt-opt --convert-moore-to-core` | b156, 1 configure for 5 to 7 | 427 s / 420 (after 606 edges of cold pre-warm) | 33 s / 6 | **discarded**: exits 0 at the parent |
+| 6 | `v6-omassert` | `4ac632ae7dd8` `[OM] Fix crash in assert w/ block arg message` | `1728445e7e57` | 1.156.0 | `circt-opt -om-elaborate-object` | reused | 589 s / 529 | 5 s / 6 | **confirmed** `assertion_03` |
+| 7 | `v7-omnonconst` | `56f16468bccf` `[OM] Fix OM evaluator assert w/ non-constant msg` | `4ac632ae7dd8` | 1.156.0 | `circt-opt -om-elaborate-object` | reused | 0 s / 0 (the parent is attempt 6's seed) | 4 s / 6 | **confirmed** `assertion_04` |
+
+Six confirmed of seven attempted; the budget was eight. The one discard is recorded because
+`04-Test-Plan.md` §5.1 step 4 requires it: the corpus filter is a subject-keyword proxy and
+A-02 already records that neither 187 nor 171 was validated by reading diffs, so a seed
+whose test passes at its parent is evidence about the filter, not a failure of the method.
+`cc71d34ab52f`'s other test file is `test/circt-verilog/roundtrip-oob-reads.sv`, which needs
+the slang front end; it was not built, so the discard is only about the `.mlir` half.
+
+Two configures, one per SDK tag, both from `w09_lib.sh:configure`; every attempt after the
+first on a tag reuses its build directory, which is why attempt 7 rebuilt nothing at all.
+Attempts 1 to 4 share one worktree and one build directory and were run in commit order, so
+each parent build is an increment on the previous attempt's seed build; the 601 s of attempt
+3 is the one large jump in that chain.
+
+## 2. The fixtures
+
+`fixtures/crashes/<class>_<nn>/`, six directories, each holding exactly the six files of
+`04-Test-Plan.md` §5.2, all produced by `w09_mkfixture.py` from the recorded run rather than
+hand-written.
+
+| Fixture | Class | Signal | What fires | Site or message | Fingerprint frame |
+|---|---|---|---|---|---|
+| `crash_01` | `crash` | `SIGSEGV` | no text at all; the signal only | `lib/Dialect/Sim/SimOps.cpp:541` (frame) | `circt::sim::StringConcatOp::fold SimOps.cpp` |
+| `assertion_01` | `assertion` | `SIGABRT` | `_ASSERT_GLIBC` | `isa<To>(Val) && "cast<Ty>() argument of incompatible type!"` at `include/llvm/Support/Casting.h:566` | `main circt-opt.cpp` (see §3.2) |
+| `assertion_02` | `assertion` | `SIGABRT` | `_ASSERT_GLIBC` | `!candidateTopLevels.empty() && "if non-cyclic, there should be at least 1 candidate top level"` at `lib/Support/InstanceGraph.cpp:230` | `circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp` |
+| `assertion_03` | `assertion` | `SIGABRT` | `_ASSERT_GLIBC` | `detail::isPresent(Val) && "dyn_cast on a non-existent value"` at `include/llvm/Support/Casting.h:656` | `verifyResult ElaborateObject.cpp` |
+| `assertion_04` | `assertion` | `SIGABRT` | `_ASSERT_GLIBC` | `isa<To>(Val) && "cast<Ty>() argument of incompatible type!"` at `include/llvm/Support/Casting.h:560` | `verifyResult ElaborateObject.cpp` |
+| `fatal_error_01` | `fatal_error` | `SIGABRT` | `_FATAL_ERROR` | `neither the scoping op nor the type class provide data layout information for !sim.dstring` | `main circt-opt.cpp` (see §3.2) |
+
+`04-Test-Plan.md` §5's **target composition is met**: at least one `assertion`, one `crash`
+and one `fatal_error`, and six against `budget.yaml`'s `acceptance.recorded_failures` of 5.
+Two SDK tags are represented, so §5.4's per-fixture image rule has more than one image to
+build. `_ASSERT_UNREACHABLE` is **not** represented: no seed in the filtered set produced an
+`UNREACHABLE executed` firing, which is consistent with §5.1's own expectation that Source A
+underproduces the deliberate-refusal paths, and it remains the one §3.6.1 pattern tested
+only against the document's constructed sample.
+
+`assertion_03` and `assertion_04` are a deliberate near-pair: two distinct upstream bugs,
+two distinct fix commits, one identical `fingerprint_frame`, separated only by the assertion
+basis. §3.2 and §3.4 below are what they and the other four exposed.
+
 ## 3. What the real output did to the design's own rules
 
 Three things were measured against real stderr rather than against a constructed sample.
@@ -158,6 +223,93 @@ on `b143/bin/circt-opt` at `2026-09-14`:
    asked for. No fixture in this set is affected: in every recorded firing the tool dies
    before the verifier reports.
 
+### 3.4 **Defect.** `out_of_scope_root` reads an inlined frame, not the physical one
+
+`03-LLD.md` §3.6.2 step 4 makes `out_of_scope_root` true *"when, after §3.7.1's crash-handler
+prologue is stripped, the first remaining frame is not in a CIRCT object"*, and FR-07.5
+makes that the gate on whether F-12 tries to repair the bug at all. LLVM's crash handler
+prints **inlined** frames as separate `#n` lines that share one address. In an
+`-O3 -gline-tables-only` build the physical frame that crashes is almost always CIRCT's,
+while the topmost inlined line inside it is an SDK header — `Diagnostics.h` for the
+`operator<<` that builds an assertion message, `AttributeSupport.h` for the `cast<>` that
+segfaults. Reading only the first line therefore answers a different question than the one
+asked.
+
+Measured over the four fixtures mined here:
+
+| Fixture | frames dropped | first line after the strip | physical frame | `out_of_scope_root` |
+|---|---|---|---|---|
+| `crash_01` | 4 | `getAbstractAttribute`, `mlir/IR/AttributeSupport.h` | `circt::sim::StringConcatOp::fold`, `SimOps.cpp:541` | **true** |
+| `assertion_01` | 9 | `createZeroValue`, `MooreToCore.cpp` | same | false |
+| `fatal_error_01` | 8 | unresolved SDK frame | MLIR's `getDefaultTypeSizeInBits` | **true** (correctly) |
+| `assertion_02` | 9 | `append<const char (&)[68]>`, `mlir/IR/Diagnostics.h` | `circt::igraph::InstanceGraph::getInferredTopLevelNodes`, `InstanceGraph.cpp:221` | **true** |
+
+`assertion_02` is the clearest case: frames `#9`, `#10` and `#11` all carry the address
+`0x00005587daf8f82b`, and `#11` is `InstanceGraph.cpp:221`. The bug is entirely CIRCT's — a
+CIRCT assertion, in a CIRCT file, fixed by a CIRCT commit — and the design as written puts
+it out of scope. `crash_01` is the same shape: `#4` through `#10` share
+`0x0000561553f7dfd5` and `#10` is `SimOps.cpp:541`.
+
+So three of the four real bugs are out of scope under the rule as written, and only
+`fatal_error_01`'s `true` is the answer the rule wanted. The fix is again one clause for
+`03-LLD.md` §3.6.2: group the stripped frames by address and take the **last** (innermost
+caller, outermost source) line of the first group, or equivalently make the predicate
+`any(f.in_circt_object for f in first_address_group)`. As with §3.2 this is recorded, not
+applied; `out_of_scope_root` is not one of §5.2's `expected.json` keys, so no fixture
+hard-codes the wrong answer, but `T-U-probe-24`'s scope assertions will land on it.
+
 ---
 
-_(Sections 1, 2, 4 and 5 are filled in as the attempts complete.)_
+## 4. What it cost
+
+| Item | Size |
+|---|---|
+| `~/.cache/chia-pin-smoke/w09` total | **3.4 GB** |
+| `b143` (1.143.0 build dir, `circt-opt` only) | 876 MB |
+| `b156` (1.156.0 build dir, `circt-opt` only) | 947 MB |
+| `sdk-1.143.0` extracted | 632 MB |
+| `sdk-1.156.0` extracted | 659 MB |
+| the two SDK tarballs, kept | 138 MB + 136 MB |
+| `wt143` + `wt156` worktrees | 32 MB + 40 MB |
+| `attempts/` (every recorded run, both sides, all pieces) | 2.6 MB |
+| the shared blobless clone `~/.cache/chia-pin-smoke/circt` | 118 MB |
+| `~/.cache/chia-pin-smoke` whole (W-04's and W-05's caches included) | 9.0 GB |
+| **the committed fixtures** | **63,585 B in 36 files** |
+
+`04-Test-Plan.md` §13 budgets this row at "5 directories, 30 files, under 1 MB"; six
+directories and 36 files at 62 kB are inside it. No binary is committed: every fixture file
+is text or JSON.
+
+Wall time was dominated by two cold-ish builds, attempt 3's 601 s and attempt 6's 589 s on
+top of a 606-edge pre-warm; the other five parent builds together cost 568 s. `ninja -j8`
+(`-j10` for the 1.156.0 attempts) with `ccache` on, on a 20-core host with 15 GiB of RAM,
+most of the swap already committed by unrelated processes, which is why parallelism was held
+well below the core count and the two build directories were never driven at once.
+
+## 5. Re-deriving the set
+
+The fixtures are pinned to commits, not to this host. To re-derive one from scratch:
+
+```
+$ analysis/measurements/w09_select.py --clone <blobless clone> --exact --limit 25
+$ analysis/measurements/w09_attempt.sh <name> <seed> <parent> <test path> <tag> \
+      <worktree> <build dir> <sdk dir> circt-opt
+$ analysis/measurements/w09_mkfixture.py --attempt <attempt dir> --piece parent-pNN \
+      --name <class>_<nn> --dest circt_bug_loop/tests/fixtures/crashes --why "<paragraph>"
+```
+
+`w09_oracle.py` is `03-LLD.md` §3.6.1, §3.6.2 and §3.7.1 transcribed verbatim and is the
+reference the fixtures were classified with; no apparatus code existed when they were mined,
+so it is committed beside them and is what a later `probe_task.py` must agree with, file by
+file, on `expected.json`. `w09_runner.py` does **not** transcribe §3.3: it imports
+`corpus.normalise_run_line` and `corpus.strip_probe_only_options` from the flow itself, so
+the argv in every `argv.json` is the argv the committed normaliser produces, defects
+(§3.3) and all.
+
+Three host-specific strings survive in the recorded evidence and are **not** compared
+values: the build prefix `~/.cache/chia-pin-smoke/w09/wt143` (or `wt156`) for CIRCT sources,
+`~/.cache/chia-pin-smoke/w09/sdk-1.143.0` (or `-1.156.0`) for the SDK, and
+`~/.cache/chia-pin-smoke/w09/b143` (or `b156`) for the binary, in place of the image's
+`/workspace/circt/` and `/opt/circt-sdk/`. §3.7.1 strips the build prefix before a site
+enters a fingerprint, so the prefix is evidence only; each fixture's `README.md` records its
+own relative site.

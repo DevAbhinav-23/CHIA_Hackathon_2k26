@@ -1,0 +1,36 @@
+circt-opt: /home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560: decltype(auto) llvm::cast(const From &) [To = mlir::StringAttr, From = mlir::TypedAttr]: Assertion `isa<To>(Val) && "cast<Ty>() argument of incompatible type!"' failed.
+PLEASE submit a bug report to https://github.com/llvm/circt and include the crash backtrace.
+Stack dump:
+0.	Program arguments: /home/adi/.cache/chia-pin-smoke/w09/b156/bin/circt-opt "-om-elaborate-object=all-public-classes=true allow-unevaluated=true" /home/adi/.cache/chia-pin-smoke/w09/attempts/v7-omnonconst/parent-p00/input.mlir -verify-diagnostics -split-input-file -allow-unregistered-dialect
+ #0 0x00007f8c88a3cdfb llvm::sys::PrintStackTrace(llvm::raw_ostream&, int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libLLVMSupport.so+0x23cdfb)
+ #1 0x00007f8c88a39ff5 llvm::sys::RunSignalHandlers() (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libLLVMSupport.so+0x239ff5)
+ #2 0x00007f8c88a3dc0b SignalHandler(int, siginfo_t*, void*) Signals.cpp:0:0
+ #3 0x00007f8c88044e70 (/usr/lib/libc.so.6+0x44e70)
+ #4 0x00007f8c880aeceb pthread_kill (/usr/lib/libc.so.6+0xaeceb)
+ #5 0x00007f8c88044d48 raise (/usr/lib/libc.so.6+0x44d48)
+ #6 0x00007f8c880257c1 abort (/usr/lib/libc.so.6+0x257c1)
+ #7 0x00007f8c88026a5d (/usr/lib/libc.so.6+0x26a5d)
+ #8 0x00007f8c8803b254 __assert_fail (/usr/lib/libc.so.6+0x3b254)
+ #9 0x00005582f7a027c5 append<llvm::StringRef &> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/mlir/IR/Diagnostics.h:354:5
+#10 0x00005582f7a027c5 operator<<<llvm::StringRef &> /home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/mlir/IR/Diagnostics.h:348:22
+#11 0x00005582f7a027c5 operator() /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:224:64
+#12 0x00005582f7a027c5 operator() /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:229:16
+#13 0x00005582f7a027c5 operator() /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:250:63
+#14 0x00005582f7a027c5 void llvm::function_ref<void (mlir::Operation*)>::callback_fn<(anonymous namespace)::verifyResult(circt::om::ClassOp, bool)::$_0>(long, mlir::Operation*) /home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/ADT/STLFunctionalExtras.h:46:12
+#15 0x00005582f6776109 void mlir::detail::walk<mlir::ForwardIterator>(mlir::Operation*, llvm::function_ref<void (mlir::Operation*)>, mlir::WalkOrder) /home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/mlir/IR/Visitors.h:0:9
+#16 0x00005582f7a00a07 verifyResult /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:252:18
+#17 0x00005582f7a00a07 (anonymous namespace)::ElaborateObjectPass::elaborateClass(circt::om::ClassOp, mlir::SymbolTable&, llvm::DenseMap<std::pair<mlir::StringAttr, mlir::StringAttr>, unsigned int, llvm::DenseMapInfo<std::pair<mlir::StringAttr, mlir::StringAttr>, void>, llvm::detail::DenseMapPair<std::pair<mlir::StringAttr, mlir::StringAttr>, unsigned int>>&, bool) /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:279:12
+#18 0x00005582f79ff97b (anonymous namespace)::ElaborateObjectPass::runOnOperation() /home/adi/.cache/chia-pin-smoke/w09/wt156/lib/Dialect/OM/Transforms/ElaborateObject.cpp:311:13
+#19 0x00007f8c8a5c7bf3 mlir::detail::OpToOpPassAdaptor::run(mlir::Pass*, mlir::Operation*, mlir::AnalysisManager, bool, unsigned int) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIRPass.so+0x1dbf3)
+#20 0x00007f8c8a5caa87 mlir::PassManager::run(mlir::Operation*) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIRPass.so+0x20a87)
+#21 0x00007f8c8c10d284 performActions(llvm::raw_ostream&, std::shared_ptr<llvm::SourceMgr> const&, mlir::MLIRContext*, mlir::MlirOptMainConfig const&) MlirOptMain.cpp:0:0
+#22 0x00007f8c8c10c30a llvm::LogicalResult llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>::callback_fn<mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&)::$_0>(long, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&) MlirOptMain.cpp:0:0
+#23 0x00007f8c88ffb849 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>, llvm::raw_ostream&, llvm::StringRef, llvm::StringRef)::$_0::operator()(llvm::StringRef) const ToolUtilities.cpp:0:0
+#24 0x00007f8c88ffb490 mlir::splitAndProcessBuffer(std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::function_ref<llvm::LogicalResult (std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, llvm::MemoryBufferRef const&, llvm::raw_ostream&)>, llvm::raw_ostream&, llvm::StringRef, llvm::StringRef) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIRSupport.so+0x15490)
+#25 0x00007f8c8c103892 mlir::MlirOptMain(llvm::raw_ostream&, std::unique_ptr<llvm::MemoryBuffer, std::default_delete<llvm::MemoryBuffer>>, mlir::DialectRegistry&, mlir::MlirOptMainConfig const&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIROptLib.so+0xd892)
+#26 0x00007f8c8c103cc9 mlir::MlirOptMain(int, char**, llvm::StringRef, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIROptLib.so+0xdcc9)
+#27 0x00007f8c8c103efd mlir::MlirOptMain(int, char**, llvm::StringRef, mlir::DialectRegistry&) (/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/lib/libMLIROptLib.so+0xdefd)
+#28 0x00005582f66784f1 main /home/adi/.cache/chia-pin-smoke/w09/wt156/tools/circt-opt/circt-opt.cpp:90:23
+#29 0x00007f8c88027d0e (/usr/lib/libc.so.6+0x27d0e)
+#30 0x00007f8c88027e4b __libc_start_main (/usr/lib/libc.so.6+0x27e4b)
+#31 0x00005582f6677b35 _start (/home/adi/.cache/chia-pin-smoke/w09/b156/bin/circt-opt+0x139cb35)
