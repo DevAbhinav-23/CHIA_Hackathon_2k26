@@ -599,6 +599,7 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
             corpus_head_sha, naming both (FR-01.11);
         ContractError from contract.validate when a record built here is not a
             valid SeedRecord, which is a defect here and never in the clone;
+        ValueError when `since` is not an ISO 8601 date;
         subprocess.CalledProcessError or subprocess.TimeoutExpired from git.
     """
     started_at = time.monotonic()
