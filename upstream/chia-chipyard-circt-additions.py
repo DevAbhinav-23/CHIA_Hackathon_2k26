@@ -210,7 +210,7 @@ def circt_reduce_run(input_path: str, test_script: str, output_path: str, *,
             "returncode": proc.returncode,
             "wall_seconds": time.monotonic() - started,
             "output_valid": out.is_file() and out.stat().st_size > 0,
-            "log_tail": (log or b"").decode("utf-8", "replace")[-4000:]}
+            "log_tail": (log or b"").decode("utf-8", "backslashreplace")[-4000:]}
 
 
 @ChiaFunction(resources={"circt": 1})
@@ -366,7 +366,10 @@ def _drain(fds: dict, deadline: float, cap: int, pgid: int) -> tuple:
                 os.close(fd)
             except OSError:                         # pragma: no cover
                 pass
-    return ({key: bytes(buf).decode("utf-8", "replace") for key, buf in buffers.items()},
+    # backslashreplace, never replace: a non-UTF-8 byte in a diagnostic must
+    # survive the seam recoverably, and U+FFFD does not (T-U-schema-18).
+    return ({key: bytes(buf).decode("utf-8", "backslashreplace")
+             for key, buf in buffers.items()},
             any(seen[key] > cap for key in fds),
             killed)
 

@@ -684,7 +684,7 @@ def _textual_reduce(target: Path, script: Path, limits: dict) -> tuple:
     the work discarded (FR-09.4), which is what `circt-reduce`'s own
     `--keep-best` does for the other branch.
     """
-    lines = target.read_text(errors="replace").splitlines(keepends=True)
+    lines = target.read_text(errors="backslashreplace").splitlines(keepends=True)
     deadline = time.monotonic() + limits["reduction_wall_seconds"]
     best = [lines]
     candidate = target.parent / ("ddmin_candidate" + target.suffix)
