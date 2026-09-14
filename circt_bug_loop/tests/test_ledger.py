@@ -439,3 +439,19 @@ def test_T_U_ledger_15_filing_caps_are_per_run(tmp_path: Path):
     ledger = ledger_module.aggregate(_RUN, loop.db_path, today=_DAY)
     assert (ledger.filings_total, ledger.filings_lifetime_total) == (2, 4)
     assert ledger_module.stop_reason(ledger, "seeded", caps) == "filings_total"
+
+    # W-18: a cap of ZERO means "this run files nothing", not "this run does
+    # nothing". `0 >= 0` is true before the first probe, so a pilot registered
+    # with both filing caps at zero - which is how a run is registered as unable
+    # to file at all - stopped its first arm in 18 ms and generated nothing.
+    # `approve.py` enforces both caps independently and refuses every filing at
+    # zero, so nothing is lost; a positive cap stops the arm exactly as before.
+    files_nothing = budget(filings_total=0, filings_per_day=0)
+    assert ledger_module.stop_reason(ledger, "seeded", files_nothing) is None
+    fresh = ledger_module.aggregate("no-such-run", loop.db_path, today=_DAY)
+    assert fresh.filings_total == 0
+    assert ledger_module.stop_reason(fresh, "seeded", files_nothing) is None
+    assert ledger_module.stop_reason(
+        fresh, "seeded", budget(filings_total=1, filings_per_day=0)) is None
+    assert ledger_module.stop_reason(
+        fresh, "seeded", budget(filings_total=0, filings_per_day=1)) is None

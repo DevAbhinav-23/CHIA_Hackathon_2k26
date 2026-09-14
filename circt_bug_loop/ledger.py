@@ -244,8 +244,16 @@ def stop_reason(ledger: BudgetLedger, arm: str, budget: BudgetFile) -> Optional[
         return "arm_window"
     if ledger.inputs_today.get(arm, 0) >= budget.generated_inputs_per_day:
         return "generated_inputs_per_day"
-    if ledger.filings_total >= budget.filings_total:
+    # A cap of ZERO means "this run files nothing", and not "this run does
+    # nothing" (W-18). `0 >= 0` is true before a single probe is written, so a
+    # pilot registered with both filing caps at zero - which is how a run is
+    # registered as unable to file at all - stopped its first arm in 18
+    # milliseconds with `stop_reason="filings_total"` and never generated
+    # anything. Nothing is lost by the exemption: `approve.py` enforces both
+    # caps independently at the one place a report is filed, and refuses every
+    # filing at a cap of zero. A POSITIVE cap stops the arm exactly as before.
+    if budget.filings_total and ledger.filings_total >= budget.filings_total:
         return "filings_total"
-    if ledger.filings_today >= budget.filings_per_day:
+    if budget.filings_per_day and ledger.filings_today >= budget.filings_per_day:
         return "filings_per_day"
     return None
