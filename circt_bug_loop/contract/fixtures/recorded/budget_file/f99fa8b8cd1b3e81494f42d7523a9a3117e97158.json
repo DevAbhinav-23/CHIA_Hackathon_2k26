@@ -41,7 +41,7 @@
   "campaign_end_utc": "2026-09-24T11:59:00+00:00",
   "campaign_spend_cap_usd": 200.0,
   "campaign_start_utc": "2026-09-20T00:00:00+00:00",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "filing_poll_window_seconds": 3600,
   "filings_per_day": 3,

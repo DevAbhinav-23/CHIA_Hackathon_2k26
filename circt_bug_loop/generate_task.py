@@ -269,6 +269,10 @@ def render_feedback(feedback: FeedbackBundle) -> str:
         if entry.oracle_class:
             lines.append(f"  oracle: {entry.oracle_class}"
                          + (f" - {entry.oracle_summary}" if entry.oracle_summary else ""))
+        if entry.error_line:
+            lines.append(f"  {entry.error_line}")
+            lines.append("  FIX this input's syntax against the build commit, or "
+                         "replace it: an input that does not parse tests nothing.")
         if entry.reduced_text:
             lines.append("  reduced case:")
             lines.extend(f"    {line}" for line in entry.reduced_text.splitlines())

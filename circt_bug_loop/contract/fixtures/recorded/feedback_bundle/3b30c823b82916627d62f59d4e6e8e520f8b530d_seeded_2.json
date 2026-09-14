@@ -2,9 +2,10 @@
   "abandon_reason": null,
   "abandoned": false,
   "arm": "seeded",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "entries": [
     {
+      "error_line": null,
       "oracle_class": null,
       "oracle_summary": null,
       "probe_id": "p-f4540aa95429",
@@ -15,6 +16,7 @@
       "stopped_at_stage": "stage_3"
     },
     {
+      "error_line": null,
       "oracle_class": null,
       "oracle_summary": null,
       "probe_id": "p-a57dfe6e7d9d",

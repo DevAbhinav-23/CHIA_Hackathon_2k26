@@ -1,7 +1,7 @@
 {
   "amount": 14400.0,
   "arm": "mutation",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "entry_id": "81797bfae1895dc28663fcabf0992c97",
   "metered": true,
   "observed": {

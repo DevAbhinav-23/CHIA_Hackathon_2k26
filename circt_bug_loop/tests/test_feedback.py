@@ -120,23 +120,23 @@ def test_T_U_feed_02():
 
 def test_T_U_feed_03():
     """T-U-feed-03 (FR-16.6): the abandonment rule, spelled as a multiset."""
-    first = build([stage_3("p-1", "parse_error", "tool_rejected_input"),
+    first = build([stage_3("p-1", "oom", "allocation_failure"),
                    stage_3("p-2", "timeout", "wall_limit")], iteration=2)
     assert first.abandoned is False
 
-    same = build([stage_3("p-3", "parse_error", "tool_rejected_input"),
+    same = build([stage_3("p-3", "oom", "allocation_failure"),
                   stage_3("p-4", "timeout", "wall_limit")], first, iteration=3)
     assert same.abandoned is True
-    assert same.abandon_reason == ("stage_3:parse_error:tool_rejected_input x1, "
-                                  "stage_3:timeout:wall_limit x1")
+    assert same.abandon_reason == ("stage_3:oom:allocation_failure x1, "
+                                   "stage_3:timeout:wall_limit x1")
     assert same.terminating_condition == "abandoned"
 
-    other_reason = build([stage_3("p-3", "parse_error", "tool_rejected_argv"),
+    other_reason = build([stage_3("p-3", "oom", "address_space_limit"),
                           stage_3("p-4", "timeout", "wall_limit")], first, iteration=3)
     assert other_reason.abandoned is False
     assert other_reason.abandon_reason is None
 
-    different_count = build([stage_3("p-3", "parse_error", "tool_rejected_input")],
+    different_count = build([stage_3("p-3", "oom", "allocation_failure")],
                             first, iteration=3)
     assert different_count.abandoned is False
 
@@ -281,3 +281,52 @@ def test_T_U_feed_11():
 
     mutation_capped = build(results, arm="mutation", iteration=3)
     assert mutation_capped.terminating_condition == "iteration_cap"
+
+
+def test_T_U_feed_12(tmp_path):
+    """T-U-feed-12 (W-23): a parse error carries its own diagnostic and is repairable."""
+    from circt_bug_loop.generate_task import render_feedback
+
+    assert "parse_error" not in feedback_module._ABANDON_STATUSES
+    assert feedback_module._ABANDON_STATUSES == {"timeout", "oom"}
+
+    directory = tmp_path / "probe_p-1"
+    directory.mkdir()
+    (directory / "stderr.txt").write_text(
+        "loading the input\n"
+        "probe.mlir:3:8: error: unknown type 'string' in dialect 'sim'\n"
+        "probe.mlir:9:1: error: a second one, which is not carried\n",
+        encoding="utf-8")
+    rejected = stage_3("p-1", "parse_error", "tool_rejected_input")
+    rejected = dataclasses.replace(rejected, artefact_dir=str(directory))
+
+    # Two iterations of the SAME parse error no longer end the seed.
+    first = build([rejected], iteration=2)
+    again = build([rejected], first, iteration=3)
+    assert first.abandoned is False and again.abandoned is False
+    assert again.terminating_condition == "iteration_cap"
+
+    entry = first.entries[0]
+    assert entry.error_line == \
+        "probe.mlir:3:8: error: unknown type 'string' in dialect 'sim'"
+    rendered = render_feedback(first)
+    assert entry.error_line in rendered
+    assert "FIX this input's syntax against the build commit, or replace it" \
+        in rendered
+
+    # Bounded, and only for the statuses that feed back.
+    (directory / "stderr.txt").write_text(
+        "probe.mlir:3:8: error: " + "x" * 500 + "\n", encoding="utf-8")
+    long_line = build([rejected], iteration=2).entries[0].error_line
+    assert len(long_line) == feedback_module.ERROR_LINE_CAP == 200
+
+    (directory / "stderr.txt").write_text("no diagnostic here\n", encoding="utf-8")
+    assert build([rejected], iteration=2).entries[0].error_line is None
+
+    timed_out = dataclasses.replace(
+        stage_3("p-2", "timeout", "wall_limit"), artefact_dir=str(directory))
+    assert build([timed_out], iteration=2).entries[0].error_line is None
+
+    # An unreadable artefact directory is not a failure of the bundle.
+    missing = dataclasses.replace(rejected, artefact_dir=str(tmp_path / "gone"))
+    assert build([missing], iteration=2).entries[0].error_line is None

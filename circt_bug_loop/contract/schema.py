@@ -7,7 +7,7 @@ import typing
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Protocol
 
-CONTRACT_VERSION = "2.2"          # MAJOR.MINOR; the single source of the string
+CONTRACT_VERSION = "2.3"          # MAJOR.MINOR; the single source of the string
 
 Arm = Literal["seeded", "mutation"]
 LedgerArm = Literal["seeded", "mutation", "shared"]
@@ -208,6 +208,7 @@ class FeedbackEntry:
     reduced_text: Optional[str] = None      # conditional, 2.12's cap rule
     reduced_from_bytes: Optional[int] = None
     reduced_to_bytes: Optional[int] = None
+    error_line: Optional[str] = None        # the probe's first `error:` line (2.3)
 
 
 @dataclass(kw_only=True)

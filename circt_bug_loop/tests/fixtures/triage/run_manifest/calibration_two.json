@@ -16,7 +16,7 @@
   ],
   "cluster_yaml_sha": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "confirmation_cutoff_date": "2026-09-23",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "current_window_has_release": true,
   "deployment": "single_machine",

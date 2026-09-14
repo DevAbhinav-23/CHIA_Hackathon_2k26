@@ -19,3 +19,10 @@
 - **Compatibility.** MINOR. `check_version` compares the MAJOR half only (`03-LLD.md` §2.2), so a 2.0 or 2.1 instance still loads. A `BudgetFile` built from a 2.1 budget.yaml now fails `budget.load_budget` check 2 for two missing keys, which is the intended refusal: a run must be registered against a file that fixes them.
 - **The fixture set.** Every `contract_version` string under `contract/fixtures/` and `tests/fixtures/` moved to `2.2`; the two `BudgetFile` fixtures gained the two keys and every `LedgerEntry` fixture gained the four `observed` keys at null. No other byte of any fixture changed.
 - **Done.** Annotated tag `contract-2.2` cut on b07d989 and pushed (2026-09-14); `03-LLD.md` §2.4 and §9.1, `01-FRD.md` FR-14.1 and `02-HLD.md` §2.9 carry the keys as 2026-09-15 errata; `design/reviews/implementation-errata-log.md` rows 51 and 54 to 59.
+
+## Contract 2.3 (W-23, 2026-09-15)
+
+- **What changed.** One field added to `FeedbackEntry`: `error_line`, the probe's own first `error:` diagnostic, bounded at 200 characters.
+- **Why.** MEASURED, campaign 1 run `903a37c8`, seed 2: all five probes were `parse_error` at the build commit and `feedback.py` counted `parse_error` among `_ABANDON_STATUSES`, so the seed was abandoned WITHOUT the next turn ever being told what the tool said. A parse error is the loop's own mistake and it is repairable; it now feeds back with its diagnostic and the instruction to fix or replace the input, while `timeout` and `oom` stay abandoned.
+- **Compatibility.** MINOR. `check_version` compares the MAJOR half only (`03-LLD.md` §2.2), so a 2.0, 2.1 or 2.2 instance still loads: `FeedbackEntry` is nested and its new field defaults to null.
+- **The fixture set.** Every `contract_version` string under `contract/fixtures/` and `tests/fixtures/` moved to `2.3`; every `FeedbackEntry` in a `feedback_bundle` fixture gained `"error_line": null`. No other byte of any fixture changed.

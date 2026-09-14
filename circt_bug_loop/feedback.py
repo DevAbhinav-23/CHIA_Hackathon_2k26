@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter
+from pathlib import Path
 from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
@@ -19,8 +20,21 @@ _FEEDBACK_DENY = ("candidate_id", "candidate_count", "candidates", "fingerprint"
                   "q4_new", "precision", "bug_count", "confirmed", "filing",
                   "issue_number", "issue_url", "repair_status", "triage_class")
 
-#: FR-16.6's three build statuses.
-_ABANDON_STATUSES = frozenset({"parse_error", "timeout", "oom"})
+#: FR-16.6's build statuses a repeated iteration of is the end of the seed.
+#: `parse_error` LEFT at W-23: MEASURED, campaign 1 seed 2, five probes in a row
+#: failed to parse at the build commit and the seed was abandoned WITHOUT the
+#: next turn being told what the tool said. A parse error is the loop's own
+#: mistake and it is repairable; a timeout and an OOM are not.
+_ABANDON_STATUSES = frozenset({"timeout", "oom"})
+
+#: The statuses whose first diagnostic feeds the next iteration instead.
+_FEEDBACK_STATUSES = frozenset({"parse_error"})
+
+#: What `probe_task.probe_execute` writes the probe's diagnostics to (3.6).
+_STDERR_FILE = "stderr.txt"
+
+#: The bound on the one error line an entry carries.
+ERROR_LINE_CAP = 200
 
 #: The stage FR-16.6 counts over.
 _ABANDON_STAGE = "stage_3"
@@ -49,6 +63,21 @@ def _summary(result: ProbeResult) -> Optional[str]:
     return f"died by {result.signal}" if result.signal else None
 
 
+def _error_line(result: ProbeResult) -> Optional[str]:
+    """The probe's first `error:` diagnostic, bounded, or None (FR-16.1)."""
+    if result.build_status not in _FEEDBACK_STATUSES:
+        return None
+    try:
+        stderr = (Path(result.artefact_dir) / _STDERR_FILE).read_text(
+            encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    for line in stderr.splitlines():
+        if "error:" in line:
+            return line.strip()[:ERROR_LINE_CAP]
+    return None
+
+
 def _entry(result: Optional[ProbeResult], probe_id: str, cap: int) -> FeedbackEntry:
     """Build one entry for one dispatched probe, present or missing."""
     if result is None:
@@ -62,7 +91,8 @@ def _entry(result: Optional[ProbeResult], probe_id: str, cap: int) -> FeedbackEn
         oracle_class=result.oracle_class,
         oracle_summary=_summary(result),
         reduced_text=text,
-        reduced_to_bytes=len(text.encode("utf-8")) if text is not None else None)
+        reduced_to_bytes=len(text.encode("utf-8")) if text is not None else None,
+        error_line=_error_line(result))
 
 
 def _abandon_multiset(entries: list) -> Optional[Counter]:
@@ -146,4 +176,5 @@ def build_feedback(results: list, previous: Optional[FeedbackBundle], seed_sha: 
                 seconds=time.monotonic() - started_at)}
 
 
-__all__ = ["build_feedback", "RESULT_MISSING", "TERMINATING_CONDITIONS"]
+__all__ = ["build_feedback", "ERROR_LINE_CAP", "RESULT_MISSING",
+           "TERMINATING_CONDITIONS"]

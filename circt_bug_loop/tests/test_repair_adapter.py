@@ -684,7 +684,7 @@ def test_repair_23_stage_sevens_tokens_are_null_with_a_reason(tmp_path, monkeypa
                         "tokens_out": None, "cost_usd": None}
     assert set(observed) == schema._DICT_KEYS[("LedgerEntry", "observed")]
     assert "token_capture" not in observed
-    assert schema.CONTRACT_VERSION == "2.2"
+    assert schema.CONTRACT_VERSION == "2.3"
 
     run = _attempt(tmp_path, monkeypatch)
     assert run.result.token_capture == "unavailable_remote_dispatch"

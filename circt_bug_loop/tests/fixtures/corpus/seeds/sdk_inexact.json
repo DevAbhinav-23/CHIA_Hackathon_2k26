@@ -16,7 +16,7 @@
   ],
   "bumps_away": 1,
   "committed_date_utc": "2025-08-26T08:30:45+00:00",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "dialect_bucket": "CombToAIG",
   "dialect_bucket_unmerged": "CombToAIG",

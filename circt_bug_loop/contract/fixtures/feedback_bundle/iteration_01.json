@@ -2,9 +2,10 @@
   "abandon_reason": null,
   "abandoned": false,
   "arm": "seeded",
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "entries": [
     {
+      "error_line": null,
       "oracle_class": "assertion",
       "oracle_summary": "Assertion `fieldType && \"lowering a null field type\"' failed. at LowerTypes.cpp:412",
       "probe_id": "p-0000000001",
@@ -15,6 +16,7 @@
       "stopped_at_stage": "gate"
     },
     {
+      "error_line": null,
       "oracle_class": null,
       "oracle_summary": null,
       "probe_id": "p-0000000003",
