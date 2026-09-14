@@ -1,14 +1,26 @@
-# budget-pilot.yaml - the pre-registration of the W-18 PILOT, and of nothing else.
+# budget-pilot.yaml - the pre-registration of the PILOT, and of nothing else.
 #
 # A COPY of budget.yaml with eight values changed, listed below. It is a separate
 # file because FR-14.7 forbids editing a registered budget file, and because the
 # pilot and the campaign are two pre-registrations with two tags: this one is
-# `registration/pilot-1` and the campaign's is W-22's. `bug_loop.py --budget
+# `registration/pilot-2` and the campaign's is W-22's. `bug_loop.py --budget
 # circt_bug_loop/budget-pilot.yaml` selects it; the flag already existed.
 #
+# PILOT 2 (W-18b, 2026-09-16), registered as `registration/pilot-2`. Pilot 1 was
+# `registration/pilot-1` on 84d77f4 and its record is
+# `analysis/measurements/2026-09-16-pilot.md`; it spent USD 7.163957 against a
+# cap of 5.00, because the pre-authorisation bounded ONE model call and a turn
+# with tools makes up to `max_tool_iterations` of them. This registration
+# measures the fix. Three values change from pilot 1 and nothing else does:
+#
+#   campaign_spend_cap_usd    5.0 -> 3.0     what W-18b is allowed to spend
+#   arm_window_seconds        900 -> 600     10 minutes an arm, 20 for the run
+#   (and budget.yaml's own new max_tool_iterations and minimal_case_lines,
+#    which are the fix under measurement and are NOT pilot-specific)
+#
 # WHAT IS DIFFERENT FROM budget.yaml, and why:
-#   campaign_spend_cap_usd  200.0 -> 5.0     the pilot's own hard stop
-#   arm_window_seconds      14400 -> 900     15 minutes an arm, 30 for the run
+#   campaign_spend_cap_usd  200.0 -> 3.0     the pilot's own hard stop
+#   arm_window_seconds      14400 -> 600     10 minutes an arm, 20 for the run
 #   per_seed_probe_cap          5 -> 3       a short window over few seeds
 #   per_seed_iteration_cap      3 -> 1       one generation per seed per arm
 #   filings_per_day             3 -> 0       THE PILOT FILES NOTHING
@@ -35,7 +47,7 @@
 # campaign driver on the head. The arms run SEQUENTIALLY, each for this same W,
 # in the order below, on the same fixed-size cluster at the same apparatus
 # concurrency. Nothing else is the budget.
-arm_window_seconds: 900.0                # 15 minutes per arm, 30 for the pilot
+arm_window_seconds: 600.0                # 10 minutes per arm, 20 for the pilot
 arm_order: [seeded, mutation]
 
 # --- the model, and the money cap (ADR-D-03, superseding section 2026-09-14) --
@@ -50,7 +62,7 @@ model_id: gemini-3.8-flash
 # (FR-18.10's third stop condition), and the results artefact states the spend.
 # 200 against the user's USD 300 credit, leaving headroom for the pilot and for
 # a re-run.
-campaign_spend_cap_usd: 5.0
+campaign_spend_cap_usd: 3.0
 
 # The two prices the ledger turns tokens into money with. The backend reports
 # usage_metadata token counts and no price, so the arithmetic is the ledger's:
