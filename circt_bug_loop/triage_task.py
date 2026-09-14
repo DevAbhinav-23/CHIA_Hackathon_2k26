@@ -1,30 +1,4 @@
-"""B6a, B6b and B7: the issue mirror, the fingerprint, the two screens, the
-triage turn and the report render (03-LLD.md 3.7, F-10, F-11, F-15).
-
-Three nodes and one pure renderer. `issue_mirror_refresh` is the only writer of
-`issue_mirror` and the only caller that reaches api.github.com; `dedup_and_screen`
-makes no request at all and reads the mirror as a table, which is FR-10.3's
-network-trace criterion held by construction. `triage_report` is the one model
-turn of the apparatus half and every number in what it renders is substituted
-from the record (FR-11.4).
-
-Head placement for B6a and B6b (K5, 3.2): both walk the head's blobless clone
-and the head-pinned `loop.db`, and neither runs a CIRCT binary, so neither takes
-a `circt` slot. B7 keeps `{"circt": 1}` for the node and `{"llm": 1.0}` for the
-turn itself, which `llm.llm_turn` declares.
-
-Two deviations from 03-LLD.md, each recorded in
-`design/reviews/implementation-errata-log.md` rather than absorbed:
-
-  * `generate_task` is imported INSIDE `_run_turn` and not at module scope, for
-    the one name B7 still needs from the supply half: `SourceReadTool`, which
-    3.5 puts in that module. 3.5.1's backend, turn and parser moved to `llm.py`
-    at the join, which is neither half, so those three are imported at module
-    scope below and the parser is one function again (architect decision 3).
-  * `dedup_and_screen`'s signature carries no `BuildResult`, so 3.7.1's
-    `signal_name` is read from `build_result.signal` by `probe_id` through the
-    store that the node already opens for the mirror screen.
-"""
+"""B6a, B6b and B7: the issue mirror, the fingerprint, the two screens, the triage turn and the report render (03-LLD.md 3.7)."""
 from __future__ import annotations
 
 import hashlib
@@ -55,44 +29,31 @@ from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
 TRIAGE_REASON_MAX_SENTENCES = 4
 MIRROR_TOKEN_MIN_CHARS = 8
 
-#: The label CIRCT's own policy forbids an AI tool to act on
-#: (`circt:docs/AIToolPolicy.md:24`), read by FR-13.9's refusal out of
-#: `DedupVerdict.evidence["issue_labels"]`.
+#: The label CIRCT's own policy forbids an AI tool to act on (`circt:docs/AIToolPolicy.md:24`).
 GOOD_FIRST_ISSUE = "good first issue"
 
-#: 3.7.1's build prefix. A frame path under it is made relative to it; any other
-#: absolute path keeps its last two components, which is what lets FR-10.6's
-#: cross-run query match two images built in different directories.
+#: 3.7.1's build prefix.
 BUILD_PREFIX = "/workspace/circt/"
 
-#: 7.4's stage-6 prompt, beside this module (1.1). `cfg["report_write"]`
-#: overrides it, which is how the driver passes the copy it already loaded.
+#: 7.4's stage-6 prompt, beside this module (1.1).
 PROMPTS = Path(__file__).resolve().parent / "prompts"
 
-#: B7's system message. 3.7.4 fixes the turn, the tool and the timeout and does
-#: not name a system message; CHIA's own chain has `prompts/system.md` and stage
-#: 6 has no such file in 1.1's list, so it is one line here.
+#: B7's system message.
 TRIAGE_SYSTEM_MESSAGE = (
     "You write CIRCT bug reports from tool output. You state observed behaviour "
     "only, you never restate a number, and you end with one fenced json block.")
 
-#: The literal 7.4 binds the six primary variables to for a `differential`
-#: candidate, so that `safe_substitute` leaves no unbound `$name` behind (W23).
+#: The literal 7.4 binds the six primary variables to for a `differential` candidate.
 NOT_APPLICABLE = "not applicable to a differential candidate"
 
 #: 7.4.1's prior-art point: the driver a differential report names (FR-08.7).
 ARC_TESTS = "circt/arc-tests"
 
-#: The top-level source directories a CIRCT frame path is made relative to, for
-#: 3.7.2's pathspecs. A path under none of them falls back to a basename glob.
+#: The top-level source directories a CIRCT frame path is made relative to.
 _SRC_ROOTS = ("lib/", "include/", "tools/", "test/", "frontends/",
               "integration_test/")
 
-#: 6.5's write, as the plain function and not as B10b's node: a plain call to a
-#: `ChiaFunction` wrapper routes through `chia.trace.profiler`, which starts a
-#: local Ray, and the node's own return is `{"path", "counters"}` while what a
-#: report needs is the path. The artefact root is bind-mounted at the identical
-#: path on every worker (FR-17.9), so the write lands in the same place.
+#: 6.5's write, as the plain function and not as B10b's node.
 _artefact_write = write_artefact
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])(?:\s+|$)")
@@ -103,9 +64,7 @@ _COMMIT = re.compile(r"^__C__ (?P<sha>[0-9a-f]{7,40}) (?P<date>\S+)$")
 _HUNK = re.compile(r"^@@ [^@]*@@ ?(?P<context>.*)$")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: The eight declared keys of `DedupVerdict.evidence` (2.9). The set is closed
-#: and `store.validate_candidate` compares it exactly, so every verdict builds
-#: the whole dict and leaves the keys it cannot fill as None.
+#: The eight declared keys of `DedupVerdict.evidence` (2.9).
 _EVIDENCE_KEYS = ("matched_key", "matched_token", "issue_number", "issue_url",
                   "issue_state", "issue_labels", "fixing_commit",
                   "duplicate_of_candidate_id")
@@ -115,43 +74,13 @@ class ReportIncomplete(Exception):
     """A substitution point the chosen template declares is absent (FR-11.3)."""
 
 
-# ---------------------------------------------------------------------------
-# 3.7.1 The primary fingerprint
-# ---------------------------------------------------------------------------
-
-
 def normalise_expr(text: str) -> str:
-    """Collapse whitespace runs in an assertion expression and strip the ends.
-
-    Nothing else changes, and in particular the `&& "message"` tail is KEPT:
-    3.7.1 makes it the most discriminating part of the expression, so two
-    different asserts on one condition stay two different bugs.
-
-    Returns:
-        str, the normalised expression.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Collapse whitespace runs in an assertion expression and strip the ends."""
     return " ".join((text or "").split())
 
 
 def normalise_site(site: str) -> str:
-    """Drop an assertion site's build prefix, keeping the line number verbatim.
-
-    A path under `BUILD_PREFIX` is made relative to it; any other absolute path
-    keeps only its last two components; a relative path is untouched. The line
-    number is kept exactly as G-43 says, because it is what separates two
-    asserts in one function.
-
-    Returns:
-        str, "<path>:<line>", or the input unchanged when it carries no line.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Drop an assertion site's build prefix, keeping the line number verbatim."""
     path, sep, line = (site or "").rpartition(":")
     if not sep or not line.isdigit():
         path, line, sep = site or "", "", ""
@@ -163,24 +92,7 @@ def normalise_site(site: str) -> str:
 
 
 def structural_hash(text: str) -> str:
-    """Hash a reduced case with every name that reduction can rewrite removed.
-
-    SSA value names, `@symbol` names, `loc(...)` suffixes and whitespace runs
-    are normalised before hashing. The symbol clause is load-bearing:
-    `circt-reduce` renames modules during reduction, `hw.module @top` becoming
-    `hw.module private @Foo`, so without it one reduced case hashed differently
-    depending on how far the reducer got (NIT 9).
-
-    It is EVIDENCE and never a merge key (FR-10.1, FR-10.2): no path in this
-    module compares two candidates by it.
-
-    Returns:
-        str, the hex SHA-256 digest.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Hash a reduced case with every name that reduction can rewrite removed."""
     normalised = _LOC.sub("loc(_)", text or "")
     normalised = _SSA.sub("%_", normalised)
     normalised = _SYMBOL.sub("@_", normalised)
@@ -189,29 +101,7 @@ def structural_hash(text: str) -> str:
 
 def compute_fingerprint(verdict: OracleVerdict, signal: Optional[str],
                         reduced_text: str, top_n: int) -> Fingerprint:
-    """Compute G-43's primary fingerprint and its three evidence fields.
-
-    The strip precedes every use of a frame (K3). For an `assertion` the value
-    is the normalised expression, a newline and the normalised site; for a
-    `crash` or a `fatal_error` it is the signal name, a newline and
-    `OracleVerdict.fingerprint_frame`, which B3 already computed as the first
-    stripped frame in a CIRCT object with a resolved line, its function name and
-    its file basename and no line number. Where no stripped frame qualifies the
-    basis falls back to the top-*top_n* tuple of normalised names; where fewer
-    than *top_n* frames resolve at all the basis is `insufficient` and the value
-    is None (FR-10.8). The top-N tuple is recorded as evidence in every case.
-
-    `fingerprint_stable` is None here and stays None until the gate's question-1
-    re-run sets it (3.9); an unstable fingerprint is reported and never merged.
-
-    Returns:
-        Fingerprint, with probe_id, basis, value, frame_tuple, structural_hash
-        and fingerprint_stable=None.
-    Worker:
-        pure; called inside B6b, which is a head node.
-    Raises:
-        nothing.
-    """
+    """Compute G-43's primary fingerprint and its three evidence fields."""
     stripped = strip_prologue(list(verdict.frames))
     names = [_normalise_function(frame.function) for frame in stripped]
     resolved = sum(1 for frame in stripped if frame.function)
@@ -235,44 +125,14 @@ def compute_fingerprint(verdict: OracleVerdict, signal: Optional[str],
 
 
 def is_duplicate(left: Fingerprint, right: Fingerprint) -> bool:
-    """Report whether two candidates are duplicates under FR-10.2, and nothing else.
-
-    Exact string equality of the primary fingerprint, and no similarity measure,
-    no threshold and no other key. The structural hash and the frame tuple take
-    no part. Identity makes it reflexive even where the basis is `insufficient`,
-    whose value is None and equals nothing, so the relation is reflexive,
-    symmetric and transitive over any set.
-
-    Returns:
-        bool.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Report whether two candidates are duplicates under FR-10.2, and nothing else."""
     if left.probe_id == right.probe_id:
         return True
     return left.value is not None and left.value == right.value
 
 
 def partition(fingerprints: list) -> list:
-    """Partition candidates into duplicate classes, independent of arrival order.
-
-    A `Fingerprint` whose value is None, and one whose `fingerprint_stable` is
-    anything but True, is its own singleton: an unstable fingerprint is REPORTED
-    and never merged (3.7.1), and a candidate whose gate re-run has not happened
-    carries None and is likewise not merged. Nothing therefore merges before the
-    gate has run, which is why B6b's own candidate-to-candidate query asks the
-    store for a fingerprint already found stable (FR-10.6 makes it cross-run).
-
-    Returns:
-        list[frozenset[str]] of probe ids, sorted by each block's least member,
-        so two shuffles of one input give the same list.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Partition candidates into duplicate classes, independent of arrival order."""
     blocks: dict = {}
     singletons: list = []
     for item in fingerprints:
@@ -285,24 +145,7 @@ def partition(fingerprints: list) -> list:
 
 
 def rates(pairs: list) -> dict:
-    """Measure FR-10.2's collision and false-merge rates over labelled pairs.
-
-    A pair is `{"label": "duplicate"|"distinct", "a": Fingerprint,
-    "b": Fingerprint}`. The collision rate is distinct-labelled pairs whose
-    fingerprints are equal over all distinct-labelled pairs; the false-merge
-    rate is duplicate-labelled pairs whose fingerprints differ over all
-    duplicate-labelled pairs. Neither is thresholded: 04-Test-Plan.md 10's
-    acceptance is that both are measured and reported (A-05).
-
-    Returns:
-        {"collision_rate": float, "false_merge_rate": float,
-         "collisions": int, "distinct_pairs": int,
-         "false_merges": int, "duplicate_pairs": int}
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Measure FR-10.2's collision and false-merge rates over labelled pairs."""
     distinct = [p for p in pairs if p["label"] == "distinct"]
     duplicate = [p for p in pairs if p["label"] == "duplicate"]
     collisions = sum(1 for p in distinct if is_duplicate(p["a"], p["b"]))
@@ -314,69 +157,21 @@ def rates(pairs: list) -> dict:
 
 
 def labelled_fingerprint(side: dict, top_n: int) -> Fingerprint:
-    """One side of an FR-10.2 labelled pair, fingerprinted from the pair's own record.
-
-    The labelled duplicate-pair set is an EXTERNAL MEASUREMENT of the project
-    and not a row of any campaign: `04-Test-Plan.md` §10 has it labelled by hand,
-    by the architect, BEFORE any fingerprint was computed, and each side carries
-    the recorded failure it was labelled from. Its rates are therefore derived
-    here, from the file, and never by looking a candidate id up in a run's
-    store - which is what lets a campaign that confirms nothing still report
-    them, and what stopped `render_results` refusing at the end of every run
-    (`T-S-regen-01`'s one remaining refusal).
-
-    *side* is one `data/labelled_pairs.json` side: `candidate_id`,
-    `oracle_class`, `frame_names`, `signal`, `reduced`, and the assertion or
-    fatal fields its class carries.
-
-    Returns:
-        Fingerprint, exactly as `compute_fingerprint` computes it for a live
-        candidate; the same function, so the measurement is of the fingerprint
-        the campaign uses and not of a second implementation of it.
-    Worker:
-        pure; it reads one mapping and runs no query.
-    Raises:
-        KeyError when *side* carries no `candidate_id`, `oracle_class` or
-        `frame_names`, those being what the labelled set is required to record.
-    """
+    """One side of an FR-10.2 labelled pair, fingerprinted from the pair's own record."""
     verdict = SimpleNamespace(
         probe_id=side["candidate_id"], oracle_class=side["oracle_class"],
         assertion_text=side.get("assertion_text"),
         assertion_site=side.get("assertion_site"),
         fingerprint_frame=side.get("fingerprint_frame"),
-        # `strip_prologue` reads a frame's function and its module, and a
-        # labelled side records the names alone: an unresolved libc frame is
-        # already gone from what was recorded.
+        # `strip_prologue` reads a frame's function and its module, and a labelled side records the names alone.
         frames=[SimpleNamespace(function=name, module="")
                 for name in side["frame_names"]])
     return compute_fingerprint(verdict, side.get("signal"),
                                side.get("reduced", ""), top_n)
 
 
-# ---------------------------------------------------------------------------
-# 3.7.3 The issue-mirror screen
-# ---------------------------------------------------------------------------
-
-
 def mirror_tokens(verdict: OracleVerdict) -> list:
-    """The screen's tokens for one candidate, per oracle class, and nothing else.
-
-    `assertion` yields two, the expression and the `file:line` exactly as the
-    verdict records them; `crash` yields one, the fingerprint frame's function
-    name without its file; `fatal_error` yields two, that function name and the
-    `LLVM ERROR:` message verbatim; `differential` yields none, and such a
-    candidate never reaches this stage (FR-08.10). A token shorter than
-    `MIRROR_TOKEN_MIN_CHARS` is dropped, because `fold` or `parse` alone would
-    match hundreds of issues and the screen would answer `known_issue` for every
-    candidate.
-
-    Returns:
-        list[str], in the order the table gives them, duplicates removed.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The screen's tokens for one candidate, per oracle class, and nothing else."""
     function = (verdict.fingerprint_frame or "").rsplit(" ", 1)[0]
     if verdict.oracle_class == "assertion":
         found = [verdict.assertion_text, verdict.assertion_site]
@@ -394,32 +189,7 @@ def mirror_tokens(verdict: OracleVerdict) -> list:
 
 
 def mirror_screen(store: LoopStore, tokens: list) -> Optional[dict]:
-    """Query the local mirror once per token and pick the issue that decides.
-
-    The predicate is `instr(title || ' ' || body, :token) > 0`, case-sensitive,
-    with ANY token matching ANY issue producing a hit. It is over-inclusive by
-    design (3.7.3): there is no scoring, no threshold and no similarity measure
-    anywhere in it, a false match costs a report rather than a wrong filing, and
-    the human at the gate sees the matched token and the issue number.
-
-    Selection, where more than one issue matched: an issue carrying
-    `GOOD_FIRST_ISSUE` first, then an `open` issue over a `closed` one because
-    an open issue is the one a maintainer would be told about twice, then token
-    order, then issue number. The label comes first because FR-13.9 refuses a
-    filing that matched ANY such issue and `DedupVerdict.evidence`'s eight keys
-    can carry the labels of one issue only.
-
-    No GitHub request is made here, which is FR-10.3's network-trace criterion.
-
-    Returns:
-        None on no match, else {"matched_token", "issue_number", "issue_url",
-        "issue_state", "issue_labels"}.
-    Worker:
-        {"num_cpus": 0.1} per query, the store's own; B6b is a head node.
-    Raises:
-        sqlite3.Error from the query. It makes no request, so it raises no
-        GitHub error.
-    """
+    """Query the local mirror once per token and pick the issue that decides."""
     hits: list = []
     for order, token in enumerate(tokens):
         for row in store.query(
@@ -442,32 +212,12 @@ def mirror_screen(store: LoopStore, tokens: list) -> Optional[dict]:
              "issue_labels")}
 
 
-# ---------------------------------------------------------------------------
-# 3.7.2 The two commit scans
-# ---------------------------------------------------------------------------
-
-
 def frame_paths(verdict: OracleVerdict) -> list:
-    """The candidate's source paths, as git pathspecs against the clone.
-
-    Frames in a CIRCT object with a file, plus the assertion site's file. A path
-    under one of `_SRC_ROOTS` is made relative to that root, which is the repo
-    path; anything else falls back to a `:(glob)**/<basename>` pathspec, so a
-    header that the build copied elsewhere still selects its file.
-
-    Returns:
-        list[str], sorted and deduplicated; empty when no frame carries a file.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The candidate's source paths, as git pathspecs against the clone."""
     files = [frame.file for frame in verdict.frames
              if frame.in_circt_object and frame.file]
     if verdict.assertion_site:
-        # The RAW site, not the normalised one: normalisation keeps two path
-        # components, which is what a fingerprint wants and what a pathspec
-        # cannot use.
+        # The RAW site, not the normalised one.
         files.append(verdict.assertion_site.rpartition(":")[0])
     out = set()
     for path in files:
@@ -486,20 +236,7 @@ def frame_paths(verdict: OracleVerdict) -> list:
 
 
 def frame_symbols(verdict: OracleVerdict) -> set:
-    """The candidate's function names, for 3.7.2's symbol-level match.
-
-    Each stripped frame's normalised function name and its last `::` component,
-    because git writes the hunk header's context in either spelling. The
-    assertion site's own function is among them by construction: the trace
-    passes through it.
-
-    Returns:
-        set[str], empty for a trace with no resolved CIRCT frame.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The candidate's function names, for 3.7.2's symbol-level match."""
     out = set()
     for frame in strip_prologue(list(verdict.frames)):
         if not frame.in_circt_object:
@@ -513,20 +250,7 @@ def frame_symbols(verdict: OracleVerdict) -> set:
 
 
 def commit_date(clone_path: str, commit: str, *, timeout: int = 60) -> str:
-    """Read one commit's committer date from the clone, as strict ISO 8601.
-
-    4.12 bounds both scans by a date, and `CandidateRecord.run_commit` and the
-    seed's own commit are SHAs, so this is the one conversion between them.
-
-    Returns:
-        str, `%cI`.
-    Worker:
-        head; the blobless clone at `--clone` is the only tree holding 24 months
-        of `main` (K5).
-    Raises:
-        subprocess.CalledProcessError when the commit is not in the clone, and
-        subprocess.TimeoutExpired past *timeout*.
-    """
+    """Read one commit's committer date from the clone, as strict ISO 8601."""
     out = subprocess.run(["git", "-C", clone_path, "log", "-1", "--format=%cI",
                           commit], capture_output=True, text=True, check=True,
                          timeout=timeout)
@@ -535,28 +259,7 @@ def commit_date(clone_path: str, commit: str, *, timeout: int = 60) -> str:
 
 def scan_commits(clone_path: str, since: str, paths: list, *,
                  timeout: int = 900) -> list:
-    """Walk `main` from *since* to the clone head over *paths*, one command.
-
-    4.12's line, which is the command the M4 measurement used:
-
-        git -C <clone> log --first-parent -p --unified=0 --no-renames \\
-            --format=__C__ %H %cI --since <lower bound> -- <the paths>
-
-    Symbol level reads the identifier git puts in the `@@ ... @@ <context>` hunk
-    header, which is the precise rule; the crude `\\b(\\w+)\\s*\\(` rule over the
-    `+`/`-` lines is NOT used, and the difference is measured: 77.0% against
-    79.1% flagged over the corpus (M4).
-
-    Returns:
-        list[dict], one per commit in walk order, each
-        {"sha": str, "date": str, "contexts": list[str]}.
-    Worker:
-        head, for the same reason as `commit_date`.
-    Raises:
-        subprocess.CalledProcessError from git, and subprocess.TimeoutExpired
-        past *timeout*. An empty *paths* returns [] without running git, because
-        `git log -- ` with no pathspec would walk the whole history.
-    """
+    """Walk `main` from *since* to the clone head over *paths*, one command."""
     if not paths:
         return []
     out = subprocess.run(
@@ -578,30 +281,12 @@ def scan_commits(clone_path: str, since: str, paths: list, *,
 
 
 def _after(commits: list, bound: Optional[str]) -> list:
-    """Drop the bound commit itself, which `--since <its own date>` includes.
-
-    Both windows are open at the bottom: FR-10.4 scans commits made AFTER the
-    run's commit and FR-15.1 fixes made after the seed's, and `git log --since`
-    takes a date and keeps a commit stamped exactly at it.
-    """
+    """Drop the bound commit itself, which `--since <its own date>` includes."""
     return [c for c in commits if bound is None or c["sha"] != bound]
 
 
 def touches_symbol(commit: dict, symbols: set) -> bool:
-    """Report whether a commit's hunk-header contexts name one of *symbols*.
-
-    This is FR-15.1's symbol level, and the identifier is read from the context
-    git itself writes after the `@@ ... @@` marker, never from the changed lines.
-    An empty symbol set matches nothing, which keeps a trace with no resolved
-    CIRCT frame out of the contamination count rather than in all of it.
-
-    Returns:
-        bool.
-    Worker:
-        pure; the git call already happened in `scan_commits`.
-    Raises:
-        nothing.
-    """
+    """Report whether a commit's hunk-header contexts name one of *symbols*."""
     if not symbols:
         return False
     for context in commit["contexts"]:
@@ -610,51 +295,15 @@ def touches_symbol(commit: dict, symbols: set) -> bool:
     return False
 
 
-# ---------------------------------------------------------------------------
-# B6a, the issue mirror
-# ---------------------------------------------------------------------------
-
-
 #: GitHub's own pagination ceiling on the issues-listing endpoint (C-22).
-#: MEASURED 2026-09-14 by `T-U-triage-35` with a token: of 100 requests the
-#: first 99 answered 200 and the hundredth answered **422**, so pages 1 to 99
-#: are reachable and one direction sees at most 9,900 numbered items, issues and
-#: pull requests together. Two directions therefore cover 19,800, which is more
-#: than `llvm/circt` has issued.
 MIRROR_PAGE_CEILING = 100
 
-#: The status a refused page answers with, which `GithubClient._error_message`
-#: puts at the head of the message it raises `GithubRequestError` with
-#: (`chia:chia/github/github_client.py:180`, `192`). Any other 4xx is a real
-#: failure and is re-raised.
+#: The status a refused page answers with.
 _CEILING_STATUS = "422"
 
 
 def mirror_walk(node, direction: str, cap: int, seen: set) -> tuple:
-    """Page llvm/circt's issue listing in ONE direction, dropping pull requests.
-
-    `GithubIssuesNode.recent` cannot be used for this: `_list` hard-codes
-    `direction: "desc"` (`chia:chia/github/github_issues_node.py:152`) and takes
-    no parameter, and CHIA is not modified (FR-12.1). Its two halves that matter
-    are reused instead, `_request` for the HTTP round trip and `_build_issue`
-    for the record, so a test that replays a recorded response set through
-    `GithubClient._request` exercises this walk exactly as it exercises CHIA's.
-
-    Returns:
-        (issues, pages, ceiling_hit, reason): the `GithubIssue`s this direction
-        added, how many pages were fetched, whether the walk stopped at GitHub's
-        pagination ceiling rather than at the end of the listing or at the cap,
-        and the class name of the error that stopped it, or None. *seen* is
-        mutated: it holds every issue number taken so far, in either direction,
-        which is what makes the union deduplicated by number.
-    Worker:
-        the caller's, which is B6a's, which is the head.
-    Raises:
-        nothing. Every `GithubError` stops this direction and is returned as
-        `reason`, so a rate limit half way through leaves the pages already
-        fetched in the caller's hands rather than discarding them, which is
-        what the one-direction walk did.
-    """
+    """Page llvm/circt's issue listing in ONE direction, dropping pull requests."""
     from chia.github.github_client import GithubError, GithubRequestError
 
     path = f"/repos/{node.owner}/{node.name}/issues"
@@ -670,8 +319,7 @@ def mirror_walk(node, direction: str, cap: int, seen: set) -> tuple:
                 "state": node.state, "sort": "created", "direction": direction,
                 "per_page": node._PER_PAGE, "page": page})
         except GithubError as error:
-            # Only the ceiling's own 422 is the ceiling: any other 4xx, and a
-            # rate limit, is a failure the run is told about (FR-10.7).
+            # Only the ceiling's own 422 is the ceiling.
             if (isinstance(error, GithubRequestError)
                     and str(error).startswith(_CEILING_STATUS)):
                 ceiling_hit = True
@@ -682,8 +330,7 @@ def mirror_walk(node, direction: str, cap: int, seen: set) -> tuple:
         if not isinstance(items, list) or not items:
             break
         for item in items:
-            # /issues conflates issues and pull requests; the mirror is issues,
-            # which is `_list`'s own rule and the reason 600 rows cost 35 pages.
+            # /issues conflates issues and pull requests.
             if item.get("pull_request") is not None:
                 continue
             number = item.get("number")
@@ -696,8 +343,7 @@ def mirror_walk(node, direction: str, cap: int, seen: set) -> tuple:
         if len(items) < node._PER_PAGE:
             break
     else:
-        # Every reachable page was fetched and the listing had not ended: the
-        # next page is the one GitHub refuses.
+        # Every reachable page was fetched and the listing had not ended.
         ceiling_hit = True
     return issues, pages, ceiling_hit, reason
 
@@ -707,44 +353,12 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
                          db_path: str) -> dict:
     """Mirror llvm/circt's open and closed issues into loop.db, once per run.
 
-    **The walk is two-directional** (3.7.3, architect decision 1, C-22). It
-    pages `direction=desc` from the newest until the listing ends, the cap is
-    reached, or GitHub's pagination ceiling refuses a page with a 422; on the
-    ceiling it then pages `direction=asc` from the oldest and unions the two
-    deduplicated by issue number. One direction sees at most 9,900 numbered
-    items and `llvm/circt`'s newest number on 2026-09-14 was 11,113, so the
-    union is the whole history. Before this, one direction at the campaign's cap
-    raised on the 422 and wrote **zero** rows: the mirror did not truncate, it
-    produced nothing (`T-U-triage-35`, measured).
-
-    Five fields per issue and no text beyond the body: number, title, body,
-    labels, state, plus the issue's own URL and the refresh time.
-    `fetch_comments` is False by requirement and not by preference: the default
-    costs one extra paginated request per issue that has comments (FR-10.9), and
-    mirroring no comment at all is what makes FR-20.4 true by construction,
-    because no maintainer's words are in the database to reach a prompt.
-
-    Once per run is the driver's rule and not this node's: the signature carries
-    no run id and no refresh flag, so B12 calls it once unless `--refresh-mirror`
-    and writes `issue_mirror_meta` from what comes back.
-
     Returns:
-        {"refreshed_utc": str, "issues_mirrored": int, "issue_cap": int,
-         "cap_bound": bool, "state": "all", "comments_mirrored": False,
-         "incomplete_reason": str | None, "ceiling_hit": bool, "pages": int,
-         "issues_added": int, "counters": CounterBlock}. The first six are
-        `RunManifest.issue_mirror`'s closed key set (2.7); the rest cannot go
-        there, that set being compared exactly by `validate` and the contract
-        being frozen at 2.0, so the driver copies the six and records the others
-        beside them. `incomplete_reason` is FR-10.7's detection point.
+        {"refreshed_utc": str, "issues_mirrored": int, "issue_cap": int, "cap_bound": bool, "state": "all", "comments_mirrored": False, "incomplete_reason": str | None, "ceiling_hit": bool, "pages": int, "issues_added": int, "counters": CounterBlock}.
     Worker:
-        head - GithubIssuesNode is documented head-node only, and the token
-        lives on the head and nowhere else (4.3 of 02-HLD.md, section 11 here).
+        head - GithubIssuesNode is documented head-node only.
     Raises:
-        nothing it does not catch. A GithubRateLimitError marks the mirror
-        incomplete with the count reached and screening proceeds against a
-        partial mirror, flagged in the return (FR-10.7's detection point); the
-        ceiling's own 422 is not an error and is reported as `ceiling_hit`.
+        nothing it does not catch.
     """
     from chia.github.github_issues_node import GithubIssuesNode
 
@@ -763,8 +377,7 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
             node, direction, issue_cap, seen)
         issues.extend(found)
         pages += walked
-        # The second direction earns its requests only where the first ran out
-        # of reachable pages with the cap unfilled and nothing failed.
+        # The second direction earns its requests only where the first ran out of reachable pages with the cap unfilled and nothing failed.
         if reason or not ceiling_hit or len(seen) >= issue_cap:
             break
 
@@ -789,49 +402,18 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
                 seconds=time.monotonic() - started_at)}
 
 
-# ---------------------------------------------------------------------------
-# B6b, the fingerprint, the screens and the two scans
-# ---------------------------------------------------------------------------
-
-
 @ChiaFunction(max_retries=0)
 def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
                      verdict: OracleVerdict, clone_path: str, db_path: str,
                      top_n: int) -> dict:
     """Fingerprint one candidate, screen it, and flag contamination both ways.
 
-    The run's commit is NOT a parameter: it is `candidate.run_commit`, which is
-    the only value that is right in both modes (K14). `RunManifest.run_commit`
-    is a list, one entry per calibrated seed, so index 0 is an arbitrary sampled
-    seed's commit and is this candidate's only by accident.
-
-    Verdict precedence, which 3.7 fixes nowhere and which this node fixes here:
-    an empty mirror is `dedup_unavailable` for every candidate (FR-10.7); then a
-    mirror hit, open before closed, because its evidence carries FR-13.9's
-    label refusal and nothing downstream can recover it; then a
-    candidate-to-candidate duplicate; then a post-pin fix; then `new`.
-
-    A candidate-to-candidate duplicate merges only against a fingerprint the
-    gate's re-run already found stable, which is what keeps 3.7.1's "an unstable
-    fingerprint is reported, never merged" true of the merge path as well as of
-    the results (FR-10.6 makes that query cross-run).
-
     Returns:
-        {"fingerprint": Fingerprint, "dedup": DedupVerdict,
-         "contaminated_symbol": bool, "contaminated_file": bool,
-         "contamination_lower_bound": str, "fixing_commits": list[str],
-         "counters": CounterBlock}, the counters counting one candidate at
-        stage_6, `dedup_unavailable` being the failed one (3.11).
+        {"fingerprint": Fingerprint, "dedup": DedupVerdict, "contaminated_symbol": bool, "contaminated_file": bool, "contamination_lower_bound": str, "fixing_commits": list[str], "counters": CounterBlock}, the counters counting one candidate at stage_6, `dedup_unavailable` being the failed one (3.11).
     Worker:
-        head - both commit scans walk 24 months of main in the head's blobless
-        clone, and the issue mirror is a table in loop.db, which is head-pinned
-        (K5, K7).
+        head - both commit scans walk 24 months of main in the head's blobless clone.
     Raises:
-        ValueError on a `differential` candidate, which FR-08.10 keeps out of
-        this stage entirely and which reaching it is a caller defect; and
-        ContractError from `validate_candidate` on the screened record. An
-        undecidable dedup is `dedup_unavailable`, which fails gate question 4
-        rather than passing it (FR-10.7), and a git or GitHub failure is caught.
+        ValueError on a `differential` candidate.
     """
     started_at = time.monotonic()
     if candidate.oracle_class == "differential":
@@ -846,9 +428,7 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     fingerprint = compute_fingerprint(
         verdict, (signal_row or {}).get("signal"), reduced_text, top_n)
 
-    # FR-10.4, the post-pin fix: file level, lower bound the candidate's own
-    # run commit, upper bound the clone head. Over-inclusive by design, because
-    # a match makes the candidate fail the gate's novelty question.
+    # FR-10.4, the post-pin fix.
     paths = frame_paths(verdict)
     fixing: list = []
     scan_failure = None
@@ -860,8 +440,7 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     except (OSError, subprocess.SubprocessError) as error:
         scan_failure = f"post_pin_scan:{type(error).__name__}"
 
-    # FR-15.1 and FR-15.5, contamination: symbol level, lower bound the seed's
-    # own commit date, or the run's commit for the 16 non-exact seeds.
+    # FR-15.1 and FR-15.5, contamination.
     exact = bool(getattr(seed, "sdk_exact", False))
     lower_bound = "seed_commit" if exact else "run_commit"
     symbols = frame_symbols(verdict)
@@ -947,12 +526,7 @@ def _screened(candidate: CandidateRecord, fingerprint: Fingerprint,
 
 def _write_rows(store: LoopStore, candidate: CandidateRecord,
                 fingerprint: Fingerprint, dedup: DedupVerdict) -> None:
-    """The candidate row and its two verdict rows, in one transaction (6.4 rule 4).
-
-    `INSERT OR REPLACE` rather than `INSERT`, because 3.2 gives this node the
-    idempotency key `(candidate_id, mirror_refreshed_utc, run_commit)`: a second
-    screen of one candidate rewrites its rows rather than raising.
-    """
+    """The candidate row and its two verdict rows, in one transaction (6.4 rule 4)."""
     store.transaction([
         ("INSERT OR REPLACE INTO candidate (candidate_id, probe_id, "
          "run_manifest_id, arm, run_commit, image_digest, oracle_class, "
@@ -983,21 +557,13 @@ def _write_rows(store: LoopStore, candidate: CandidateRecord,
     ])
 
 
-# ---------------------------------------------------------------------------
-# B7, the triage turn and the report render
-# ---------------------------------------------------------------------------
-
 #: 7.4.1's thirteen substitution points, primary template.
 PRIMARY_POINTS = ("title", "summary", "observed_behaviour", "reduced_case",
                   "repro_command", "build_identity", "frames", "dedup_evidence",
                   "arm", "contamination", "fingerprint", "why_it_matters",
                   "assisted_by")
 
-#: 7.4.1's twelve, differential template. Enforced SEPARATELY and not as one
-#: superset: there is no `observed_behaviour` point, because the two behaviour
-#: points replace it, and none of `frames`, `reduced_case`, `repro_command`,
-#: `dedup_evidence`, `contamination` or `fingerprint`, because a `differential`
-#: candidate has none of them (FR-08.10, FR-09.8, FR-13.14).
+#: 7.4.1's twelve, differential template.
 DIFFERENTIAL_POINTS = ("title", "summary", "arcilator_behaviour",
                        "verilator_behaviour", "divergence_point", "stimulus",
                        "x_policy", "prior_art", "build_identity", "arm",
@@ -1110,26 +676,7 @@ def render_report(template: Literal["primary", "differential"],
                   differential: Optional[DifferentialVerdict],
                   dedup: Optional[DedupVerdict], manifest: RunManifest,
                   prose: dict) -> str:
-    """Render one report.md from the record, substituting every number itself.
-
-    No number the agent produced reaches the report (FR-11.4): every count,
-    size, time, hash, SHA and verdict below is read off the record, and the
-    agent's contribution is `title`, `summary` and `why_it_matters` only.
-
-    The two point lists are enforced SEPARATELY: a point the chosen template
-    declares and the record cannot fill raises, and the other template's absent
-    points are accepted. A `differential` candidate is the one call that passes
-    *differential* non-None and *verdict*, *reduced* and *dedup* all None (W23).
-
-    Returns:
-        str, the rendered markdown; the caller writes it and hashes it.
-    Worker:
-        pure; it is called inside B7 and runs no process.
-    Raises:
-        ReportIncomplete(point) when any substitution point of 7.4.1 that the
-        chosen template declares is absent from the record (FR-11.3);
-        ValueError on a template name that is neither.
-    """
+    """Render one report.md from the record, substituting every number itself."""
     if template == "primary":
         points, text = PRIMARY_POINTS, _PRIMARY_TEMPLATE
         values = _primary_values(candidate, reduced, verdict, dedup, manifest)
@@ -1148,34 +695,14 @@ def render_report(template: Literal["primary", "differential"],
 
 
 def assisted_by_model(manifest: RunManifest) -> Optional[str]:
-    """The model that ACTUALLY ran stage 6, or None when no turn was made.
-
-    Read off `RunManifest.stages_metered["stage_6"]`, which is the run's own
-    statement about whether stage 6 was a model turn, and not off `model_ids`,
-    which is what the run would have used had it made one.
-    """
+    """The model that ACTUALLY ran stage 6, or None when no turn was made."""
     if not manifest.stages_metered.get("stage_6", True):
         return None
     return manifest.model_ids["triage_report"]
 
 
 def assisted_by(manifest: RunManifest) -> str:
-    """FR-11.6's trailer: the model that ACTUALLY ran, or a sentence saying none.
-
-    `RunManifest.stages_metered["stage_6"]` is the run's own statement about
-    whether stage 6 was a model turn. Under `--generator recorded` it is False
-    and no turn was made anywhere, and the rendered report's first line says
-    exactly that - while its last line said `Assisted-by: vertex:gemini-3.8-flash`,
-    because this was read off `model_ids` in three places with nothing asking
-    whether the model had run (W-19b #7). One artefact cannot state both.
-
-    Returns:
-        str, the trailer line.
-    Worker:
-        pure; it reads two manifest fields.
-    Raises:
-        nothing.
-    """
+    """FR-11.6's trailer: the model that ACTUALLY ran, or a sentence saying none."""
     model = assisted_by_model(manifest)
     if model is None:
         return ("Assisted-by: none. No model turn was made for this report "
@@ -1227,13 +754,7 @@ def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
 def _differential_values(candidate: CandidateRecord,
                          differential: Optional[DifferentialVerdict],
                          manifest: RunManifest) -> dict:
-    """The differential template's record-sourced points (7.4.1's second table).
-
-    `stimulus` is 7.4.1's `ProbeSpec.differential` five keys, and `render_report`
-    takes no `ProbeSpec`: three come off the `DifferentialVerdict` and two off
-    9.4's campaign constants, which is the same data by FR-08.3's rule that one
-    stimulus definition serves the whole campaign.
-    """
+    """The differential template's record-sourced points (7.4.1's second table)."""
     from circt_bug_loop.probe_task import RESET_PROTOCOL, SAMPLE_POINT
 
     image = dict(manifest.image_spec)
@@ -1278,13 +799,7 @@ def _differential_values(candidate: CandidateRecord,
 
 
 def _observed(verdict: Optional[OracleVerdict]) -> Optional[str]:
-    """FR-07.10's observed-behaviour point, in the failure class's own words.
-
-    A `fatal_error` is a refusal CIRCT chose deliberately, so the wording here
-    says neither "crash" nor the other word, exactly as 7.4 forbids the agent to
-    (W13): calling a deliberate refusal a crash is how a maintainer's tolerance
-    gets spent.
-    """
+    """FR-07.10's observed-behaviour point, in the failure class's own words."""
     if verdict is None:
         return None
     if verdict.oracle_class == "assertion":
@@ -1324,34 +839,17 @@ def _dedup_lines(dedup: Optional[DedupVerdict]) -> Optional[str]:
 
 
 def cap_sentences(text: str, limit: int = TRIAGE_REASON_MAX_SENTENCES) -> tuple:
-    """Truncate a classification reason to *limit* sentences, recording that it was.
-
-    Counted by splitting on `.`, `!` and `?` followed by whitespace or the end
-    of the string. Truncated rather than rejected (FR-11.1): a reason that is
-    too long is still the agent's opinion, and the gate reads none of it.
-
-    Returns:
-        (str, bool): the capped text, and whether anything was dropped.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Truncate a classification reason to *limit* sentences, recording that it was."""
     parts = [p for p in _SENTENCE_END.split(text or "") if p.strip()]
     if len(parts) <= limit:
         return (text or "").strip(), False
     return " ".join(part.strip() for part in parts[:limit]), True
 
 
-#: The three dedup verdicts FR-11.2 turns into `known_issue` whatever the agent
-#: wrote: the screen matched the candidate to an issue the maintainers already
-#: have.
+#: The three dedup verdicts FR-11.2 turns into `known_issue` whatever the agent wrote.
 _KNOWN_ISSUE_VERDICTS = ("known_open_issue", "known_closed_issue", "fixed_post_pin")
 
 #: What a candidate the screen did not call `new` is classified as, by verdict.
-#: `dedup_unavailable` is the one value that says nothing about the candidate,
-#: so it takes FR-11.8's `untriaged`, which is what a candidate with no
-#: classification is; the gate refuses all five at question 4 either way.
 _SCREENED_CLASSIFICATION = {
     "known_open_issue": "known_issue",
     "known_closed_issue": "known_issue",
@@ -1361,9 +859,6 @@ _SCREENED_CLASSIFICATION = {
 }
 
 #: The prose a report written without a turn carries, in place of an agent's.
-#: It is the driver's own sentence and says so, which is the same rule
-#: `--generator recorded` follows (FR-11.6's trailer names the model that
-#: ACTUALLY ran, and none did).
 NO_TURN_PROSE = (
     "NO MODEL TURN WAS MADE FOR THIS CANDIDATE. The duplicate screen matched it "
     "before stage 6's agent turn, so FR-11.2's tool verdict already decides the "
@@ -1375,18 +870,7 @@ NO_TURN_PROSE = (
 
 
 def screened_out(dedup: Optional[DedupVerdict]) -> Optional[tuple]:
-    """What to record for a candidate the screen already decided, or None.
-
-    None means "ask a model": a `new` candidate, and a `differential` one, whose
-    call site passes no `DedupVerdict` at all (FR-08.10).
-
-    Returns:
-        (classification, prose, reason) | None.
-    Worker:
-        pure; it reads one record.
-    Raises:
-        nothing.
-    """
+    """What to record for a candidate the screen already decided, or None."""
     if dedup is None or dedup.verdict == "new":
         return None
     classification = _SCREENED_CLASSIFICATION.get(dedup.verdict, "untriaged")
@@ -1401,40 +885,12 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                   *, differential: Optional[DifferentialVerdict] = None) -> dict:
     """Classify one candidate advisorily and render the report a maintainer reads.
 
-    Two rules make the output safe to report. The TOOL VERDICT WINS: a candidate
-    whose `DedupVerdict` is `known_open_issue`, `known_closed_issue` or
-    `fixed_post_pin` is classified `known_issue` whatever the agent wrote, and
-    the agent's only freedom is the reason text (FR-11.2). And NO NUMBER THE
-    AGENT PRODUCED REACHES THE REPORT: `render_report` substitutes every count,
-    size, time, hash, SHA and verdict from the record (FR-11.4).
-
-    **THE TURN IS MADE ONLY FOR A `new` CANDIDATE** (W-18b, errata row 47).
-    `dedup_and_screen` runs before this node, so its verdict is known here, and
-    for every verdict but `new` the tool verdict has already decided the
-    classification and gate question 4 already refuses the candidate: the turn
-    could change neither and cost a whole tool loop. The pilot paid USD 3.96 for
-    one such turn over a candidate the screen had already matched to an open
-    issue, and the prose it bought disagreed with the match and was overruled by
-    FR-11.2 in the same function. The report is still RENDERED - every field of
-    it comes off the record - with `NO_TURN_PROSE` in the three prose slots, and
-    the ledger entry carries no token count at all.
-
-    The turn is 3.5.1's turn: `llm.build_llm` with stage 6's timeout and
-    `cfg["model_id"]`, dispatched through `llm.dispatch_turn` with exactly one
-    tool, `SourceReadTool`, named for the candidate and stopped in a `finally`
-    as A3 does.
-
     Returns:
-        {"report": Report, "logs": dict, "failure": str | None, "counters":
-        CounterBlock}. `logs` carries the turn's five FR-04.6 files by path, its
-        usage, and `reason_truncated`; the counters count one candidate at
-        stage_6, a failed turn being the failed one (3.11).
+        {"report": Report, "logs": dict, "failure": str | None, "counters": CounterBlock}.
     Worker:
         {"circt": 1} for the node; the one turn at {"llm": 1.0}.
     Raises:
-        nothing. A failed turn yields classification "untriaged" and an empty
-        report; the candidate still receives four mechanical gate answers and is
-        held with held_reason=no_report if it passes (FR-11.8).
+        nothing.
     """
     started_at = time.monotonic()
     validate_candidate(candidate)
@@ -1449,10 +905,7 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     screened = screened_out(dedup)
 
     if screened is not None:
-        # No turn at all. The tool verdict already decides this candidate's
-        # classification and the gate refuses it at question 4 whatever prose a
-        # model would have written, so the turn buys nothing and costs a whole
-        # tool loop (FR-11.2, W-18b).
+        # No turn at all.
         classification, prose, reason = screened
         logs.update({"turn_skipped": dedup.verdict, "success": True,
                      "result": "", "stream": "", "stderr": ""})
@@ -1516,14 +969,7 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                    dedup: Optional[DedupVerdict],
                    differential: Optional[DifferentialVerdict],
                    manifest: RunManifest, cfg: dict) -> str:
-    """7.4's prompt, one prompt and two fillings, with no `$name` left unbound.
-
-    For a `differential` candidate the six primary variables are bound to the
-    literal `NOT_APPLICABLE` and the three differential variables come off the
-    `DifferentialVerdict`, because `safe_substitute` leaves an unbound `$name`
-    in place and an unbound `$frames` in a prompt is a defect rather than a
-    blank (W23).
-    """
+    """7.4's prompt, one prompt and two fillings, with no `$name` left unbound."""
     text = cfg.get("report_write") or (PROMPTS / "report_write.md").read_text()
     values = {
         "max_sentences": cfg.get("max_sentences", TRIAGE_REASON_MAX_SENTENCES),
@@ -1564,30 +1010,7 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
 
 
 def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
-    """One 3.5.1 turn on the campaign backend, with `SourceReadTool` and nothing else.
-
-    The turn is `llm.py`'s, which is neither half, so it is imported at module
-    scope. `generate_task` is still imported HERE and not there, for the one
-    name 3.5 leaves in the supply half: `SourceReadTool`.
-
-    B7 runs on a `circt` worker, which carries neither the key nor the
-    interlock. It builds no backend: `llm_turn` constructs the client on the
-    `llm` worker from that worker's own environment, and what crosses is the
-    system message, the prompt, the tool's endpoint, the stage, the timeout and
-    the model id (K2, W7).
-
-    The tool is constructed as 3.5's constructor declares it,
-    `(name, clone_path, run_commit, cap_bytes, task_options)`, and by keyword.
-    The two positional arguments this call site carried bound `name` to the
-    clone path and `clone_path` to the commit and then raised `TypeError` for
-    the missing `run_commit`, so no triage turn could ever have run (architect
-    decision 4; T-U-triage-36 constructs the real tool).
-
-    The turn goes through `dispatch_turn` and not through `llm_turn` itself: a
-    plain call to the decorated wrapper routes through `chia.trace.profiler`,
-    which starts a local Ray where none is running, which is what A3's own turn
-    avoids the same way (3.5.1, 04-Test-Plan.md 0.4).
-    """
+    """One 3.5.1 turn on the campaign backend, with `SourceReadTool` and nothing else."""
     from circt_bug_loop import generate_task
 
     tool = generate_task.SourceReadTool(
