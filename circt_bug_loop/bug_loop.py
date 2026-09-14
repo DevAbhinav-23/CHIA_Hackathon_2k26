@@ -1176,16 +1176,28 @@ def check_10_issue_mirror(*, mirror: Optional[dict], refresh_requested: bool) ->
 
 
 def check_11_forum_post(*, forum_post_url: Optional[str],
-                        forum_post_date: Optional[str]) -> None:
+                        forum_post_date: Optional[str],
+                        filings_total: Optional[int] = None) -> None:
     """Check 11: the method's forum post exists before the campaign starts (FR-20.1).
+
+    *filings_total* is the run's registered filing cap, and **zero exempts the
+    run** (W-18). FR-20.1 posts the method so CIRCT's maintainers are not met by
+    reports from an automated system they were never told about; a run whose
+    pre-registration caps filings at zero can produce no report for anyone to be
+    surprised by, and the check would otherwise make the project's own pilot -
+    the run that exists to be small and to file nothing - impossible to start
+    until a human has posted to a public forum. Any positive cap, and the two
+    values are required exactly as before.
 
     Returns:
         None.
     Worker:
-        head; it reads two argv values and makes no request.
+        head; it reads two argv values and one budget key, and makes no request.
     Raises:
         PreflightFailed("forum_post", detail) naming the missing one.
     """
+    if filings_total == 0:
+        return
     missing = [name for name, value in (("forum_post_url", forum_post_url),
                                         ("forum_post_date", forum_post_date))
                if not value]
@@ -3710,7 +3722,8 @@ def run_campaign(args, out) -> int:
     mirror = _mirror(store, budget, args, dispatch, triage_task)
     check_10_issue_mirror(mirror=mirror, refresh_requested=args.refresh_mirror)
     check_11_forum_post(forum_post_url=args.forum_post_url,
-                        forum_post_date=args.forum_post_date)
+                        forum_post_date=args.forum_post_date,
+                        filings_total=budget.filings_total)
     # W4: `--generator recorded` exists so the whole dispatch path can be
     # exercised ON THE CLUSTER with no model turn and no credential, and
     # check 12 refused such a run unless the head and both llm workers carried
@@ -3848,7 +3861,17 @@ def run_campaign(args, out) -> int:
 
 def _mirror(store: LoopStore, budget: BudgetFile, args, dispatch: Dispatch,
             triage_task) -> Optional[dict]:
-    """Refresh the issue mirror, or return the existing one's meta row (FR-10.9)."""
+    """Refresh the issue mirror, or return the existing one's meta row (FR-10.9).
+
+    `issue_mirror_meta` is keyed by `run_manifest_id` and is written by
+    `write_run_rows`, so only a previous DRIVER run can have put a row in it. A
+    mirror built by `triage_task.issue_mirror_refresh` called any other way -
+    which is how A7's offline synthesis builds one (8.3) - filled
+    `issue_mirror` and left the meta table empty, and FR-10.9's "or an existing
+    one is reused" could then never be taken (W-18). The fallback reads the
+    mirror TABLE: every field comes off the rows themselves, and a table with no
+    row still returns None so check 10's refusal is untouched.
+    """
     existing = store.query_one(
         "SELECT refreshed_utc, issues_mirrored, issue_cap, cap_bound, state, "
         "comments_mirrored FROM issue_mirror_meta ORDER BY refreshed_utc DESC")
@@ -3856,6 +3879,20 @@ def _mirror(store: LoopStore, budget: BudgetFile, args, dispatch: Dispatch,
         return {**existing, "cap_bound": bool(existing["cap_bound"]),
                 "comments_mirrored": bool(existing["comments_mirrored"]),
                 "incomplete_reason": None}
+    if not args.refresh_mirror:
+        rows = store.query_one(
+            "SELECT COUNT(*) AS mirrored, MAX(mirrored_utc) AS refreshed "
+            "FROM issue_mirror")
+        if rows and rows["mirrored"]:
+            cap = int(budget.issue_mirror_issue_cap)
+            return {"refreshed_utc": rows["refreshed"],
+                    "issues_mirrored": int(rows["mirrored"]),
+                    "issue_cap": cap, "cap_bound": int(rows["mirrored"]) >= cap,
+                    # The table can hold nothing else: `state` has a CHECK for
+                    # the two values and `comments_mirrored` a CHECK for zero
+                    # (FR-20.4, 6.2), so neither is a guess.
+                    "state": "all", "comments_mirrored": False,
+                    "incomplete_reason": None}
     return dispatch.call(triage_task.issue_mirror_refresh, "llvm/circt",
                          budget.issue_mirror_issue_cap, args.github_token_file,
                          store.db_path)

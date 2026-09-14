@@ -330,6 +330,21 @@ def test_T_U_driver_11():
         bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date="2026-09-18")
     assert "forum_post_url" in str(raised.value)
 
+    # W-18: a run whose REGISTERED filing cap is zero is exempt, and nothing
+    # else is. FR-20.1 posts the method so maintainers are not met by reports
+    # from a system they were never told about, and a run that can file nothing
+    # produces no report for anyone to be surprised by. Any positive cap still
+    # requires both values, and an unsupplied cap still requires them.
+    bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
+                                 filings_total=0)
+    for cap in (1, 10, None):
+        with pytest.raises(bug_loop.PreflightFailed):
+            bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
+                                         filings_total=cap)
+    # And the driver passes the budget's own value, not a literal.
+    source = inspect.getsource(bug_loop.run_campaign)
+    assert "filings_total=budget.filings_total" in source
+
 
 def test_T_U_driver_27():
     """T-U-driver-27 (NFR-06, NFR-08): check 12, the interlock and the key.
