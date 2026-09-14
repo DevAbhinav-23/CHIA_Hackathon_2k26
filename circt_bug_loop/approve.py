@@ -1,29 +1,4 @@
-"""B9c, `bugloop-approve`: the one interface a human touches (`03-LLD.md` §13.2).
-
-A program, not a node: `input()` and `print()`, no framework (ADR-D-12). It owns
-both halves of FR-13.18, the approval and the issue URL, so a filing is never two
-tools; and it writes **nothing** until an approval is complete, so a human who
-walks away leaves the candidate held and the next invocation presents the same
-report.
-
-Run it as `python -m circt_bug_loop.approve`. §13.2 also names a
-`bugloop-approve` console script backed by a `pyproject.toml` in the flow
-directory; the team repository packages nothing and has no such file, so the
-module entry is the spelling that exists here and the console script is W-26's
-packaging work (erratum).
-
-Deviations from §13.2, each recorded in
-`design/reviews/implementation-errata-log.md`:
-
-  * The commands are `list`, `show`, `approve`, `refuse`, `url`, `filed` and
-    `poll`. §13.2's table names `reject` where W-14's brief names `refuse`, and
-    splits `url` differently: there, one `url <id> <issue_url>` both prints and
-    records; here `url <id>` prints the pre-filled link or the hand-filing text
-    and `filed <id> <url>` records the pasted one, which is two verbs for two
-    acts. §13.2's `status` is not written: `list` and `show` print what it would.
-  * A human refusal is recorded as the candidate's `held_reason`. §13.2 gives it
-    no table and §6.2 has none.
-"""
+"""B9c, `bugloop-approve`: the one interface a human touches (`03-LLD.md` §13.2)."""
 from __future__ import annotations
 
 import argparse
@@ -37,12 +12,10 @@ from typing import Optional
 from circt_bug_loop.store import LoopStore, utc_now
 from circt_bug_loop.triage_task import GOOD_FIRST_ISSUE
 
-#: §9.4, FR-13.17, fixed by ADR-D-02. An FR-11.3-compliant body carries the
-#: reduced case verbatim, so the fallback is the expected path and not the edge.
+#: §9.4, FR-13.17, fixed by ADR-D-02.
 PREFILL_URL_CHAR_LIMIT = 6000
 
-#: `llvm/circt` has no `.github/ISSUE_TEMPLATE/` directory, so `?title=&body=`
-#: prefill is available at all (verified).
+#: `llvm/circt` has no `.github/ISSUE_TEMPLATE/` directory.
 REPO = "llvm/circt"
 ISSUE_NEW_URL = f"https://github.com/{REPO}/issues/new"
 ISSUE_PATH_PREFIX = f"/{REPO}/issues/"
@@ -50,8 +23,7 @@ ISSUE_PATH_PREFIX = f"/{REPO}/issues/"
 #: The two decisions that can reach a human. Anything else is `nothing`.
 FILEABLE = ("report", "report_plus_patch")
 
-#: What `refuse` writes into `candidate.held_reason`, and what `approve` reads
-#: back to refuse a second look at a candidate a human has already declined.
+#: What `refuse` writes into `candidate.held_reason`.
 REFUSED_PREFIX = "human_refused:"
 AWAITING = "awaiting_approval"
 
@@ -74,26 +46,12 @@ LLVM exceptions, and the confirmation is recorded against this report and never
 defaulted. The patch is on screen above. Confirm? [yes/no] """
 
 
-#: Now, UTC, ISO-8601. `store.utc_now` and not a second spelling of it: the
-#: driver and the approval CLI both stamp rows of the same store (N3).
+#: Now, UTC, ISO-8601.
 _utc = utc_now
 
 
 def load_budget_caps(path: str) -> dict:
-    """FR-13.8's two caps, read from the pre-registered `budget.yaml`.
-
-    Read directly rather than through `budget.load_budget`, which also runs the
-    campaign's git pre-registration checks; the caps are what this program needs
-    and a human approving a report is not starting a run.
-
-    Returns:
-        {"filings_per_day": int, "filings_total": int,
-         "filing_poll_window_seconds": int}.
-    Worker:
-        none; this is a program.
-    Raises:
-        OSError when the file is unreadable; KeyError on a missing cap.
-    """
+    """FR-13.8's two caps, read from the pre-registered `budget.yaml`."""
     import yaml
 
     budget = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
@@ -102,16 +60,7 @@ def load_budget_caps(path: str) -> dict:
 
 
 def load_case(store: LoopStore, candidate_id: str) -> dict:
-    """Every row one candidate's approval view needs, in one dict.
-
-    Returns:
-        {"candidate", "report", "gate", "repair", "reduced", "dedup",
-         "fingerprint", "filing"}; every value but "candidate" may be None.
-    Worker:
-        none.
-    Raises:
-        LookupError when no candidate row carries *candidate_id*.
-    """
+    """Every row one candidate's approval view needs, in one dict."""
     candidate = store.query_one("SELECT * FROM candidate WHERE candidate_id = ?",
                                 (candidate_id,))
     if candidate is None:
@@ -137,32 +86,14 @@ def load_case(store: LoopStore, candidate_id: str) -> dict:
 
 
 def refusal(store: LoopStore, case: dict, caps: dict) -> Optional[str]:
-    """The first refusal that applies, or None, checked BEFORE anything is shown.
-
-    In §13.2's order and no other: the per-UTC-day filing cap, the total cap, the
-    `good first issue` refusal, FR-11.8's hold, and a second approval of an
-    already-approved candidate. Each is a reason string the caller prints before
-    exiting non-zero; the human is never shown a report that cannot be filed
-    (FR-13.8's "enforced before the human is asked, not after").
-
-    Returns:
-        str or None.
-    Worker:
-        none.
-    Raises:
-        nothing.
-    """
+    """The first refusal that applies, or None, checked BEFORE anything is shown."""
     candidate, filing = case["candidate"], case["filing"]
     if filing is not None:
         return (f"{candidate['candidate_id']} was approved by "
                 f"{filing['approver']} at {filing['approved_at_utc']}: approval "
                 f"is per report and does not repeat (FR-13.13)")
 
-    # Both caps are PER CAMPAIGN RUN (W11). `loop.db` persists across runs and
-    # `--resume` depends on that, so a lifetime count against
-    # `budget.filings_total` held every report of every campaign after the
-    # tenth approval, whichever run had made it. The lifetime figure is shown
-    # beside the run's for information and is compared against nothing.
+    # Both caps are PER CAMPAIGN RUN (W11).
     run_id = candidate["run_manifest_id"]
     today = _utc()[:10]
     lifetime = store.query_one("SELECT COUNT(*) AS n FROM filing")["n"]
@@ -204,18 +135,7 @@ def refusal(store: LoopStore, case: dict, caps: dict) -> Optional[str]:
 
 
 def render_view(case: dict) -> str:
-    """FR-13.12's one view: the report, the four answers, the diff, the case.
-
-    Read-only, and the same text `show` prints and `approve` puts on screen
-    before it asks, so a human approves what they were shown.
-
-    Returns:
-        str.
-    Worker:
-        none.
-    Raises:
-        OSError when a recorded path no longer exists on disk.
-    """
+    """FR-13.12's one view: the report, the four answers, the diff, the case."""
     candidate, gate = case["candidate"], case["gate"] or {}
     parts = [f"=== candidate {candidate['candidate_id']} "
              f"({candidate['arm']}, {candidate['oracle_class']}) ===", ""]
@@ -252,16 +172,7 @@ def render_view(case: dict) -> str:
 
 
 def prefill(title: str, body: str) -> tuple:
-    """ADR-D-02(c)'s pre-filled issue URL, measured before it is offered.
-
-    Returns:
-        (url or None, length, fallback reason or None). The length is recorded
-        whichever branch is taken, which is what FR-13.17 asks for.
-    Worker:
-        none.
-    Raises:
-        nothing.
-    """
+    """ADR-D-02(c)'s pre-filled issue URL, measured before it is offered."""
     url = f"{ISSUE_NEW_URL}?" + urllib.parse.urlencode({"title": title, "body": body})
     if len(url) > PREFILL_URL_CHAR_LIMIT:
         return None, len(url), (f"prefill_url_{len(url)}_chars_over_"
@@ -270,13 +181,7 @@ def prefill(title: str, body: str) -> tuple:
 
 
 def issue_number(url: str) -> Optional[int]:
-    """The issue number of a `llvm/circt` issue URL, or None if it is not one.
-
-    The conjunction is on the ACCEPT side (NIT 14): the scheme **is** `https`,
-    the host **is** exactly `github.com`, the path **begins** `/llvm/circt/issues/`
-    and it **ends in digits**. Putting it on the refuse side accepts a
-    `github.com` URL with any path at all.
-    """
+    """The issue number of a `llvm/circt` issue URL, or None if it is not one."""
     parsed = urllib.parse.urlsplit(url)
     tail = parsed.path[len(ISSUE_PATH_PREFIX):] if parsed.path.startswith(
         ISSUE_PATH_PREFIX) else ""
@@ -284,11 +189,6 @@ def issue_number(url: str) -> Optional[int]:
             and tail.isdigit()):
         return int(tail)
     return None
-
-
-# ---------------------------------------------------------------------------
-# The commands
-# ---------------------------------------------------------------------------
 
 
 def cmd_list(store: LoopStore, args, out) -> int:
@@ -317,13 +217,7 @@ def cmd_show(store: LoopStore, args, out) -> int:
 
 
 def cmd_approve(store: LoopStore, args, out) -> int:
-    """Run the refusals, show the view, take the typed approval, write one row.
-
-    Nothing is written until the approval is complete: a human who walks away
-    between the view and the typed `yes` leaves the store unchanged and the
-    candidate `held` with `held_reason=awaiting_approval`, and the next
-    invocation presents the same report (FR-13.7, `02-HLD.md` §6).
-    """
+    """Run the refusals, show the view, take the typed approval, write one row."""
     case = load_case(store, args.candidate_id)
     caps = load_budget_caps(args.budget)
     refused = refusal(store, case, caps)
@@ -346,8 +240,7 @@ def cmd_approve(store: LoopStore, args, out) -> int:
         licence = input(_LICENCE_PROMPT).strip().lower() == "yes"
         licence_at = _utc()
         if not licence:
-            # FR-20.5: never defaulted, and a decline downgrades rather than
-            # silently offering the patch anyway.
+            # FR-20.5: never defaulted.
             decision = "report"
             print("licence declined: the decision is downgraded to 'report' and "
                   "no patch is offered (FR-20.5)", file=out)
@@ -414,12 +307,7 @@ def cmd_filed(store: LoopStore, args, out) -> int:
 
 
 def cmd_poll(store: LoopStore, args, out) -> int:
-    """FR-13.16: complete a `FilingRecord` from the read-only issues node.
-
-    A GET listing and nothing else: the loop matches a newly filed issue by the
-    primary fingerprint its body carries, and asks the human to paste a URL only
-    where that finds nothing (NFR-04, C-04).
-    """
+    """FR-13.16: complete a `FilingRecord` from the read-only issues node."""
     pending = store.query(
         "SELECT f.candidate_id, fp.value AS fingerprint FROM filing f "
         "JOIN fingerprint fp USING (candidate_id) WHERE f.issue_url IS NULL")
@@ -489,15 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list] = None, out=None) -> int:
-    """Parse *argv*, run the one command, and return its exit status.
-
-    Returns:
-        0 on success, 1 where a human declined, 2 where a refusal applied.
-    Worker:
-        none; this is a program and runs on the head (ADR-D-12).
-    Raises:
-        LookupError for an unknown candidate id; SystemExit from argparse.
-    """
+    """Parse *argv*, run the one command, and return its exit status."""
     args = build_parser().parse_args(argv)
     return _COMMANDS[args.command](LoopStore(args.db), args, out or sys.stdout)
 
