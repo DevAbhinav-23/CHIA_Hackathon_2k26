@@ -813,3 +813,22 @@ def test_T_U_layout_11_dispatch_pins_them_and_nothing_else(monkeypatch):
     assert isinstance(strategy, NodeAffinitySchedulingStrategy)
     assert strategy.node_id == HEAD_ID and strategy.soft is False
     assert seen["circt_bug_loop.probe_task.probe_execute"] == {}
+
+    # W-18: A NODE DEFINED IN THIS FILE REPORTS `__main__` when the driver is
+    # run as a script, which is exactly how `bug_loop_submit.sh` runs it, and
+    # `"__main__.build_image"` is in no set. B1 then lost its head affinity on
+    # every submitted run and Ray placed it in a worker container with no Docker
+    # daemon - `FileNotFoundError: 'docker'`, with `max_retries=0` and no second
+    # attempt. Every test that imports the module sees the dotted name and
+    # cannot meet it, so the substitution is asserted directly.
+    def as_script():
+        """`build_image` as the submitted entrypoint's own process sees it."""
+
+    as_script.__module__, as_script.__name__ = "__main__", "build_image"
+
+    assert bug_loop.node_key(as_script) == "circt_bug_loop.bug_loop.build_image"
+    assert bug_loop.node_key(as_script) in bug_loop.HEAD_NODES
+    seen.clear()
+    assert dispatch.call(stand_in(as_script)) == "collected"
+    pinned = seen["circt_bug_loop.bug_loop.build_image"]["scheduling_strategy"]
+    assert pinned.node_id == HEAD_ID and pinned.soft is False

@@ -260,12 +260,30 @@ HEAD_NODES = frozenset({
 })
 
 
+#: What `__module__` is for a node DEFINED IN THIS FILE when the file is run as
+#: a script, which is how `bug_loop_submit.sh` runs the driver: `__main__`. It
+#: is the only entry point of the flow that is run that way - `approve.py` is
+#: run with `-m` and every other module is imported - so the substitution below
+#: can name exactly one module and needs no search.
+_MAIN_MODULE = "circt_bug_loop.bug_loop"
+
+
 def node_key(fn: Callable) -> str:
     """`<module>.<name>` for one node, which is how `HEAD_NODES` names it.
 
     `ChiaFunction.__call__` returns a `functools.wraps` closure, so the wrapper
     carries the undecorated function's `__module__` and `__name__` and the key
     is the same either side of the decorator.
+
+    **`__main__` IS THIS MODULE** (W-18). `python <flow dir>/bug_loop.py` - the
+    entrypoint `bug_loop_submit.sh` builds - makes this file `__main__`, so
+    `build_image.__module__` was `"__main__"`, `"__main__.build_image"` is in no
+    set, and B1 lost its head affinity on every submitted run. Ray then placed
+    an unresourced task on any node with a free CPU, which is a worker
+    container with no Docker daemon: `FileNotFoundError: 'docker'`, with
+    `max_retries=0` and therefore no second attempt. It was invisible to
+    `T-U-layout-11`, which IMPORTS the module and sees the dotted name, and to
+    every test that builds a `Dispatch` in-process.
 
     Returns:
         str.
@@ -274,7 +292,10 @@ def node_key(fn: Callable) -> str:
     Raises:
         nothing; a callable with neither attribute yields "".
     """
-    return f"{getattr(fn, '__module__', '')}.{getattr(fn, '__name__', '')}"
+    module = getattr(fn, "__module__", "") or ""
+    if module == "__main__":
+        module = _MAIN_MODULE
+    return f"{module}.{getattr(fn, '__name__', '')}"
 
 
 def _stage_ignore(directory: str, names: list) -> set:
