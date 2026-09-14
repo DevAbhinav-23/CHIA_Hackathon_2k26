@@ -643,7 +643,12 @@ class Report:
     path: str                         # <probe dir>/report.md
     template: Literal["primary", "differential"]
     title: str
-    classification: Literal["bug", "invalid_input", "known_issue", "untriaged"]
+    # `duplicate` is W-18b's: a candidate the screen matched to ANOTHER
+    # candidate of this run is not a known ISSUE, the maintainers having never
+    # seen it, and calling it one was the only value available. `Report` is not
+    # a contract member, so the value costs no version bump.
+    classification: Literal["bug", "invalid_input", "known_issue", "duplicate",
+                            "untriaged"]
     classification_reason: str        # at most 4 sentences [DEFAULT], 3.8.3
     rendered_sha256: str
     assisted_by: str                  # "<tool>:<model>" (FR-11.6, FR-20.3)

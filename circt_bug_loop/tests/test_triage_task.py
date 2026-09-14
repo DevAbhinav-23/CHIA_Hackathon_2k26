@@ -301,11 +301,12 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
             self.stopped = True
 
     def dispatch_turn(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id, guard=None):
+                      timeout_seconds, model_id, guard=None,
+                      max_tool_iterations=None):
         assert os.environ.get("BUGLOOP_ALLOW_LIVE_MODEL") is None
         seen.update(system_message=system_message, timeout_seconds=timeout_seconds,
                     model_id=model_id, prompt=user_message, tools=tools,
-                    stage=stage)
+                    stage=stage, max_tool_iterations=max_tool_iterations)
         if raises is not None:
             raise raises
         return {"result": turn or "", "stream": turn or "", "stderr": "",
@@ -327,7 +328,10 @@ def _turn_text(name):
 
 def _cfg(**over):
     cfg = {"model_id": "gemini-3.8-flash", "timeout_seconds": 1200,
-           "clone_path": "/home/adi/.cache/circt", "run_commit": "c" * 40}
+           "clone_path": "/home/adi/.cache/circt", "run_commit": "c" * 40,
+           # `budget.yaml`'s own per-stage tool-loop caps (errata row 38).
+           "max_tool_iterations": {"stage_1": 6, "stage_2": 6, "stage_6": 3,
+                                   "stage_7": 20}}
     cfg.update(over)
     return cfg
 
@@ -1229,7 +1233,11 @@ PROSE = {"title": "[Moore] VariableOpConversion casts an operand it did not chec
 
 def test_triage_21_the_tool_verdict_wins(tmp_path, monkeypatch):
     """T-U-triage-21 (FR-11.2): a candidate the dedup stage marked known is
-    classified `known_issue` whatever the agent wrote; the reason survives."""
+    classified `known_issue`, and since W-18b (errata row 47) NO TURN IS MADE
+    for it at all: the tool verdict already decides the classification and gate
+    question 4 already refuses the candidate, so there is nothing an agent
+    could change and a whole tool loop to pay for. The report is still
+    rendered, from the record, and the ledger sees no token."""
     seen = _fake_generate(monkeypatch, _turn_text("report_write_disagree"))
     candidate, reduced, verdict, dedup = _render_bundle(
         tmp_path, dedup_verdict="known_closed_issue")
@@ -1239,9 +1247,53 @@ def test_triage_21_the_tool_verdict_wins(tmp_path, monkeypatch):
 
     assert out["failure"] is None
     assert out["report"].classification == "known_issue"
+    assert seen == {}, "no turn was dispatched for a screened-out candidate"
+    assert out["logs"]["turn_skipped"] == "known_closed_issue"
+    assert out["logs"]["usage"] == {}, "the ledger charges no model tokens"
+    assert out["report"].classification_reason == triage_task.NO_TURN_PROSE
+    assert out["counters"].completed == 1
+    rendered = Path(out["report"].path).read_text(encoding="utf-8")
+    assert rendered.startswith("# " + triage_task.NO_TURN_PROSE[:20])
+    # FR-11.4 is untouched: every number in it still comes off the record.
+    assert candidate.assertion_text in rendered
+
+    # Every verdict but `new` skips, and each records its own classification.
+    for name, classification in (("known_open_issue", "known_issue"),
+                                 ("fixed_post_pin", "known_issue"),
+                                 ("duplicate_of_candidate", "duplicate"),
+                                 ("dedup_unavailable", "untriaged")):
+        screened = triage_task.screened_out(
+            DedupVerdict(probe_id="p-01", verdict=name,
+                         evidence=dict.fromkeys(triage_task._EVIDENCE_KEYS)))
+        assert screened[0] == classification
+    assert triage_task.screened_out(None) is None
+    assert triage_task.screened_out(
+        DedupVerdict(probe_id="p-01", verdict="new",
+                     evidence=dict.fromkeys(triage_task._EVIDENCE_KEYS))) is None
+
+
+def test_triage_21b_a_new_candidate_still_gets_its_turn(tmp_path, monkeypatch):
+    """The other branch of errata row 47: `new` is the one verdict that pays.
+
+    The agent's classification and reason both reach the report, which is what
+    a candidate nobody has seen before is for, and the turn carries stage 6's
+    own registered `max_tool_iterations`. Fixture: the recorded turn text.
+    Tier 0.
+    """
+    seen = _fake_generate(monkeypatch, _turn_text("report_write_disagree"))
+    candidate, reduced, verdict, dedup = _render_bundle(tmp_path)
+    assert dedup.verdict == "new"
+
+    out = call_node(triage_report, candidate, reduced, verdict, dedup,
+                    _manifest(), _cfg(), str(tmp_path / "probe"))
+
+    assert out["failure"] is None
     assert out["report"].classification_reason == (
         "I still think this is a fresh fault in the conversion.")
+    assert out["logs"]["usage"]["tokens_in"] == 11
+    assert "turn_skipped" not in out["logs"]
     assert seen["model_id"] == "gemini-3.8-flash" and seen["timeout_seconds"] == 1200
+    assert seen["max_tool_iterations"] == 3, "stage 6's registered cap"
     assert len(seen["tools"]) == 1 and seen["tools"][0].stopped, "stopped in a finally"
 
 
@@ -1508,7 +1560,8 @@ def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkey
     seen = {}
 
     def dispatch_turn(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id, guard=None):
+                      timeout_seconds, model_id, guard=None,
+                      max_tool_iterations=None):
         seen["tools"] = list(tools)
         seen["stage"] = stage
         return {"result": _turn_text("report_write_ok"), "stream": "", "stderr": "",

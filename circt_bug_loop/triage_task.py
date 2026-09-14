@@ -1343,6 +1343,57 @@ def cap_sentences(text: str, limit: int = TRIAGE_REASON_MAX_SENTENCES) -> tuple:
     return " ".join(part.strip() for part in parts[:limit]), True
 
 
+#: The three dedup verdicts FR-11.2 turns into `known_issue` whatever the agent
+#: wrote: the screen matched the candidate to an issue the maintainers already
+#: have.
+_KNOWN_ISSUE_VERDICTS = ("known_open_issue", "known_closed_issue", "fixed_post_pin")
+
+#: What a candidate the screen did not call `new` is classified as, by verdict.
+#: `dedup_unavailable` is the one value that says nothing about the candidate,
+#: so it takes FR-11.8's `untriaged`, which is what a candidate with no
+#: classification is; the gate refuses all five at question 4 either way.
+_SCREENED_CLASSIFICATION = {
+    "known_open_issue": "known_issue",
+    "known_closed_issue": "known_issue",
+    "fixed_post_pin": "known_issue",
+    "duplicate_of_candidate": "duplicate",
+    "dedup_unavailable": "untriaged",
+}
+
+#: The prose a report written without a turn carries, in place of an agent's.
+#: It is the driver's own sentence and says so, which is the same rule
+#: `--generator recorded` follows (FR-11.6's trailer names the model that
+#: ACTUALLY ran, and none did).
+NO_TURN_PROSE = (
+    "NO MODEL TURN WAS MADE FOR THIS CANDIDATE. The duplicate screen matched it "
+    "before stage 6's agent turn, so FR-11.2's tool verdict already decides the "
+    "classification and gate question 4 refuses the candidate whatever prose a "
+    "model would have written; the turn was skipped and this field is the "
+    "driver's own sentence. Every number, size, hash and verdict below is read "
+    "off the record exactly as it is for a candidate that did get a turn "
+    "(FR-11.4).")
+
+
+def screened_out(dedup: Optional[DedupVerdict]) -> Optional[tuple]:
+    """What to record for a candidate the screen already decided, or None.
+
+    None means "ask a model": a `new` candidate, and a `differential` one, whose
+    call site passes no `DedupVerdict` at all (FR-08.10).
+
+    Returns:
+        (classification, prose, reason) | None.
+    Worker:
+        pure; it reads one record.
+    Raises:
+        nothing.
+    """
+    if dedup is None or dedup.verdict == "new":
+        return None
+    classification = _SCREENED_CLASSIFICATION.get(dedup.verdict, "untriaged")
+    prose = dict.fromkeys(("title", "summary", "why_it_matters"), NO_TURN_PROSE)
+    return classification, prose, NO_TURN_PROSE
+
+
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                   verdict: Optional[OracleVerdict], dedup: Optional[DedupVerdict],
@@ -1356,6 +1407,17 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     the agent's only freedom is the reason text (FR-11.2). And NO NUMBER THE
     AGENT PRODUCED REACHES THE REPORT: `render_report` substitutes every count,
     size, time, hash, SHA and verdict from the record (FR-11.4).
+
+    **THE TURN IS MADE ONLY FOR A `new` CANDIDATE** (W-18b, errata row 47).
+    `dedup_and_screen` runs before this node, so its verdict is known here, and
+    for every verdict but `new` the tool verdict has already decided the
+    classification and gate question 4 already refuses the candidate: the turn
+    could change neither and cost a whole tool loop. The pilot paid USD 3.96 for
+    one such turn over a candidate the screen had already matched to an open
+    issue, and the prose it bought disagreed with the match and was overruled by
+    FR-11.2 in the same function. The report is still RENDERED - every field of
+    it comes off the record - with `NO_TURN_PROSE` in the three prose slots, and
+    the ledger entry carries no token count at all.
 
     The turn is 3.5.1's turn: `llm.build_llm` with stage 6's timeout and
     `cfg["model_id"]`, dispatched through `llm.dispatch_turn` with exactly one
@@ -1384,31 +1446,41 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     prose: dict = {}
     classification = "untriaged"
     reason = ""
+    screened = screened_out(dedup)
 
-    try:
-        turn = _run_turn(prompt, cfg, f"src_{candidate.candidate_id}")
-        logs.update({key: turn.get(key) for key in
-                     ("result", "stream", "stderr", "success")})
-        logs["usage"] = turn.get("usage") or {}
-        answer = parse_json_footer(
-            turn.get("result") or "",
-            ("classification", "reason", "title", "summary", "why_it_matters"))
-        classification = answer["classification"]
-        reason, logs["reason_truncated"] = cap_sentences(answer["reason"])
-        prose = {key: answer[key] for key in ("title", "summary", "why_it_matters")}
-    except PromptContractError as error:
-        failure = f"prompt_contract:{error}"
-    except Exception as error:                      # noqa: BLE001 - FR-11.8
-        failure = f"turn_failed:{type(error).__name__}"
+    if screened is not None:
+        # No turn at all. The tool verdict already decides this candidate's
+        # classification and the gate refuses it at question 4 whatever prose a
+        # model would have written, so the turn buys nothing and costs a whole
+        # tool loop (FR-11.2, W-18b).
+        classification, prose, reason = screened
+        logs.update({"turn_skipped": dedup.verdict, "success": True,
+                     "result": "", "stream": "", "stderr": ""})
+    else:
+        try:
+            turn = _run_turn(prompt, cfg, f"src_{candidate.candidate_id}")
+            logs.update({key: turn.get(key) for key in
+                         ("result", "stream", "stderr", "success")})
+            logs["usage"] = turn.get("usage") or {}
+            answer = parse_json_footer(
+                turn.get("result") or "",
+                ("classification", "reason", "title", "summary", "why_it_matters"))
+            classification = answer["classification"]
+            reason, logs["reason_truncated"] = cap_sentences(answer["reason"])
+            prose = {key: answer[key]
+                     for key in ("title", "summary", "why_it_matters")}
+        except PromptContractError as error:
+            failure = f"prompt_contract:{error}"
+        except Exception as error:                  # noqa: BLE001 - FR-11.8
+            failure = f"turn_failed:{type(error).__name__}"
 
-    if dedup is not None and dedup.verdict in (
-            "known_open_issue", "known_closed_issue", "fixed_post_pin"):
-        classification = "known_issue"
-    elif failure is not None:
-        classification = "untriaged"
-    elif classification not in ("bug", "invalid_input", "known_issue"):
-        failure = failure or f"prompt_contract:bad_classification:{classification}"
-        classification = "untriaged"
+        if dedup is not None and dedup.verdict in _KNOWN_ISSUE_VERDICTS:
+            classification = "known_issue"
+        elif failure is not None:
+            classification = "untriaged"
+        elif classification not in ("bug", "invalid_input", "known_issue"):
+            failure = failure or f"prompt_contract:bad_classification:{classification}"
+            classification = "untriaged"
 
     _persist_turn(artefact_dir, logs)
     if failure is not None:
@@ -1527,7 +1599,9 @@ def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
                              stage="stage_6",
                              timeout_seconds=int(cfg.get("timeout_seconds", 1200)),
                              model_id=cfg["model_id"],
-                             guard=cfg.get("spend_guard"))
+                             guard=cfg.get("spend_guard"),
+                             max_tool_iterations=(cfg.get("max_tool_iterations")
+                                                  or {}).get("stage_6"))
     finally:
         stop = getattr(tool, "stop", None)
         if callable(stop):
@@ -1568,4 +1642,4 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",
            "assisted_by", "assisted_by_model",
            "issue_mirror_refresh", "dedup_and_screen", "triage_report",
-           "render_report"]
+           "render_report", "screened_out", "NO_TURN_PROSE"]
