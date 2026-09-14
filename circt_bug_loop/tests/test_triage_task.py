@@ -642,6 +642,52 @@ def test_triage_27_the_two_fallbacks_and_the_evidence_tuple():
 # ===========================================================================
 
 
+def _synthetic_issues(numbers, *, pull_requests=()):
+    """Listing payloads for *numbers*, some of them pull requests.
+
+    The mirror's own filter is what these exercise: `/issues` conflates issues
+    and pull requests in one number space, and a pull request must cost a slot
+    of the page and none of the cap.
+    """
+    return [{"number": n, "title": f"issue {n}", "body": f"body of {n}",
+             "state": "open" if n % 2 else "closed", "labels": [{"name": "bug"}],
+             "user": {"login": "someone"}, "created_at": "2026-01-01T00:00:00Z",
+             "updated_at": "2026-01-02T00:00:00Z", "closed_at": None,
+             "comments": 0, "html_url": f"https://github.com/llvm/circt/issues/{n}",
+             **({"pull_request": {"url": "x"}} if n in pull_requests else {})}
+            for n in numbers]
+
+
+def _directional_transport(monkeypatch, payload, *, ceiling_page=None,
+                           per_page=100, error=None):
+    """Serve one listing in the direction the caller asked for.
+
+    `payload` is newest-first, which is what `direction=desc` returns; `asc` is
+    served from its reverse. `ceiling_page` is the page GitHub refuses with the
+    **422** of C-22, and `error` is any other failure to raise there instead, so
+    a test can show that only the ceiling's own status is treated as a ceiling.
+    """
+    from chia.github.github_client import GithubClient, GithubRequestError
+
+    calls = []
+
+    def _request(self, path, params=None, accept=None):
+        params = dict(params or {})
+        calls.append({"path": path, "params": params})
+        assert path.endswith("/issues"), path
+        page = int(params.get("page", 1))
+        if ceiling_page is not None and page >= ceiling_page:
+            raise (error or GithubRequestError(
+                "422 Unprocessable Entity for https://api.github.com"
+                "/repos/llvm/circt/issues: In order to keep the API fast for "
+                "everyone, pagination is limited for this resource."))
+        ordered = payload if params["direction"] == "desc" else payload[::-1]
+        return ordered[(page - 1) * per_page: page * per_page]
+
+    monkeypatch.setattr(GithubClient, "_request", _request)
+    return calls
+
+
 def test_triage_10_the_one_mirror_call_never_fetches_comments(tmp_path, monkeypatch):
     """T-U-triage-10 (FR-10.9): one `state="all"` listing, `n=issue_cap`,
     `fetch_comments=False`, asserted on the recorded call."""
@@ -709,6 +755,99 @@ def test_triage_12_all_six_manifest_values_are_recorded(tmp_path, monkeypatch):
     manifest.issue_mirror = block
     schema.validate(manifest)
     assert out["incomplete_reason"] is None
+
+
+def test_triage_37_the_walk_is_two_directional_and_unions_by_number(tmp_path,
+                                                                    monkeypatch):
+    """T-U-triage-37 (FR-10.9, FR-10.3, C-22): `desc` to the ceiling, then `asc`.
+
+    Architect decision 1. GitHub's issues listing refuses page 100 with a 422,
+    measured; one direction therefore sees at most 9,900 numbered items, and at
+    the campaign's cap the old one-direction walk raised on the refusal and
+    wrote **zero** rows. Here the ceiling is a fake at page 3, so `desc` sees
+    the two newest pages, `asc` sees the two oldest, the two are unioned
+    deduplicated by number, pull requests cost a page slot and no row, and the
+    return records `ceiling_hit` and the page count.
+
+    Fixture: none, the listing being synthetic. Tier 0.
+    """
+    numbers = list(range(1, 501))[::-1]              # 500 down to 1, newest first
+    pulls = {n for n in numbers if n % 5 == 0}       # 100 of the 500 are PRs
+    payload = _synthetic_issues(numbers, pull_requests=pulls)
+    calls = _directional_transport(monkeypatch, payload, ceiling_page=3,
+                                   per_page=100)
+    token = tmp_path / "token"
+    token.write_text(FAKE_TOKEN)
+    db = str(tmp_path / "loop.db")
+
+    out = call_node(issue_mirror_refresh, "llvm/circt", 600, str(token), db)
+
+    # Two directions were asked for, and the refused page was asked for once in
+    # each: pages 1, 2, 3 desc then 1, 2, 3 asc.
+    directions = [call["params"]["direction"] for call in calls]
+    assert directions == ["desc"] * 3 + ["asc"] * 3
+    assert [call["params"]["page"] for call in calls] == [1, 2, 3, 1, 2, 3]
+    assert out["ceiling_hit"] is True
+    assert out["pages"] == 4, "two fetched pages per direction; the third is refused"
+    assert out["incomplete_reason"] is None, "the ceiling is not a failure"
+
+    store = LoopStore(db)
+    mirrored = {row["issue_number"] for row in
+                store.query("SELECT issue_number FROM issue_mirror")}
+    newest = {n for n in range(301, 501) if n not in pulls}
+    oldest = {n for n in range(1, 201) if n not in pulls}
+    assert mirrored == newest | oldest, "the union of the two directions"
+    assert not mirrored & pulls, "a pull request is never a mirrored issue"
+    assert out["issues_mirrored"] == len(mirrored) == out["issues_added"]
+    assert out["cap_bound"] is False
+
+
+def test_triage_37b_the_cap_bounds_both_directions(tmp_path, monkeypatch):
+    """T-U-triage-37 (FR-10.9): `issue_mirror_issue_cap` is the row bound of the
+    UNION and not of one direction, so the second walk stops at it too."""
+    payload = _synthetic_issues(list(range(1, 501))[::-1])
+    calls = _directional_transport(monkeypatch, payload, ceiling_page=3)
+    token = tmp_path / "token"
+    token.write_text(FAKE_TOKEN)
+    db = str(tmp_path / "loop.db")
+
+    out = call_node(issue_mirror_refresh, "llvm/circt", 150, str(token), db)
+
+    assert out["cap_bound"] is True
+    assert out["issues_mirrored"] == 150
+    assert [call["params"]["direction"] for call in calls] == ["desc", "desc"]
+    assert out["ceiling_hit"] is False, "it stopped at the cap, not at the ceiling"
+    store = LoopStore(db)
+    numbers = {row["issue_number"] for row in
+               store.query("SELECT issue_number FROM issue_mirror")}
+    assert numbers == set(range(351, 501)), "the newest 150, from `desc` alone"
+
+
+def test_triage_38_only_a_422_is_the_ceiling(tmp_path, monkeypatch):
+    """T-U-triage-38 (FR-10.7, C-22): another 4xx is a failure, not a ceiling.
+
+    The ceiling is recognised by GitHub's own status, which
+    `GithubClient._error_message` puts at the head of the message; a 403 that is
+    not a rate limit raises `GithubRequestError` too, and treating it as a
+    ceiling would silently mirror a fraction of the history and then walk the
+    other way into the same wall. Fixture: none. Tier 0.
+    """
+    from chia.github.github_client import GithubRequestError
+
+    payload = _synthetic_issues(list(range(1, 301))[::-1])
+    _directional_transport(monkeypatch, payload, ceiling_page=2,
+                           error=GithubRequestError(
+                               "403 Forbidden for https://api.github.com/repos/"
+                               "llvm/circt/issues: secondary rate limit"))
+    token = tmp_path / "token"
+    token.write_text(FAKE_TOKEN)
+    db = str(tmp_path / "loop.db")
+
+    out = call_node(issue_mirror_refresh, "llvm/circt", 600, str(token), db)
+
+    assert out["incomplete_reason"] == "GithubRequestError"
+    assert out["ceiling_hit"] is False
+    assert out["issues_mirrored"] == 100, "the first page survives the failure"
 
 
 def test_triage_13_a_rate_limit_leaves_a_partial_mirror(tmp_path, monkeypatch):
@@ -1427,14 +1566,20 @@ def test_triage_frame_paths_and_symbols_are_repo_relative():
 @pytest.mark.skipif(not os.environ.get("GITHUB_TOKEN"),
                     reason="no GITHUB_TOKEN: H-05's read-only token is not set")
 def test_triage_35_live_mirror_against_llvm_circt(tmp_path):
-    """T-U-triage-35 (FR-10.9), LIVE and `t1`: one paginated listing of
+    """T-U-triage-35 (FR-10.9, C-22), LIVE and `t1`: the TWO-DIRECTION listing of
     `llvm/circt`, open and closed, pull requests excluded as the node does, up
-    to `budget.yaml`'s `issue_mirror_issue_cap`, recording the refresh time.
+    to `budget.yaml`'s `issue_mirror_issue_cap`, recording the refresh time, the
+    page count and whether GitHub's pagination ceiling was reached.
 
-    Read-only, `fetch_comments=False`, one listing, and nothing is written
-    outside `tmp_path`. The token is read from the environment into a file with
-    mode 0600 and is never logged, printed or committed.
+    This is the measurement architect decision 1 rests on: at the old cap of
+    20,000 the one-direction walk raised on the 422 that page 100 answers and
+    wrote zero rows. Read-only, `fetch_comments=False`, listing requests only,
+    and nothing is written outside `tmp_path`. The token is read from the
+    environment into a file with mode 0600 and is never logged, printed or
+    committed.
     """
+    import time
+
     import yaml
     from chia.github.github_client import GithubClient
 
@@ -1455,20 +1600,26 @@ def test_triage_35_live_mirror_against_llvm_circt(tmp_path):
         return original(self, path, params=params, accept=accept)
 
     GithubClient._request = _counted
+    started = time.monotonic()
     try:
         out = call_node(issue_mirror_refresh, "llvm/circt", cap, str(token),
                         str(tmp_path / "loop.db"))
     finally:
         GithubClient._request = original
+    wall = time.monotonic() - started
 
     store = LoopStore(str(tmp_path / "loop.db"))
     rows = store.query("SELECT state, COUNT(*) AS n FROM issue_mirror GROUP BY state")
     states = {row["state"]: row["n"] for row in rows}
     print(f"\nlive mirror: {out['issues_mirrored']} issues, "
-          f"{len(pages)} requests, refreshed {out['refreshed_utc']}, "
-          f"cap {cap}, states {states}")
+          f"{len(pages)} requests, {out['pages']} pages accepted, "
+          f"ceiling_hit {out['ceiling_hit']}, {wall:.1f} s wall, "
+          f"refreshed {out['refreshed_utc']}, cap {cap}, states {states}")
 
-    assert out["incomplete_reason"] is None
+    assert out["incomplete_reason"] is None, (
+        "the ceiling is not a failure and the cap is inside two directions' reach")
+    assert out["pages"] >= 1 and out["pages"] <= len(pages)
+    assert isinstance(out["ceiling_hit"], bool)
     assert out["issues_mirrored"] > 0
     assert out["issues_mirrored"] == sum(states.values())
     assert set(states) == {"open", "closed"}, "state='all' reaches both"

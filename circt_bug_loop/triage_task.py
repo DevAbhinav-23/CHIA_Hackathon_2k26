@@ -571,20 +571,114 @@ def touches_symbol(commit: dict, symbols: set) -> bool:
 # ---------------------------------------------------------------------------
 
 
+#: GitHub's own pagination ceiling on the issues-listing endpoint (C-22).
+#: MEASURED 2026-09-14 by `T-U-triage-35` with a token: of 100 requests the
+#: first 99 answered 200 and the hundredth answered **422**, so pages 1 to 99
+#: are reachable and one direction sees at most 9,900 numbered items, issues and
+#: pull requests together. Two directions therefore cover 19,800, which is more
+#: than `llvm/circt` has issued.
+MIRROR_PAGE_CEILING = 100
+
+#: The status a refused page answers with, which `GithubClient._error_message`
+#: puts at the head of the message it raises `GithubRequestError` with
+#: (`chia:chia/github/github_client.py:180`, `192`). Any other 4xx is a real
+#: failure and is re-raised.
+_CEILING_STATUS = "422"
+
+
+def mirror_walk(node, direction: str, cap: int, seen: set) -> tuple:
+    """Page llvm/circt's issue listing in ONE direction, dropping pull requests.
+
+    `GithubIssuesNode.recent` cannot be used for this: `_list` hard-codes
+    `direction: "desc"` (`chia:chia/github/github_issues_node.py:152`) and takes
+    no parameter, and CHIA is not modified (FR-12.1). Its two halves that matter
+    are reused instead, `_request` for the HTTP round trip and `_build_issue`
+    for the record, so a test that replays a recorded response set through
+    `GithubClient._request` exercises this walk exactly as it exercises CHIA's.
+
+    Returns:
+        (issues, pages, ceiling_hit, reason): the `GithubIssue`s this direction
+        added, how many pages were fetched, whether the walk stopped at GitHub's
+        pagination ceiling rather than at the end of the listing or at the cap,
+        and the class name of the error that stopped it, or None. *seen* is
+        mutated: it holds every issue number taken so far, in either direction,
+        which is what makes the union deduplicated by number.
+    Worker:
+        the caller's, which is B6a's, which is the head.
+    Raises:
+        nothing. Every `GithubError` stops this direction and is returned as
+        `reason`, so a rate limit half way through leaves the pages already
+        fetched in the caller's hands rather than discarding them, which is
+        what the one-direction walk did.
+    """
+    from chia.github.github_client import GithubError, GithubRequestError
+
+    path = f"/repos/{node.owner}/{node.name}/issues"
+    issues: list = []
+    pages = 0
+    ceiling_hit = False
+    reason = None
+    for page in range(1, MIRROR_PAGE_CEILING):
+        if len(seen) >= cap:
+            break
+        try:
+            items = node._request(path, params={
+                "state": node.state, "sort": "created", "direction": direction,
+                "per_page": node._PER_PAGE, "page": page})
+        except GithubError as error:
+            # Only the ceiling's own 422 is the ceiling: any other 4xx, and a
+            # rate limit, is a failure the run is told about (FR-10.7).
+            if (isinstance(error, GithubRequestError)
+                    and str(error).startswith(_CEILING_STATUS)):
+                ceiling_hit = True
+            else:
+                reason = type(error).__name__
+            break
+        pages += 1
+        if not isinstance(items, list) or not items:
+            break
+        for item in items:
+            # /issues conflates issues and pull requests; the mirror is issues,
+            # which is `_list`'s own rule and the reason 600 rows cost 35 pages.
+            if item.get("pull_request") is not None:
+                continue
+            number = item.get("number")
+            if number in seen:
+                continue
+            seen.add(number)
+            issues.append(node._build_issue(item, fetch_comments=False))
+            if len(seen) >= cap:
+                break
+        if len(items) < node._PER_PAGE:
+            break
+    else:
+        # Every reachable page was fetched and the listing had not ended: the
+        # next page is the one GitHub refuses.
+        ceiling_hit = True
+    return issues, pages, ceiling_hit, reason
+
+
 @ChiaFunction(max_retries=0)
 def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
                          db_path: str) -> dict:
     """Mirror llvm/circt's open and closed issues into loop.db, once per run.
 
-    The one call is `GithubIssuesNode(repo, token=<read from the file>,
-    state="all").recent(n=issue_cap, fetch_comments=False)`. `fetch_comments` is
-    False by requirement and not by preference: the default costs one extra
-    paginated request per issue that has comments (FR-10.9), and mirroring no
-    comment at all is what makes FR-20.4 true by construction, because no
-    maintainer's words are in the database to reach a prompt.
+    **The walk is two-directional** (3.7.3, architect decision 1, C-22). It
+    pages `direction=desc` from the newest until the listing ends, the cap is
+    reached, or GitHub's pagination ceiling refuses a page with a 422; on the
+    ceiling it then pages `direction=asc` from the oldest and unions the two
+    deduplicated by issue number. One direction sees at most 9,900 numbered
+    items and `llvm/circt`'s newest number on 2026-09-14 was 11,113, so the
+    union is the whole history. Before this, one direction at the campaign's cap
+    raised on the 422 and wrote **zero** rows: the mirror did not truncate, it
+    produced nothing (`T-U-triage-35`, measured).
 
     Five fields per issue and no text beyond the body: number, title, body,
     labels, state, plus the issue's own URL and the refresh time.
+    `fetch_comments` is False by requirement and not by preference: the default
+    costs one extra paginated request per issue that has comments (FR-10.9), and
+    mirroring no comment at all is what makes FR-20.4 true by construction,
+    because no maintainer's words are in the database to reach a prompt.
 
     Once per run is the driver's rule and not this node's: the signature carries
     no run id and no refresh flag, so B12 calls it once unless `--refresh-mirror`
@@ -593,19 +687,21 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
     Returns:
         {"refreshed_utc": str, "issues_mirrored": int, "issue_cap": int,
          "cap_bound": bool, "state": "all", "comments_mirrored": False,
-         "incomplete_reason": str | None}. The first six are
-        `RunManifest.issue_mirror`'s closed key set (2.7); the seventh is
-        FR-10.7's detection point, which those six cannot express, and the
-        driver does not copy it into the manifest.
+         "incomplete_reason": str | None, "ceiling_hit": bool, "pages": int,
+         "issues_added": int}. The first six are
+        `RunManifest.issue_mirror`'s closed key set (2.7); the rest cannot go
+        there, that set being compared exactly by `validate` and the contract
+        being frozen at 2.0, so the driver copies the six and records the others
+        beside them. `incomplete_reason` is FR-10.7's detection point.
     Worker:
         head - GithubIssuesNode is documented head-node only, and the token
         lives on the head and nowhere else (4.3 of 02-HLD.md, section 11 here).
     Raises:
         nothing it does not catch. A GithubRateLimitError marks the mirror
         incomplete with the count reached and screening proceeds against a
-        partial mirror, flagged in the return (FR-10.7's detection point).
+        partial mirror, flagged in the return (FR-10.7's detection point); the
+        ceiling's own 422 is not an error and is reported as `ceiling_hit`.
     """
-    from chia.github.github_client import GithubError
     from chia.github.github_issues_node import GithubIssuesNode
 
     token = Path(token_path).read_text().strip()
@@ -613,11 +709,19 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
     del token
     refreshed = datetime.now(timezone.utc).isoformat(timespec="seconds")
     reason = None
+    seen: set = set()
     issues: list = []
-    try:
-        issues = node.recent(n=issue_cap, fetch_comments=False)
-    except GithubError as error:
-        reason = f"{type(error).__name__}"
+    pages = 0
+    ceiling_hit = False
+    for direction in ("desc", "asc"):
+        found, walked, ceiling_hit, reason = mirror_walk(
+            node, direction, issue_cap, seen)
+        issues.extend(found)
+        pages += walked
+        # The second direction earns its requests only where the first ran out
+        # of reachable pages with the cap unfilled and nothing failed.
+        if reason or not ceiling_hit or len(seen) >= issue_cap:
+            break
 
     store = LoopStore(db_path)
     if issues:
@@ -630,9 +734,10 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
             for issue in issues])
     mirrored = store.query_one("SELECT COUNT(*) AS n FROM issue_mirror")["n"]
     return {"refreshed_utc": refreshed, "issues_mirrored": mirrored,
-            "issue_cap": issue_cap, "cap_bound": len(issues) >= issue_cap,
+            "issue_cap": issue_cap, "cap_bound": len(seen) >= issue_cap,
             "state": "all", "comments_mirrored": False,
-            "incomplete_reason": reason}
+            "incomplete_reason": reason, "ceiling_hit": ceiling_hit,
+            "pages": pages, "issues_added": len(issues)}
 
 
 # ---------------------------------------------------------------------------
@@ -1348,7 +1453,8 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "ReportIncomplete",
            "normalise_expr", "normalise_site", "structural_hash",
            "compute_fingerprint", "is_duplicate", "partition", "rates",
-           "mirror_tokens", "mirror_screen", "frame_paths", "frame_symbols",
+           "MIRROR_PAGE_CEILING", "mirror_tokens", "mirror_screen",
+           "mirror_walk", "frame_paths", "frame_symbols",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",
            "issue_mirror_refresh", "dedup_and_screen", "triage_report",
            "render_report"]

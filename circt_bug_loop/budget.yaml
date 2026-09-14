@@ -111,9 +111,20 @@ reduction_wall_seconds: 600
 reduction_sigkill_grace_seconds: 10
 
 # --- the issue mirror (FR-10.9) ---------------------------------------------
-# An ISSUE cap, not a page cap: GithubIssuesNode.recent takes n and pages
-# internally. Comments are never mirrored.
-issue_mirror_issue_cap: 20000
+# An ISSUE cap, not a page cap: the mirror walk pages internally. Comments are
+# never mirrored.
+#
+# 12000 [DEFAULT], lowered from 20000 at the join (W-17, architect decision 1,
+# C-22). It is a ROW bound and it now sits below what two directions can reach.
+# MEASURED 2026-09-14 by T-U-triage-35: GitHub refuses page 100 of the issues
+# listing with a 422, so ONE direction sees at most 9,900 numbered items, issues
+# and pull requests together. triage_task.issue_mirror_refresh therefore walks
+# `direction=desc` and then, on that refusal, `direction=asc`, and unions the
+# two by issue number; 19,800 reachable numbers covers llvm/circt's whole
+# history, whose newest number on 2026-09-14 was 11,113. 12000 is that number
+# with headroom for the campaign's own months and no more: a cap above the
+# union's reach would be a promise the endpoint cannot keep.
+issue_mirror_issue_cap: 12000
 
 # --- filing (FR-13.16) ------------------------------------------------------
 filing_poll_window_seconds: 3600
