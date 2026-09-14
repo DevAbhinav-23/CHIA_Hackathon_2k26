@@ -267,11 +267,13 @@ def _recording_transport(monkeypatch, payload, *, fail_after_pages=None):
 
 
 def _fake_generate(monkeypatch, turn=None, *, raises=None):
-    """Substitute the two `llm.py` calls B7 makes, and nothing else.
+    """Substitute the ONE `llm.py` call B7 makes, and nothing else.
 
-    Since the join the backend, the turn and the footer parser are `llm.py`'s
-    and are imported by `triage_task` at module scope, so the two names are
-    substituted where B7 reads them rather than by installing a module. The
+    Since the join the turn and the footer parser are `llm.py`'s and are
+    imported by `triage_task` at module scope, so the name is substituted where
+    B7 reads it rather than by installing a module. Since K2 there is no second
+    name to substitute: B7 builds no backend, the client being `llm_turn`'s on
+    the `llm` worker, and what B7 sends is the turn request's fields. The
     tool is still a stand-in HERE, because a real `SourceReadTool` stands up an
     MCP server and needs a git repository; `T-U-triage-36` constructs the real
     one and is what pins the call site.
@@ -291,14 +293,12 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
         def stop(self):
             self.stopped = True
 
-    def build_llm(system_message, timeout_seconds, model_id):
+    def dispatch_turn(system_message, user_message, tools, *, stage,
+                      timeout_seconds, model_id):
         assert os.environ.get("BUGLOOP_ALLOW_LIVE_MODEL") is None
         seen.update(system_message=system_message, timeout_seconds=timeout_seconds,
-                    model_id=model_id)
-        return object()
-
-    def dispatch_turn(llm, user_message, tools, *, stage="stage_2"):
-        seen.update(prompt=user_message, tools=tools, stage=stage)
+                    model_id=model_id, prompt=user_message, tools=tools,
+                    stage=stage)
         if raises is not None:
             raise raises
         return {"result": turn or "", "stream": turn or "", "stderr": "",
@@ -306,7 +306,6 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
                 "usage": {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
                           "model": "gemini-3.8-flash"}}
 
-    monkeypatch.setattr(triage_task, "build_llm", build_llm)
     monkeypatch.setattr(triage_task, "dispatch_turn", dispatch_turn)
     module = types.ModuleType("circt_bug_loop.generate_task")
     module.SourceReadTool = SourceReadTool
@@ -1504,10 +1503,8 @@ def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkey
     clone, head = throwaway_repo
     seen = {}
 
-    def build_llm(system_message, timeout_seconds, model_id):
-        return object()
-
-    def dispatch_turn(backend, user_message, tools, *, stage="stage_2"):
+    def dispatch_turn(system_message, user_message, tools, *, stage,
+                      timeout_seconds, model_id):
         seen["tools"] = list(tools)
         seen["stage"] = stage
         return {"result": _turn_text("report_write_ok"), "stream": "", "stderr": "",
@@ -1515,7 +1512,6 @@ def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkey
                                            "num_turns": 1,
                                            "model": "gemini-3.8-flash"}}
 
-    monkeypatch.setattr(triage_task, "build_llm", build_llm)
     monkeypatch.setattr(triage_task, "dispatch_turn", dispatch_turn)
 
     before = len(ChiaTool._tool_registry)

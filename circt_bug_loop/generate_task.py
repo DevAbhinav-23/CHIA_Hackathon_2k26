@@ -586,6 +586,11 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
     is the placement 3.5's Worker paragraph declares; with no Ray running there
     is no cluster to dispatch to and the same node runs in this process, which
     is what a driver-less replay does.
+
+    A3 sits on a `circt` worker, which carries neither the key nor the
+    interlock, and it builds no backend here: what it sends is the turn request
+    of 3.5.1 and `llm_turn` constructs the client from the LLM worker's own
+    environment (K2, W7).
     """
     name = f"llm_{stage}"
     logs[f"{name}.prompt.md"] = _write(directory, f"{name}.prompt.md", prompt)
@@ -593,9 +598,10 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
     turn: dict = {"result": "", "stream": "", "stderr": "", "success": False,
                   "usage": {}}
     try:
-        llm = build_llm(GENERATE_SYSTEM_MESSAGE,
-                        int(cfg.get("timeout_seconds", 2400)), cfg["model_id"])
-        turn = dispatch_turn(llm, prompt, tools, stage=_TURN_STAGE[stage])
+        turn = dispatch_turn(GENERATE_SYSTEM_MESSAGE, prompt, tools,
+                             stage=_TURN_STAGE[stage],
+                             timeout_seconds=int(cfg.get("timeout_seconds", 2400)),
+                             model_id=cfg["model_id"])
         return turn
     finally:
         turn["wall_seconds"] = time.monotonic() - started

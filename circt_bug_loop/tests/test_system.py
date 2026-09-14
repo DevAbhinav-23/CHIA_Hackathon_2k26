@@ -395,18 +395,20 @@ def test_recorded_never_builds_a_model(tmp_path, monkeypatch):
     """The mode's whole point, asserted rather than reasoned about.
 
     `llm.build_llm` is the ONE constructor every model turn of §3.5.1 goes
-    through. It is replaced here with a function that raises, and both recorded
-    nodes then run to completion.
+    through, and since K2 `llm.dispatch_turn` is the ONE way to reach it. Both
+    are replaced here with functions that raise, and both recorded nodes then
+    run to completion.
     """
     from circt_bug_loop import llm
 
     def refuse(*args, **kwargs):
-        raise AssertionError("build_llm was called in --generator recorded")
+        raise AssertionError("a model turn was set up in --generator recorded")
 
     monkeypatch.setattr(llm, "build_llm", refuse)
-    monkeypatch.setattr("circt_bug_loop.generate_task.build_llm", refuse,
+    monkeypatch.setattr(llm, "dispatch_turn", refuse)
+    monkeypatch.setattr("circt_bug_loop.generate_task.dispatch_turn", refuse,
                         raising=False)
-    monkeypatch.setattr("circt_bug_loop.triage_task.build_llm", refuse,
+    monkeypatch.setattr("circt_bug_loop.triage_task.dispatch_turn", refuse,
                         raising=False)
 
     generated = bug_loop._recorded_generation(

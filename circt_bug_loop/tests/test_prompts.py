@@ -380,11 +380,11 @@ def _render_one(name: str, monkeypatch, tmp_path, mirror, repo) -> str:  # noqa:
     # as far as its one turn and the turn is what refuses.
     rendered = {}
 
-    def _dispatch(backend, user_message, tools, *, stage="stage_2"):
+    def _dispatch(system_message, user_message, tools, *, stage,
+                  timeout_seconds, model_id):
         rendered["text"] = user_message
         raise PromptContractError("no_block")
 
-    monkeypatch.setattr(llm, "build_llm", lambda *a, **k: object())
     monkeypatch.setattr(llm, "dispatch_turn", _dispatch)
     with pytest.raises(PromptContractError):
         mutator_synth.synthesise_mutators._chia_original(

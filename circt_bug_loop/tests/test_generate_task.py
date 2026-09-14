@@ -103,21 +103,24 @@ def config(tmp_path, throwaway_repo) -> dict:  # noqa: F811
 def replay(monkeypatch, tool_servers):  # noqa: F811
     """Replay recorded turn text through the one call that reaches a model.
 
-    `build_llm` and `dispatch_turn` are the two functions substituted, and
-    nothing else is: `_turn` still renders, writes FR-04.6's five files and
-    records the usage, the two `ChiaTool`s are constructed and stopped for
-    real, and a turn's declared files are written through `write_probe` itself,
-    so a name the tool would refuse is refused here too.
+    `dispatch_turn` is the ONE function substituted, and nothing else is:
+    `_turn` still renders, writes FR-04.6's five files and records the usage,
+    the two `ChiaTool`s are constructed and stopped for real, and a turn's
+    declared files are written through `write_probe` itself, so a name the tool
+    would refuse is refused here too. Since K2 the node builds no backend at
+    all - the client is `llm_turn`'s, on the `llm` worker - so the substitute
+    receives the turn request's fields and never an LLM.
     """
     def install(turns: list) -> dict:
         state = {"calls": [], "pending": list(turns)}
-        monkeypatch.setattr(generate_task, "build_llm",
-                            lambda system, timeout, model: {"model": model})
 
-        def _dispatch(llm, user_message, tools, *, stage="stage_2"):
+        def _dispatch(system_message, user_message, tools, *, stage,
+                      timeout_seconds, model_id):
             turn = state["pending"].pop(0)
             state["calls"].append({"prompt": user_message, "tools": list(tools),
-                                   "llm": llm, "stage": stage})
+                                   "system_message": system_message,
+                                   "timeout_seconds": timeout_seconds,
+                                   "model_id": model_id, "stage": stage})
             for name, content in (turn.get("files") or {}).items():
                 tools[-1].write_probe(name, content)
             if turn.get("raises") is not None:
@@ -456,8 +459,12 @@ def test_generate_mutation_emits_validated_specs_with_no_model(config, monkeypat
     `SeedRecord` the seeded arm gets and reads only `test_files`, and nothing
     in `mutators/` can reach a backend.
     """
-    monkeypatch.setattr(generate_task, "build_llm", lambda *a, **k: pytest.fail(
+    from circt_bug_loop import llm as llm_module
+
+    monkeypatch.setattr(llm_module, "build_llm", lambda *a, **k: pytest.fail(
         "the mutation arm built a model backend (FR-05.1)"))
+    monkeypatch.setattr(llm_module, "dispatch_turn", lambda *a, **k: pytest.fail(
+        "the mutation arm dispatched a model turn (FR-05.1)"))
     result = call_node(generate_mutation, seed(), empty_feedback(),
                        schema.LedgerSnapshot(arm="mutation",
                                              unit="wall_clock_seconds",

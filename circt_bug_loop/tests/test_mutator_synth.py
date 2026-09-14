@@ -88,13 +88,13 @@ def turn(monkeypatch):
     """Return the one recorded turn text from the one call that reaches a model."""
     def install(text: str) -> dict:
         state = {"calls": []}
-        monkeypatch.setattr(llm, "build_llm",
-                            lambda system, timeout, model: {"model": model,
-                                                            "timeout": timeout})
 
-        def _dispatch(llm, user_message, tools, *, stage="stage_2"):
+        def _dispatch(system_message, user_message, tools, *, stage,
+                      timeout_seconds, model_id):
             state["calls"].append({"prompt": user_message, "tools": list(tools),
-                                   "llm": llm, "stage": stage})
+                                   "system_message": system_message,
+                                   "timeout_seconds": timeout_seconds,
+                                   "model_id": model_id, "stage": stage})
             return {"result": text, "stream": text, "stderr": "", "success": True,
                     "usage": {"tokens_in": 900, "tokens_out": 300,
                               "num_turns": 1, "model": MODEL_ID}}

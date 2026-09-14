@@ -43,7 +43,7 @@ from chia.base.ChiaFunction import ChiaFunction
 from circt_bug_loop.contract.schema import (CounterBlock, RunManifest,
                                             SeedRecord)
 from circt_bug_loop.llm import (PromptContractError,  # noqa: F401
-                                build_llm, dispatch_turn, parse_json_footer)
+                                dispatch_turn, parse_json_footer)
 from circt_bug_loop.probe_task import _normalise_function, strip_prologue
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, LoopStore,
@@ -1417,9 +1417,15 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
 def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
     """One 3.5.1 turn on the campaign backend, with `SourceReadTool` and nothing else.
 
-    The backend and the turn are `llm.py`'s, which is neither half, so they are
-    imported at module scope. `generate_task` is still imported HERE and not
-    there, for the one name 3.5 leaves in the supply half: `SourceReadTool`.
+    The turn is `llm.py`'s, which is neither half, so it is imported at module
+    scope. `generate_task` is still imported HERE and not there, for the one
+    name 3.5 leaves in the supply half: `SourceReadTool`.
+
+    B7 runs on a `circt` worker, which carries neither the key nor the
+    interlock. It builds no backend: `llm_turn` constructs the client on the
+    `llm` worker from that worker's own environment, and what crosses is the
+    system message, the prompt, the tool's endpoint, the stage, the timeout and
+    the model id (K2, W7).
 
     The tool is constructed as 3.5's constructor declares it,
     `(name, clone_path, run_commit, cap_bytes, task_options)`, and by keyword.
@@ -1435,14 +1441,15 @@ def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
     """
     from circt_bug_loop import generate_task
 
-    backend = build_llm(TRIAGE_SYSTEM_MESSAGE,
-                        int(cfg.get("timeout_seconds", 1200)), cfg["model_id"])
     tool = generate_task.SourceReadTool(
         name=name, clone_path=cfg["clone_path"], run_commit=cfg["run_commit"],
         cap_bytes=int(cfg.get("artefact_inline_cap_bytes", 262144)),
         task_options=cfg.get("head_options"))
     try:
-        return dispatch_turn(backend, prompt, [tool], stage="stage_6")
+        return dispatch_turn(TRIAGE_SYSTEM_MESSAGE, prompt, [tool],
+                             stage="stage_6",
+                             timeout_seconds=int(cfg.get("timeout_seconds", 1200)),
+                             model_id=cfg["model_id"])
     finally:
         stop = getattr(tool, "stop", None)
         if callable(stop):

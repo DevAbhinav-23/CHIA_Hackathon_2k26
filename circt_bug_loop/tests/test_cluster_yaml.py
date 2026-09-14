@@ -252,3 +252,26 @@ def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
     assert 'export BUGLOOP_HEAD_ENV="${BUGLOOP_HEAD_ENV:-' in submit
     assert 'PYBIN="${BUGLOOP_PY:-$(dirname "$BUGLOOP_HEAD_ENV")/python}"' in submit
     assert "BUGLOOP_HEAD_ENV" not in submit.split("ENV_JSON=")[1].split("PY\n)")[0]
+
+
+def test_T_U_cluster_10(loader_env):
+    """T-U-cluster-10 (K2, NFR-06): only `llm` and `repair` carry the credential.
+
+    New id, W-20b. K2 measured the other side of this: the seeded arm and stage
+    6 built their backend on the `circt` worker, which carries neither variable,
+    so every seeded generation and every triage report refused. Since the fix
+    the only node that constructs a client is `llm.llm_turn` at `{"llm": 1.0}`,
+    and stage 7's chain is CHIA's own on `{"repair": 1}`; every other type must
+    therefore see neither name, and a YAML that gave one to `bugloop_circt`
+    would be handing a key to the containers that run generated input.
+    Fixture: none. Tier 0.
+    """
+    from chia.cluster.config import load_config
+
+    keyed = {}
+    for name, node in load_config(str(SINGLE)).node_types.items():
+        options = " ".join(node.docker.run_options)
+        keyed[name] = ("GEMINI_API_KEY" in options,
+                       bug_loop.LIVE_MODEL_ENV in options)
+    assert keyed == {"bugloop_llm": (True, True), "bugloop_repair": (True, True),
+                     "bugloop_circt": (False, False)}

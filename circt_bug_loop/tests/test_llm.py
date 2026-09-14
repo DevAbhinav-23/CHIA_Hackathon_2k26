@@ -47,6 +47,26 @@ MODEL_ID = "gemini-3.8-flash"
 ALLOW_ENV = {"BUGLOOP_ALLOW_LIVE_MODEL": "1", "GEMINI_API_KEY": SYNTHETIC_KEY}
 
 
+@pytest.fixture
+def allow_worker_env(monkeypatch):
+    """Let `llm_turn` build its client, without setting the real variable.
+
+    Since K2 the turn node reads the LLM WORKER's own environment through
+    `llm.worker_env`, which takes no argument precisely so that no request can
+    carry a key (W7). Substituting that one function is how a test reaches the
+    allow path while `BUGLOOP_ALLOW_LIVE_MODEL` stays absent from this process.
+    """
+    monkeypatch.setattr(llm_module, "worker_env", lambda: dict(ALLOW_ENV))
+
+
+def turn_request(prompt: str, tools, *, stage: str = "stage_2",
+                 timeout_seconds: int = 2400) -> dict:
+    """The request `dispatch_turn` builds, for a test that calls the node."""
+    return {"system_message": "be terse", "prompt": prompt,
+            "tools": llm_module.tool_endpoints(tools), "stage": stage,
+            "timeout_seconds": timeout_seconds, "model_id": MODEL_ID}
+
+
 # ---------------------------------------------------------------------------
 # 3.5.1 The backend, the interlock and the turn
 # ---------------------------------------------------------------------------
@@ -158,7 +178,8 @@ def test_T_U_gen_23_express_mode_construction(monkeypatch, fake_vertex):
 
 
 @pytest.mark.t0
-def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex):
+def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
+                                                   allow_worker_env):
     """T-U-gen-24 (FR-14.6, FR-14.8): the token counts return with the result.
 
     Two assertions pin WHY the node exists: `QueryResult` carries no usage
@@ -173,8 +194,7 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex):
     install, _ = fake_vertex
     install([vertex_response([vertex_text_part("PONG")], in_tok=11, out_tok=7)])
 
-    llm = build_llm("be terse", 2400, MODEL_ID, env=ALLOW_ENV)
-    turn = call_node(llm_turn, llm, "ping", [])
+    turn = call_node(llm_turn, turn_request("ping", []))
 
     assert turn["usage"] == {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
                              "model": MODEL_ID}
@@ -188,7 +208,7 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex):
     tree = ast.parse(textwrap.dedent(inspect.getsource(llm_turn._chia_original)))
     calls = {ast.unparse(node) for node in ast.walk(tree)
              if isinstance(node, ast.Call)}
-    assert "llm.prompt(user_message, tools)" in calls
+    assert "llm.prompt(request['prompt'], list(request.get('tools') or []))" in calls
     attributes = {ast.unparse(node) for node in ast.walk(tree)
                   if isinstance(node, ast.Attribute)}
     assert not [name for name in attributes
@@ -197,7 +217,80 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex):
 
 
 @pytest.mark.t0
+def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
+                                                            fake_vertex,
+                                                            allow_worker_env):
+    """K2/W7: the request is six fields, none of them an LLM and none a key.
+
+    Two halves. The request `dispatch_turn` builds is asserted field by field,
+    and the backend it never constructs is asserted by refusing `build_llm`
+    everywhere but inside the node: a caller that still built one would fail
+    here rather than silently ship a key through the object store.
+    """
+    install, capture = fake_vertex
+    install([vertex_response([vertex_text_part("PONG")], in_tok=2, out_tok=3)])
+
+    seen = {}
+    real_turn = llm_turn._chia_original
+
+    def record(request):
+        seen.update(request)
+        return real_turn(request)
+
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original", record)
+    turn = llm_module.dispatch_turn("be terse", "ping", [], stage="synthesis",
+                                    timeout_seconds=1200, model_id=MODEL_ID)
+
+    assert turn["result"] == "PONG"
+    assert set(seen) == {"system_message", "prompt", "tools", "stage",
+                         "timeout_seconds", "model_id"}
+    assert seen["tools"] == [] and seen["stage"] == "synthesis"
+    assert seen["timeout_seconds"] == 1200 and seen["model_id"] == MODEL_ID
+    # No value anywhere in the request is the key, and nothing in it is an LLM.
+    assert SYNTHETIC_KEY not in repr(seen)
+    assert capture["client_kwargs"]["api_key"] == SYNTHETIC_KEY
+
+
+@pytest.mark.t0
+def test_T_U_gen_24c_a_circt_worker_reaches_no_model(monkeypatch):
+    """K2: `llm_turn` refuses on a worker whose environment has no interlock.
+
+    This is the `circt` container's own case: `cluster_single.yaml` passes the
+    two variables to `bugloop_llm` and `bugloop_repair` and to no other type,
+    and the refusal now happens where the client is built, which is the `llm`
+    worker, rather than on the caller.
+    """
+    monkeypatch.setattr(llm_module, "worker_env", lambda: {})
+    with pytest.raises(LiveModelRefused):
+        call_node(llm_turn, turn_request("ping", []))
+
+
+@pytest.mark.t0
+def test_T_U_gen_24d_tool_endpoints_are_what_the_backend_reads(tmp_path,
+                                                               tool_servers,  # noqa: F811
+                                                               throwaway_repo):  # noqa: F811
+    """K2: the endpoint record carries exactly the four attributes CHIA reads.
+
+    `chia:chia/models/vertex.py` builds `http://{hostname}:{port}/{name}/mcp`
+    and records `node_id` beside them; a record of those four therefore serves
+    the turn as the live tool object does, and is what may cross to a worker.
+    """
+    path, head = throwaway_repo
+    tool = SourceReadTool(name="src_x", clone_path=path, run_commit=head)
+    try:
+        endpoint, = llm_module.tool_endpoints([tool])
+    finally:
+        tool.stop()
+
+    assert (endpoint.name, endpoint.hostname, endpoint.port) == (
+        "src_x", tool.hostname, tool.port)
+    assert [f.name for f in __import__("dataclasses").fields(endpoint)] == [
+        "name", "hostname", "port", "node_id"]
+
+
+@pytest.mark.t0
 def test_T_U_gen_25_the_tool_loop_runs_offline(monkeypatch, fake_vertex, tmp_path,
+                                               allow_worker_env,
                                                tool_servers, throwaway_repo):  # noqa: F811
     """T-U-gen-25 (FR-04.4, FR-19.1): two tools declared, one call, one response.
 
@@ -215,8 +308,8 @@ def test_T_U_gen_25_the_tool_loop_runs_offline(monkeypatch, fake_vertex, tmp_pat
 
     source_read = SourceReadTool(name="src_x", clone_path=path, run_commit=head)
     probe_write = ProbeWriteTool(name="probe_x", probe_dir=str(tmp_path / "probes"))
-    llm = build_llm("be terse", 2400, MODEL_ID, env=ALLOW_ENV)
-    turn = call_node(llm_turn, llm, "look at the tree", [source_read, probe_write])
+    turn = call_node(llm_turn, turn_request("look at the tree",
+                                            [source_read, probe_write]))
 
     assert turn["result"] == "done"
     assert turn["usage"]["tokens_in"] == 13 and turn["usage"]["num_turns"] == 2

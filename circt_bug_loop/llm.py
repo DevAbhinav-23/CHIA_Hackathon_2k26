@@ -26,6 +26,7 @@ shape that does both (architect decision 2).
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -106,8 +107,10 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
         VertexGeminiLLM, configured for Vertex AI express mode: one API key, no
         project and no location.
     Worker:
-        the caller's; the object it returns is serialised to an `llm` worker by
-        `llm_turn`.
+        the `llm` worker: `llm_turn` below is the only caller in the flow, and
+        it calls this on the worker its own decorator placed it on. No other
+        worker type needs the key or the interlock (K2), and the object never
+        crosses a task boundary, so the key is not a Ray task argument (W7).
     Raises:
         LiveModelRefused, from `require_live_model` above. Nothing else. No
         network call is made here: constructing the backend opens no connection.
@@ -139,15 +142,70 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
     return llm
 
 
-@ChiaFunction(resources={"llm": 1.0}, max_retries=0)
-def llm_turn(llm, user_message: str, tools: list, *,
-             stage: str = "stage_2") -> dict:
-    """Run one model turn on an `llm` worker and bring its token counts home.
+@dataclasses.dataclass(frozen=True)
+class ToolEndpoint:
+    """Where one `ChiaTool`'s MCP server answers, and nothing else about it.
 
-    *stage* is the caller's, because a turn belongs to the stage that asked for
-    it and this node cannot know which: A3 runs two, B7 runs stage 6 and A7 runs
-    the offline synthesis. It names the `CounterBlock` 3.11 requires and nothing
-    else.
+    This is what crosses to the `llm` worker in a tool's place. CHIA's backend
+    reads exactly these off a tool object - `tool.hostname`, `tool.name` and
+    `getattr(tool, "port", 8000)` to build
+    `http://{hostname}:{port}/{name}/mcp` (`chia:chia/models/vertex.py:426-428`),
+    and `node_id` for its own `_last_metadata["tools"]` record (`:291-295`) -
+    so a record of four strings serves the turn exactly as the live object does,
+    without shipping a FastMCP server's whole state through the object store.
+    """
+
+    name: str
+    hostname: str
+    port: int
+    node_id: Optional[str] = None
+
+
+def tool_endpoints(tools) -> list:
+    """The `ToolEndpoint` of every tool in *tools*, in order.
+
+    Returns:
+        list[ToolEndpoint]; an empty list for a turn with no tools.
+    Worker:
+        the caller's, which is where the tool servers were started.
+    Raises:
+        AttributeError when a tool was never started, `hostname` being None
+        until `__post_init__` has run.
+    """
+    return [ToolEndpoint(name=tool.name, hostname=tool.hostname,
+                         port=getattr(tool, "port", 8000),
+                         node_id=getattr(tool, "node_id", None))
+            for tool in tools or []]
+
+
+def worker_env() -> Mapping[str, str]:
+    """The environment `llm_turn` builds its client from: the LLM WORKER's own.
+
+    A function of no arguments and deliberately NOT a field of the turn request
+    (K2, W7): a request that could carry an environment could carry a key, and
+    the key travelling as a Ray task argument is the unrecorded persistence
+    surface W7 names. A test substitutes this name to exercise the allow path
+    without ever putting the interlock into a process environment
+    (`T-U-layout-08` (1), architect decision 2).
+    """
+    return os.environ
+
+
+@ChiaFunction(resources={"llm": 1.0}, max_retries=0)
+def llm_turn(request: dict) -> dict:
+    """Build the backend HERE and run one model turn, bringing its counts home.
+
+    *request* is what a caller on any worker may send: `system_message`,
+    `prompt`, `tools` (a list of `ToolEndpoint`), `stage`, `timeout_seconds` and
+    `model_id`. It carries NO credential and no LLM object. The client is
+    constructed on this node from this node's own environment, so the interlock
+    and the key are needed on the `llm` containers and on no other: the `circt`
+    workers that run A3 and B7 reach a model only through this node (K2).
+
+    *request["stage"]* is the caller's, because a turn belongs to the stage that
+    asked for it and this node cannot know which: A3 runs two, B7 runs stage 6
+    and A7 runs the offline synthesis. It names the `CounterBlock` 3.11 requires
+    and nothing else.
 
     Returns:
         {"result": str, "stream": str, "stderr": str, "success": bool,
@@ -157,8 +215,9 @@ def llm_turn(llm, user_message: str, tools: list, *,
         {"llm": 1.0}; the MCP tool servers stay where their own task_options put
         them and are reached over HTTP from here.
     Raises:
-        whatever the backend raises. A3, A7 and B7 each catch it and record it
-        as their stage's turn failure (FR-04.8, FR-11.8).
+        LiveModelRefused when this worker carries neither the interlock nor a
+        usable key, and whatever the backend raises. A3, A7 and B7 each catch it
+        and record it as their stage's turn failure (FR-04.8, FR-11.8).
     """
     # A DIRECT call, not llm.prompt.options(...).chia_remote(...): the vertex
     # backend accumulates its token counts on the LLM OBJECT
@@ -167,7 +226,10 @@ def llm_turn(llm, user_message: str, tools: list, *,
     # would count on a copy that dies with the task and FR-14.6 would be
     # unsatisfiable. This node holds {"llm": 1.0} in that copy's place.
     started = time.monotonic()
-    cli = llm.prompt(user_message, tools)
+    stage = request.get("stage", "stage_2")
+    llm = build_llm(request["system_message"], int(request["timeout_seconds"]),
+                    request["model_id"], env=worker_env())
+    cli = llm.prompt(request["prompt"], list(request.get("tools") or []))
     meta = dict(getattr(llm, "_last_metadata", {}) or {})
     success = bool(getattr(cli, "success", False))
     return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
@@ -182,15 +244,17 @@ def llm_turn(llm, user_message: str, tools: list, *,
                                      seconds=time.monotonic() - started)}
 
 
-def dispatch_turn(llm, user_message: str, tools: list, *,
-                  stage: str = "stage_2") -> dict:
+def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
+                  timeout_seconds: int, model_id: str) -> dict:
     """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn.
 
-    A3, A7 and B7 all reach a model through this one line. Under Ray the node
-    is dispatched and holds an `llm` slot, which is what caps the campaign's
-    concurrent prompts at the container count (FR-14.5); with no Ray running
-    there is no cluster to dispatch to and the same node runs in this process,
-    which is what a driver-less replay and an offline synthesis do.
+    A3, A7 and B7 all reach a model through this one line, and none of them
+    holds a backend object or a key: what crosses is the request `llm_turn`
+    documents. Under Ray the node is dispatched and holds an `llm` slot, which
+    is what caps the campaign's concurrent prompts at the container count
+    (FR-14.5); with no Ray running there is no cluster to dispatch to and the
+    same node runs in this process, which is what a driver-less replay and an
+    offline synthesis do.
 
     Returns:
         `llm_turn`'s dict, whichever way it ran.
@@ -199,9 +263,12 @@ def dispatch_turn(llm, user_message: str, tools: list, *,
     Raises:
         whatever the backend raises, unchanged.
     """
+    request = {"system_message": system_message, "prompt": prompt,
+               "tools": tool_endpoints(tools), "stage": stage,
+               "timeout_seconds": int(timeout_seconds), "model_id": model_id}
     if ray.is_initialized():
-        return get(llm_turn.chia_remote(llm, user_message, tools, stage=stage))
-    return llm_turn._chia_original(llm, user_message, tools, stage=stage)
+        return get(llm_turn.chia_remote(request))
+    return llm_turn._chia_original(request)
 
 
 # ---------------------------------------------------------------------------
@@ -249,5 +316,6 @@ def parse_json_footer(text: str, required: tuple) -> dict:
 
 
 __all__ = ["MODEL_BACKEND", "LiveModelRefused", "PromptContractError",
-           "build_llm", "dispatch_turn", "llm_turn", "parse_json_footer",
-           "require_live_model"]
+           "ToolEndpoint", "build_llm", "dispatch_turn", "llm_turn",
+           "parse_json_footer", "require_live_model", "tool_endpoints",
+           "worker_env"]
