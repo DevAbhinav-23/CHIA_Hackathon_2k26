@@ -19,6 +19,7 @@ import dataclasses
 import inspect
 import json
 import os
+import socket
 import subprocess
 from pathlib import Path
 
@@ -1156,7 +1157,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
             token_capture="unavailable_remote_dispatch")}
 
     def gate(candidate, reduced, dedup, repair_result, manifest_, db_path,
-             *, limits, top_n, bin_dir):
+             *, limits, top_n, bin_dir, minimal_case_lines):
         from circt_bug_loop.store import GateDecision
 
         return {"counters": schema.CounterBlock(
@@ -1946,3 +1947,58 @@ def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_pat
     source = inspect.getsource(bug_loop.run_campaign)
     assert "corpus_since(args.clone, budget.corpus_head_sha)" in source
     assert "budget.campaign_start_utc[:10]" not in source
+
+
+def test_T_U_driver_46_a_stale_ray_cluster_file_is_removed(tmp_path, monkeypatch):
+    """T-U-driver-46 (errata row 37): pre-flight clears what a `chia down` left.
+
+    `/tmp/ray/ray_current_cluster` is what `ray start` writes and what a
+    teardown leaves behind, and every reader of the Ray runtime context then
+    retries THAT address five seconds at a time - for ever in
+    `get_runtime_context`, and for sixty seconds and then a process-terminating
+    `QuickExit` in the client. It hung W-12c's first live turn for twelve
+    minutes and is W-19b §3.4 in a second place. The run rule is that the file
+    names a live cluster or does not exist; this is the half that enforces it,
+    and `NODE_ID_TIMEOUT_SECONDS` in `upstream/vertex-usage.patch` is the other.
+
+    Three cases: a file naming nothing that listens is removed and its address
+    returned, a file naming a socket that DOES answer is left alone, and an
+    absent file is not an error. Fixture: a real listening socket on a port the
+    kernel chose. Tier 0.
+    """
+    monkeypatch.setattr(bug_loop.ray, "is_initialized", lambda: False)
+    stale = tmp_path / "ray_current_cluster"
+
+    assert bug_loop.clear_stale_ray_cluster(str(stale)) is None, "no file, no error"
+
+    # A port nothing listens on. Bound, read back, then closed, so the number
+    # is real and free rather than guessed.
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    dead_port = probe.getsockname()[1]
+    probe.close()
+    stale.write_text(f"127.0.0.1:{dead_port}\n")
+    assert bug_loop.clear_stale_ray_cluster(str(stale)) == f"127.0.0.1:{dead_port}"
+    assert not stale.exists()
+
+    # A cluster that answers is load-bearing while it is true.
+    live = socket.socket()
+    live.bind(("127.0.0.1", 0))
+    live.listen(1)
+    try:
+        stale.write_text(f"127.0.0.1:{live.getsockname()[1]}")
+        assert bug_loop.clear_stale_ray_cluster(str(stale)) is None
+        assert stale.exists()
+    finally:
+        live.close()
+
+    # And nothing is removed from under a driver that has already joined one.
+    monkeypatch.setattr(bug_loop.ray, "is_initialized", lambda: True)
+    stale.write_text(f"127.0.0.1:{dead_port}")
+    assert bug_loop.clear_stale_ray_cluster(str(stale)) is None
+    assert stale.exists()
+
+    # The pre-flight calls it, and calls it BEFORE ray.init (13.1).
+    source = inspect.getsource(bug_loop.run_campaign)
+    assert source.index("clear_stale_ray_cluster()") < source.index('ray.init(address="auto"')
+    assert bug_loop.RAY_CURRENT_CLUSTER == "/tmp/ray/ray_current_cluster"

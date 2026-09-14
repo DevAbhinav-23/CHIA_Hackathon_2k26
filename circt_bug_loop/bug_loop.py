@@ -31,6 +31,7 @@ import logging
 import os
 import random
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -199,6 +200,65 @@ class BuildTimeout(Exception):
 # ---------------------------------------------------------------------------
 # Placement, and the runtime environment
 # ---------------------------------------------------------------------------
+
+#: What `ray start` writes and `chia down` leaves behind: the address of the
+#: cluster this machine last joined. `ray.get_runtime_context()` reads it and
+#: then retries the GCS at that address five seconds at a time FOR EVER, so a
+#: file naming a cluster that is down hangs every caller instead of failing one
+#: (errata row 37, measured twice: W-12c's twelve-minute hang inside a vertex
+#: error path, and W-19b §3.4).
+RAY_CURRENT_CLUSTER = "/tmp/ray/ray_current_cluster"
+
+
+def clear_stale_ray_cluster(path: str = RAY_CURRENT_CLUSTER) -> Optional[str]:
+    """Remove *path* when it names a cluster that is not running (errata row 37).
+
+    The run rule is that the file must name a LIVE cluster or not exist. The
+    driver's own `ray.init(address="auto")` makes it live, which is why the
+    campaign never met the hang; the four call sites that did are on CHIA's
+    vertex error paths, where a 429 on a machine carrying a stale file waits
+    instead of retrying. This is the pre-flight half of the fix and
+    `_get_node_id`'s own bound - `upstream/vertex-usage.patch`,
+    `NODE_ID_TIMEOUT_SECONDS` - is the other; neither alone is enough, because a
+    stale file also hangs `ray.init` itself.
+
+    "Not running" is decided by `ray.is_initialized()` in this process and by
+    the absence of a GCS listening on the address the file names. Nothing is
+    removed when a cluster IS up: that file is load-bearing while it is true.
+
+    Returns:
+        str, the address the removed file named, or None when nothing was
+        removed - because there was no file, or because its cluster answers.
+    Worker:
+        head; one file read, one TCP connect with a one-second timeout, one
+        unlink.
+    Raises:
+        nothing. A file that cannot be read or removed is left alone: this is a
+        courtesy and not a check, and refusing the run over it would trade one
+        hang for one refusal.
+    """
+    if ray.is_initialized():
+        return None
+    try:
+        address = Path(path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not address:
+        address = "(empty)"
+    host, _, port = address.rpartition(":")
+    if host and port.isdigit():
+        probe = socket.socket()
+        probe.settimeout(1.0)
+        try:
+            if probe.connect_ex((host, int(port))) == 0:
+                return None               # the cluster answers; the file is true
+        finally:
+            probe.close()
+    try:
+        os.unlink(path)
+    except OSError:
+        return None
+    return address
 
 
 def _head_node_id() -> str:
@@ -3790,6 +3850,14 @@ def run_campaign(args, out) -> int:
     config = load_config(args.cluster_yaml)
     resources = {name: dict(node_type.resources)
                  for name, node_type in config.node_types.items()}
+    # Errata row 37, before anything reads the Ray runtime context: a
+    # `ray_current_cluster` left behind by a `chia down` names a GCS that does
+    # not answer, and every reader then retries it five seconds at a time for
+    # ever - `ray.init` included.
+    stale = clear_stale_ray_cluster()
+    if stale is not None:
+        print(f"pre-flight: removed a stale {RAY_CURRENT_CLUSTER} naming "
+              f"{stale}, which no cluster answers (errata row 37)", file=out)
     ray.init(address="auto", runtime_env=runtime_env(shipped),
              ignore_reinit_error=True)
     # The driver IS the head (13.1's B12 row), so its own node id is what pins
