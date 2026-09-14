@@ -383,7 +383,13 @@ def test_T_U_driver_17b(tmp_path):
     unpatched = tmp_path / "issue_task.py"
     unpatched.write_text("def _turn():\n    pass\n", encoding="utf-8")
     patched = tmp_path / "patched.py"
-    patched.write_text(f"    {bug_loop.VERTEX_BRANCH}\n", encoding="utf-8")
+    patched.write_text(
+        f"    {bug_loop.VERTEX_BRANCH}\n"
+        + "".join(f"        {bound}'x']\n" for bound in bug_loop.VERTEX_BRANCH_BOUNDS),
+        encoding="utf-8")
+    # W-18d: the branch without its two bounds is a stale staging, not a run.
+    stale = tmp_path / "stale.py"
+    stale.write_text(f"    {bug_loop.VERTEX_BRANCH}\n", encoding="utf-8")
 
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_13_vertex_branch(issue_task_path=str(unpatched),
@@ -400,6 +406,12 @@ def test_T_U_driver_17b(tmp_path):
     assert bug_loop.check_13_vertex_branch(
         issue_task_path=str(patched), repair_backend="vertex",
         repair_enabled=True) == "vertex"
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_13_vertex_branch(issue_task_path=str(stale),
+                                        repair_backend="vertex",
+                                        repair_enabled=True)
+    assert raised.value.check == "vertex_branch"
+    assert "turn_budget_usd" in str(raised.value)
 
     thin = tmp_path / "vertex.py"
     thin.write_text('meta["output_tokens"] += 0\n', encoding="utf-8")
@@ -1530,3 +1542,37 @@ def test_T_U_driver_46_a_stale_ray_cluster_file_is_removed(tmp_path, monkeypatch
     source = inspect.getsource(bug_loop.run_campaign)
     assert source.index("clear_stale_ray_cluster()") < source.index('ray.init(address="auto"')
     assert bug_loop.RAY_CURRENT_CLUSTER == "/tmp/ray/ray_current_cluster"
+
+
+def test_T_U_driver_29_stage_seven_runs_only_for_a_new_candidate():
+    """T-U-driver-29 (W-18d): the screen's verdict gates the loop's costliest stage."""
+    class _Campaign:
+        repair_enabled = True
+
+    def _dedup(verdict):
+        return DedupVerdict(probe_id="p", verdict=verdict, evidence={})
+
+    for verdict in ("duplicate_of_candidate", "known_open_issue",
+                    "known_closed_issue", "fixed_post_pin", "dedup_unavailable"):
+        out, result = {"verdicts": {}, "stages": []}, _Stopping()
+        assert bug_loop._drive_repair(_Campaign(), None, None, None, None,
+                                      _dedup(verdict), {}, out, result) is None
+        assert out["verdicts"]["stage_7"] == f"skipped:{verdict}"
+        # A stage that did not run is not an occupancy and does not stop the probe.
+        assert out["stages"] == [] and result.stopping_stage == "stage_6"
+
+    # --no-repair is still the earlier and quieter refusal: no verdict at all.
+    class _NoRepair(_Campaign):
+        repair_enabled = False
+
+    out = {"verdicts": {}, "stages": []}
+    assert bug_loop._drive_repair(_NoRepair(), None, None, None, None,
+                                  _dedup("new"), {}, out, _Stopping()) is None
+    assert out["verdicts"] == {}
+
+
+class _Stopping:
+    """Whatever `_drive_repair` records its stopping stage on."""
+
+    def __init__(self):
+        self.stopping_stage = "stage_6"

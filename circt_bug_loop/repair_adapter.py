@@ -13,7 +13,8 @@ import chia
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
-from circt_bug_loop.llm import MODEL_BACKEND, require_live_model
+from circt_bug_loop.llm import (DEFAULT_TOOL_ITERATIONS, MODEL_BACKEND, SpendGuard,
+                                require_live_model)
 from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
                                   RepairResult, Report, sha256_file)
 
@@ -41,7 +42,8 @@ PROMPT_FILES = {"system_prompt": "system.md", "assess_prompt": "assess.md",
 #: Every key `run_issue_remote` reads.
 CFG_KEYS = frozenset({"tag", "tool_targets", "repro_dir", "repro_path",
                       "require_repro", "backend", "model", "vertex",
-                      "build_jobs", "timeouts", *PROMPT_FILES})
+                      "build_jobs", "timeouts", "max_tool_iterations",
+                      "turn_budget_usd", *PROMPT_FILES})
 
 #: The CIRCT source tree inside the image.
 CIRCT_BUILD_BIN = "/workspace/circt/build/bin"
@@ -144,8 +146,9 @@ def repro_script(verdict: OracleVerdict, *, input_path: str, case_name: str) -> 
 
 
 def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
-              local_id: int, issue_solver: Optional[Path] = None) -> dict:
-    """Assemble every one of the sixteen keys `run_issue_remote` reads (§3.8)."""
+              local_id: int, budget, report_text: str = "",
+              issue_solver: Optional[Path] = None) -> dict:
+    """Assemble every one of the eighteen keys `run_issue_remote` reads (§3.8)."""
     prompts = (issue_solver or issue_solver_dir()) / "prompts"
     backend, _, model = manifest.model_ids["repair_adapt"].partition(":")
     repro_dir = os.path.join(manifest.artefact_root, manifest.run_manifest_id,
@@ -163,10 +166,33 @@ def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
                    "location": "global"},
         "build_jobs": BUILD_JOBS,
         "timeouts": dict(PHASE_TIMEOUTS),
+        "max_tool_iterations": stage_seven_cap(budget),
     }
     cfg.update({key: (prompts / name).read_text(encoding="utf-8")
                 for key, name in PROMPT_FILES.items()})
+    cfg["turn_budget_usd"] = turn_ceiling_usd(cfg, report_text, budget)
     return cfg
+
+
+def stage_seven_cap(budget) -> int:
+    """Stage 7's registered tool-loop cap, which bounds one phase's turn."""
+    return int((getattr(budget, "max_tool_iterations", None) or {}).get("stage_7")
+               or DEFAULT_TOOL_ITERATIONS)
+
+
+def turn_ceiling_usd(cfg: dict, report_text: str, budget) -> float:
+    """What ONE phase of the chain may spend: W1's worst case for its largest turn."""
+    bodies = [cfg.get(key) or "" for key in PROMPT_FILES]
+    guard = SpendGuard(
+        cap_usd=float(budget.campaign_spend_cap_usd), spend_usd=0.0,
+        price_usd_per_m_input_tokens=budget.price_usd_per_m_input_tokens,
+        price_usd_per_m_output_tokens=budget.price_usd_per_m_output_tokens)
+    return guard.worst_case_usd({
+        "system_message": max(bodies, key=len) if bodies else "",
+        "prompt": report_text or "",
+        # Every phase but the writeup carries tools, which is the priced shape.
+        "tools": [True],
+        "max_tool_iterations": cfg["max_tool_iterations"]})
 
 
 def failing_phase(logs: dict) -> Optional[str]:
@@ -177,11 +203,18 @@ def failing_phase(logs: dict) -> Optional[str]:
     return None
 
 
-def stage7_observed(elapsed: float) -> dict:
-    """The stage-7 `LedgerEntry.observed`, whose three money fields are NULL (§3.8)."""
+def stage7_observed(elapsed: float, ceiling_usd: Optional[float] = None) -> dict:
+    """The stage-7 `LedgerEntry.observed`: authorised for every phase, billed NULL.
+
+    The chain dispatches its own turns, so nothing here can count tokens; what
+    the loop knows is the per-phase ceiling it handed the backend, once for each
+    phase `run_issue_remote` runs (§3.8).
+    """
+    authorised = (None if ceiling_usd is None
+                  else round(len(PHASE_TIMEOUTS) * float(ceiling_usd), 6))
     return {"cpu_seconds": elapsed, "tokens_in": None, "tokens_out": None,
-            "cost_usd": None, "authorised_usd": None, "ceiling_usd": None,
-            "billed_usd": None, "calls": None}
+            "cost_usd": None, "authorised_usd": authorised,
+            "ceiling_usd": ceiling_usd, "billed_usd": None, "calls": None}
 
 
 @ChiaFunction(resources={"repair": 1}, max_retries=0)
@@ -223,6 +256,16 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
             f"cfg is missing {sorted(missing)}: `run_issue_remote` reads all "
             f"{len(CFG_KEYS)} keys and `repair_adapter.build_cfg` on the head "
             f"is what assembles them (K3, K6)")
+    # The GENERATOR's cfg carries `max_tool_iterations` too, as the per-stage
+    # dict; the chain hands its value straight to one backend constructor.
+    wrong = [key for key, kind in (("max_tool_iterations", int),
+                                   ("turn_budget_usd", float))
+             if not isinstance(chain_cfg[key], kind)]
+    if wrong:
+        raise ValueError(
+            f"cfg carries {sorted(wrong)} in a shape `run_issue_remote` cannot "
+            f"hand to a backend: stage 7's cap is one integer and its ceiling "
+            f"one float, both from `repair_adapter.build_cfg` (K3, K6)")
     if chain_cfg["backend"] != cfg["repair_backend"]:
         raise ValueError(
             f"RunManifest.model_ids['repair_adapt'] names backend "
@@ -260,10 +303,13 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
                                 chain_cfg["backend"], before != after, restore,
                                 chia_artifact_dir)
     fixed = int(attempt.status == "fixed")
+    elapsed = time.monotonic() - started_at
     return {"result": attempt,
+            "logs": {"usage": stage7_observed(elapsed,
+                                              chain_cfg.get("turn_budget_usd"))},
             "counters": CounterBlock(
                 stage="stage_7", started=1, completed=fixed, failed=1 - fixed,
-                seconds=time.monotonic() - started_at)}
+                seconds=elapsed)}
 
 
 def _restore(candidate: CandidateRecord, manifest: RunManifest, chain_cfg: dict,

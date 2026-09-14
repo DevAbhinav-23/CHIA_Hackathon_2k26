@@ -27,6 +27,7 @@ from circt_bug_loop.repair_adapter import (BUILD_JOBS, CFG_KEYS, LOCAL_ID_BASE,
 from circt_bug_loop.store import (CandidateRecord, LoopStore, OracleVerdict,
                                   ReducedCase, Report)
 from circt_bug_loop.tests.conftest import call_node
+from circt_bug_loop.tests.test_bug_loop import budget_file
 
 pytestmark = pytest.mark.t0
 
@@ -187,7 +188,8 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
     shutil.copyfile(REPAIR / "case.mlir", case)
     # The COMPLETE cfg the head assembles since K3/K6.
     local_id = LOCAL_ID_BASE + 7
-    chain_cfg = {**build_cfg(candidate, manifest, local_id=local_id),
+    chain_cfg = {**build_cfg(candidate, manifest, local_id=local_id,
+                             budget=budget_file(), report_text="a report"),
                  "repair_enabled": True,
                  **dict(cfg or {"repair_backend": "vertex"})}
     # `{"result", "counters"}` since the join (W-17).
@@ -201,7 +203,7 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
         env=dict(ALLOW_ENV if env is None else env))
     assert out["counters"].stage == "stage_7"
     return types.SimpleNamespace(result=out["result"], counters=out["counters"],
-                                 chain=chain, util=util,
+                                 logs=out.get("logs"), chain=chain, util=util,
                                  manifest=manifest, candidate=candidate,
                                  generate=generate, bin_dir=bin_dir)
 
@@ -361,7 +363,7 @@ def _chia_checkout():
 
 @pytest.mark.t1
 def test_repair_07_the_patch_is_one_additive_hunk(tmp_path):
-    """T-U-repair-07, T-U-repair-21 (FR-12.1): `git apply --check` accepts the patch at `16c35e92`, the applied diff is **one hunk, 19 insertions and 0 deletions** over **one** path, and the patched file parses."""
+    """T-U-repair-07, T-U-repair-21 (FR-12.1): `git apply --check` accepts the patch at `16c35e92`, the applied diff is **one hunk, 21 insertions and 0 deletions** over **one** path, and the patched file parses."""
     root = _chia_checkout()
     patch = Path(__file__).resolve().parents[2] / "upstream" / "issue_task-vertex-branch.patch"
     assert subprocess.run(["git", "-C", str(root), "apply", "--check", str(patch)],
@@ -383,7 +385,7 @@ def test_repair_07_the_patch_is_one_additive_hunk(tmp_path):
 
     numstat = subprocess.run(["git", "-C", str(work), "diff", "--numstat"],
                              capture_output=True, text=True, check=True).stdout.split()
-    assert numstat == ["19", "0", "examples/circt_issue_solver/issue_task.py"]
+    assert numstat == ["21", "0", "examples/circt_issue_solver/issue_task.py"]
     diff = subprocess.run(["git", "-C", str(work), "diff", "-U0"],
                           capture_output=True, text=True, check=True).stdout
     assert diff.count("\n@@") == 1, "exactly one hunk"
@@ -401,7 +403,7 @@ def test_repair_08_the_six_prompts_are_byte_identical(tmp_path):
     """T-U-repair-08 (FR-12.9): every prompt the adapter passes is byte-identical to CHIA's own at `16c35e92`, compared against the file `build_cfg` read."""
     root = _chia_checkout()
     cfg = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
-                    local_id=LOCAL_ID_BASE + 7)
+                    local_id=LOCAL_ID_BASE + 7, budget=budget_file())
     for key, name in PROMPT_FILES.items():
         recorded = subprocess.run(
             ["git", "-C", str(root), "show",
@@ -410,12 +412,13 @@ def test_repair_08_the_six_prompts_are_byte_identical(tmp_path):
         assert cfg[key] == recorded, name
 
 
-def test_repair_16_every_one_of_the_sixteen_cfg_keys(tmp_path):
-    """T-U-repair-16 (FR-12.1): the key set is exactly the sixteen `run_issue_remote` reads, with §3.8's table's own values."""
+def test_repair_16_every_one_of_the_eighteen_cfg_keys(tmp_path):
+    """T-U-repair-16 (FR-12.1): the key set is exactly the eighteen `run_issue_remote` reads, with §3.8's table's own values."""
     manifest = _manifest(tmp_path)
-    cfg = build_cfg(_candidate(tmp_path), manifest, local_id=LOCAL_ID_BASE + 7)
+    cfg = build_cfg(_candidate(tmp_path), manifest, local_id=LOCAL_ID_BASE + 7,
+                    budget=budget_file(), report_text="a report")
 
-    assert set(cfg) == set(CFG_KEYS) and len(CFG_KEYS) == 16
+    assert set(cfg) == set(CFG_KEYS) and len(CFG_KEYS) == 18
     assert cfg["tool_targets"] == tuple(manifest.image_spec["targets"])
     assert cfg["require_repro"] is True
     # FOUR since W-19b, and the cluster YAML's `bugloop_repair --cpus` matches it.
@@ -480,13 +483,13 @@ def test_repair_20b_a_backend_disagreement_is_refused(tmp_path, monkeypatch):
 def test_repair_20c_the_generators_cfg_is_refused_by_name(tmp_path, monkeypatch):
     """K3, K6: an incomplete cfg refuses loudly, and `build_cfg` is the head's."""
     from circt_bug_loop import bug_loop
-    from circt_bug_loop.tests.test_bug_loop import budget_file
 
     manifest = _manifest(tmp_path)
     generator_cfg = bug_loop.generator_cfg(
         manifest, budget_file(), clone_path=str(tmp_path), iteration=1)
     assert "repair_backend" not in generator_cfg
-    assert not (set(CFG_KEYS) & set(generator_cfg))
+    assert set(CFG_KEYS) & set(generator_cfg) == {"max_tool_iterations"}, \
+        "the per-stage caps are the one name both cfgs carry, by different shape"
 
     _recording_interlock(monkeypatch)
     monkeypatch.setitem(sys.modules, "circt_util", _CirctUtil())
@@ -500,8 +503,10 @@ def test_repair_20c_the_generators_cfg_is_refused_by_name(tmp_path, monkeypatch)
                   env=dict(ALLOW_ENV))
     message = str(raised.value)
     assert "build_cfg" in message
-    # Every one of CHIA's sixteen is named as missing, none of them silently.
-    for key in CFG_KEYS:
+    # Every one CHIA reads is named as missing, none of them silently; the
+    # per-stage caps are present under the same name in the generator's own
+    # dict shape, and are refused for that instead.
+    for key in CFG_KEYS - {"max_tool_iterations"}:
         assert key in message, key
 
     # And `build_cfg` reads the six prompt bodies from a directory only the head has.
@@ -698,3 +703,64 @@ def test_repair_24_the_node_keeps_its_decorator_and_its_docstring(tmp_path):
     for paragraph in ("Returns:", "Worker:", "Raises:"):
         assert paragraph in doc
     assert '{"repair": 1}' in doc
+
+
+def test_repair_25_stage_seven_carries_its_cap_and_its_ceiling(tmp_path, monkeypatch):
+    """T-U-repair-25 (W-18d): the registered stage-7 cap and W1's worst case reach the chain."""
+    funds = budget_file()
+    report_text = "a report" * 100
+    cfg = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                    local_id=LOCAL_ID_BASE + 7, budget=funds,
+                    report_text=report_text)
+
+    assert cfg["max_tool_iterations"] == funds.max_tool_iterations["stage_7"] == 20
+    guard = llm.SpendGuard(
+        cap_usd=float(funds.campaign_spend_cap_usd), spend_usd=0.0,
+        price_usd_per_m_input_tokens=funds.price_usd_per_m_input_tokens,
+        price_usd_per_m_output_tokens=funds.price_usd_per_m_output_tokens)
+    assert cfg["turn_budget_usd"] == guard.worst_case_usd({
+        "system_message": max((cfg[key] for key in PROMPT_FILES), key=len),
+        "prompt": report_text, "tools": [True], "max_tool_iterations": 20})
+
+    # A longer report is a dearer turn, and the ceiling follows it.
+    dearer = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                       local_id=LOCAL_ID_BASE + 7, budget=funds,
+                       report_text=report_text * 10)
+    assert dearer["turn_budget_usd"] > cfg["turn_budget_usd"]
+
+    # The chain is handed both, and the vertex branch passes both on.
+    run = _attempt(tmp_path, monkeypatch)
+    handed = run.chain.calls[0]["cfg"]
+    assert handed["max_tool_iterations"] == 20
+    assert handed["turn_budget_usd"] == build_cfg(
+        run.candidate, run.manifest, local_id=LOCAL_ID_BASE + 7,
+        budget=budget_file(), report_text="a report")["turn_budget_usd"] > 0
+    patch = (Path(__file__).resolve().parents[2] / "upstream"
+             / "issue_task-vertex-branch.patch").read_text(encoding="utf-8")
+    assert '+                max_tool_iterations=cfg["max_tool_iterations"],' in patch
+    assert '+                turn_budget_usd=cfg["turn_budget_usd"],' in patch
+
+    # And what the attempt cost is recorded as authorised, never as billed.
+    usage = run.logs["usage"]
+    assert usage["authorised_usd"] == round(
+        len(PHASE_TIMEOUTS) * handed["turn_budget_usd"], 6)
+    assert usage["ceiling_usd"] == handed["turn_budget_usd"]
+    assert usage["billed_usd"] is None and usage["calls"] is None
+
+
+def test_repair_26_a_generator_shaped_cap_is_refused(tmp_path, monkeypatch):
+    """T-U-repair-26 (K3, K6): a per-stage dict where the chain wants one integer."""
+    _recording_interlock(monkeypatch)
+    monkeypatch.setitem(sys.modules, "circt_util", _CirctUtil())
+    case = tmp_path / "reduced.mlir"
+    shutil.copyfile(REPAIR / "case.mlir", case)
+    manifest = _manifest(tmp_path)
+    cfg = {**build_cfg(_candidate(tmp_path), manifest, local_id=LOCAL_ID_BASE + 7,
+                       budget=budget_file(), report_text="a report"),
+           "repair_enabled": True, "repair_backend": "vertex",
+           "max_tool_iterations": {"stage_7": 20}}
+    with pytest.raises(ValueError) as raised:
+        call_node(repair_adapt, _report(), _candidate(tmp_path), _reduced(case),
+                  _verdict(), manifest, cfg, local_id=LOCAL_ID_BASE + 7,
+                  input_path="/art/probe/input.mlir", env=dict(ALLOW_ENV))
+    assert "max_tool_iterations" in str(raised.value)

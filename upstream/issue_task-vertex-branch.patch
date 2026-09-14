@@ -1,6 +1,6 @@
 --- a/examples/circt_issue_solver/issue_task.py
 +++ b/examples/circt_issue_solver/issue_task.py
-@@ -114,6 +114,25 @@
+@@ -114,6 +114,27 @@
                  timeout_seconds=cfg["timeouts"][phase],
                  additional_providers=[gemini], config=perms,
              )
@@ -17,6 +17,8 @@
 +            llm = VertexGeminiLLM(
 +                model=cfg["model"], system_message=cfg["system_prompt"],
 +                timeout_seconds=cfg["timeouts"][phase],
++                max_tool_iterations=cfg["max_tool_iterations"],
++                turn_budget_usd=cfg["turn_budget_usd"],
 +                client_kwargs={"api_key": os.environ["GEMINI_API_KEY"],
 +                               "http_options": {
 +                                   "timeout": cfg["timeouts"][phase] * 1000}},

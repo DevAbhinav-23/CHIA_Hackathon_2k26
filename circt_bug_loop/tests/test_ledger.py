@@ -403,3 +403,33 @@ def test_T_U_ledger_15_filing_caps_are_per_run(tmp_path: Path):
         fresh, "seeded", budget(filings_total=1, filings_per_day=0)) is None
     assert ledger_module.stop_reason(
         fresh, "seeded", budget(filings_total=0, filings_per_day=1)) is None
+
+
+def test_T_U_ledger_15_an_unmetered_turn_counts_at_what_it_authorised(tmp_path: Path):
+    """T-U-ledger-15 (W-18d): a null-billed stage-7 attempt reaches the campaign cap."""
+    from circt_bug_loop.repair_adapter import PHASE_TIMEOUTS, stage7_observed
+
+    block = stage7_observed(12.5, 0.5)
+    assert block["authorised_usd"] == round(len(PHASE_TIMEOUTS) * 0.5, 6)
+    assert block["ceiling_usd"] == 0.5
+    assert block["billed_usd"] is None and block["calls"] is None
+    assert block["tokens_in"] is None and block["tokens_out"] is None
+    assert set(block) == set(_OBSERVED_KEYS)
+
+    db_path = str(tmp_path / "loop.db")
+    loop = open_store(tmp_path)
+    seed_rows(loop)
+    accrue_all(db_path, [entry("e-7", stage="stage_7", amount=12.5, observed=block)])
+
+    # `cost_usd` stays null - nothing counted tokens - and the cap sees the money.
+    row = loop.query_one("SELECT observed_json FROM ledger_entry WHERE entry_id = 'e-7'")
+    assert json.loads(row["observed_json"])["cost_usd"] is None
+    aggregate = ledger_module.aggregate(_RUN, db_path, today=_DAY)
+    authorised = round(len(PHASE_TIMEOUTS) * 0.5, 6)
+    assert aggregate.spend_usd == authorised
+    assert aggregate.per_arm_spend_usd["seeded"] == authorised
+
+    # And it is the cap's own arithmetic, not a report's.
+    assert ledger_module.stop_reason(
+        aggregate, "seeded", budget(campaign_spend_cap_usd=authorised)) \
+        == "campaign_spend_cap"

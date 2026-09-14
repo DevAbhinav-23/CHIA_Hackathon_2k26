@@ -98,6 +98,10 @@ def aggregate(run_manifest_id: str, db_path: str, *, today: str = None) -> Budge
         arm, stage, amount = row["arm"], row["stage"], float(row["amount"])
         observed = json.loads(row["observed_json"])
         cost = observed.get("cost_usd")
+        if cost is None:
+            # A turn the loop cannot meter counts at what it was authorised for,
+            # which is the only bound the campaign cap has on it (§3.8).
+            cost = observed.get("authorised_usd")
         if cost is not None:
             spend_usd += float(cost)
             per_arm_spend_usd[arm] = per_arm_spend_usd.get(arm, 0.0) + float(cost)

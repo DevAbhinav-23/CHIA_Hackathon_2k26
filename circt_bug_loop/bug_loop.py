@@ -58,6 +58,8 @@ _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
 
 #: The two upstream patches the staged copy carries.
 VERTEX_BRANCH = 'elif backend == "vertex":'
+#: The two bounds that branch hands the backend, which a stale staged copy lacks.
+VERTEX_BRANCH_BOUNDS = ("max_tool_iterations=cfg[", "turn_budget_usd=cfg[")
 #: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38).
 VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
                        "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS")
@@ -818,7 +820,8 @@ def check_15_entrypoint_imports(*, flow_dir: str = str(FLOW_DIR),
 def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
                            repair_enabled: bool) -> str:
     """Check 13 (K7): the backend the SHIPPED `issue_task.py` can actually run."""
-    present = VERTEX_BRANCH in Path(issue_task_path).read_text(encoding="utf-8")
+    text = Path(issue_task_path).read_text(encoding="utf-8")
+    present = VERTEX_BRANCH in text
     if repair_enabled and repair_backend == _METERED_REPAIR_BACKEND and not present:
         raise PreflightFailed(
             "vertex_branch",
@@ -826,6 +829,15 @@ def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
             f"CHIA's else-branch backend while the manifest recorded "
             f"{_METERED_REPAIR_BACKEND!r} (K7). Re-stage the package, or run "
             "with --no-repair")
+    if present:
+        missing = [bound for bound in VERTEX_BRANCH_BOUNDS if bound not in text]
+        if missing:
+            raise PreflightFailed(
+                "vertex_branch",
+                f"{issue_task_path}'s vertex branch passes {sorted(missing)} to "
+                f"nothing: every phase of stage 7 would run with the backend's "
+                f"own defaults and no money ceiling (K7, W-18d). Re-stage the "
+                "package")
     return repair_backend
 
 
@@ -1815,8 +1827,8 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
     out["verdicts"]["report"] = report.get("failure") or "rendered"
     write_report(campaign.store, report["report"])
 
-    repair = _drive_repair(campaign, spec, candidate, reduced, verdict, report, out,
-                           result)
+    repair = _drive_repair(campaign, spec, candidate, reduced, verdict, dedup,
+                           report, out, result)
 
     try:
         decision = campaign.call("gate_decide", campaign.stages.gate_decide,
@@ -1837,10 +1849,23 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
     return stop("gate", decision.taxonomy_bucket or decision.decision)
 
 
+def _report_text(report) -> str:
+    """The rendered report a repair turn carries, or "" when none was written."""
+    try:
+        return Path(report.path).read_text(encoding="utf-8")
+    except (OSError, TypeError, ValueError):
+        return ""
+
+
 def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecord,
-                  reduced, verdict, report: dict, out: dict, result):
-    """Stage 7 for one candidate, the loop's own row written before CHIA's."""
+                  reduced, verdict, dedup, report: dict, out: dict, result):
+    """Stage 7 for one NEW candidate, the loop's own row written before CHIA's."""
     if not campaign.repair_enabled:
+        return None
+    # A known or duplicate candidate is already somebody's issue: repairing it
+    # buys nothing and is the most expensive stage of the loop.
+    if getattr(dedup, "verdict", None) != "new":
+        out["verdicts"]["stage_7"] = f"skipped:{getattr(dedup, 'verdict', None)}"
         return None
     from circt_bug_loop.repair_adapter import (build_cfg, issue_solver_dir,
                                                mint_local_id)
@@ -1856,6 +1881,8 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
             backend=campaign.manifest.model_ids["repair_adapt"].partition(":")[0])
         solver = issue_solver_dir()
         cfg = {**build_cfg(candidate, campaign.manifest, local_id=local_id,
+                           budget=campaign.budget,
+                           report_text=_report_text(report["report"]),
                            issue_solver=solver),
                # The two keys the LOOP reads.
                "repair_enabled": campaign.repair_enabled,
