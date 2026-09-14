@@ -3,6 +3,7 @@
  "assertion_text": null,
  "assertion_site": null,
  "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+ "out_of_scope_root": false,
  "prologue_dropped": 4,
  "top_frames": [
   "getAbstractAttribute",

@@ -514,6 +514,86 @@ def test_u_probe_44_strip_prologue(tmp_path) -> None:
 
 
 @pytest.mark.t0
+def test_u_probe_52_the_anonymous_namespace_segment_goes_first() -> None:
+    """T-U-probe-52 (FR-10.1, W-09 finding 1): the cut that threw the name away.
+
+    Pass criterion: `_normalise_function` strips every `(anonymous namespace)::`
+    segment **before** cutting at the first depth-zero `(`, so the real frame
+    `(anonymous namespace)::VariableOpConversion::matchAndRewrite(...)` of
+    `crashes/assertion_01` normalises to the qualified name and not to the empty
+    string, while a plain frame normalises exactly as it did before. Clang
+    spells the qualifier with a literal parenthesis at depth zero, so the
+    unamended cut landed at index 0, every CIRCT pass frame became degenerate,
+    and both recorded `fatal_error`-class fingerprints fell through to `main`.
+    """
+    anonymous = ("(anonymous namespace)::VariableOpConversion::matchAndRewrite("
+                 "circt::moore::VariableOp, circt::moore::VariableOpAdaptor, "
+                 "mlir::ConversionPatternRewriter&) const")
+    assert probe_task._normalise_function(anonymous) == \
+        "VariableOpConversion::matchAndRewrite"
+    # The real frame, read out of the recorded trace rather than retyped.
+    recorded = next(
+        f for f in probe_task._parse_frames(
+            (FIXTURES / "crashes" / "assertion_01" / "stderr.txt").read_text())
+        if f.function.startswith("(anonymous namespace)::VariableOpConversion"))
+    assert probe_task._normalise_function(recorded.function) == \
+        "VariableOpConversion::matchAndRewrite"
+
+    # A plain frame is untouched, and so is the `const` strip and the rule that
+    # a `(` inside a template argument is not the cut.
+    assert probe_task._normalise_function(
+        "circt::chooseName(llvm::StringRef, llvm::StringRef)") == "circt::chooseName"
+    assert probe_task._normalise_function(
+        "circt::hw::ArrayType::parse(mlir::AsmParser&) const") == \
+        "circt::hw::ArrayType::parse"
+    assert probe_task._normalise_function("append<const char (&)[68]>") == \
+        "append<const char (&)[68]>"
+    # A lambda still reduces to the degenerate name the fingerprint rule skips.
+    assert probe_task._normalise_function("operator()") in probe_task._DEGENERATE
+
+
+@pytest.mark.t0
+def test_u_probe_53_one_address_is_one_inlined_group(tmp_path) -> None:
+    """T-U-probe-53 (FR-07.5, FR-10.1, W-09 finding 2): the group, not the line.
+
+    Driven by the recorded `crashes/assertion_02`, whose frames #9, #10 and #11
+    all carry the address `0x5587daf8f82b`: #9 and #10 are SDK diagnostic
+    headers inlined into #11, which is `lib/Support/InstanceGraph.cpp:221` in
+    CIRCT's own source.
+
+    Pass criterion: the three are one group; the group is in scope because one
+    member resolves to a CIRCT source file, so `out_of_scope_root` is False
+    where reading only frame #9 made it True; and the fingerprint frame is the
+    group's last-listed CIRCT member, which is #11.
+    """
+    crash = FIXTURES / "crashes" / "assertion_02"
+    tool, roots = _fixture_roots((crash / "stderr.txt").read_text())
+    build = _build("assertion", "clean.txt", tmp_path, binary_path=tool,
+                   signal="SIGABRT", stderr_path=str(crash / "stderr.txt"))
+    verdict = _oracle(build, tmp_path, circt_roots=roots)
+    stripped = strip_prologue(verdict.frames)
+
+    group = probe_task._address_groups(stripped)[0]
+    assert [f.index for f in group] == [9, 10, 11]
+    # LLVM zero-pads every address in one trace to the same width, so the group
+    # key is the literal string and needs no integer conversion.
+    assert {f.address for f in group} == {"0x00005587daf8f82b"}
+    assert int(group[0].address, 16) == 0x5587daf8f82b
+    assert [f.in_circt_object for f in group] == [False, False, True]
+    assert group[-1].file.endswith("lib/Support/InstanceGraph.cpp")
+    assert group[-1].line == 221
+
+    assert probe_task.root_in_scope(stripped) is True
+    assert verdict.out_of_scope_root is False
+    assert verdict.fingerprint_frame == \
+        "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp"
+
+    # The control: reading only the first line of the group is what made every
+    # one of these out of scope, and it is no longer what the field asks.
+    assert stripped[0].in_circt_object is False
+
+
+@pytest.mark.t0
 def test_u_probe_23_24_the_two_counts_and_the_scope_root(tmp_path) -> None:
     """T-U-probe-23, -24 (FR-07.4, FR-07.5): what each count means, and when.
 
@@ -575,9 +655,15 @@ def test_u_probe_51_the_oracle_against_every_recorded_real_failure(
     rather than against a synthetic sample.
 
     Pass criterion: for every committed fixture the class, the number of
-    prologue frames dropped, the fingerprint frame and the top-five evidence
-    tuple equal the recording, and for an `assertion` the extracted text and
-    site equal it character for character.
+    prologue frames dropped, the fingerprint frame, `out_of_scope_root` and the
+    top-five evidence tuple equal the recording, and for an `assertion` the
+    extracted text and site equal it character for character.
+
+    The recordings were re-derived on 2026-09-14 after the two frame fixes of
+    W-09 findings 1 and 2, by `analysis/measurements/w09_oracle.py`, which is an
+    independent transcription of §3.6.2 and §3.7.1 and not this module; the
+    `stderr.txt`, `input.*`, `argv.json`, `commit.json` and `README.md` of every
+    fixture are untouched.
     """
     expected = json.loads((crash / "expected.json").read_text())
     stderr = (crash / "stderr.txt").read_text()
@@ -590,6 +676,7 @@ def test_u_probe_51_the_oracle_against_every_recorded_real_failure(
     assert verdict.oracle_class == expected["class"]
     assert verdict.prologue_dropped == expected["prologue_dropped"]
     assert verdict.fingerprint_frame == expected["fingerprint_frame"]
+    assert verdict.out_of_scope_root == expected["out_of_scope_root"]
     stripped = strip_prologue(verdict.frames)
     assert [probe_task._normalise_function(f.function) for f in stripped[:5]] == \
         expected["top_frames"]

@@ -222,6 +222,11 @@ _PROLOGUE = ("llvm::sys::PrintStackTrace", "llvm::sys::RunSignalHandlers", "Sign
 #: a fingerprint frame, because it names no function a reader could look up.
 _DEGENERATE = ("", "operator")
 
+#: Clang's spelling of an internal-linkage qualifier. Every CIRCT pass and every
+#: conversion pattern is declared in one, so a normalisation that cut at this
+#: opening parenthesis threw the whole name away (W-09 finding 1).
+_ANONYMOUS = "(anonymous namespace)::"
+
 _FIRING = ("crash", "assertion", "fatal_error")
 
 
@@ -286,7 +291,7 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
         frames_with_location=sum(1 for f in frames
                                  if f.line > 0 and f.in_circt_object),
         fingerprint_frame=_fingerprint_frame(stripped),
-        out_of_scope_root=bool(fired) and not (stripped and stripped[0].in_circt_object),
+        out_of_scope_root=bool(fired) and not root_in_scope(stripped),
         repro_command=repro, flag_string=image_spec.flag_string,
         tool_version_output=_tool_version(build.binary_path))
 
@@ -361,29 +366,98 @@ def _parse_frames(stderr: str) -> list:
     return frames
 
 
+def _address_groups(frames: list) -> list:
+    """Consecutive frames sharing one address: LLVM's inlined chain, as one group.
+
+    LLVM prints one `#n` line per **inlined** frame and gives them all the same
+    runtime address, innermost first, the last being the function that actually
+    owns the address. Reading only the first line of such a run is what W-09
+    measured wrong (finding 2, architect's decision 2026-09-14): in three of the
+    four mined assertions the first line lands in an SDK header that was inlined
+    into a CIRCT function one or two lines below it.
+
+    Returns:
+        a list of groups, each a non-empty list of frames, in trace order.
+    Worker:
+        pure.
+    Raises:
+        nothing.
+    """
+    groups: list = []
+    for frame in frames:
+        if groups and groups[-1][0].address == frame.address:
+            groups[-1].append(frame)
+        else:
+            groups.append([frame])
+    return groups
+
+
+def root_in_scope(stripped: list) -> bool:
+    """Whether the ROOT inlined group holds a CIRCT frame (§3.6.2 step 4).
+
+    `out_of_scope_root` is its negation. The group and not the single first
+    line, because an inlined SDK header at the top of the chain is not where the
+    crash roots: the CIRCT function it was inlined into is, and that function is
+    a line or two below at the same address.
+
+    Returns:
+        False for an empty trace, which is what keeps a firing with no frames
+        out of scope exactly as before.
+    Worker:
+        pure.
+    Raises:
+        nothing.
+    """
+    if not stripped:
+        return False
+    return any(frame.in_circt_object for frame in _address_groups(stripped)[0])
+
+
 def _fingerprint_frame(stripped: list) -> Optional[str]:
-    """"<function> <basename(file)>", the first stripped CIRCT frame with a line.
+    """"<function> <basename(file)>", from the first stripped CIRCT inlined group.
+
+    The first group holding a usable CIRCT frame decides, and within it the
+    **last-listed** such frame is taken, because that is the function that owns
+    the address: the lines above it were inlined into it and a compiler's
+    inlining decisions are not a property of the bug. A usable frame is in a
+    CIRCT object, carries a resolved line and has a non-degenerate name, so the
+    name in a fingerprint is always a function a reader can look up.
 
     No line number: a one-line edit inside the same function must not split one
-    bug into two across runs (§3.7.1). A degenerate name is skipped, so the name
-    in a fingerprint is always a function a reader can look up.
+    bug into two across runs (§3.7.1).
     """
-    for frame in stripped:
-        name = _normalise_function(frame.function)
-        if frame.in_circt_object and frame.line > 0 and name not in _DEGENERATE:
-            return f"{name} {os.path.basename(frame.file)}"
+    for group in _address_groups(stripped):
+        usable = [frame for frame in group
+                  if frame.in_circt_object and frame.line > 0
+                  and _normalise_function(frame.function) not in _DEGENERATE]
+        if usable:
+            frame = usable[-1]
+            return (f"{_normalise_function(frame.function)} "
+                    f"{os.path.basename(frame.file)}")
     return None
 
 
 def _normalise_function(name: str) -> str:
-    """§3.7.1's four steps: cut the parameter list, drop ` const`, collapse space.
+    """§3.7.1's steps: drop `(anonymous namespace)::`, cut the parameter list,
+    drop ` const`, collapse space.
 
     The cut is at the first `(` at bracket depth zero, so a `(` inside a
     template argument is kept. `--functions=short` would do the cut for us and
     is not used: measured on the assertions-on build it returns `??` under
     `-gline-tables-only`, a short name needing debug information the flag does
     not emit.
+
+    **Every `(anonymous namespace)::` segment goes first** (W-09 finding 1,
+    architect's decision 2026-09-14). Clang spells an internal-linkage qualifier
+    with a literal parenthesis, so the depth-zero cut landed at index 0 and
+    `(anonymous namespace)::VariableOpConversion::matchAndRewrite(...)`
+    normalised to the empty string: the frame was then degenerate, skipped by
+    the fingerprint rule and blank in the evidence tuple. Since every CIRCT pass
+    and every conversion pattern is declared in an anonymous namespace, the two
+    real `fatal_error` fingerprints in the recorded set both collapsed to `main`.
+    Stripping the segment keeps the qualified name the reader can look up.
     """
+    name = name.replace(_ANONYMOUS, "")
     depth, cut = 0, len(name)
     for index, char in enumerate(name):
         if char == "<":

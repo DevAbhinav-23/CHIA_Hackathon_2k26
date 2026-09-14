@@ -61,6 +61,10 @@ def main():
                "assertion_text": orc["assertion_text"],
                "assertion_site": orc["assertion_site"],
                "fingerprint_frame": orc["fingerprint_frame"],
+               # Recorded since W-09 finding 2: the inlined-group scope rule is
+               # what this field measures, so it needs a regression guard of its
+               # own rather than being reconstructible only from the trace.
+               "out_of_scope_root": orc["out_of_scope_root"],
                "prologue_dropped": orc["prologue_dropped"],
                "top_frames": orc["top_frames"],
                "exit_status": rc if (rc is not None and rc >= 0) else None,

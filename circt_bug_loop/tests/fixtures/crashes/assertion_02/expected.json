@@ -3,12 +3,13 @@
  "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
  "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
  "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+ "out_of_scope_root": false,
  "prologue_dropped": 9,
  "top_frames": [
   "append<const char (&)[68]>",
   "operator<<<const char (&)[68]>",
   "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
-  "",
+  "SVTraceIVerilogPass::runOnOperation",
   "mlir::detail::OpToOpPassAdaptor::run"
  ],
  "exit_status": null,

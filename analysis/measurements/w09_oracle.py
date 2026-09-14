@@ -110,9 +110,12 @@ def parse_frames(stderr):
 
 
 def normalise_func(name):
-    """3.7.1 steps 2 to 4."""
+    """3.7.1 steps 2 to 4, with W-09 finding 1's amendment (architect's decision
+    2026-09-14): every `(anonymous namespace)::` segment goes BEFORE the
+    depth-zero cut, or the cut lands at index 0 and the qualified name is lost."""
     if not name:
         return ""
+    name = name.replace("(anonymous namespace)::", "")
     depth, cut = 0, len(name)
     for i, ch in enumerate(name):
         if ch in "<[{":
@@ -186,14 +189,32 @@ def strip_prologue(frames):
     return frames[n:], n
 
 
+def address_groups(frames):
+    """W-09 finding 2 (architect's decision 2026-09-14): consecutive frames
+    sharing ONE address are one inlined chain, innermost line first, and the
+    last line is the function that owns the address."""
+    groups = []
+    for f in frames:
+        if groups and groups[-1][0]["addr"] == f["addr"]:
+            groups[-1].append(f)
+        else:
+            groups.append([f])
+    return groups
+
+
 def run(stderr, rc, sdk, build_root, src_root, top_n=5, limit_hit=None):
     status, reason = classify(rc, stderr, limit_hit)
     text, site, fatal, kind, func = extract(status, stderr)
     frames = symbolise(parse_frames(stderr), sdk, build_root, src_root)
     stripped, dropped = strip_prologue(frames)
+    groups = address_groups(stripped)
+    # The group decides, and within it the LAST usable CIRCT line, not the first.
     fframe = None
-    for f in stripped:
-        if f["in_circt_object"] and f["sym_line"] and f["norm"] and f["norm"] != "operator":
+    for g in groups:
+        usable = [f for f in g if f["in_circt_object"] and f["sym_line"]
+                  and f["norm"] and f["norm"] != "operator"]
+        if usable:
+            f = usable[-1]
             fframe = f'{f["norm"]} {os.path.basename(f["sym_file"])}'
             break
     first_circt = None
@@ -213,7 +234,8 @@ def run(stderr, rc, sdk, build_root, src_root, top_n=5, limit_hit=None):
                                  if f["sym_line"] and f["in_circt_object"]),
         fingerprint_frame=fframe,
         first_circt_frame=first_circt,
-        out_of_scope_root=bool(stripped) and not stripped[0]["in_circt_object"],
+        out_of_scope_root=bool(groups) and not any(f["in_circt_object"]
+                                                   for f in groups[0]),
         top_frames=[f["norm"] for f in stripped[:top_n]],
         frames=[{k: f[k] for k in ("i", "shape", "module", "offset", "norm",
                                    "sym_file", "sym_line", "in_circt_object")}

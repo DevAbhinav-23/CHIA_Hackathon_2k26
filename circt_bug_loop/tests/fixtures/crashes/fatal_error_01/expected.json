@@ -2,7 +2,8 @@
  "class": "fatal_error",
  "assertion_text": null,
  "assertion_site": null,
- "fingerprint_frame": "main circt-opt.cpp",
+ "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+ "out_of_scope_root": true,
  "prologue_dropped": 8,
  "top_frames": [
   "",
