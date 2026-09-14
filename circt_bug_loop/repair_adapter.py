@@ -33,6 +33,11 @@ REPAIR_CLASSES = ("crash", "assertion")
 #: §3.8's last paragraph.
 TOKEN_CAPTURE = "unavailable_remote_dispatch"
 
+#: Characters of each phase's turn `RepairResult` keeps. The whole transcript is
+#: CHIA's own, under `chia_artifact_dir`; this is the tail that travels back to
+#: the head with the result, which is where a failed attempt is read from.
+PHASE_LOG_TAIL = 1000
+
 #: The six prompt bodies of the `cfg`, mapped to the files they are read from.
 PROMPT_FILES = {"system_prompt": "system.md", "assess_prompt": "assess.md",
                 "repro_prompt": "reproduce.md", "fix_prompt": "fix.md",
@@ -147,6 +152,7 @@ def repro_script(verdict: OracleVerdict, *, input_path: str, case_name: str) -> 
 
 def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
               local_id: int, budget, report_text: str = "",
+              spend_usd: float = 0.0,
               issue_solver: Optional[Path] = None) -> dict:
     """Assemble every one of the eighteen keys `run_issue_remote` reads (§3.8)."""
     prompts = (issue_solver or issue_solver_dir()) / "prompts"
@@ -170,7 +176,8 @@ def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
     }
     cfg.update({key: (prompts / name).read_text(encoding="utf-8")
                 for key, name in PROMPT_FILES.items()})
-    cfg["turn_budget_usd"] = turn_ceiling_usd(cfg, report_text, budget)
+    cfg["turn_budget_usd"] = turn_ceiling_usd(cfg, report_text, budget,
+                                              spend_usd=spend_usd)
     return cfg
 
 
@@ -180,19 +187,53 @@ def stage_seven_cap(budget) -> int:
                or DEFAULT_TOOL_ITERATIONS)
 
 
-def turn_ceiling_usd(cfg: dict, report_text: str, budget) -> float:
-    """What ONE phase of the chain may spend: W1's worst case for its largest turn."""
+def turn_ceiling_usd(cfg: dict, report_text: str, budget,
+                     spend_usd: float = 0.0) -> float:
+    """What ONE phase of the chain may spend: W1's worst case, under the cap.
+
+    The chain runs `len(PHASE_TIMEOUTS)` phases and hands each of them this one
+    ceiling, so the ceiling times the phase count is what stage 7 can cost. The
+    worst case alone ignored `cap_usd` entirely: five phases of it could pass
+    the campaign's remaining money with nothing refusing (W-23). The ceiling is
+    therefore clamped so that all five phases fit what is left.
+
+    Raises:
+        RepairRefused when the remaining cap cannot pay for ONE phase's first
+        call, which is the smallest thing a phase can do.
+    """
     bodies = [cfg.get(key) or "" for key in PROMPT_FILES]
     guard = SpendGuard(
         cap_usd=float(budget.campaign_spend_cap_usd), spend_usd=0.0,
         price_usd_per_m_input_tokens=budget.price_usd_per_m_input_tokens,
         price_usd_per_m_output_tokens=budget.price_usd_per_m_output_tokens)
-    return guard.worst_case_usd({
-        "system_message": max(bodies, key=len) if bodies else "",
-        "prompt": report_text or "",
-        # Every phase but the writeup carries tools, which is the priced shape.
-        "tools": [True],
-        "max_tool_iterations": cfg["max_tool_iterations"]})
+    request = {"system_message": max(bodies, key=len) if bodies else "",
+               "prompt": report_text or "",
+               # Every phase but the writeup carries tools, which is the priced shape.
+               "tools": [True],
+               "max_tool_iterations": cfg["max_tool_iterations"]}
+    remaining = float(budget.campaign_spend_cap_usd) - float(spend_usd or 0.0)
+    phases = len(PHASE_TIMEOUTS)
+    ceiling = round(min(guard.worst_case_usd(request), remaining / phases), 6)
+    one_call = guard.worst_case_usd({**request, "tools": []})
+    if ceiling < one_call:
+        raise RepairRefused(
+            f"spend_cap: USD {remaining:.4f} left of "
+            f"{float(budget.campaign_spend_cap_usd):.4f} is {ceiling:.6f} over "
+            f"{phases} phases, under the {one_call:.6f} one call of one phase "
+            f"costs at worst: not even one phase fits (FR-18.10, W1)")
+    return ceiling
+
+
+def phase_log_tails(logs: dict) -> dict:
+    """The last `PHASE_LOG_TAIL` characters of each phase's turn, by phase."""
+    tails = {}
+    for phase, entry in (logs or {}).items():
+        text = (entry or {}).get("stream") or (entry or {}).get("result") or ""
+        if not isinstance(text, str):
+            text = str(text)
+        if text:
+            tails[phase] = text[-PHASE_LOG_TAIL:]
+    return tails
 
 
 def failing_phase(logs: dict) -> Optional[str]:
@@ -381,4 +422,8 @@ def _as_repair_result(result: dict, candidate: CandidateRecord, local_id: int,
         restore_log=restore["log"],
         backend=backend,
         token_capture=TOKEN_CAPTURE,
+        phase_logs=phase_log_tails(result.get("logs")),
+        # `notes` is where `_assess_decision` puts the `REASON:` text of a turn
+        # that refused to proceed, and it is the only account of that refusal.
+        assess_reason=result.get("notes"),
     )

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from circt_bug_loop import llm, repair_adapter
+from circt_bug_loop import bug_loop, llm, repair_adapter
 from circt_bug_loop.contract import schema
 from circt_bug_loop.repair_adapter import (BUILD_JOBS, CFG_KEYS, LOCAL_ID_BASE,
                                            LOCAL_ID_MAX, PHASE_TIMEOUTS,
@@ -764,3 +764,78 @@ def test_repair_26_a_generator_shaped_cap_is_refused(tmp_path, monkeypatch):
                   _verdict(), manifest, cfg, local_id=LOCAL_ID_BASE + 7,
                   input_path="/art/probe/input.mlir", env=dict(ALLOW_ENV))
     assert "max_tool_iterations" in str(raised.value)
+
+
+def test_repair_27_the_phase_ceiling_fits_the_remaining_cap(tmp_path):
+    """T-U-repair-27 (W-23): five phases at the ceiling fit what is left of the cap."""
+    import dataclasses
+
+    funds = budget_file()
+    phases = len(PHASE_TIMEOUTS)
+    report_text = "a report" * 100
+    roomy = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                      local_id=LOCAL_ID_BASE + 7, budget=funds,
+                      report_text=report_text)
+    worst = roomy["turn_budget_usd"]
+    assert phases * worst < funds.campaign_spend_cap_usd, \
+        "the registered cap is roomy, so the clamp does not bind here"
+
+    # A cap five phases of the worst case do NOT fit: the ceiling is what does.
+    tight = dataclasses.replace(funds, campaign_spend_cap_usd=phases * worst / 2)
+    ceiling = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                        local_id=LOCAL_ID_BASE + 7, budget=tight,
+                        report_text=report_text)["turn_budget_usd"]
+    assert ceiling == round(tight.campaign_spend_cap_usd / phases, 6) < worst
+    assert phases * ceiling <= tight.campaign_spend_cap_usd
+
+    # What is already SPENT comes off the remainder before the division.
+    spent = build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                      local_id=LOCAL_ID_BASE + 7, budget=tight,
+                      report_text=report_text,
+                      spend_usd=tight.campaign_spend_cap_usd / 2)["turn_budget_usd"]
+    assert spent == round(ceiling / 2, 6)
+
+    # And a remainder that cannot pay one phase's FIRST call refuses outright.
+    broke = dataclasses.replace(funds, campaign_spend_cap_usd=0.001)
+    with pytest.raises(repair_adapter.RepairRefused) as raised:
+        build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                  local_id=LOCAL_ID_BASE + 7, budget=broke,
+                  report_text=report_text)
+    assert "not even one phase fits" in str(raised.value)
+    with pytest.raises(repair_adapter.RepairRefused):
+        build_cfg(_candidate(tmp_path), _manifest(tmp_path),
+                  local_id=LOCAL_ID_BASE + 7, budget=funds,
+                  report_text=report_text,
+                  spend_usd=funds.campaign_spend_cap_usd)
+
+    # The driver hands the ledger's own spend in, so the remainder is the run's.
+    driver = inspect.getsource(bug_loop._drive_repair)
+    assert "spend_usd=campaign.spend_usd()" in driver
+
+
+def test_repair_28_a_failed_attempt_keeps_its_phase_logs(tmp_path, monkeypatch):
+    """T-U-repair-28 (W-23): the log tails and the assess REASON survive the attempt."""
+    chain = _Recorder({
+        "status": "unclear", "reproduced": False,
+        "notes": "the expected behaviour is not clear from the report",
+        "logs": {"assess": {"success": False, "stream": "x" * 4000 + "TAIL",
+                            "result": "DECISION: UNCLEAR"},
+                 "repro": {"success": True, "result": "only a result here"},
+                 "fix": {"success": True, "stream": ""}}})
+    run = _attempt(tmp_path, monkeypatch, chain=chain)
+
+    assert run.result.status == "unclear"
+    assert run.result.assess_reason == \
+        "the expected behaviour is not clear from the report"
+    assert set(run.result.phase_logs) == {"assess", "repro"}, \
+        "a phase with no text at all contributes no entry"
+    assert len(run.result.phase_logs["assess"]) == repair_adapter.PHASE_LOG_TAIL == 1000
+    assert run.result.phase_logs["assess"].endswith("TAIL")
+    assert run.result.phase_logs["repro"] == "only a result here"
+
+    # A chain that says nothing leaves both empty rather than absent.
+    quiet = _attempt(tmp_path, monkeypatch, verdict="fixed.json")
+    assert quiet.result.phase_logs == {} or all(
+        len(tail) <= repair_adapter.PHASE_LOG_TAIL
+        for tail in quiet.result.phase_logs.values())
+    assert quiet.result.assess_reason is None

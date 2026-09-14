@@ -1891,6 +1891,7 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
         cfg = {**build_cfg(candidate, campaign.manifest, local_id=local_id,
                            budget=campaign.budget,
                            report_text=_report_text(report["report"]),
+                           spend_usd=campaign.spend_usd(),
                            issue_solver=solver),
                # The two keys the LOOP reads.
                "repair_enabled": campaign.repair_enabled,

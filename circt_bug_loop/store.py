@@ -9,7 +9,7 @@ import sqlite3
 import sys
 import time
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -634,6 +634,11 @@ class RepairResult:
     backend: str                      # cfg["backend"], "vertex" by default (3.8, 13.1)
     token_capture: str                # why this stage's tokens are or are not observed
     # token_capture is "unavailable_remote_dispatch" on every backend CHIA's chain implements, including vertex.
+    # Neither of the two below is a column of `repair`: 03-LLD.md 6.2 fixes that
+    # table's DDL and T-U-store-01 compares it byte for byte. They travel back to
+    # the driver with the result, which is where a failed attempt is read from.
+    phase_logs: dict[str, str] = field(default_factory=dict)   # phase -> its turn's log tail
+    assess_reason: Optional[str] = None   # the assess turn's `REASON:` text, when it refused
 
 
 @dataclass(kw_only=True)
