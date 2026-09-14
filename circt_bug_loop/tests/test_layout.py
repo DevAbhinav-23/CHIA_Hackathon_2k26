@@ -54,16 +54,30 @@ NO_TEST_MODULES = ("contract/__init__.py", "__init__.py")
 #: §1.3's two structural test modules, which have no source counterpart.
 STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py")
 
-#: §1.3's five artefact test modules, exempt from the mapping BY NAME. The one
-#: rename is `test_image_spec.py` -> `test_image.py` (errata row 15).
-ARTEFACT_TESTS = ("test_image.py", "test_prompts.py", "test_cluster_yaml.py",
-                  "test_submit.py", "test_budget_yaml.py")
+#: §1.3's exemption list, compared for EQUALITY so neither document can grow
+#: one the other does not: the five artefact test modules, with
+#: `test_image_spec.py` renamed `test_image.py` (errata row 15), and
+#: `test_tools.py` for the two `ChiaTool`s, which are not a source module
+#: (LLD §16.2, 2026-09-15).
+EXEMPT_TESTS = ("test_image.py", "test_prompts.py", "test_cluster_yaml.py",
+                "test_submit.py", "test_budget_yaml.py", "test_tools.py")
 
-#: Two test modules §1.3 does not list and the implementation has (errata row
-#: 16): the three functions proposed for `chia/chipyard/circt.py`, developed in
-#: this tree as `circt_core.py`, and the two `ChiaTool`s of §3.5.
-EXTRA_MODULES = {"circt_core.py": "test_circt_core.py",
-                 "generate_task.py:tools": "test_tools.py"}
+#: The one test module neither §1.3 nor its exemption list names (errata row
+#: 16): the three functions proposed for `chia/chipyard/circt.py` are developed
+#: in this tree as `circt_core.py` and tested here, `chia/chipyard/test/` being
+#: a CHIA path this repository does not hold.
+EXTRA_MODULES = {"circt_core.py": "test_circt_core.py"}
+
+#: `02-HLD.md` §1.2's supply half, module by module: A1, A2, A3 and A4, A5,
+#: A6a, A6b and A4's frozen set. Everything else is the apparatus half or the
+#: seam, and §2.9's import rule is about this list.
+SUPPLY_HALF = ("corpus.py", "pin_select.py", "generate_task.py", "feedback.py",
+               "budget.py", "ledger.py", "mutator_synth.py", "mutators/__init__.py")
+
+#: The one exemption from that rule, by module and by name: `ledger.py` is A6b
+#: and `BudgetLedger` and `LoopStore` are declared in `store.py`, which is where
+#: the records the ledger owns the arithmetic of live (LLD §16.2, 2026-09-15).
+SEAM_EXEMPT = {"ledger.py": ("BudgetLedger", "LoopStore")}
 
 #: §14.5's six apparatus modules, and its three exempt by name.
 APPARATUS = ("probe_task.py", "triage_task.py", "repair_adapter.py", "gate.py",
@@ -148,17 +162,18 @@ def test_T_U_layout_01_mapping():
 
 @pytest.mark.t0
 def test_T_U_layout_01_exemptions():
-    """T-U-layout-01 (NFR-12): the exemption list equals the five artefacts 1.3 names.
+    """T-U-layout-01 (NFR-12): the exemption list equals the six 1.3 names.
 
-    The five are a Dockerfile, a prompt directory, two YAMLs, a shell script and
-    a YAML data file, none of which is a module, so none can have a
+    Five of the six are a Dockerfile, a prompt directory, two YAMLs, a shell
+    script and a YAML data file, and the sixth is a pair of `ChiaTool`s inside
+    another module; none of them is a source module, so none can have a
     `test_<module>.py` counterpart under the mapping rule. The list is compared
     for equality so neither document can grow one the other does not; the one
     rename is recorded in the errata log. Fixture: none. Tier 0.
     """
-    assert set(ARTEFACT_TESTS) == {
+    assert set(EXEMPT_TESTS) == {
         "test_image.py", "test_prompts.py", "test_cluster_yaml.py",
-        "test_submit.py", "test_budget_yaml.py"}
+        "test_submit.py", "test_budget_yaml.py", "test_tools.py"}
     for artefact, test in (
             (REPO / "upstream" / "dockerfiles" / "ChiaCirctAssertDockerfile", "test_image.py"),
             (FLOW / "prompts", "test_prompts.py"),
@@ -166,7 +181,7 @@ def test_T_U_layout_01_exemptions():
             (FLOW / "bug_loop_submit.sh", "test_submit.py"),
             (FLOW / "budget.yaml", "test_budget_yaml.py")):
         assert artefact.exists(), str(artefact)
-        assert test in ARTEFACT_TESTS
+        assert test in EXEMPT_TESTS
 
 
 @pytest.mark.xfail(reason="errata row 18: tests/test_prompts.py and "
@@ -176,14 +191,46 @@ def test_T_U_layout_01_exemptions():
 def test_T_U_layout_01_twenty_five():
     """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
 
-    Eighteen for the source modules that hold logic, two structural, five for
-    the artefacts, and the two the implementation added (errata row 16).
+    Eighteen for the source modules that hold logic, two structural, six on the
+    exemption list and one the implementation added (errata row 16). It becomes
+    nineteen source modules when the join lands `llm.py` (LLD §16.2).
     Fixture: none. Tier 0.
     """
     present = {path.name for path in TESTS.glob("test_*.py")}
     expected = (set(SOURCE_MODULES.values()) | set(STRUCTURAL_TESTS)
-                | set(ARTEFACT_TESTS) | set(EXTRA_MODULES.values()))
+                | set(EXEMPT_TESTS) | set(EXTRA_MODULES.values()))
     assert present == expected
+
+
+# ---------------------------------------------------------------------------
+# 1.3's rule (2): no store.py name reaches a supply-half module
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.t0
+def test_T_U_layout_01_seam():
+    """T-U-layout-01 (FR-16.1, §2.9): the supply half imports no `store.py` name.
+
+    The fourteen apparatus-internal records live beside their DDL and cross
+    nothing; a supply-half module that imported one would have the apparatus's
+    result shapes in the half that proposes work, which is what FR-16.1 exists
+    to stop. `ledger.py` is exempt and by exactly two names: `BudgetLedger` and
+    `LoopStore` are declared in `store.py` and A6b owns the arithmetic over
+    them, so the rule as first written was false of the design it describes.
+    Fixture: none. Tier 0.
+    """
+    for name in SUPPLY_HALF:
+        imported = [alias.name
+                    for node in ast.walk(parse(FLOW / name))
+                    if isinstance(node, ast.ImportFrom)
+                    and (node.module or "").endswith("store")
+                    for alias in node.names]
+        imported += [alias.name.split(".")[-1]
+                     for node in ast.walk(parse(FLOW / name))
+                     if isinstance(node, ast.Import)
+                     for alias in node.names if alias.name.endswith("store")]
+        allowed = SEAM_EXEMPT.get(name, ())
+        assert set(imported) <= set(allowed), (name, imported)
 
 
 # ---------------------------------------------------------------------------
