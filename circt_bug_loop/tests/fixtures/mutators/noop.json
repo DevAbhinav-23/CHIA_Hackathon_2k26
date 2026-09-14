@@ -1,0 +1,26 @@
+{
+  "format_version": 1,
+  "frozen": false,
+  "mutators": [
+    {
+      "derived_from": [],
+      "description": "a pattern no CIRCT test carries",
+      "id": "mlir.attr.never.matches",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "zzzNoSuchTokenAnywhere",
+      "replacement": "zero"
+    }
+  ],
+  "set_version": "noop",
+  "synthesis_input": {
+    "issue_numbers_sha256": "",
+    "issues_used": 0,
+    "mirror_refreshed_utc": "",
+    "query": "none: constructed fixture",
+    "repo": "llvm/circt"
+  },
+  "synthesis_model": "",
+  "synthesised_utc": ""
+}

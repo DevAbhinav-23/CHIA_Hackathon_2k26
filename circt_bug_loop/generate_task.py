@@ -921,8 +921,10 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
     Worker:
         {"circt": 1}. No model runs here at any point (FR-05.1).
     Raises:
-        nothing. A mutator that raises is recorded against its id and the arm
-        continues (FR-05.7).
+        MutatorSetError when the set on disk is not the one the run's manifest
+        names, which stops the arm rather than quietly changing the baseline
+        (8.1 rule 1). Nothing else: a mutator that raises is recorded against
+        its id and the arm continues (FR-05.7).
     """
     started = time.monotonic()
     iteration = int(cfg["iteration"])

@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "frozen": false,
+  "mutators": [
+    {
+      "derived_from": [],
+      "description": "a pattern that will not compile",
+      "id": "mlir.abort.pattern_uncompilable",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(unclosed",
+      "replacement": "zero"
+    },
+    {
+      "derived_from": [],
+      "description": "a line operation on a text mutator",
+      "id": "mlir.abort.wrong_kind",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "hw",
+      "replacement": "duplicate"
+    },
+    {
+      "derived_from": [],
+      "description": "shift one integer attribute literal by one",
+      "id": "mlir.attr.int.off_by_one",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<![\\w.])(\\d+)\\s*:\\s*i(\\d+)",
+      "replacement": "off_by_one"
+    }
+  ],
+  "set_version": "raising",
+  "synthesis_input": {
+    "issue_numbers_sha256": "",
+    "issues_used": 0,
+    "mirror_refreshed_utc": "",
+    "query": "none: constructed fixture",
+    "repo": "llvm/circt"
+  },
+  "synthesis_model": "",
+  "synthesised_utc": ""
+}
