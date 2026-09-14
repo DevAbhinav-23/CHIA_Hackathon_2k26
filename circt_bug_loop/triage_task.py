@@ -1159,11 +1159,10 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     AGENT PRODUCED REACHES THE REPORT: `render_report` substitutes every count,
     size, time, hash, SHA and verdict from the record (FR-11.4).
 
-    The turn is 3.5.1's turn: `generate_task.build_llm` with stage 6's timeout
-    and `cfg["model_id"]`, dispatched through `generate_task.llm_turn` with
-    exactly one tool, `SourceReadTool`, stopped in a `finally` as A3 does. The
-    import is inside this function and not at module scope, because
-    05-Work-Plan.md 2.3 forbids a cross-half import before the join.
+    The turn is 3.5.1's turn: `llm.build_llm` with stage 6's timeout and
+    `cfg["model_id"]`, dispatched through `llm.dispatch_turn` with exactly one
+    tool, `SourceReadTool`, named for the candidate and stopped in a `finally`
+    as A3 does.
 
     Returns:
         {"report": Report, "logs": dict, "failure": str | None}. `logs` carries
@@ -1187,7 +1186,7 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     reason = ""
 
     try:
-        turn = _run_turn(prompt, cfg)
+        turn = _run_turn(prompt, cfg, f"src_{candidate.candidate_id}")
         logs.update({key: turn.get(key) for key in
                      ("result", "stream", "stderr", "success")})
         logs["usage"] = turn.get("usage") or {}
@@ -1286,12 +1285,19 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     return Template(text).safe_substitute(**values)
 
 
-def _run_turn(prompt: str, cfg: dict) -> dict:
+def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
     """One 3.5.1 turn on the campaign backend, with `SourceReadTool` and nothing else.
 
     The backend and the turn are `llm.py`'s, which is neither half, so they are
     imported at module scope. `generate_task` is still imported HERE and not
     there, for the one name 3.5 leaves in the supply half: `SourceReadTool`.
+
+    The tool is constructed as 3.5's constructor declares it,
+    `(name, clone_path, run_commit, cap_bytes, task_options)`, and by keyword.
+    The two positional arguments this call site carried bound `name` to the
+    clone path and `clone_path` to the commit and then raised `TypeError` for
+    the missing `run_commit`, so no triage turn could ever have run (architect
+    decision 4; T-U-triage-36 constructs the real tool).
 
     The turn goes through `dispatch_turn` and not through `llm_turn` itself: a
     plain call to the decorated wrapper routes through `chia.trace.profiler`,
@@ -1302,7 +1308,10 @@ def _run_turn(prompt: str, cfg: dict) -> dict:
 
     backend = build_llm(TRIAGE_SYSTEM_MESSAGE,
                         int(cfg.get("timeout_seconds", 1200)), cfg["model_id"])
-    tool = generate_task.SourceReadTool(cfg["clone_path"], cfg["run_commit"])
+    tool = generate_task.SourceReadTool(
+        name=name, clone_path=cfg["clone_path"], run_commit=cfg["run_commit"],
+        cap_bytes=int(cfg.get("artefact_inline_cap_bytes", 262144)),
+        task_options=cfg.get("head_options"))
     try:
         return dispatch_turn(backend, prompt, [tool])
     finally:

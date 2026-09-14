@@ -13,7 +13,8 @@ placement statically off `_chia_options`.
 `llm.dispatch_turn` (`03-LLD.md` §3.5.1, architect decision 3), imported by
 `triage_task` at module scope, so `_fake_generate` substitutes those two names
 on this module and nothing else. `SourceReadTool` stays `generate_task`'s and is
-still reached through B7's one lazy import.
+still reached through B7's one lazy import; the stand-in for it carries §3.5's
+real five-parameter signature, and `T-U-triage-36` constructs the real tool.
 
 **The GitHub layer replays a recorded response set and mocks nothing**
 (`04-Test-Plan.md` §0.3): `_recording_transport` serves
@@ -50,6 +51,11 @@ from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, Frame,
                                   LoopStore, OracleVerdict, ReducedCase)
 from circt_bug_loop.tests.conftest import call_node
+# The throwaway git repository and the no-Ray tool construction are shared
+# with the tool tests rather than built twice: T-U-triage-36 constructs the
+# real `SourceReadTool`.
+from circt_bug_loop.tests.test_tools import (throwaway_repo,  # noqa: F401
+                                             tool_servers)
 from circt_bug_loop.llm import PromptContractError, parse_json_footer
 from circt_bug_loop.triage_task import (DIFFERENTIAL_POINTS,
                                         MIRROR_TOKEN_MIN_CHARS,
@@ -64,7 +70,13 @@ from circt_bug_loop.triage_task import (DIFFERENTIAL_POINTS,
                                         render_report, scan_commits,
                                         structural_hash, triage_report)
 
-pytestmark = pytest.mark.t0
+#: Tier 0 for the whole module, and one warning filter: `T-U-triage-36`
+#: constructs a real `ChiaTool`, whose `FastMCP` settings model raises
+#: `pydantic_settings.IncompleteFieldDefinitionWarning` about its own `lifespan`
+#: field, which `-W error` turns into an error. A module-level mark is the one
+#: filter that outranks a command-line `-W` (04-Test-Plan.md 16.7).
+pytestmark = [pytest.mark.t0, pytest.mark.filterwarnings(
+    "ignore::pydantic_settings.exceptions.IncompleteFieldDefinitionWarning")]
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 MIRROR = FIXTURES / "mirror"
@@ -269,11 +281,12 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
     seen = {}
 
     class SourceReadTool:
-        # Two positional parameters, which is the call site's shape and NOT
-        # §3.5's five: errata row "W-13 #2" and architect decision 4. The join's
-        # third fix corrects both and adds T-U-triage-36.
-        def __init__(self, clone_path, run_commit):
-            self.clone_path, self.run_commit, self.stopped = clone_path, run_commit, False
+        # §3.5's five parameters, which is what the call site now passes by
+        # keyword; `T-U-triage-36` constructs the real class instead.
+        def __init__(self, name, clone_path, run_commit,
+                     cap_bytes=262144, task_options=None):
+            self.name, self.clone_path, self.run_commit = name, clone_path, run_commit
+            self.cap_bytes, self.task_options, self.stopped = cap_bytes, task_options, False
 
         def stop(self):
             self.stopped = True
@@ -1325,6 +1338,68 @@ def test_triage_report_records_the_render_and_refuses_a_differential_dedup(tmp_p
         call_node(dedup_and_screen, _candidate(tmp_path, oracle_class="differential"),
                   _seed(), _verdict("differential"), "/nonexistent",
                   str(tmp_path / "loop.db"), 5)
+
+
+def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkeypatch,
+                                                                tool_servers,  # noqa: F811
+                                                                throwaway_repo):  # noqa: F811
+    """T-U-triage-36 (FR-04.4, FR-11.1): B7 builds §3.5's real `SourceReadTool`.
+
+    Architect decision 4 and errata row W-13 #2. The call site passed **two
+    positional** arguments to a constructor whose signature is
+    `(name, clone_path, run_commit, cap_bytes, task_options)`, so it bound
+    `name` to the clone path and `clone_path` to the commit and then raised
+    `TypeError` for the missing `run_commit`; every triage turn would have
+    failed as `turn_failed:TypeError`, and nothing caught it because the tool
+    was a stand-in in every test. This test installs **no** stand-in module: the
+    real class is constructed, its three methods answer against a real git
+    repository, and the registry is empty again afterwards.
+
+    Fixture: `tests/fixtures/triage/turns/report_write_ok.jsonl` plus the
+    throwaway repository of `test_tools.py`. Tier 0.
+    """
+    from chia.base.tools.ChiaTool import ChiaTool
+
+    from circt_bug_loop.generate_task import SourceReadTool
+
+    clone, head = throwaway_repo
+    seen = {}
+
+    def build_llm(system_message, timeout_seconds, model_id):
+        return object()
+
+    def dispatch_turn(backend, user_message, tools):
+        seen["tools"] = list(tools)
+        return {"result": _turn_text("report_write_ok"), "stream": "", "stderr": "",
+                "success": True, "usage": {"tokens_in": 11, "tokens_out": 7,
+                                           "num_turns": 1,
+                                           "model": "gemini-3.8-flash"}}
+
+    monkeypatch.setattr(triage_task, "build_llm", build_llm)
+    monkeypatch.setattr(triage_task, "dispatch_turn", dispatch_turn)
+
+    before = len(ChiaTool._tool_registry)
+    candidate, reduced, verdict, dedup = _render_bundle(tmp_path)
+    out = call_node(triage_report, candidate, reduced, verdict, dedup, _manifest(),
+                    _cfg(clone_path=clone, run_commit=head,
+                         artefact_inline_cap_bytes=1024,
+                         head_options={"scheduling_strategy": "head-node"}),
+                    str(tmp_path / "probe"))
+
+    assert out["failure"] is None
+    (tool,) = seen["tools"]
+    assert type(tool) is SourceReadTool, "the real class, not a stand-in"
+    assert (tool.clone_path, tool.run_commit) == (clone, head)
+    assert tool.name == f"src_{candidate.candidate_id}"
+    assert tool.cap_bytes == 1024
+    # The tool answers for real at the run's commit, which is the whole point of
+    # binding the commit and not a ref (FR-04.4).
+    assert tool.read_file("README.md").startswith("circt")
+    assert tool.read_file("NoSuch.cpp").startswith("Error:")
+    # Started and stopped: one server was constructed and the registry is empty
+    # again, `triage_report` stopping it in its own `finally`.
+    assert len(tool_servers) == 1 and tool_servers[0] is tool
+    assert len(ChiaTool._tool_registry) == before, "the triage turn leaked a tool"
 
 
 def test_triage_frame_paths_and_symbols_are_repo_relative():
