@@ -163,7 +163,7 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
 def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
                                                             fake_vertex,
                                                             allow_worker_env):
-    """K2/W7: the request is nine fields, none of them an LLM and none a key."""
+    """K2/W7: the request is ten fields, none of them an LLM and none a key."""
     install, capture = fake_vertex
     install([vertex_response([vertex_text_part("PONG")], in_tok=2, out_tok=3)])
 
@@ -181,7 +181,8 @@ def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
     assert turn["result"] == "PONG"
     assert set(seen) == {"system_message", "prompt", "tools", "stage",
                          "timeout_seconds", "model_id", "max_tool_iterations",
-                         "final_tool_names", "final_tool_iterations"}
+                         "max_output_tokens", "final_tool_names",
+                         "final_tool_iterations"}
     # No guard, so no ceiling is sent either: the key is absent, not null.
     assert "turn_budget_usd" not in seen
     assert seen["tools"] == [] and seen["stage"] == "synthesis"
@@ -463,7 +464,8 @@ def test_the_guard_settles_an_authorisation_to_what_the_turn_billed(monkeypatch)
                                  guard=raising)
     assert raising.in_flight_usd == 0.0
     assert raising.settled_usd == raising.worst_case_usd(
-        {"prompt": "ping", "system_message": "be terse", "tools": []})
+        {"prompt": "ping", "system_message": "be terse", "tools": [],
+         "max_output_tokens": llm_module.stage_max_output_tokens("stage_2")})
 
     # And the cap still refuses: settled plus in flight plus the worst case.
     refusing = guard()
@@ -473,3 +475,57 @@ def test_the_guard_settles_an_authorisation_to_what_the_turn_billed(monkeypatch)
         refusing.authorise({"worst": 3.5})
     assert "in flight" in str(raised.value)
     assert refusing.in_flight_usd == 2.0, "a refused turn authorises nothing"
+
+
+@pytest.mark.t0
+def test_T_U_gen_28b_stage_two_is_priced_at_its_own_output_cap(monkeypatch):
+    """W-23: stage 2's turn is built AND authorised at 32,000 output tokens."""
+    assert llm_module.stage_max_output_tokens("stage_2") == 32000
+    for stage in ("stage_1", "stage_6", "stage_7", "synthesis", "anything"):
+        assert llm_module.stage_max_output_tokens(stage) == \
+            llm_module.MAX_OUTPUT_TOKENS == 16000, stage
+
+    guard = llm_module.SpendGuard(
+        cap_usd=100.0, spend_usd=0.0, price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+    request = {"prompt": "x" * 3000, "system_message": "", "tools": [object()],
+               "max_tool_iterations": 6}
+    n = guard.iterations(request)
+    tokens_in = sum(1500 + i * llm_module.TOOL_OUTPUT_TOKENS_CAP for i in range(n))
+
+    # No key: the guard's own default, which is what stage 7 still prices at.
+    assert guard.worst_case_usd(request) == round(
+        tokens_in / 1e6 * 0.75 + n * 16000 / 1e6 * 3.75, 6)
+    # The stage's value, which is the one its backend is built with.
+    big = {**request, "max_output_tokens": 32000}
+    assert guard.worst_case_usd(big) == round(
+        tokens_in / 1e6 * 0.75 + n * 32000 / 1e6 * 3.75, 6)
+    assert guard.worst_case_usd(big) > guard.worst_case_usd(request)
+
+    # And the request `dispatch_turn` builds carries the stage's value through
+    # to `build_llm`'s `max_tokens`, which is the backend's own cap.
+    sent = {}
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original",
+                        lambda request: sent.update(request) or {
+                            "result": "", "stream": "", "stderr": "",
+                            "success": True, "usage": {}})
+    roomy = llm_module.SpendGuard(
+        cap_usd=100.0, spend_usd=0.0, price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+    llm_module.dispatch_turn("be terse", "ping", [], stage="stage_2",
+                             timeout_seconds=60, model_id=MODEL_ID, guard=roomy,
+                             max_tool_iterations=6)
+    assert sent["max_output_tokens"] == 32000
+    assert sent["turn_budget_usd"] == roomy.worst_case_usd(
+        {**sent, "tools": []})
+
+    sent.clear()
+    llm_module.dispatch_turn("be terse", "ping", [], stage="stage_1",
+                             timeout_seconds=60, model_id=MODEL_ID)
+    assert sent["max_output_tokens"] == 16000
+
+    built = build_llm("be terse", 60, MODEL_ID, env=dict(ALLOW_ENV),
+                      max_output_tokens=32000)
+    assert built.max_tokens == 32000
+    assert build_llm("be terse", 60, MODEL_ID, env=dict(ALLOW_ENV)).max_tokens \
+        == 16000, "CHIA's own default when no stage value is passed"

@@ -51,6 +51,7 @@ def require_live_model(purpose: str, *, need_key: bool = True,
 def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
               env: Optional[Mapping[str, str]] = None,
               max_tool_iterations: Optional[int] = None,
+              max_output_tokens: Optional[int] = None,
               turn_budget_usd: Optional[float] = None,
               final_tool_names: Optional[list] = None,
               final_tool_iterations: Optional[int] = None):
@@ -61,6 +62,8 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
     extra = {}
     if max_tool_iterations is not None:
         extra["max_tool_iterations"] = int(max_tool_iterations)
+    if max_output_tokens is not None:
+        extra["max_tokens"] = int(max_output_tokens)
     if turn_budget_usd is not None:
         extra["turn_budget_usd"] = float(turn_budget_usd)
     if final_tool_names:
@@ -101,6 +104,17 @@ def tool_endpoints(tools) -> list:
 
 #: What CHIA's Vertex backend caps ONE `generate_content` call's output at.
 MAX_OUTPUT_TOKENS = 16000
+
+#: The stages whose cap is not the default. Stage 2 writes up to
+#: `per_seed_probe_cap` whole programs plus its json footer in ONE response and
+#: MEASURED, campaign 1 seed 1, it was truncated at 16,000 and the turn raised.
+#: Every other stage answers in prose or one small json block.
+MAX_OUTPUT_TOKENS_BY_STAGE = {"stage_2": 32000}
+
+
+def stage_max_output_tokens(stage: str) -> int:
+    """The output cap one stage's turn is given, and priced at."""
+    return int(MAX_OUTPUT_TOKENS_BY_STAGE.get(stage, MAX_OUTPUT_TOKENS))
 
 #: Characters per token, for the pre-authorisation only.
 CHARS_PER_TOKEN = 2.0
@@ -162,7 +176,9 @@ class SpendGuard:
         prompt_tokens = prompt_chars / CHARS_PER_TOKEN
         tokens_in = sum(prompt_tokens + i * TOOL_OUTPUT_TOKENS_CAP
                         for i in range(n))
-        tokens_out = n * self.max_output_tokens
+        # The STAGE's cap, which is the one its backend is built with.
+        tokens_out = n * int(request.get("max_output_tokens")
+                             or self.max_output_tokens)
         return round(
             tokens_in / 1e6 * self.price_usd_per_m_input_tokens
             + tokens_out / 1e6 * self.price_usd_per_m_output_tokens, 6)
@@ -225,6 +241,7 @@ def llm_turn(request: dict) -> dict:
     llm = build_llm(request["system_message"], int(request["timeout_seconds"]),
                     request["model_id"], env=worker_env(),
                     max_tool_iterations=request.get("max_tool_iterations"),
+                    max_output_tokens=request.get("max_output_tokens"),
                     turn_budget_usd=request.get("turn_budget_usd"),
                     final_tool_names=request.get("final_tool_names"),
                     final_tool_iterations=request.get("final_tool_iterations"))
@@ -267,6 +284,7 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
                "tools": tool_endpoints(tools), "stage": stage,
                "timeout_seconds": int(timeout_seconds), "model_id": model_id,
                "max_tool_iterations": max_tool_iterations,
+               "max_output_tokens": stage_max_output_tokens(stage),
                "final_tool_names": list(final_tool_names or []),
                "final_tool_iterations": int(final_tool_iterations)}
     handle = authorised = ceiling = billed = None
@@ -327,7 +345,8 @@ def parse_json_footer(text: str, required: tuple) -> dict:
     return decoded
 
 
-__all__ = ["MODEL_BACKEND", "MAX_OUTPUT_TOKENS", "CHARS_PER_TOKEN",
+__all__ = ["MODEL_BACKEND", "MAX_OUTPUT_TOKENS", "MAX_OUTPUT_TOKENS_BY_STAGE",
+           "CHARS_PER_TOKEN", "stage_max_output_tokens",
            "TOOL_OUTPUT_TOKENS_CAP", "DEFAULT_TOOL_ITERATIONS", "tool_iterations",
            "LiveModelRefused", "PromptContractError", "SpendCapRefused",
            "SpendGuard", "ToolEndpoint", "build_llm", "dispatch_turn",
