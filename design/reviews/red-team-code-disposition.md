@@ -25,3 +25,14 @@ All 11 kills and 12 wounds accepted. Decisions below are binding for the fix rou
 | N1–N10 | Fix N2, N3, N5, N6, N8, N9, N10 in the same round; N4 documented; N7 reworded in the LLD. |
 
 **The single question (project-level hard spend cap).** Google Cloud budgets are alerts, not caps. The loop's own cap, made trustworthy by K10/K11/W1, is the hard stop; the pilot runs with `campaign_spend_cap_usd: 5.0` and `--no-repair`, and the operator confirms the project's billing page against the ledger after the pilot before the campaign. The user is asked to confirm no other workload shares the key's project.
+
+## Additions from W-19b (architect, 2026-09-15)
+| Item | Decision |
+|---|---|
+| `Dispatch` never dispatched (`isinstance(fn, ChiaFunction)` false for every node) | Fixed by W-19b (`hasattr(fn, "chia_remote")`); add a T1 test that a dispatched node runs off-head (node id differs from the driver's) whenever a cluster is present. |
+| `mutant_seed_int` is unsigned 64-bit; SQLite INTEGER is signed | Mask to 63 bits (`& (2**63 - 1)`) **before** A7 freezes any set; regenerate the two mutation fixtures; document in §8.2. |
+| `render_results` refuses at campaign end (labelled pairs have no way in; `ResultsIncomplete` uncaught) | The driver passes `labelled_pairs` from the committed labelled set (`tests/fixtures/dedup/` or its non-test home under `circt_bug_loop/data/labelled_pairs.json`, moved there) and catches `ResultsIncomplete`, writing the refusal list to the artefact root and exiting non-zero after the ledger and store are complete. |
+| Calibration mode unsatisfiable with a fixed image (FR-02.7) | Calibration runs only for seeds whose parent's LLVM pin equals the image's pin: the `circt` worker checks out the parent inside `/workspace/circt` (fetch by SHA), builds the entry tool incrementally with the image's SDK, runs the probe, then restores (`circt_git_reset` + rebuild + hash check). Seeds on other pins are `not_calibratable_in_deployment` and excluded from the sample; the six host-built fixtures remain the oracle/reducer calibration. FRD erratum to FR-02.7 and D-01(d); `calibration_sample_shas` re-drawn from the eligible set. |
+| Submitted job could not import its package | Keep W-19b's `PYTHONPATH` in the wrapper; add a pre-flight check that the entrypoint imports `circt_bug_loop` in a subprocess. |
+| `Assisted-by:` trailer names a model that did not run | Trailer reflects `stages_metered` and the actual backend per turn; omitted in recorded mode. |
+| `test_layout.py` registrations for `test_system.py` and `test_upstream_patches.py` | Done by W-19b; keep. |
