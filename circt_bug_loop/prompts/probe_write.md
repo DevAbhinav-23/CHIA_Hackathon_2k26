@@ -44,6 +44,12 @@ Rules that are not negotiable.
      your only tools are write_probe and the three read-only source tools. What
      your inputs do is measured by the apparatus, not reported by you.
 
+You may make at most $max_tool_calls tool calls this turn. Read one region at a
+time, and use grep to find a symbol before you read_file around it: read_file
+returns one page and names the first_line to continue from. When the calls run
+out you will be asked to answer from what you have already read, so spend them
+on what you need in order to decide.
+
 State for each input what you expect to happen, in one clause, in the compiler's
 own terms: which pass or which check you expect to break, not "it will crash".
 Your expectation is recorded and compared with what actually happened; being

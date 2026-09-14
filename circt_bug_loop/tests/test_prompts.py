@@ -198,6 +198,31 @@ def test_T_U_prompt_07_the_stage_six_prompt_has_two_fillings():
     assert 'isa<To>(Val) && "bad cast"' not in differential
 
 
+def test_T_U_prompt_08_every_tool_bearing_turn_states_its_budget():
+    """T-U-prompt-08 (W-18d): the cap is in the prompt, filled from the stage's own."""
+    for name in ("seed_read.md", "probe_write.md", "report_write.md"):
+        text = prompt_text(name)
+        assert "at most $max_tool_calls tool calls" in text, name
+        for instruction in ("grep", "read_file", "first_line",
+                            "from what you have already read"):
+            assert instruction in text, (name, instruction)
+
+    # Filled from the STAGE's registered cap, not from one number for the run.
+    cfg = {"per_seed_probe_cap": 3,
+           "max_tool_iterations": {"stage_1": 12, "stage_2": 9, "stage_6": 6}}
+    assert "at most 12 tool calls" in generate_task.render_seed_read(seed(), cfg)
+    written = generate_task.render_probe_write(
+        seed(), "a class", [], schema.FeedbackBundle(
+            run_manifest_id="r", seed_sha=seed().seed_sha, arm="seeded",
+            iteration=0, entries=[], abandoned=False,
+            terminating_condition=None), "/tmp/probe", cfg)
+    assert "at most 9 tool calls" in written
+
+    # And with no registered cap it states the backend's own default, never zero.
+    assert "at most 100 tool calls" in generate_task.render_seed_read(
+        seed(), {"per_seed_probe_cap": 3})
+
+
 def test_T_U_prompt_05_report_write_is_not_chias_writeup():
     """T-U-prompt-05 (FR-11.5): a separate file, and no `Fixes #<number>` line."""
     text = prompt_text("report_write.md")

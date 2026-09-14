@@ -261,7 +261,7 @@ def _cfg(**over):
     cfg = {"model_id": "gemini-3.8-flash", "timeout_seconds": 1200,
            "clone_path": "/home/adi/.cache/circt", "run_commit": "c" * 40,
            # `budget.yaml`'s own per-stage tool-loop caps (errata row 38).
-           "max_tool_iterations": {"stage_1": 6, "stage_2": 6, "stage_6": 3,
+           "max_tool_iterations": {"stage_1": 12, "stage_2": 12, "stage_6": 6,
                                    "stage_7": 20}}
     cfg.update(over)
     return cfg
@@ -1116,7 +1116,7 @@ def test_triage_21b_a_new_candidate_still_gets_its_turn(tmp_path, monkeypatch):
     assert out["logs"]["usage"]["tokens_in"] == 11
     assert "turn_skipped" not in out["logs"]
     assert seen["model_id"] == "gemini-3.8-flash" and seen["timeout_seconds"] == 1200
-    assert seen["max_tool_iterations"] == 3, "stage 6's registered cap"
+    assert seen["max_tool_iterations"] == 6, "stage 6's registered cap"
     assert len(seen["tools"]) == 1 and seen["tools"][0].stopped, "stopped in a finally"
 
 
@@ -1264,7 +1264,7 @@ def test_triage_34_two_templates_two_lists_and_no_leaked_dollar(tmp_path):
 
 
 def test_triage_prompt_file_is_the_lld_text_verbatim():
-    """FR-11.5, §7.4: the committed prompt is stage 6's, distinct from CHIA's `writeup`, and declares exactly the thirteen substitution variables."""
+    """FR-11.5, §7.4: the committed prompt is stage 6's, distinct from CHIA's `writeup`, and declares exactly the fourteen substitution variables."""
     from string import Template
 
     text = (Path(triage_task.__file__).resolve().parent
@@ -1274,6 +1274,7 @@ def test_triage_prompt_file_is_the_lld_text_verbatim():
     assert names == {"oracle_class", "assertion_text", "assertion_site", "frames",
                      "repro_command", "reduced_case", "dedup_verdict",
                      "dedup_evidence", "build_identity", "max_sentences",
+                     "max_tool_calls",
                      "arcilator_behaviour", "verilator_behaviour", "stimulus"}
     assert "PART A - CLASSIFY, ADVISORILY." in text
     assert "PART B - WRITE THE PROSE." in text

@@ -30,6 +30,12 @@ summary/description fields in the *.td files. There is no shell, no build tool
 and no test tool this turn, by design: nothing you can call changes anything or
 measures anything.
 
+You may make at most $max_tool_calls tool calls this turn. Read one region at a
+time, and use grep to find a symbol before you read_file around it: read_file
+returns one page and names the first_line to continue from. When the calls run
+out you will be asked to answer from what you have already read, so spend them
+on what you need in order to decide.
+
 Do two things, in this order.
 
 PART A - THE ROOT CAUSE CLASS.

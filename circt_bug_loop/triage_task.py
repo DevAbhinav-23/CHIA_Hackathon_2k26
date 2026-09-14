@@ -18,7 +18,7 @@ from chia.base.ChiaFunction import ChiaFunction
 from circt_bug_loop.contract.schema import (CounterBlock, RunManifest,
                                             SeedRecord)
 from circt_bug_loop.llm import (PromptContractError,  # noqa: F401
-                                dispatch_turn, parse_json_footer)
+                                dispatch_turn, parse_json_footer, tool_iterations)
 from circt_bug_loop.probe_task import _normalise_function, strip_prologue
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, LoopStore,
@@ -973,6 +973,7 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     text = cfg.get("report_write") or (PROMPTS / "report_write.md").read_text()
     values = {
         "max_sentences": cfg.get("max_sentences", TRIAGE_REASON_MAX_SENTENCES),
+        "max_tool_calls": tool_iterations(cfg, "stage_6"),
         "oracle_class": candidate.oracle_class,
         "arcilator_behaviour": NOT_APPLICABLE,
         "verilator_behaviour": NOT_APPLICABLE,

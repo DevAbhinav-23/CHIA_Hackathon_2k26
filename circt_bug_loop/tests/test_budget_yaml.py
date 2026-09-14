@@ -58,11 +58,16 @@ def test_T_U_byaml_01_the_committed_file_is_9_1s_schema(registered):
         assert math.isfinite(doc[price])
     assert doc["campaign_spend_cap_usd"] > 0
 
+    # W-18d: the registered tool-loop caps, which price every authorised turn.
+    assert doc["max_tool_iterations"] == {"stage_1": 12, "stage_2": 12,
+                                          "stage_6": 6, "stage_7": 20}
+
     # And it loads: the same twenty-seven values.
     assert isinstance(registered, schema.BudgetFile)
     assert registered.model_id == doc["model_id"]
     assert registered.contract_version == schema.CONTRACT_VERSION
     assert len(registered.budget_file_sha) == 40
+    assert registered.max_tool_iterations == doc["max_tool_iterations"]
 
 
 def test_T_U_byaml_02_every_default_that_lives_here_is_read_by_the_code(registered):

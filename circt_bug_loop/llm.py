@@ -107,6 +107,17 @@ TOOL_OUTPUT_TOKENS_CAP = 32768
 _NO_TOOL_ITERATIONS = 1
 
 
+#: The tool calls one turn may make when no cap is registered for its stage,
+#: which is the patched backend's own `max_tool_iterations` default.
+DEFAULT_TOOL_ITERATIONS = 100
+
+
+def tool_iterations(cfg: Mapping, stage: str) -> int:
+    """The registered tool-loop cap of *stage*, or the backend's own default."""
+    return int((cfg.get("max_tool_iterations") or {}).get(stage)
+               or DEFAULT_TOOL_ITERATIONS)
+
+
 class SpendCapRefused(RuntimeError):
     """A turn was refused because its worst case would reach the USD cap (W1)."""
 
@@ -261,7 +272,7 @@ def parse_json_footer(text: str, required: tuple) -> dict:
 
 
 __all__ = ["MODEL_BACKEND", "MAX_OUTPUT_TOKENS", "CHARS_PER_TOKEN",
-           "TOOL_OUTPUT_TOKENS_CAP",
+           "TOOL_OUTPUT_TOKENS_CAP", "DEFAULT_TOOL_ITERATIONS", "tool_iterations",
            "LiveModelRefused", "PromptContractError", "SpendCapRefused",
            "SpendGuard", "ToolEndpoint", "build_llm", "dispatch_turn",
            "llm_turn", "parse_json_footer", "require_live_model",

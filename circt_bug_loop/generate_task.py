@@ -21,7 +21,8 @@ from circt_bug_loop.contract.schema import (ContractError, CounterBlock,
                                             validate)
 from circt_bug_loop.llm import (MODEL_BACKEND, LiveModelRefused,  # noqa: F401
                                 PromptContractError, build_llm, dispatch_turn,
-                                llm_turn, parse_json_footer, require_live_model)
+                                llm_turn, parse_json_footer, require_live_model,
+                                tool_iterations)
 
 #: 7.2 and 7.3 live beside this module (1.1).
 PROMPTS = Path(__file__).resolve().parent / "prompts"
@@ -309,7 +310,8 @@ def render_seed_read(seed: SeedRecord, cfg: dict) -> str:
                    test_files=render_test_files(seed),
                    run_lines="\n".join(seed.run_lines),
                    entry_tool=seed.entry_tool,
-                   max_sites=int(cfg["per_seed_probe_cap"]))
+                   max_sites=int(cfg["per_seed_probe_cap"]),
+                   max_tool_calls=tool_iterations(cfg, "stage_1"))
 
 
 def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
@@ -325,6 +327,7 @@ def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
                    language=seed_language(seed),
                    probe_dir=probe_dir,
                    cap=int(cfg["per_seed_probe_cap"]),
+                   max_tool_calls=tool_iterations(cfg, "stage_2"),
                    feedback=render_feedback(feedback))
 
 

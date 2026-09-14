@@ -136,15 +136,16 @@ calibration_sample_shas: []
 # figure becomes the per-turn ceiling the patched backend enforces from the
 # inside: change it and every authorised number changes.
 #
-# 6 for stages 1 and 2: the pilot's two A3 turns took 14 and 21 calls at a cap
-# of 100 and neither of them needed more than a handful of source reads to
-# write three probes. 3 for stage 6, which reads the record and writes prose.
-# 20 for stage 7, which is CHIA's OWN repair chain: the loop there is the
-# chain's and this value is RECORDED rather than enforced by this file.
+# 12 for stages 1 and 2: pilot 2 ran both stage-1 turns out of a cap of 6 and
+# they returned nothing at all, so the cap is doubled and the exhausted loop
+# now asks for a final answer instead of returning empty. 6 for stage 6, which
+# reads the record and writes prose. 20 for stage 7, which is CHIA's OWN repair
+# chain: the loop there is the chain's and this value is RECORDED rather than
+# enforced by this file.
 max_tool_iterations:
-  stage_1: 6
-  stage_2: 6
-  stage_6: 3
+  stage_1: 12
+  stage_2: 12
+  stage_6: 6
   stage_7: 20
 
 # --- minimality (FR-13.3, gate question 2) -----------------------------------

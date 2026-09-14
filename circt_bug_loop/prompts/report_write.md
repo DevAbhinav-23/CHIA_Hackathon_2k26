@@ -35,6 +35,12 @@ You have three READ-ONLY source tools, read_file(path), grep(pattern,
 path_prefix) and list_dir(path), over CIRCT at the run's commit. Read the code
 around the frames before you write. There is no shell and no build tool.
 
+You may make at most $max_tool_calls tool calls this turn. Read one region at a
+time, and use grep to find a symbol before you read_file around it: read_file
+returns one page and names the first_line to continue from. When the calls run
+out you will be asked to answer from what you have already read, so spend them
+on what you need in order to decide.
+
 If the failure class above is "differential" there are no frames, no assertion
 and no reduced case, and the two behaviours below are what you have:
 
