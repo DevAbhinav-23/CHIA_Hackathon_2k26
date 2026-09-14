@@ -3,8 +3,22 @@
 # A COPY of budget.yaml with eight values changed, listed below. It is a separate
 # file because FR-14.7 forbids editing a registered budget file, and because the
 # pilot and the campaign are two pre-registrations with two tags: this one is
-# `registration/pilot-7` and the campaign's is W-22's. `bug_loop.py --budget
+# `registration/pilot-8` and the campaign's is W-22's. `bug_loop.py --budget
 # circt_bug_loop/budget-pilot.yaml` selects it; the flag already existed.
+#
+# PILOT 8 (2026-09-15), registered as `registration/pilot-8`. NO VALUE CHANGES
+# from pilot 7, and for the same reason a third time: nothing pilot 7 measured
+# was about the caps. Its stage-1 turn was REFUSED BY THE QUOTA on its first
+# `generate_content` - HTTP 429, translated to `RateLimitError`, which
+# `prompt()` never retries because a retry re-sends the whole conversation -
+# and the turn, the arm and the run ended there, having billed nothing (D-8).
+# This tag registers two fixes. The backend now waits a 429 out INSIDE the
+# call, up to six attempts, 20 s doubling to a 300 s cap with jitter, or
+# whatever delay the refusal names: a refused call costs nothing, so the cap
+# below is untouched and only the turn's wall clock grows, which
+# `arm_window_seconds` already bounds. And a turn that raises now carries its
+# guard settlement home, so its ledger row is priced at what was settled rather
+# than at null (D-7), which is what made pilot 7's own spend unreadable.
 #
 # PILOT 7 (2026-09-15), registered as `registration/pilot-7`. NO VALUE CHANGES
 # from pilot 6, and for a reason the cap itself makes: pilot 6's stage-2 turn
