@@ -1,18 +1,4 @@
-"""The repository's own layout properties (`03-LLD.md` §1.3, §1.4, §14.5).
-
-`04-Test-Plan.md` §1.1, the `T-U-layout-*` tests. They read the tree with `ast`
-and with the imported modules; none of them runs a stage, a tool or a model, so
-every one is tier 0 but `T-U-layout-10`, which runs `upstream/sync-to-chia.sh`
-into a throwaway clone of a real CHIA checkout.
-
-**Every rule here passes, since W-17's join.** Four assertions were `xfail`ed
-against a row of `design/reviews/implementation-errata-log.md` that said what
-had to change; all four rows are closed and no assertion was weakened to close
-one: `llm.py` is the nineteenth source module, the two owed test modules are
-written, every node of §3.2 returns a `CounterBlock`, `probe_task`'s two
-simulator sides are `side` rather than `arm`, and no test puts the interlock's
-name into a process environment.
-"""
+"""The repository's own layout properties (`03-LLD.md` §1.3)."""
 import ast
 import importlib
 import inspect
@@ -27,9 +13,7 @@ import pytest
 from circt_bug_loop import bug_loop
 from circt_bug_loop.contract import schema
 
-# Each test carries its own tier marker rather than the module carrying one:
-# T-U-layout-10 is tier 1, needing a CHIA checkout outside this repository, and
-# a module-level t0 would select it into the tier-0 run (04-Test-Plan.md 0.5).
+# Each test carries its own tier marker rather than the module carrying one.
 
 FLOW = Path(bug_loop.FLOW_DIR)
 REPO = FLOW.parent
@@ -37,8 +21,7 @@ TESTS = FLOW / "tests"
 SYNC = REPO / "upstream" / "sync-to-chia.sh"
 CHIA_STUB = TESTS / "fixtures" / "layout" / "chia_stub"
 
-#: §1.3's NINETEEN source modules that hold logic, each with its test
-#: module: eighteen, plus `llm.py`, the join's neutral module (LLD §16.2).
+#: §1.3's NINETEEN source modules that hold logic, each with its test module.
 SOURCE_MODULES = {
     "bug_loop.py": "test_bug_loop.py", "contract/schema.py": "test_schema.py",
     "corpus.py": "test_corpus.py", "pin_select.py": "test_pin_select.py",
@@ -51,45 +34,26 @@ SOURCE_MODULES = {
     "ledger.py": "test_ledger.py", "feedback.py": "test_feedback.py",
     "store.py": "test_store.py", "results.py": "test_results.py"}
 
-#: §1.3's one source module with no test module of its own, plus the package
-#: marker the two-tree layout needs and §1.1 does not list (errata row 14).
+#: §1.3's one source module with no test module of its own.
 NO_TEST_MODULES = ("contract/__init__.py", "__init__.py")
 
-#: §1.3's two structural test modules, which have no source counterpart, plus
-#: the THIRD the join added and the FOURTH W-19b added. `test_integration.py`
-#: holds §2's seventeen `T-I-*` tests and `test_system.py` holds §3's `T-S-*`
-#: tests; both sets' slugs name a CROSSING or a whole TIER and not a module
-#: (`04-Test-Plan.md` §0.1), so neither can have a source counterpart any more
-#: than `test_layout.py` can (errata row W-19b-8).
+#: §1.3's two structural test modules.
 STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py", "test_integration.py",
                     "test_system.py")
 
-#: §1.3's exemption list, compared for EQUALITY so neither document can grow
-#: one the other does not: the five artefact test modules, with
-#: `test_image_spec.py` renamed `test_image.py` (errata row 15),
-#: `test_tools.py` for the two `ChiaTool`s, which are not a source module
-#: (LLD §16.2, 2026-09-15), and `test_upstream_patches.py` for `upstream/*.patch`,
-#: whose artefacts are patches against CHIA and not a module of this tree
-#: (W-20b K10/K11 hand-off row 4, landed by W-19b).
+#: §1.3's exemption list, compared for EQUALITY so neither document can grow one the other does not.
 EXEMPT_TESTS = ("test_image.py", "test_prompts.py", "test_cluster_yaml.py",
                 "test_submit.py", "test_budget_yaml.py", "test_tools.py",
                 "test_upstream_patches.py")
 
-#: The one test module neither §1.3 nor its exemption list names (errata row
-#: 16): the three functions proposed for `chia/chipyard/circt.py` are developed
-#: in this tree as `circt_core.py` and tested here, `chia/chipyard/test/` being
-#: a CHIA path this repository does not hold.
+#: The one test module neither §1.3 nor its exemption list names (errata row 16).
 EXTRA_MODULES = {"circt_core.py": "test_circt_core.py"}
 
-#: `02-HLD.md` §1.2's supply half, module by module: A1, A2, A3 and A4, A5,
-#: A6a, A6b and A4's frozen set. Everything else is the apparatus half or the
-#: seam, and §2.9's import rule is about this list.
+#: `02-HLD.md` §1.2's supply half, module by module.
 SUPPLY_HALF = ("corpus.py", "pin_select.py", "generate_task.py", "feedback.py",
                "budget.py", "ledger.py", "mutator_synth.py", "mutators/__init__.py")
 
-#: The one exemption from that rule, by module and by name: `ledger.py` is A6b
-#: and `BudgetLedger` and `LoopStore` are declared in `store.py`, which is where
-#: the records the ledger owns the arithmetic of live (LLD §16.2, 2026-09-15).
+#: The one exemption from that rule, by module and by name.
 SEAM_EXEMPT = {"ledger.py": ("BudgetLedger", "LoopStore")}
 
 #: §14.5's six apparatus modules, and its three exempt by name.
@@ -97,10 +61,7 @@ APPARATUS = ("probe_task.py", "triage_task.py", "repair_adapter.py", "gate.py",
              "store.py", "ddmin.py")
 ARM_EXEMPT = ("ledger.py", "results.py", "contract/schema.py")
 
-#: §3.2's node table: every node the flow ships, with the placement its row
-#: gives it. `llm.llm_turn` is §3.5.1's own node and its `{"llm": 1}`
-#: is a FOURTH placement that §3.2's table never gained (errata row 17);
-#: `gate.gate_validate` is the third gate node of the architect's decision 6.
+#: §3.2's node table: every node the flow ships, with the placement its row gives it.
 NODES = {
     "corpus.build_corpus": None, "corpus.resolve_sites": None,
     "pin_select.select_release_pinned_main": None,
@@ -109,9 +70,7 @@ NODES = {
     "llm.llm_turn": {"llm": 1.0},
     "feedback.build_feedback": None, "budget.load_budget": None,
     "ledger.accrue": None, "mutator_synth.synthesise_mutators": None,
-    # Head-side since W-20b: the Docker daemon and the build context are the
-    # head's, and the CIRCT worker type is itself a container of the image B1
-    # would build (K1). §3.2's row said `{"circt": 1}`.
+    # Head-side since W-20b.
     "bug_loop.build_image": None,
     "probe_task.probe_execute": {"circt": 1},
     "probe_task.oracle_primary": {"circt": 1},
@@ -125,15 +84,13 @@ NODES = {
     "gate.gate_validate": {"circt": 1},
     "store.artefact_write": None, "results.render_results": None}
 
-#: §3.10's three, which are CHIA's file and not the example's: `{"circt": 1}`
-#: and, as §3.10 spells them, no `max_retries`.
+#: §3.10's three, which are CHIA's file and not the example's.
 CORE_NODES = ("circt_core.circt_exec_probe", "circt_core.circt_reduce_run",
               "circt_core.circt_symbolize")
 
 #: §0's dependency rule: the standard library, plus these and nothing else.
 THIRD_PARTY = {"yaml", "ray", "chia"}
-#: CHIA's own two example modules, which §13.1 ships through `py_modules` and
-#: `repair_adapter` imports on the worker (FR-12.1 forbids copying them).
+#: CHIA's own two example modules.
 CHIA_EXAMPLE_MODULES = {"issue_task", "circt_util"}
 
 
@@ -154,18 +111,9 @@ def node_object(dotted: str):
     return getattr(importlib.import_module(f"circt_bug_loop.{module}"), name)
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-01: the four sets of 1.3, both directions
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_layout_01_mapping():
-    """T-U-layout-01 (FR-19.5): every source module that holds logic has its test module.
-
-    Both directions: no source module without a test module, and no test module
-    naming a source module that does not exist. Fixture: none. Tier 0.
-    """
+    """T-U-layout-01 (FR-19.5): every source module that holds logic has its test module."""
     for source, test in SOURCE_MODULES.items():
         assert (FLOW / source).is_file(), source
         assert (TESTS / test).is_file(), test
@@ -178,15 +126,7 @@ def test_T_U_layout_01_mapping():
 
 @pytest.mark.t0
 def test_T_U_layout_01_exemptions():
-    """T-U-layout-01 (NFR-12): the exemption list equals the six 1.3 names.
-
-    Five of the six are a Dockerfile, a prompt directory, two YAMLs, a shell
-    script and a YAML data file, and the sixth is a pair of `ChiaTool`s inside
-    another module; none of them is a source module, so none can have a
-    `test_<module>.py` counterpart under the mapping rule. The list is compared
-    for equality so neither document can grow one the other does not; the one
-    rename is recorded in the errata log. Fixture: none. Tier 0.
-    """
+    """T-U-layout-01 (NFR-12): the exemption list equals the six 1.3 names."""
     assert set(EXEMPT_TESTS) == {
         "test_image.py", "test_prompts.py", "test_cluster_yaml.py",
         "test_submit.py", "test_budget_yaml.py", "test_tools.py",
@@ -204,37 +144,16 @@ def test_T_U_layout_01_exemptions():
 
 @pytest.mark.t0
 def test_T_U_layout_01_twenty_five():
-    """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
-
-    Nineteen for the source modules that hold logic, `llm.py` included, FOUR
-    structural (`test_integration.py` is the join's, holding §2's seventeen
-    `T-I-*` tests, and `test_system.py` is W-19b's, holding §3's), six on the
-    exemption list and one the implementation added (errata row 16). Fixture:
-    none. Tier 0.
-    """
+    """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules."""
     present = {path.name for path in TESTS.glob("test_*.py")}
     expected = (set(SOURCE_MODULES.values()) | set(STRUCTURAL_TESTS)
                 | set(EXEMPT_TESTS) | set(EXTRA_MODULES.values()))
     assert present == expected
 
 
-# ---------------------------------------------------------------------------
-# 1.3's rule (2): no store.py name reaches a supply-half module
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_layout_01_seam():
-    """T-U-layout-01 (FR-16.1, §2.9): the supply half imports no `store.py` name.
-
-    The fourteen apparatus-internal records live beside their DDL and cross
-    nothing; a supply-half module that imported one would have the apparatus's
-    result shapes in the half that proposes work, which is what FR-16.1 exists
-    to stop. `ledger.py` is exempt and by exactly two names: `BudgetLedger` and
-    `LoopStore` are declared in `store.py` and A6b owns the arithmetic over
-    them, so the rule as first written was false of the design it describes.
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-01 (FR-16.1): the supply half imports no `store.py` name."""
     for name in SUPPLY_HALF:
         imported = [alias.name
                     for node in ast.walk(parse(FLOW / name))
@@ -249,19 +168,8 @@ def test_T_U_layout_01_seam():
         assert set(imported) <= set(allowed), (name, imported)
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-02: 14.5's walk, where `arm` may be branched on
-# ---------------------------------------------------------------------------
-
-
 def _branch_operands(node: ast.AST) -> list:
-    """The expressions §14.5 calls a branch's operand, and no others.
-
-    An `If`'s TEST and not its body, a `Compare`'s left and comparators, a
-    `Match`'s subject and a `Subscript`'s slice. Walking a whole `If` instead,
-    as the section's wording invites, reports every mention of `arm` inside the
-    branch, which is carrying it and is what FR-18.1 permits.
-    """
+    """The expressions §14.5 calls a branch's operand, and no others."""
     if isinstance(node, ast.If):
         return [node.test]
     if isinstance(node, ast.Compare):
@@ -274,12 +182,7 @@ def _branch_operands(node: ast.AST) -> list:
 
 
 def arm_branches(path: Path) -> list:
-    """Every line of *path* that branches on a name or attribute `arm`.
-
-    "Ending in arm" is read as `arm` itself or a `_arm` suffix: the literal
-    reading also matches `warm`, and `circt_warm_build` is a name this tree uses
-    (errata row 19).
-    """
+    """Every line of *path* that branches on a name or attribute `arm`."""
     found = []
     for node in ast.walk(parse(path)):
         for operand in _branch_operands(node):
@@ -293,10 +196,7 @@ def arm_branches(path: Path) -> list:
 
 @pytest.mark.t0
 def test_T_U_layout_02():
-    """T-U-layout-02 (FR-18.1): the apparatus carries `arm` and does not branch on it.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-02 (FR-18.1): the apparatus carries `arm` and does not branch on it."""
     for name in APPARATUS:
         assert arm_branches(FLOW / name) == [], name
     assert set(ARM_EXEMPT) == {"ledger.py", "results.py", "contract/schema.py"}
@@ -306,22 +206,10 @@ def test_T_U_layout_02():
 
 @pytest.mark.t0
 def test_T_U_layout_02_probe_task():
-    """T-U-layout-02 (FR-18.1): the walk over `probe_task.py` itself.
-
-    It failed on a NAME COLLISION and not on a violation: `oracle_differential`
-    called its two SIMULATOR sides `arm`, and §14.5's walk reads the name.
-    W-17's seventh fix renamed them `side`, so the walk passes honestly: the one
-    remaining `arm` in the module is `spec.arm` carried into a `ProbeResult`,
-    which FR-18.1 requires it to carry (errata row 19). Fixture: none. Tier 0.
-    """
+    """T-U-layout-02 (FR-18.1): the walk over `probe_task.py` itself."""
     assert arm_branches(FLOW / "probe_task.py") == []
     source = (FLOW / "probe_task.py").read_text(encoding="utf-8")
     assert "arm=spec.arm" in source, "the arm is carried, which is the rule"
-
-
-# ---------------------------------------------------------------------------
-# T-U-layout-03, -04, -05: docstrings, tools, dependencies
-# ---------------------------------------------------------------------------
 
 
 def paragraphs(doc: str) -> list:
@@ -331,14 +219,7 @@ def paragraphs(doc: str) -> list:
 
 @pytest.mark.t0
 def test_T_U_layout_03_nodes():
-    """T-U-layout-03 (FR-19.4, NFR-12): every node's docstring has the three paragraphs.
-
-    The rule is narrowed to the nodes and the two tools, which is the
-    architect's instruction and errata row 20: as `03-LLD.md` §3.1 states it, it
-    covers every public callable, and 45 of the flow's 184 public functions
-    across seven modules do not carry all three. Every node and every tool
-    method does. Fixture: none. Tier 0.
-    """
+    """T-U-layout-03 (FR-19.4): every node's docstring has the three paragraphs."""
     for dotted in list(NODES) + list(CORE_NODES):
         doc = inspect.getdoc(node_object(dotted))
         assert paragraphs(doc) == ["Returns:", "Worker:", "Raises:"], dotted
@@ -347,12 +228,7 @@ def test_T_U_layout_03_nodes():
 
 @pytest.mark.t0
 def test_T_U_layout_03_tools():
-    """T-U-layout-03 (FR-19.4): each tool method states an action, an argument and a failure.
-
-    An MCP method's docstring is what the model reads, so it is checked against
-    what a caller needs rather than against the node paragraphs. Fixture: none.
-    Tier 0.
-    """
+    """T-U-layout-03 (FR-19.4): each tool method states an action, an argument and a failure."""
     from circt_bug_loop import generate_task
 
     for tool in (generate_task.SourceReadTool, generate_task.ProbeWriteTool):
@@ -364,19 +240,13 @@ def test_T_U_layout_03_tools():
             assert doc.splitlines()[0].endswith("."), name
             arguments = list(inspect.signature(fn).parameters)[1:]
             # ONE argument, which is the rule as the plan states it.
-            # `write_probe` names `filename` and not `content` (errata row 24).
             assert any(argument in doc for argument in arguments), name
             assert "Error" in doc, name
 
 
 @pytest.mark.t0
 def test_T_U_layout_04():
-    """T-U-layout-04 (FR-19.1): no bare `ray.remote`, and every tool is a `ChiaTool`.
-
-    FR-19.1's five long-work categories are the `AsyncJobTool` rule's trigger
-    and neither tool falls in one, so that half holds vacuously and the check
-    still runs. Fixture: none. Tier 0.
-    """
+    """T-U-layout-04 (FR-19.1): no bare `ray.remote`, and every tool is a `ChiaTool`."""
     for path in flow_files():
         for node in ast.walk(parse(path)):
             if isinstance(node, ast.Attribute) and node.attr == "remote":
@@ -392,15 +262,7 @@ def test_T_U_layout_04():
 
 @pytest.mark.t0
 def test_T_U_layout_05():
-    """T-U-layout-05 (FR-19.8, NFR-11): no dependency outside CHIA's own and the stdlib.
-
-    The permitted non-standard imports are `yaml`, `ray` and `chia`, the flow's
-    own package, and CHIA's two example modules, which §13.1 ships through
-    `py_modules` because FR-12.1 forbids copying them. §0's own list of
-    standard-library modules is five short of what the implementation uses and
-    that is recorded rather than asserted here (errata row 21). Fixture: none.
-    Tier 0.
-    """
+    """T-U-layout-05 (FR-19.8): no dependency outside CHIA's own and the stdlib."""
     allowed = (THIRD_PARTY | CHIA_EXAMPLE_MODULES | {"circt_bug_loop"}
                | set(sys.stdlib_module_names))
     for path in flow_files():
@@ -415,20 +277,9 @@ def test_T_U_layout_05():
                 assert name in allowed, f"{path}:{node.lineno}: {name}"
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-06, -07: the decorators, and the counters
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_layout_06():
-    """T-U-layout-06 (FR-12.11, FR-13.2, FR-19.1): every node's `_chia_options`.
-
-    `max_retries=0` on every node of the flow; `{"repair": 1}` held by
-    `repair_adapt` alone; `gate_decide` and the four head nodes declaring no
-    worker resource at all, which is the head move of the LLD's own revision.
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-06 (FR-12.11): every node's `_chia_options`."""
     for dotted, resources in NODES.items():
         options = node_object(dotted)._chia_options
         assert options.get("max_retries") == 0, dotted
@@ -448,16 +299,7 @@ def returns_counters(dotted: str) -> bool:
 
 @pytest.mark.t0
 def test_T_U_layout_07():
-    """T-U-layout-07 (FR-17.4, FR-19.4): every node returns a `CounterBlock`.
-
-    §3.11 makes it every node of §3.2. Two halves, both static: the documented
-    **Returns** paragraph names the key `counters`, and the node's own return
-    annotation is `dict`, because a node returning a bare record has nowhere to
-    put the block. Errata row 22 recorded nine node modules that returned none;
-    the join gave every one of them the block, and `_COUNTER_STAGES` gained the
-    five names none of them had (feedback, budget, ledger, artefact, results).
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-07 (FR-17.4): every node returns a `CounterBlock`."""
     missing = [dotted for dotted in NODES if not returns_counters(dotted)]
     assert missing == []
     bare = [dotted for dotted in NODES
@@ -469,42 +311,20 @@ def test_T_U_layout_07():
 
 @pytest.mark.t0
 def test_T_U_layout_07_stages():
-    """T-U-layout-07 (FR-17.4): `CounterBlock.stage` is drawn from `_COUNTER_STAGES`.
-
-    The half of the rule that holds: the driver refuses a block naming anything
-    else, whoever produced it. Fixture: none. Tier 0.
-    """
+    """T-U-layout-07 (FR-17.4): `CounterBlock.stage` is drawn from `_COUNTER_STAGES`."""
     assert set(schema._COUNTER_STAGES) == set(schema._STAGE_IDS) | {
         "image", "corpus", "pin", "mirror", "synthesis",
-        # Five added at the join (W-17, errata row 22): 3.11 requires a block of
-        # EVERY node of 3.2 and none of these five had a stage to name.
+        # Five added at the join (W-17).
         "feedback", "budget", "ledger", "artefact", "results"}
     log = bug_loop.CounterLog("run", None)
-    # "feedback" was the invented name here until the join made it a real stage
-    # (errata row 22); the rule is unchanged and the name that is not a stage is.
+    # "feedback" was the invented name here until the join made it a real stage (errata row 22).
     with pytest.raises(ValueError):
         log.record("seeded", schema.CounterBlock(stage="stage_9", started=1,
                                                  completed=1, failed=0, seconds=0.0))
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-08: nothing below T3 can reach a model
-# ---------------------------------------------------------------------------
-
-
 def interlock_setters(path: Path) -> list:
-    """Every line of a test module that puts the interlock into the environment.
-
-    `monkeypatch.setenv`, `os.environ[...] = `, `os.environ.setdefault` and
-    `os.putenv`, with the name read as a literal or as any attribute or name
-    ending `LIVE_MODEL_ENV`; a name the walk cannot resolve to a literal is a
-    failure, because "a computed name does not pass it".
-
-    The RECEIVER is read as well as the method name, which the first version did
-    not do: a bare `setdefault` is `dict.setdefault` far more often than it is
-    `os.environ`'s, and `by_rule.setdefault(raw["rule"], [])` is a computed key
-    on a plain dict that the unqualified rule reported as an interlock write.
-    """
+    """Every line of a test module that puts the interlock into the environment."""
     receivers = {"setenv": "monkeypatch", "setdefault": "environ", "putenv": "os"}
     found = []
     for node in ast.walk(parse(path)):
@@ -535,12 +355,7 @@ def interlock_setters(path: Path) -> list:
 
 @pytest.mark.t0
 def test_T_U_layout_08_no_test_sets_it():
-    """T-U-layout-08 (NFR-06, NFR-08): no test module puts the interlock in the environment.
-
-    An `ast` walk and not a grep, so a docstring naming the variable does not
-    fail and a computed name does not pass. `tests/system/` is the one directory
-    the rule exempts and it does not exist yet. Fixture: none. Tier 0.
-    """
+    """T-U-layout-08 (NFR-06): no test module puts the interlock in the environment."""
     setters = {path.name: interlock_setters(path)
                for path in sorted(TESTS.glob("test_*.py"))}
     assert {name: lines for name, lines in setters.items() if lines} == {}
@@ -548,15 +363,7 @@ def test_T_U_layout_08_no_test_sets_it():
 
 @pytest.mark.t0
 def test_T_U_layout_08_one_construction_path():
-    """T-U-layout-08 (NFR-06): two construction paths, both behind the same refusal.
-
-    `VertexGeminiLLM` is named in exactly one function of the loop's own
-    modules, `llm.build_llm`; the second path is the `vertex` arm of
-    `upstream/issue_task-vertex-branch.patch`, which is CHIA's file and cannot
-    carry the interlock, so `repair_adapter.repair_adapt` calls
-    `require_live_model` before it invokes the chain. There is no third.
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-08 (NFR-06): two construction paths, both behind the same refusal."""
     owners = []
     for path in flow_files():
         for node in ast.walk(parse(path)):
@@ -579,16 +386,7 @@ def test_T_U_layout_08_one_construction_path():
 
 @pytest.mark.t0
 def test_T_U_layout_08_conftest_refuses():
-    """T-U-layout-08 (NFR-08): `conftest.py`'s own fixture, both halves of §0.5.
-
-    This test reads the fixture's EFFECT and not its source, which is what §0.5
-    asks for. The interlock is absent for every test in this run, which the
-    fixture asserts rather than merely deleting: refusing to start is the
-    stronger form. And `GEMINI_API_KEY` holds the synthetic value of
-    `fixtures/secrets/known_values.txt`, so a code path that reached the backend
-    unmocked would present a key that cannot authenticate. Fixture:
-    `secrets/known_values.txt`. Tier 0.
-    """
+    """T-U-layout-08 (NFR-08): `conftest.py`'s own fixture, both halves of §0.5."""
     from circt_bug_loop.tests import conftest
 
     assert bug_loop.LIVE_MODEL_ENV not in os.environ
@@ -597,29 +395,16 @@ def test_T_U_layout_08_conftest_refuses():
     values = conftest.known_values()
     assert set(values) == {"GITHUB_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY"}
     assert os.environ["GEMINI_API_KEY"] == values["GEMINI_API_KEY"]
-    # Each has the SHAPE the secret grep looks for and authenticates against
-    # nothing: no real credential is ever committed (§13).
+    # Each has the SHAPE the secret grep looks for and authenticates against nothing.
     assert values["GITHUB_TOKEN"].startswith("ghp_") and len(values["GITHUB_TOKEN"]) == 40
     assert values["GEMINI_API_KEY"].startswith("AQ.") and len(values["GEMINI_API_KEY"]) == 35
     assert values["GOOGLE_API_KEY"].startswith("AIza") and len(values["GOOGLE_API_KEY"]) == 39
     assert all(set(value[4:]) <= {"0"} for value in values.values())
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-09, -10: the two-tree layout and the sync script
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_layout_09_no_module_walks_up():
-    """T-U-layout-09 (FR-19.2): no flow module walks past its own directory.
-
-    `circt_bug_loop/` in the team repository and `examples/circt_bug_loop/` in a
-    CHIA checkout have different ancestors, so a module that derived CHIA's
-    package directory from its own location would be right in one tree and
-    wrong in the other. `chia.__path__[0]` and never `chia.__file__`, which is
-    `None` for a namespace package. Fixture: none. Tier 0.
-    """
+    """T-U-layout-09 (FR-19.2): no flow module walks past its own directory."""
     for path in flow_files():
         for node in ast.walk(parse(path)):
             if isinstance(node, ast.Attribute) and node.attr == "parent":
@@ -650,13 +435,7 @@ def tree_state(root: Path) -> dict:
 
 @pytest.mark.t0
 def test_T_U_layout_09_sync_is_idempotent(tmp_path: Path):
-    """T-U-layout-09 (FR-19.5): the sync script refuses a non-checkout and repeats cleanly.
-
-    Run twice into a copy of the stub checkout, the second run leaves it
-    byte-identical: the appended functions are guarded by their marker and the
-    vertex branch by the branch itself. `--dry-run` changes nothing at all.
-    Fixture: `layout/chia_stub/`. Tier 0.
-    """
+    """T-U-layout-09 (FR-19.5): the sync script refuses a non-checkout and repeats cleanly."""
     refused = sync(tmp_path / "not-a-checkout")
     assert refused.returncode == 3 and "chia" in refused.stderr
 
@@ -681,14 +460,7 @@ def test_T_U_layout_09_sync_is_idempotent(tmp_path: Path):
 
 @pytest.mark.t1
 def test_T_U_layout_10_sync_into_a_real_checkout(tmp_path: Path):
-    """T-U-layout-10 (FR-19.5, FR-12.1): the sync into a throwaway clone of CHIA.
-
-    The stub cannot exercise step 4: it carries the `vertex` branch already, so
-    the guard skips the patch. This runs the whole script against a real CHIA
-    checkout, cloned locally from `~/.cache/chia-src` so that nothing is
-    fetched, and asserts that the patch applies, that the example lands beside
-    CHIA's own, and that a second run is a no-op. Tier 1.
-    """
+    """T-U-layout-10 (FR-19.5): the sync into a throwaway clone of CHIA."""
     source = Path.home() / ".cache" / "chia-src"
     if not (source / ".git").is_dir():
         pytest.skip(f"no CHIA checkout at {source}")
@@ -706,9 +478,7 @@ def test_T_U_layout_10_sync_into_a_real_checkout(tmp_path: Path):
     first = sync(target)
     assert first.returncode == 0, first.stderr
     assert 'elif backend == "vertex":' in issue_task.read_text(encoding="utf-8")
-    # BOTH patches, since W-20b: a sync that applied only the first would leave
-    # a checkout whose stage 7 runs the backend the manifest names and whose
-    # every priced turn is low by the tokens the model thinks (K7, K11).
+    # BOTH patches, since W-20b.
     assert "thoughts_token_count" in vertex.read_text(encoding="utf-8")
     assert (target / "examples" / "circt_bug_loop" / "bug_loop.py").is_file()
     assert (target / "dockerfiles" / "ChiaCirctAssertDockerfile").is_file()
@@ -723,27 +493,9 @@ def test_T_U_layout_10_sync_into_a_real_checkout(tmp_path: Path):
         'elif backend == "vertex":') == 1
 
 
-# ---------------------------------------------------------------------------
-# T-U-layout-11: the head placement set (K4, K5)
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_layout_11_head_nodes_match_the_docstrings():
-    """T-U-layout-11 (K4, K5): `HEAD_NODES` is exactly the nodes that say head.
-
-    New id, W-20b. Ray places a task with no resource on any node with a free
-    CPU, and every head-side node is declared `@ChiaFunction(max_retries=0)`
-    with none; the worker containers advertise CPU, so before `HEAD_NODES`
-    existed `ledger.accrue` and `dedup_and_screen` were free to open `loop.db`
-    inside a container where its path does not exist, once per run, at random.
-    The membership rule is structural and is read off the tree rather than
-    restated: a node that declares NO resource is one Ray may place anywhere,
-    and every such node in this flow is a head node. Each one's own `Worker:`
-    paragraph is then asserted to say so, which is the half a human reads.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-layout-11 (K4): `HEAD_NODES` is exactly the nodes that say head."""
     import re
 
     unresourced = set()
@@ -769,13 +521,7 @@ def test_T_U_layout_11_head_nodes_match_the_docstrings():
 
 @pytest.mark.t0
 def test_T_U_layout_11_dispatch_pins_them_and_nothing_else(monkeypatch):
-    """T-U-layout-11 (K4, K5): the affinity is hard, and only head nodes get one.
-
-    `soft=False` is the assertion that matters: a soft affinity is a preference
-    and Ray falls back to any node with a free CPU, which is the very placement
-    the set exists to forbid. CHIA's `get` is substituted so that no ObjectRef
-    is collected and no local Ray is started (§0.4). Fixture: none. Tier 0.
-    """
+    """T-U-layout-11 (K4): the affinity is hard, and only head nodes get one."""
     from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
     HEAD_ID = "ab" * 28          # Ray validates the length of a node id
@@ -814,16 +560,9 @@ def test_T_U_layout_11_dispatch_pins_them_and_nothing_else(monkeypatch):
     assert strategy.node_id == HEAD_ID and strategy.soft is False
     assert seen["circt_bug_loop.probe_task.probe_execute"] == {}
 
-    # W-18: A NODE DEFINED IN THIS FILE REPORTS `__main__` when the driver is
-    # run as a script, which is exactly how `bug_loop_submit.sh` runs it, and
-    # `"__main__.build_image"` is in no set. B1 then lost its head affinity on
-    # every submitted run and Ray placed it in a worker container with no Docker
-    # daemon - `FileNotFoundError: 'docker'`, with `max_retries=0` and no second
-    # attempt. Every test that imports the module sees the dotted name and
-    # cannot meet it, so the substitution is asserted directly.
+    # W-18: A NODE DEFINED IN THIS FILE REPORTS `__main__` when the driver is run as a script.
     def as_script():
         """`build_image` as the submitted entrypoint's own process sees it."""
-
     as_script.__module__, as_script.__name__ = "__main__", "build_image"
 
     assert bug_loop.node_key(as_script) == "circt_bug_loop.bug_loop.build_image"

@@ -1,9 +1,4 @@
-"""`04-Test-Plan.md` §1.10: the eight tests of `ddmin.py` (B5's textual reducer).
-
-Wholly tier 0, which is the reason `03-LLD.md` §1.1 gives for `ddmin.py` being a
-file of its own: it is the only piece of the apparatus with no CIRCT knowledge,
-so it is the only piece testable with no CIRCT present.
-"""
+"""`04-Test-Plan.md` §1.10: the eight tests of `ddmin.py` (B5's textual reducer)."""
 from __future__ import annotations
 
 import ast
@@ -43,11 +38,7 @@ def _counting(predicate):
 
 
 def test_u_ddmin_01_minimality_on_the_specified_fixture(case_200_3) -> None:
-    """T-U-ddmin-01 (FR-09.10): exactly the three lines, in input order.
-
-    Pass criterion: on the 200-line fixture whose interestingness depends on
-    three lines, ddmin returns those three lines and no others.
-    """
+    """T-U-ddmin-01 (FR-09.10): exactly the three lines, in input order."""
     lines, expected = case_200_3
     needed = set(expected)
     out, _ = ddmin(lines, lambda ls: needed <= set(ls))
@@ -55,14 +46,7 @@ def test_u_ddmin_01_minimality_on_the_specified_fixture(case_200_3) -> None:
 
 
 def test_u_ddmin_02_termination_on_an_adversarial_predicate() -> None:
-    """T-U-ddmin-02 (FR-09.10): the loop exits by the `n >= len(lines)` break.
-
-    Pass criterion: on a predicate true only for the whole list, ddmin returns
-    the whole list within `len(lines) ** 2` interestingness calls, and the loop
-    variant `(len(lines), len(lines) - n)` of `03-LLD.md` §10.3 strictly
-    decreases lexicographically at every change, checked by tracing ddmin's own
-    frame.
-    """
+    """T-U-ddmin-02 (FR-09.10): the loop exits by the `n >= len(lines)` break."""
     lines = _lines(FIXTURES / "adversarial" / "input.txt")
     whole = list(lines)
     predicate = _counting(lambda ls: ls == whole)
@@ -95,21 +79,13 @@ def test_u_ddmin_02_termination_on_an_adversarial_predicate() -> None:
 
 
 def test_u_ddmin_03_uninteresting_input_raises() -> None:
-    """T-U-ddmin-03 (FR-09.10): a caller defect, not a reduction outcome.
-
-    Pass criterion: ValueError when the input is not interesting to begin with.
-    """
+    """T-U-ddmin-03 (FR-09.10): a caller defect, not a reduction outcome."""
     with pytest.raises(ValueError, match="not interesting to begin with"):
         ddmin(["a", "b"], lambda ls: False)
 
 
 def test_u_ddmin_04_call_count_is_returned(case_200_3) -> None:
-    """T-U-ddmin-04 (FR-09.10): `interestingness_calls` has a source.
-
-    Pass criterion: the returned call count equals the number of times the
-    predicate was actually invoked, so what a `ReducedCase` records is measured
-    and not estimated.
-    """
+    """T-U-ddmin-04 (FR-09.10): `interestingness_calls` has a source."""
     lines, expected = case_200_3
     needed = set(expected)
     predicate = _counting(lambda ls: needed <= set(ls))
@@ -119,13 +95,7 @@ def test_u_ddmin_04_call_count_is_returned(case_200_3) -> None:
 
 
 def test_u_ddmin_05_budget_truncation(case_200_3) -> None:
-    """T-U-ddmin-05 (FR-09.10, NFR-02): `max_calls` stops it, still interesting.
-
-    Pass criterion: with `max_calls` below the natural call count the function
-    returns early, having spent at most that many calls, and the lines it
-    returns are still interesting, which is what lets the caller record
-    `fixpoint=False` with `budget_truncated=True` on a reproducible row.
-    """
+    """T-U-ddmin-05 (FR-09.10): `max_calls` stops it, still interesting."""
     lines, expected = case_200_3
     needed = set(expected)
     _, natural = ddmin(lines, lambda ls: needed <= set(ls))
@@ -139,11 +109,7 @@ def test_u_ddmin_05_budget_truncation(case_200_3) -> None:
 
 
 def test_u_ddmin_06_result_is_one_minimal(case_200_3) -> None:
-    """T-U-ddmin-06 (FR-09.10): 1-minimality, checked exhaustively.
-
-    Pass criterion: removing any single line of the untruncated result makes it
-    uninteresting.
-    """
+    """T-U-ddmin-06 (FR-09.10): 1-minimality, checked exhaustively."""
     lines, expected = case_200_3
     needed = set(expected)
     out, _ = ddmin(lines, lambda ls: needed <= set(ls))
@@ -152,10 +118,7 @@ def test_u_ddmin_06_result_is_one_minimal(case_200_3) -> None:
 
 
 def test_u_ddmin_07_degenerate_inputs() -> None:
-    """T-U-ddmin-07 (FR-09.10): empty, single-line, and all-load-bearing.
-
-    Pass criterion: each terminates and returns the only correct answer.
-    """
+    """T-U-ddmin-07 (FR-09.10): empty, single-line, and all-load-bearing."""
     assert ddmin([], lambda ls: True) == ([], 1)
     assert ddmin(["only"], lambda ls: ls == ["only"]) == (["only"], 1)
     every = ["a", "b", "c", "d"]
@@ -165,12 +128,7 @@ def test_u_ddmin_07_degenerate_inputs() -> None:
 
 
 def test_u_ddmin_08_standard_library_only_and_no_circt() -> None:
-    """T-U-ddmin-08 (FR-09.10, FR-19.8): the import walk that makes it tier 0.
-
-    Pass criterion: every module `ddmin.py` imports is in the standard library,
-    it imports no module of the loop, and it starts no process: it cannot reach
-    a CIRCT binary even by accident, which is what makes it tier 0.
-    """
+    """T-U-ddmin-08 (FR-09.10): the import walk that makes it tier 0."""
     source = (Path(__file__).resolve().parents[1] / "ddmin.py").read_text()
     tree = ast.parse(source)
     imported = set()

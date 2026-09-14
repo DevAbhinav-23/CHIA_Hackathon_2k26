@@ -1,17 +1,4 @@
-"""`04-Test-Plan.md` §1's `appr` rows: `approve.py` (B9c), F-13's human half, F-20.
-
-Every test drives the CLI through `main(argv)`, which is the same entry
-`python -m circt_bug_loop.approve` runs; one drives it through `subprocess` as
-well, so the module entry `03-LLD.md` §13.2's console-script line describes is
-exercised as a program and not only as a function.
-
-**Nothing writes without an approval.** Three of the tests below assert that
-directly, by comparing the database file's bytes before and after.
-
-The GitHub layer is a stand-in for exactly one command, `poll`, and it is a GET
-listing: FR-13.16's reconciliation matches a filed issue by the fingerprint its
-body carries, and no test makes a request.
-"""
+"""`04-Test-Plan.md` §1's `appr` rows: `approve.py` (B9c), F-13's human half, F-20."""
 from __future__ import annotations
 
 import hashlib
@@ -40,11 +27,6 @@ FINGERPRINT = 'op && "null op"\nHWOps.cpp:412'
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
             "duplicate_of_candidate_id")
-
-
-# ---------------------------------------------------------------------------
-# A store carrying whole candidates, as B9a left them
-# ---------------------------------------------------------------------------
 
 
 def _answers(**over):
@@ -212,15 +194,8 @@ def _today():
     return _utc()[:10]
 
 
-# ===========================================================================
-# T-U-appr-01, -02, -03, -04, -05: the refusals, before anything is shown
-# ===========================================================================
-
-
 def test_appr_01_the_per_day_cap_is_enforced_before_the_human_is_asked(tmp_path):
-    """T-U-appr-01 (FR-13.8): with `filings_per_day` 1 and one filing already
-    recorded for the current UTC day, the second candidate is held, the refusal
-    happens before anything is shown, and nothing is written."""
+    """T-U-appr-01 (FR-13.8): with `filings_per_day` 1 and one filing already recorded for the current UTC day, the second candidate is held, the refusal happens before anything is shown, and nothing is written."""
     store = _store(tmp_path)
     _case(store, tmp_path, "cand-0002")
     _record_filing(store, "cand-0001", f"{_today()}T01:00:00+00:00")
@@ -248,10 +223,7 @@ def test_appr_02_the_total_cap_is_enforced_the_same_way(tmp_path):
 
 
 def test_appr_03_a_good_first_issue_match_is_refused(tmp_path):
-    """T-U-appr-03 (FR-13.9, FR-20.2): a candidate whose `dedup_evidence`
-    carries `good first issue` is refused whatever the rest of the gate said,
-    with the label named, and no filing is possible as an issue, a comment or a
-    fix - there being exactly one writer of a `filing` row."""
+    """T-U-appr-03 (FR-13.9): a candidate whose `dedup_evidence` carries `good first issue` is refused whatever the rest of the gate said, with the label named, and no filing is possible as an issue, a comment or a fix - there being exactly one writer of a `filing` row."""
     store = _store(tmp_path, labels=["bug", "good first issue"],
                    dedup="known_open_issue")
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi")
@@ -273,8 +245,7 @@ def test_appr_04_a_held_candidate_is_not_presented(tmp_path):
 
 
 def test_appr_05_a_second_approval_names_the_first(tmp_path):
-    """T-U-appr-05 (FR-13.13): a second approval of an already-approved
-    candidate is refused, naming the first approval's timestamp."""
+    """T-U-appr-05 (FR-13.13): a second approval of an already-approved candidate is refused, naming the first approval's timestamp."""
     store = _store(tmp_path)
     _record_filing(store, "cand-0001", "2026-09-14T01:02:03+00:00")
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi")
@@ -297,8 +268,7 @@ def test_appr_05b_a_refused_candidate_cannot_be_approved(tmp_path):
 
 
 def test_appr_06_approval_does_not_generalise(tmp_path):
-    """T-U-appr-06 (FR-13.13): two pending reports need two approvals; approving
-    one leaves the other pending and `list` still shows it."""
+    """T-U-appr-06 (FR-13.13): two pending reports need two approvals; approving one leaves the other pending and `list` still shows it."""
     store = _store(tmp_path)
     _case(store, tmp_path, "cand-0002")
     status, _ = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
@@ -313,14 +283,8 @@ def test_appr_06_approval_does_not_generalise(tmp_path):
     assert "1 pending" in listing
 
 
-# ===========================================================================
-# T-U-appr-07, -08, -09, -12, -14: the view, the approval and the licence
-# ===========================================================================
-
-
 def test_appr_09_show_prints_all_four_in_one_view(tmp_path):
-    """T-U-appr-09 (FR-13.12): the full rendered report, the four gate answers
-    with the stopping question, the repair diff, and the reduced case."""
+    """T-U-appr-09 (FR-13.12): the full rendered report, the four gate answers with the stopping question, the repair diff, and the reduced case."""
     store = _store(tmp_path, decision="report_plus_patch",
                    diff="--- a/lib/Dialect/HW/HWOps.cpp\n+  return failure();\n")
     before = _digest(tmp_path)
@@ -340,9 +304,7 @@ def test_appr_09_show_prints_all_four_in_one_view(tmp_path):
 
 
 def test_appr_07_the_licence_is_taken_with_the_patch_on_screen(tmp_path):
-    """T-U-appr-07 (FR-20.5, NFR-11): the confirmation is asked for only where
-    the decision is `report_plus_patch`, with the patch already on screen, and a
-    decline downgrades the decision to `report` and is recorded."""
+    """T-U-appr-07 (FR-20.5): the confirmation is asked for only where the decision is `report_plus_patch`, with the patch already on screen, and a decline downgrades the decision to `report` and is recorded."""
     store = _store(tmp_path, decision="report_plus_patch",
                    diff="--- a/lib/Dialect/HW/HWOps.cpp\n+  return failure();\n")
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
@@ -356,8 +318,7 @@ def test_appr_07_the_licence_is_taken_with_the_patch_on_screen(tmp_path):
 
 
 def test_appr_07b_a_declined_licence_downgrades_the_decision(tmp_path):
-    """FR-20.5: a `report_plus_patch` without a recorded confirmation is
-    downgraded by the code path, and the decline itself is recorded."""
+    """FR-20.5: a `report_plus_patch` without a recorded confirmation is downgraded by the code path, and the decline itself is recorded."""
     store = _store(tmp_path, decision="report_plus_patch", diff="--- a/x\n+y\n")
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
                         answers=["yes", "no"])
@@ -369,8 +330,7 @@ def test_appr_07b_a_declined_licence_downgrades_the_decision(tmp_path):
 
 
 def test_appr_07c_no_licence_is_asked_for_a_report_without_a_patch(tmp_path):
-    """FR-20.5 is about a patch; a plain `report` is never asked and the field
-    stays NULL, which is what "never defaulted" means in both directions."""
+    """FR-20.5 is about a patch; a plain `report` is never asked and the field stays NULL, which is what "never defaulted" means in both directions."""
     store = _store(tmp_path)
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
                         answers=["yes"])
@@ -379,9 +339,7 @@ def test_appr_07c_no_licence_is_asked_for_a_report_without_a_patch(tmp_path):
 
 
 def test_appr_08_walking_away_writes_nothing(tmp_path):
-    """T-U-appr-08 (FR-13.7): interrupting between presentation and the typed
-    `yes` leaves the candidate held with `held_reason=awaiting_approval`, no
-    `filing` row, and the next invocation presenting the same report."""
+    """T-U-appr-08 (FR-13.7): interrupting between presentation and the typed `yes` leaves the candidate held with `held_reason=awaiting_approval`, no `filing` row, and the next invocation presenting the same report."""
     store = _store(tmp_path)
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
                         answers=["no"])
@@ -400,8 +358,7 @@ def test_appr_08_walking_away_writes_nothing(tmp_path):
 
 
 def test_appr_12_the_filing_row_carries_the_approver_and_the_timestamp(tmp_path):
-    """T-U-appr-12 (FR-13.7, FR-20.5): the row names who approved, when, what
-    was approved, and the licence confirmation with its own timestamp."""
+    """T-U-appr-12 (FR-13.7): the row names who approved, when, what was approved, and the licence confirmation with its own timestamp."""
     store = _store(tmp_path)
     _run(tmp_path, "approve", "cand-0001", "--by", "Adithya J", answers=["yes"])
     row = _filing(store)
@@ -413,8 +370,7 @@ def test_appr_12_the_filing_row_carries_the_approver_and_the_timestamp(tmp_path)
 
 
 def test_appr_14_nothing_files_by_default(tmp_path):
-    """T-U-appr-14 (FR-13.7, FR-20.6): every command but `approve` leaves the
-    `filing` table empty, and a walkthrough with no approval produces zero."""
+    """T-U-appr-14 (FR-13.7): every command but `approve` leaves the `filing` table empty, and a walkthrough with no approval produces zero."""
     store = _store(tmp_path)
     _case(store, tmp_path, "cand-0002")
     before = _digest(tmp_path)
@@ -425,8 +381,7 @@ def test_appr_14_nothing_files_by_default(tmp_path):
 
 
 def test_appr_14b_the_gate_decides_who_reaches_a_human(tmp_path):
-    """FR-13.10: only `report` and `report_plus_patch` reach a human; a
-    candidate the gate decided `nothing` about is refused and never listed."""
+    """FR-13.10: only `report` and `report_plus_patch` reach a human; a candidate the gate decided `nothing` about is refused and never listed."""
     store = _store(tmp_path, decision="nothing")
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi")
     assert status == 2 and "'nothing'" in text
@@ -434,15 +389,8 @@ def test_appr_14b_the_gate_decides_who_reaches_a_human(tmp_path):
     assert _filing(store) is None
 
 
-# ===========================================================================
-# T-U-appr-10, -11, -13: the URL, the paste and the poll
-# ===========================================================================
-
-
 def test_appr_10_the_prefilled_url_is_measured_before_it_is_offered(tmp_path):
-    """T-U-appr-10 (FR-13.17): a report under the limit produces the pre-filled
-    link; one over it produces the hand-filing instruction and records both the
-    length and the reason."""
+    """T-U-appr-10 (FR-13.17): a report under the limit produces the pre-filled link; one over it produces the hand-filing instruction and records both the length and the reason."""
     short = APPROVE / "short.md"
     url, length, reason = prefill("t", short.read_text())
     assert url.startswith("https://github.com/llvm/circt/issues/new?title=")
@@ -464,8 +412,7 @@ def test_appr_10_the_prefilled_url_is_measured_before_it_is_offered(tmp_path):
 
 
 def test_appr_10b_the_approval_prints_the_url_it_recorded(tmp_path):
-    """FR-13.18: one interface owns both halves, so the approval ends with the
-    link rather than sending the human to a second tool."""
+    """FR-13.18: one interface owns both halves, so the approval ends with the link rather than sending the human to a second tool."""
     store = _store(tmp_path)
     status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
                         answers=["yes"])
@@ -483,10 +430,7 @@ def test_appr_10b_the_approval_prints_the_url_it_recorded(tmp_path):
     "https://github.com/llvm/circt/issues/1/comments",
 ])
 def test_appr_11_the_url_conjunction_is_on_the_accept_side(tmp_path, url):
-    """T-U-appr-11 (FR-13.18): a URL is accepted only when its scheme **is**
-    https, its host **is** exactly github.com, its path **begins**
-    `/llvm/circt/issues/` and it **ends in digits**. The earlier wording put the
-    conjunction on the refuse side and accepted a github.com URL with any path."""
+    """T-U-appr-11 (FR-13.18): a URL is accepted only when its scheme **is** https, its host **is** exactly github.com, its path **begins** `/llvm/circt/issues/` and it **ends in digits**."""
     assert issue_number(url) is None
     store = _store(tmp_path)
     _run(tmp_path, "approve", "cand-0001", "--by", "adi", answers=["yes"])
@@ -496,8 +440,7 @@ def test_appr_11_the_url_conjunction_is_on_the_accept_side(tmp_path, url):
 
 
 def test_appr_11b_a_pasted_url_is_recorded_against_the_same_report(tmp_path):
-    """T-U-appr-11 (FR-13.18): `filed` records the URL where the poll found
-    nothing, with `url_source="pasted"`, against the same report id."""
+    """T-U-appr-11 (FR-13.18): `filed` records the URL where the poll found nothing, with `url_source="pasted"`, against the same report id."""
     store = _store(tmp_path)
     assert issue_number("https://github.com/llvm/circt/issues/11200") == 11200
 
@@ -534,10 +477,7 @@ def _fake_issues(monkeypatch, issues):
 
 
 def test_appr_13_the_poll_matches_on_the_primary_fingerprint(tmp_path, monkeypatch):
-    """T-U-appr-13 (FR-13.16, NFR-04): a filed issue whose body carries the
-    report's primary fingerprint completes the `FilingRecord` with
-    `url_source="poll"`, using a GET listing only; an empty poll falls back to
-    the paste and says so."""
+    """T-U-appr-13 (FR-13.16): a filed issue whose body carries the report's primary fingerprint completes the `FilingRecord` with `url_source="poll"`, using a GET listing only; an empty poll falls back to the paste and says so."""
     store = _store(tmp_path)
     token = tmp_path / "token"
     token.write_text("synthetic-not-a-real-token")
@@ -568,16 +508,8 @@ def test_appr_13_the_poll_matches_on_the_primary_fingerprint(tmp_path, monkeypat
     assert "no filing awaits a URL" in text
 
 
-# ===========================================================================
-# The program itself
-# ===========================================================================
-
-
 def test_appr_15_the_module_entry_runs_as_a_program(tmp_path):
-    """T-U-appr-15 (FR-13.12): §13.2's entry, exercised as a program. The team repository packages
-    nothing, so `python -m circt_bug_loop.approve` is the spelling that exists
-    and the `bugloop-approve` console script is W-26's packaging work
-    (erratum)."""
+    """T-U-appr-15 (FR-13.12): §13.2's entry, exercised as a program."""
     _store(tmp_path)
     completed = subprocess.run(
         [sys.executable, "-m", "circt_bug_loop.approve",
@@ -596,16 +528,14 @@ def test_appr_15_the_module_entry_runs_as_a_program(tmp_path):
 
 
 def test_appr_16_an_unknown_candidate_is_a_lookup_error(tmp_path):
-    """T-U-appr-16 (FR-13.12): a typo in a candidate id is refused loudly rather than writing nothing
-    quietly, which is the failure mode a human would not notice."""
+    """T-U-appr-16 (FR-13.12): a typo in a candidate id is refused loudly rather than writing nothing quietly, which is the failure mode a human would not notice."""
     _store(tmp_path)
     with pytest.raises(LookupError, match="cand-9999"):
         _run(tmp_path, "show", "cand-9999")
 
 
 def test_appr_17_the_view_survives_a_missing_patch_and_a_missing_report(tmp_path):
-    """T-U-appr-17 (FR-13.12): the view is rendered for every candidate that reaches it, held
-    ones included, so a hold is visible rather than being a blank screen."""
+    """T-U-appr-17 (FR-13.12): the view is rendered for every candidate that reaches it, held ones included, so a hold is visible rather than being a blank screen."""
     store = _store(tmp_path, held="no_report")
     store.update("report", {"candidate_id": "cand-0001"}, {"path": "/nonexistent"})
     store.transaction([("DELETE FROM report WHERE candidate_id = ?", ("cand-0001",))])

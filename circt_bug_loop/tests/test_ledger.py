@@ -1,15 +1,4 @@
-"""`ledger.py`: the three arms, the two scopes, the stop rule.
-
-`04-Test-Plan.md` §1.16, the eleven `T-U-ledger-*` tests, `price` included from
-2026-09-14. All tier 0: `ledger.py` is head-side and its store is one SQLite
-file in a temporary directory.
-
-The budget these tests meter against is `03-LLD.md` §9.5's complete file, which
-is the repository's committed `budget.yaml`, read here and given a synthetic
-`budget_file_sha`: the pre-registration rule is `test_budget.py`'s subject and
-not this one's, and what the ledger needs from the file is its two prices, its
-window and its three caps.
-"""
+"""`ledger.py`: the three arms, the two scopes, the stop rule."""
 import json
 import sqlite3
 from pathlib import Path
@@ -26,9 +15,7 @@ from circt_bug_loop.tests.test_store import open_store, seed_rows
 
 pytestmark = pytest.mark.t0
 
-#: `fixtures/ledger/`, the recorded rows of `04-Test-Plan.md` §13. Each was
-#: produced by `accrue` in this module and then committed, which is the "through
-#: accrue in a test" the inventory specifies.
+#: `fixtures/ledger/`, the recorded rows of `04-Test-Plan.md` §13.
 LEDGER_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "ledger"
 
 _RUN = "run-01"
@@ -47,11 +34,7 @@ def budget(**overrides) -> schema.BudgetFile:
 
 
 def observed(cpu_seconds=1.0, tokens_in=None, tokens_out=None, **money) -> dict:
-    """An `observed` block carrying exactly the eight keys §2.7 freezes.
-
-    The four money keys are contract 2.2's per-turn row (W-18b): a stage that
-    made no turn carries them all null, which is most stages.
-    """
+    """An `observed` block carrying exactly the eight keys §2.7 freezes."""
     block = {"cpu_seconds": cpu_seconds, "tokens_in": tokens_in,
              "tokens_out": tokens_out, "cost_usd": None,
              "authorised_usd": None, "ceiling_usd": None,
@@ -79,11 +62,7 @@ def accrue_all(db_path: str, entries, funds=None) -> None:
 
 
 def test_T_U_ledger_01(tmp_path: Path):
-    """T-U-ledger-01 (FR-14.4): `arm` takes exactly the three values.
-
-    Rejected twice: by the seam's Literal, before the row is built, and by the
-    table's own CHECK, so a writer that bypasses `accrue` still meets the rule.
-    """
+    """T-U-ledger-01 (FR-14.4): `arm` takes exactly the three values."""
     db_path = str(tmp_path / "loop.db")
     loop = open_store(tmp_path)
     seed_rows(loop)
@@ -120,7 +99,7 @@ def test_T_U_ledger_02(tmp_path: Path):
 
 
 def test_T_U_ledger_03(tmp_path: Path):
-    """T-U-ledger-03 (FR-14.4, FR-14.5): one arm_window entry per arm per run."""
+    """T-U-ledger-03 (FR-14.4): one arm_window entry per arm per run."""
     db_path = str(tmp_path / "loop.db")
     loop = open_store(tmp_path)
     seed_rows(loop)
@@ -184,7 +163,7 @@ def test_T_U_ledger_05(tmp_path: Path):
 
 
 def test_T_U_ledger_06(tmp_path: Path):
-    """T-U-ledger-06 (FR-14.4, FR-18.10, NFR-08): the window, the binding cap, or None."""
+    """T-U-ledger-06 (FR-14.4): the window, the binding cap, or None."""
     db_path = str(tmp_path / "loop.db")
     seed_rows(open_store(tmp_path))
     funds = budget(generated_inputs_per_day=5)
@@ -228,17 +207,7 @@ def test_T_U_ledger_07(tmp_path: Path):
 
 
 def test_T_U_ledger_08(tmp_path: Path):
-    """T-U-ledger-08 (FR-14.6, FR-14.8): `observed`'s four keys, and stage 7's disagreement.
-
-    On the campaign's `vertex` backend all four are populated and `metered` is
-    true. They are null and `metered` false on the `claude` fallback, which
-    reports no per-phase usage. Stage 7 is the one stage on the campaign backend
-    where the two disagree: it is declared metered and its tokens are
-    nevertheless null, because CHIA's `_turn` dispatches the turn remotely and
-    the LLM copy that accumulates the counts dies on the worker. The test
-    asserts that disagreement explicitly, so "populated on the campaign backend"
-    is not read as a rule stage 7 violates silently.
-    """
+    """T-U-ledger-08 (FR-14.6): `observed`'s four keys, and stage 7's disagreement."""
     db_path = str(tmp_path / "loop.db")
     loop = open_store(tmp_path)
     seed_rows(loop)
@@ -268,10 +237,7 @@ def test_T_U_ledger_08(tmp_path: Path):
     assert set(written["v-1"]) == set(_OBSERVED_KEYS)
     assert written["r-1"]["cost_usd"] is None
 
-    # the committed rows of 13's `fixtures/ledger/` row, which were recorded
-    # through this same accrue and then committed: re-accruing each reproduces
-    # the cost_usd the ledger computed from 9.5's two prices, so the fixture is
-    # a record of this module's arithmetic and not a hand-written number.
+    # the committed rows of 13's `fixtures/ledger/` row.
     found = sorted(LEDGER_FIXTURES.rglob("*.json"))
     assert [path.parent.name for path in found].count("vertex") == 4
     assert [path.parent.name for path in found].count("claude") == 2
@@ -304,13 +270,7 @@ def test_T_U_ledger_09(tmp_path: Path):
 
 
 def test_T_U_ledger_10(tmp_path: Path):
-    """T-U-ledger-10 (FR-14.6): `price`, the ledger's own arithmetic.
-
-    At the committed 0.75 and 3.75 a million prompt tokens and a million output
-    tokens cost 4.50, and 11 prompt plus 7 output tokens cost 0.000034. The
-    money comes from `budget.yaml` and never from the backend, which reports
-    counts and no price: a usage dict carrying a cost of its own is ignored.
-    """
+    """T-U-ledger-10 (FR-14.6): `price`, the ledger's own arithmetic."""
     funds = budget()
     assert funds.price_usd_per_m_input_tokens == 0.75
     assert funds.price_usd_per_m_output_tokens == 3.75
@@ -341,13 +301,7 @@ def test_T_U_ledger_10(tmp_path: Path):
 
 
 def test_T_U_ledger_11(tmp_path: Path):
-    """T-U-ledger-11 (FR-18.10, NFR-08): the USD cap is campaign-wide, and third.
-
-    It stops BOTH arms, whichever arm the entries were charged to and `shared`
-    included, and it is compared against `spend_usd` and never against
-    `per_arm_spend_usd`, because the money cap protects a credit balance rather
-    than the comparison. Precedence is asserted in both directions.
-    """
+    """T-U-ledger-11 (FR-18.10): the USD cap is campaign-wide, and third."""
     db_path = str(tmp_path / "loop.db")
     seed_rows(open_store(tmp_path))
     funds = budget(campaign_spend_cap_usd=0.01)
@@ -379,19 +333,7 @@ def test_T_U_ledger_11(tmp_path: Path):
 
 @pytest.mark.t0
 def test_T_U_ledger_15_filing_caps_are_per_run(tmp_path: Path):
-    """T-U-ledger-15 (W11, FR-13.8): the caps count THIS run's filings.
-
-    New id, W-20b. `aggregate` ran `SELECT approved_at_utc FROM filing` with no
-    predicate and `stop_reason` compared the count against
-    `budget.filings_total`; `loop.db` persists across runs and `--resume`
-    depends on that, so after ten lifetime approvals every arm of every
-    subsequent run returned `filings_total` from its very first `_arm_stop` and
-    mined nothing. Whether the caps are per campaign or lifetime is a question
-    FR-13.8 does not settle and the code had chosen lifetime by omission. The
-    lifetime figure is still reported, for information.
-
-    Fixture: a throwaway `loop.db` carrying two runs' filings. Tier 0.
-    """
+    """T-U-ledger-15 (FR-13.8): the caps count THIS run's filings."""
     loop = open_store(tmp_path)
     seed_rows(loop)                                  # run-01, one candidate
     caps = budget(filings_total=2, filings_per_day=2)
@@ -451,12 +393,7 @@ def test_T_U_ledger_15_filing_caps_are_per_run(tmp_path: Path):
     assert (ledger.filings_total, ledger.filings_lifetime_total) == (2, 4)
     assert ledger_module.stop_reason(ledger, "seeded", caps) == "filings_total"
 
-    # W-18: a cap of ZERO means "this run files nothing", not "this run does
-    # nothing". `0 >= 0` is true before the first probe, so a pilot registered
-    # with both filing caps at zero - which is how a run is registered as unable
-    # to file at all - stopped its first arm in 18 ms and generated nothing.
-    # `approve.py` enforces both caps independently and refuses every filing at
-    # zero, so nothing is lost; a positive cap stops the arm exactly as before.
+    # W-18: a cap of ZERO means "this run files nothing", not "this run does nothing".
     files_nothing = budget(filings_total=0, filings_per_day=0)
     assert ledger_module.stop_reason(ledger, "seeded", files_nothing) is None
     fresh = ledger_module.aggregate("no-such-run", loop.db_path, today=_DAY)

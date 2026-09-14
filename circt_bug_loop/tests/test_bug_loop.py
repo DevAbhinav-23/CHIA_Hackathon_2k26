@@ -1,19 +1,4 @@
-"""`bug_loop.py`: argv, the twelve pre-flight refusals, the manifest, the loop.
-
-`04-Test-Plan.md` §1.20, the `T-U-driver-*` tests. All tier 0. Three properties
-of this module are what make that possible and each is a decision recorded in
-`design/reviews/implementation-errata-log.md`:
-
-  * each pre-flight check is a function of its own that takes what it checks,
-    so a fixture store, a fixture `ImageSpec` and an explicit environment
-    mapping are enough to exercise all twelve with no cluster;
-  * `interlock_probe` reads a mapping the caller passes, so **no test here sets
-    `BUGLOOP_ALLOW_LIVE_MODEL` in the process environment**, which is
-    `T-U-layout-08`'s rule as W-16 rewrote it;
-  * `campaign_drive` dispatches through `Stages` and `Dispatch`, so one whole
-    iteration runs in this process against a fixture store and a fake
-    generator, which is the dry-run iteration this module's last test drives.
-"""
+"""`bug_loop.py`: argv, the twelve pre-flight refusals, the manifest, the loop."""
 import hashlib
 import dataclasses
 import inspect
@@ -36,10 +21,7 @@ from circt_bug_loop.store import (BuildResult, DedupVerdict, DifferentialVerdict
 from circt_bug_loop.tests.conftest import call_node
 from circt_bug_loop.tests.test_store import open_store
 
-# `-W error` turns FastMCP's own IncompleteFieldDefinitionWarning into an error
-# on every ChiaTool construction, and `default_stages` imports the module that
-# defines two (W-13 erratum 18). A module-level filter is the one filter that
-# outranks a command-line -W.
+# `-W error` turns FastMCP's own IncompleteFieldDefinitionWarning into an error on every ChiaTool construction.
 pytestmark = [pytest.mark.t0,
               pytest.mark.filterwarnings("ignore::UserWarning")]
 
@@ -59,11 +41,6 @@ _CLUSTER = {"cluster_yaml_sha": "f" * 64, "worker_type": "bugloop_circt",
             "deployment": "single_machine"}
 
 
-# ---------------------------------------------------------------------------
-# Helpers: a budget, an ImageSpec, a throwaway registered repository
-# ---------------------------------------------------------------------------
-
-
 def image_spec(name: str = "ok") -> ImageSpec:
     """The recorded `ImageSpec` of `fixtures/driver/image_spec/<name>.json`."""
     return ImageSpec(**json.loads((DRIVER / "image_spec" / f"{name}.json").read_text()))
@@ -80,21 +57,7 @@ def budget_file(**overrides) -> schema.BudgetFile:
 
 def registered_repo(tmp_path: Path, *, mutator_after: bool = False,
                     tag: str = "registration/campaign-01") -> Path:
-    """A throwaway repository whose `budget.yaml` commit carries the registration tag.
-
-    Built here rather than committed, which is W-06 erratum 18's rule for every
-    budget fixture: the file under test is the repository's own `budget.yaml`
-    and a second copy would drift from it.
-
-    Every commit is dated EXPLICITLY, an hour apart. The dates no longer decide
-    the freeze rule - W-12 made it ancestry under the registration tag - but
-    they still decide FR-14.2's "earlier than the run's start", and two commits
-    in the same wall-clock second are what W-16 hit.
-
-    *tag* is the annotated `registration/*` tag, placed on the registration
-    commit. `None` builds the same repository UNREGISTERED, which is what a dry
-    run, the calibration draw and A7 all see (W-12).
-    """
+    """A throwaway repository whose `budget.yaml` commit carries the registration tag."""
     repo = tmp_path / "repo"
     flow = repo / "circt_bug_loop" / "mutators"
     flow.mkdir(parents=True)
@@ -111,8 +74,7 @@ def registered_repo(tmp_path: Path, *, mutator_after: bool = False,
                             "GIT_COMMITTER_DATE": when})
 
     source = Path(budget_module.BUDGET_YAML).read_text(encoding="utf-8")
-    # The set `budget.MUTATOR_SET` resolves to, not a spelled version: check 2
-    # asks about the file the run's digest is computed over (W-12c).
+    # The set `budget.MUTATOR_SET` resolves to, not a spelled version.
     frozen = flow / Path(budget_module.MUTATOR_SET).name
     frozen.write_text('{"set_version": "vN"}\n', encoding="utf-8")
     budget_path = repo / "circt_bug_loop" / "budget.yaml"
@@ -141,21 +103,8 @@ def parsed_args(**overrides):
     return bug_loop.build_parser().parse_args(argv)
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-01 to -12: the twelve pre-flight checks, in 13.1's order
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_01(tmp_path: Path):
-    """T-U-driver-01 (FR-14.2, FR-14.3): check 1 accepts a registered file, refuses a later one.
-
-    Since W-12 it also refuses a CAMPAIGN in a repository carrying no
-    `registration/*` tag, and lets a dry run and a `--generator recorded` run
-    read the same file, which is the whole point of the tag: A7 and the
-    calibration draw both run before the registration exists.
-
-    Fixture: a throwaway repository built here. Tier 0.
-    """
+    """T-U-driver-01 (FR-14.2): check 1 accepts a registered file, refuses a later one."""
     repo = registered_repo(tmp_path)
     path = str(repo / "circt_bug_loop" / "budget.yaml")
     budget = bug_loop.check_01_budget_registered(
@@ -183,28 +132,21 @@ def test_T_U_driver_01(tmp_path: Path):
 
 
 def test_T_U_driver_02(tmp_path: Path):
-    """T-U-driver-02 (FR-05.2): check 2 refuses a set the registration tag cannot reach.
-
-    Fixture: the same repository, with the frozen set edited afterwards. Tier 0.
-    """
+    """T-U-driver-02 (FR-05.2): check 2 refuses a set the registration tag cannot reach."""
     repo = registered_repo(tmp_path, mutator_after=True)
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_02_mutator_set_earlier(
             repo_root=str(repo), flow_dir=str(repo / "circt_bug_loop"))
     assert raised.value.check == "mutator_set_earlier"
 
-    # An unregistered repository has nothing to be earlier than, and check 1
-    # has already refused the campaign in it (W-12).
+    # An unregistered repository has nothing to be earlier than.
     untagged = registered_repo(tmp_path / "untagged", mutator_after=True, tag=None)
     bug_loop.check_02_mutator_set_earlier(
         repo_root=str(untagged), flow_dir=str(untagged / "circt_bug_loop"))
 
 
 def test_T_U_driver_03():
-    """T-U-driver-03 (FR-01.11): check 3 names both SHAs on a difference.
-
-    Fixture: none; the clone's HEAD is supplied, which is what keeps it tier 0.
-    """
+    """T-U-driver-03 (FR-01.11): check 3 names both SHAs on a difference."""
     bug_loop.check_03_clone_head(clone_path="/clone", corpus_head_sha="a" * 40,
                                  head_sha="a" * 40)
     with pytest.raises(bug_loop.PreflightFailed) as raised:
@@ -214,10 +156,7 @@ def test_T_U_driver_03():
 
 
 def test_T_U_driver_04(tmp_path: Path):
-    """T-U-driver-04 (FR-17.9): check 4 refuses a missing, an empty and an unwritable root.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-04 (FR-17.9): check 4 refuses a missing, an empty and an unwritable root."""
     bug_loop.check_04_artefact_root_head(artefact_root=str(tmp_path))
     for root in ("", str(tmp_path / "absent")):
         with pytest.raises(bug_loop.PreflightFailed) as raised:
@@ -226,12 +165,7 @@ def test_T_U_driver_04(tmp_path: Path):
 
 
 def test_T_U_driver_05(tmp_path: Path):
-    """T-U-driver-05 (FR-17.9): check 5 names the worker and the path, as `artefact_root_unmounted`.
-
-    The probe itself runs here, which is what it does on a worker; the mapping
-    check 5 reads is the one the driver builds by dispatching it per type.
-    Fixture: none. Tier 0 (the plan puts the dispatched form at tier 3).
-    """
+    """T-U-driver-05 (FR-17.9): check 5 names the worker and the path, as `artefact_root_unmounted`."""
     probe = bug_loop.artefact_root_probe(str(tmp_path))
     assert probe["writable"] is True and probe["detail"] is None
     bug_loop.check_05_artefact_root_workers(artefact_root=str(tmp_path),
@@ -248,11 +182,7 @@ def test_T_U_driver_05(tmp_path: Path):
 
 
 def test_T_U_driver_06():
-    """T-U-driver-06 (FR-03.17): check 6 refuses an image whose lit discovery failed.
-
-    Fixture: `driver/image_spec/ok.json`, `driver/image_spec/lit_broken.json`.
-    Tier 0.
-    """
+    """T-U-driver-06 (FR-03.17): check 6 refuses an image whose lit discovery failed."""
     bug_loop.check_06_image_lit_discovery(image_spec=image_spec("ok"))
     for spec in (None, image_spec("lit_broken")):
         with pytest.raises(bug_loop.PreflightFailed) as raised:
@@ -261,11 +191,7 @@ def test_T_U_driver_06():
 
 
 def test_T_U_driver_07():
-    """T-U-driver-07 (FR-06.1, FR-03.16): check 7 names the worker, the tool and both hashes.
-
-    Fixture: `driver/image_spec/ok.json`. Tier 0 (the plan's tier 2 is the same
-    check over hashes taken inside a running container, which is `test_image.py`).
-    """
+    """T-U-driver-07 (FR-06.1): check 7 names the worker, the tool and both hashes."""
     spec = image_spec("ok")
     bug_loop.check_07_tool_hashes(image_spec=spec,
                                   observed={"bugloop_circt": spec.tool_hashes})
@@ -278,10 +204,7 @@ def test_T_U_driver_07():
 
 
 def test_T_U_driver_08():
-    """T-U-driver-08 (FR-03.15): check 8 refuses a changed Verilator, naming both.
-
-    Fixture: `driver/image_spec/ok.json`. Tier 0.
-    """
+    """T-U-driver-08 (FR-03.15): check 8 refuses a changed Verilator, naming both."""
     spec = image_spec("ok")
     bug_loop.check_08_verilator_version(
         image_spec=spec, observed={"bugloop_circt": spec.verilator_version})
@@ -293,11 +216,7 @@ def test_T_U_driver_08():
 
 
 def test_T_U_driver_09():
-    """T-U-driver-09 (FR-02.1 to FR-02.4): check 9 requires all seven pin fields.
-
-    `resolved_utc` is A2's eighth field and has no manifest home (W-07 erratum
-    7), so it is not one of the seven. Fixture: none. Tier 0.
-    """
+    """T-U-driver-09 (FR-02.1 to FR-02.4): check 9 requires all seven pin fields."""
     assert set(bug_loop.PIN_FIELDS) == set(_PIN) - {"resolved_utc"}
     bug_loop.check_09_pin_stamped(pin=_PIN)
     with pytest.raises(bug_loop.PreflightFailed) as raised:
@@ -306,10 +225,7 @@ def test_T_U_driver_09():
 
 
 def test_T_U_driver_10():
-    """T-U-driver-10 (FR-10.9, FR-10.7): check 10 refuses no mirror and an incomplete one.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-10 (FR-10.9): check 10 refuses no mirror and an incomplete one."""
     bug_loop.check_10_issue_mirror(mirror=_MIRROR, refresh_requested=False)
     with pytest.raises(bug_loop.PreflightFailed):
         bug_loop.check_10_issue_mirror(mirror=None, refresh_requested=False)
@@ -321,21 +237,14 @@ def test_T_U_driver_10():
 
 
 def test_T_U_driver_11():
-    """T-U-driver-11 (FR-20.1): check 11 requires the forum post's URL and date.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-11 (FR-20.1): check 11 requires the forum post's URL and date."""
     bug_loop.check_11_forum_post(forum_post_url="https://x/1",
                                  forum_post_date="2026-09-18")
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date="2026-09-18")
     assert "forum_post_url" in str(raised.value)
 
-    # W-18: a run whose REGISTERED filing cap is zero is exempt, and nothing
-    # else is. FR-20.1 posts the method so maintainers are not met by reports
-    # from a system they were never told about, and a run that can file nothing
-    # produces no report for anyone to be surprised by. Any positive cap still
-    # requires both values, and an unsupplied cap still requires them.
+    # W-18: a run whose REGISTERED filing cap is zero is exempt, and nothing else is.
     bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
                                  filings_total=0)
     for cap in (1, 10, None):
@@ -346,9 +255,7 @@ def test_T_U_driver_11():
     source = inspect.getsource(bug_loop.run_campaign)
     assert "filings_total=budget.filings_total" in source
 
-    # The contract is frozen at 2.1 and makes both manifest fields non-null, so
-    # an exempt run records WHY there is no post rather than a URL nobody
-    # posted; an operator's own values still win.
+    # The contract is frozen at 2.1 and makes both manifest fields non-null.
     assert "filings_total is 0" in bug_loop.NO_FORUM_POST
     manifest = inspect.getsource(bug_loop.build_manifest)
     assert "forum_post_url=args.forum_post_url or NO_FORUM_POST" in manifest
@@ -356,13 +263,7 @@ def test_T_U_driver_11():
 
 
 def test_T_U_driver_27():
-    """T-U-driver-27 (NFR-06, NFR-08): check 12, the interlock and the key.
-
-    Four failing cases and one passing one, and the probe returns **two booleans
-    and never a value**, asserted on its return. The environment is a mapping
-    this test passes: nothing here writes `BUGLOOP_ALLOW_LIVE_MODEL` into the
-    process environment, which is `T-U-layout-08`'s rule. Fixture: none. Tier 0.
-    """
+    """T-U-driver-27 (NFR-06): check 12, the interlock and the key."""
     live = {bug_loop.LIVE_MODEL_ENV: "1", bug_loop.API_KEY_ENV: "AQ.synthetic-test-key"}
     probe = bug_loop.interlock_probe(env=live)
     assert probe == {"interlock_ok": True, "key_ok": True}
@@ -383,18 +284,13 @@ def test_T_U_driver_27():
         assert "bugloop_llm" in str(raised.value), label
         assert "k" != str(raised.value), label
 
-    # W-18: the head is checked only where a turn would be BUILT there. Under
-    # Ray it never is - `llm_turn` builds the client on the `llm` worker from
-    # that worker's own environment - and 11.2 forbids forwarding the key or the
-    # interlock to a submitted driver, so requiring them of the head made the
-    # submit wrapper unable to start any live campaign.
+    # W-18: the head is checked only where a turn would be BUILT there.
     unset = bug_loop.interlock_probe(env={})
     bug_loop.check_12_live_model(workers={"bugloop_llm": probe})
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_12_live_model(head=unset, workers={"bugloop_llm": probe})
     assert "head" in str(raised.value)
-    # And an empty worker map is a refusal and not a pass: a live run with no
-    # `llm` container has nowhere to build a client.
+    # And an empty worker map is a refusal and not a pass.
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_12_live_model(workers={})
     assert "llm" in str(raised.value)
@@ -404,17 +300,7 @@ def test_T_U_driver_27():
 
 
 def test_T_U_driver_28a():
-    """T-U-driver-28 (13.1, K7, K11): the checks are named functions, in order.
-
-    Twelve until W-20b, fifteen since: check 13 greps the STAGED
-    `issue_task.py` for the vertex branch, because `model_ids["repair_adapt"]`
-    was a claim about a file nothing had read; check 14 greps the staged
-    `vertex.py` for the two billed usage fields, because without them every
-    priced turn and the USD cap are low by whatever the model thinks; and
-    check 15 imports `circt_bug_loop` in a subprocess with the wrapper's own
-    PYTHONPATH, which is the failure that killed the first real
-    `chia job submit` before its first line of work. Fixture: none. Tier 0.
-    """
+    """T-U-driver-28 (13.1): the checks are named functions, in order."""
     assert len(bug_loop.PREFLIGHT_CHECKS) == 15
     assert bug_loop.PREFLIGHT_CHECKS[-3:] == ("vertex_branch", "vertex_usage_patch",
                                               "entrypoint_import")
@@ -431,16 +317,8 @@ def test_T_U_driver_28a():
     assert "ModuleNotFoundError" in str(raised.value)
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-12 to -17: argv, the flags, and the shipped modules
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_12():
-    """T-U-driver-12 (FR-19.3): every argument of 13.1's table parses with its default.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-12 (FR-19.3): every argument of 13.1's table parses with its default."""
     args = bug_loop.build_parser().parse_args(["--mode", "discovery"])
     assert args.arm == "both" and args.repair_backend == "vertex"
     assert args.budget.endswith("budget.yaml")
@@ -455,11 +333,7 @@ def test_T_U_driver_12():
 
 
 def test_T_U_driver_13():
-    """T-U-driver-13 (FR-19.3, FR-18.10): one flag swaps the arm, and `both` is sequential.
-
-    Fixture: the committed `budget.yaml`, whose `arm_order` is what `both` runs.
-    Tier 0.
-    """
+    """T-U-driver-13 (FR-19.3): one flag swaps the arm, and `both` is sequential."""
     for arm in ("seeded", "mutation", "both"):
         assert bug_loop.build_parser().parse_args(
             ["--mode", "discovery", "--arm", arm]).arm == arm
@@ -467,21 +341,7 @@ def test_T_U_driver_13():
 
 
 def test_T_U_driver_17(tmp_path):
-    """T-U-driver-17 (FR-12.1, K6, K7, W6): `runtime_env` ships the STAGED package.
-
-    13.1's `py_modules` named the flow's loose modules, the installed `chia`
-    directory and two of CHIA's example files, and three of those were wrong on
-    a worker: the flow's modules are a package here and import each other as
-    `circt_bug_loop.<module>`; uploading the flow directory shipped `tests/`
-    (3.8 of its 5.8 MB), `fixtures/repair/issues.db` and, at 6.1's path,
-    `loop.db` with the mirrored issue corpus in it; and the installed `chia` is
-    an implicit namespace package, which MERGES with a container's own install
-    rather than shadowing it, and is unpatched.
-
-    Staged into a `tmp_path` here, so the assertions are about what the function
-    produces and not about whatever an earlier run left in the tree. Fixture:
-    the installed CHIA checkout. Tier 0.
-    """
+    """T-U-driver-17 (FR-12.1): `runtime_env` ships the STAGED package."""
     staged = bug_loop.stage_shipped(target=str(tmp_path / "_shipped"))
     root = Path(staged["root"])
     assert [Path(p).name for p in staged["py_modules"]] == [
@@ -519,13 +379,7 @@ def test_T_U_driver_17(tmp_path):
 
 
 def test_T_U_driver_17b(tmp_path):
-    """T-U-driver-17 (K7, K11): checks 13 and 14 read the staged files.
-
-    New half, W-20b. Both refusals are exercised against a staged copy with the
-    marker removed, which is exactly the state the tree was in before the
-    staging existed: `sync-to-chia.sh` applied the branch into a TARGET checkout
-    the driver never ran. Fixture: none. Tier 0.
-    """
+    """T-U-driver-17 (K7): checks 13 and 14 read the staged files."""
     unpatched = tmp_path / "issue_task.py"
     unpatched.write_text("def _turn():\n    pass\n", encoding="utf-8")
     patched = tmp_path / "patched.py"
@@ -563,10 +417,7 @@ def test_T_U_driver_17b(tmp_path):
 
 
 def test_T_U_driver_23(capsys):
-    """T-U-driver-23 (FR-19.3, NFR-12): `--print-config` prints both databases and no secret.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-23 (FR-19.3): `--print-config` prints both databases and no secret."""
     status = bug_loop.main(["--mode", "discovery", "--print-config"])
     printed = capsys.readouterr().out
     assert status == 0
@@ -578,11 +429,7 @@ def test_T_U_driver_23(capsys):
 
 
 def test_T_U_driver_21():
-    """T-U-driver-21 (FR-14.1, FR-14.3): the calibration draw is reproducible and writes nothing.
-
-    Two draws at one `corpus_head_sha` are the same twenty, and a different head
-    draws differently. Fixture: none. Tier 0.
-    """
+    """T-U-driver-21 (FR-14.1): the calibration draw is reproducible and writes nothing."""
     pool = [f"{i:040x}" for i in range(171)]
     first = bug_loop.draw_calibration(corpus_head_sha="d7e9", sample_size=20,
                                       exact_pin_shas=pool)
@@ -596,24 +443,8 @@ def test_T_U_driver_21():
                                   exact_pin_shas=pool[:5])
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-24, -25: B1's tag, its argument list and its refusals
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_24():
-    """T-U-driver-24 (K1, FR-03.7, FR-03.10, FR-03.13): the tag, and the digest beside it.
-
-    Two naming schemes used to be in the tree and they could not agree: the
-    Dockerfile's header says `chia-circt-assert:<CIRCT_SHA[:12]>` and
-    `image_tag` returned `<registry>/chia-circt-assert:<manifest digest[:12]>`,
-    so step 1's reuse lookup always missed and `--image-tag eade0de61bc5` could
-    never match. The TAG is now the Dockerfile's, and the property that used to
-    be the tag's - any one of the six inputs changing it, `slang` and
-    `base_image` included - is `manifest_digest`'s, which the `ImageSpec`
-    records. The argument ORDER of the target list changes neither, the
-    manifest sorting it. Fixture: none. Tier 0.
-    """
+    """T-U-driver-24 (FR-03.7): the tag, and the digest beside it."""
     base = dict(circt_sha="e" * 40, sdk_tag="firtool-1.159.0",
                 targets=("circt-opt", "firtool"), flag_string="-O3 -UNDEBUG")
     manifest = bug_loop.image_manifest(**base)
@@ -633,27 +464,17 @@ def test_T_U_driver_24():
         bug_loop.image_manifest(**base, slang=False)) != digest
     assert bug_loop.manifest_digest(
         bug_loop.image_manifest(**base, base_image="other")) != digest
-    # The five inputs other than the commit share a tag and differ in the digest,
-    # which is exactly why the digest is recorded rather than folded into a name.
+    # The five inputs other than the commit share a tag and differ in the digest.
     assert bug_loop.image_tag(bug_loop.image_manifest(**base, slang=False)) == tag
 
 
 def test_T_U_driver_24b(monkeypatch):
-    """T-U-driver-24 (K1): B1 is a head node, it never pushes, and --dry-run inspects.
-
-    New half, W-20b. `build_image` ran at `{"circt": 1}`, inside a container of
-    the very image it would build: no docker binary, no socket, and `_run`
-    catches only `TimeoutExpired`, so its first line raised `FileNotFoundError`
-    out of the node - and `--dry-run` returns AFTER all of that, so the one
-    command that is supposed to spend nothing died before printing anything.
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-24 (K1): B1 is a head node, it never pushes, and --dry-run inspects."""
     from circt_bug_loop.bug_loop import ImageBuildError
 
     assert bug_loop.build_image._chia_options == {"max_retries": 0}
     assert "circt_bug_loop.bug_loop.build_image" in bug_loop.HEAD_NODES
-    # Read off the parsed body and not the text, the docstring naming the step
-    # that was removed: no literal anywhere under `build_image` is a push.
+    # Read off the parsed body and not the text, the docstring naming the step that was removed.
     import ast
     import textwrap
 
@@ -678,8 +499,7 @@ def test_T_U_driver_24b(monkeypatch):
     assert raised.value.step == "reuse"
     assert calls == [["docker", "image", "inspect", f"chia-circt-assert:{'e' * 12}"]]
 
-    # And the Dockerfile it would have built from exists in THIS tree, which is
-    # the path K1 measured as absent under `~/.cache/chia-src/dockerfiles/`.
+    # And the Dockerfile it would have built from exists in THIS tree.
     dockerfile, context = bug_loop.dockerfile_and_context()
     assert Path(dockerfile).is_file()
     assert dockerfile == str(Path(bug_loop.FLOW_DIR).parent / "upstream"
@@ -688,12 +508,7 @@ def test_T_U_driver_24b(monkeypatch):
 
 
 def test_T_U_driver_25a():
-    """T-U-driver-25 (FR-03.4, FR-03.7): step 2's argument list, and no `--progress=plain`.
-
-    The six build arguments are the ones the Dockerfile's own `ARG` lines
-    declare, checked against that file rather than against this document.
-    Fixture: `upstream/dockerfiles/ChiaCirctAssertDockerfile`. Tier 0.
-    """
+    """T-U-driver-25 (FR-03.4): step 2's argument list, and no `--progress=plain`."""
     manifest = bug_loop.image_manifest("e" * 40, "firtool-1.159.0",
                                        bug_loop.IMAGE_TARGETS,
                                        bug_loop.IMAGE_FLAG_STRING)
@@ -711,11 +526,7 @@ def test_T_U_driver_25a():
 
 
 def test_T_U_driver_25b():
-    """T-U-driver-25 (FR-03.17): step 4 reads FR-03.17's two figures off lit's own output.
-
-    Fixture: `image/lit_show_tests.txt`, `image/lit_notes.txt`, `image/lit_fatal.txt`.
-    Tier 0.
-    """
+    """T-U-driver-25 (FR-03.17): step 4 reads FR-03.17's two figures off lit's own output."""
     shown = (FIXTURES / "image" / "lit_show_tests.txt").read_text(encoding="utf-8")
     notes = (FIXTURES / "image" / "lit_notes.txt").read_text(encoding="utf-8")
     ok, count = bug_loop.lit_discovery(0, notes + shown)
@@ -723,11 +534,6 @@ def test_T_U_driver_25b():
     assert bug_loop.lit_discovery(1, notes + shown)[0] is False
     fatal = (FIXTURES / "image" / "lit_fatal.txt").read_text(encoding="utf-8")
     assert bug_loop.lit_discovery(0, fatal)[0] is False
-
-
-# ---------------------------------------------------------------------------
-# T-U-driver-28: the manifest, and every field's producer
-# ---------------------------------------------------------------------------
 
 
 def manifest(**overrides) -> schema.RunManifest:
@@ -741,13 +547,7 @@ def manifest(**overrides) -> schema.RunManifest:
 
 
 def test_T_U_driver_28b():
-    """T-U-driver-28 (FR-14.8, FR-18.2): every manifest field comes from its named producer.
-
-    No field is None that the schema requires, `model_ids` is four
-    `"<backend>:<model id>"` strings with the campaign's three the same, the
-    three closed dicts carry exactly their declared key sets, and the manifest
-    validates. Fixture: `driver/image_spec/ok.json`. Tier 0.
-    """
+    """T-U-driver-28 (FR-14.8): every manifest field comes from its named producer."""
     built = manifest()
     schema.validate(built)
     assert built.backend == "vertex"
@@ -771,10 +571,7 @@ def test_T_U_driver_28b():
 
 
 def test_T_U_driver_28c():
-    """T-U-driver-28 (FR-14.8): `stages_metered` follows the arm and the repair backend.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-28 (FR-14.8): `stages_metered` follows the arm and the repair backend."""
     seeded_only = bug_loop.stages_metered(arms=("mutation",), repair_backend="vertex",
                                           repair_enabled=True)
     assert seeded_only["stage_1"] is False and seeded_only["stage_2"] is False
@@ -789,10 +586,7 @@ def test_T_U_driver_28c():
 
 
 def test_T_U_driver_28d():
-    """T-U-driver-28 (FR-02.7): `run_commit` is one entry per mode, not one shape.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-28 (FR-02.7): `run_commit` is one entry per mode, not one shape."""
     discovery = bug_loop.run_commits(mode="discovery", pin=_PIN)
     assert len(discovery) == 1 and discovery[0].seed_sha is None
 
@@ -813,15 +607,7 @@ def test_T_U_driver_28d():
 
 
 def test_T_U_driver_29(tmp_path: Path, monkeypatch):
-    """T-U-driver-29 (12.1, ADR-D-04): the cluster YAML produces four manifest fields.
-
-    `cluster_yaml_sha` is the file's own SHA-256, so an edited YAML is a
-    different run. The four variables are set one literal at a time, and by
-    `monkeypatch` rather than by `os.environ`, so that `T-U-layout-08`'s `ast`
-    walk can read every name this file puts in the environment and so that none
-    of them outlives the test. Fixture: the committed `cluster_single.yaml`.
-    Tier 0.
-    """
+    """T-U-driver-29 (12.1): the cluster YAML produces four manifest fields."""
     monkeypatch.setenv("CHIA_HEAD", "127.0.0.1")
     monkeypatch.setenv("BUGLOOP_ARTEFACTS", str(tmp_path))
     monkeypatch.setenv("BUGLOOP_IMAGE_TAG", "deadbeefcafe")
@@ -833,18 +619,8 @@ def test_T_U_driver_29(tmp_path: Path, monkeypatch):
     assert len(summary["cluster_yaml_sha"]) == 64
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-20: the counters, named and summed
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_20(tmp_path: Path):
-    """T-U-driver-20 (FR-17.4, NFR-09): four counters, no fifth, two nodes of one stage sum.
-
-    The driver checks `started == completed + failed` per block and logs a NAMED
-    violation rather than repairing it, and rewrites `counters.json` on every
-    aggregation. Fixture: none. Tier 0.
-    """
+    """T-U-driver-20 (FR-17.4): four counters, no fifth, two nodes of one stage sum."""
     log = bug_loop.CounterLog(_RUN, str(tmp_path / "results"))
     assert set(f.name for f in schema.dataclasses.fields(schema.CounterBlock)) == {
         "stage", "started", "completed", "failed", "seconds"}
@@ -865,17 +641,8 @@ def test_T_U_driver_20(tmp_path: Path):
     assert written["totals"]["seeded/stage_3"]["started"] == 2
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-15: --record-fixtures
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_15(tmp_path: Path):
-    """T-U-driver-15 (FR-04.3): every recorded instance is validated first and named by its id.
-
-    A recorder with no directory writes nothing at all, which is the default.
-    Fixture: none. Tier 0.
-    """
+    """T-U-driver-15 (FR-04.3): every recorded instance is validated first and named by its id."""
     recorder = bug_loop.FixtureRecorder(str(tmp_path / "rec"))
     built = manifest()
     path = recorder.record(built)
@@ -893,17 +660,8 @@ def test_T_U_driver_15(tmp_path: Path):
         recorder.record(bad)
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-18: the end-of-run reconciliation
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_18(tmp_path: Path):
-    """T-U-driver-18 (FR-12.10): a loop repair row with no CHIA counterpart is marked.
-
-    Fixture: a throwaway `loop.db` and a throwaway `issues.db` of CHIA's own
-    shape. Tier 0.
-    """
+    """T-U-driver-18 (FR-12.10): a loop repair row with no CHIA counterpart is marked."""
     import sqlite3
 
     from circt_bug_loop.tests.test_store import seed_rows
@@ -940,26 +698,8 @@ def test_T_U_driver_18(tmp_path: Path):
     assert loop.query_one("SELECT chia_row_seen FROM repair")["chia_row_seen"] == 1
 
 
-# ---------------------------------------------------------------------------
-# The dry-run iteration: one whole seed through every stage, with no Ray
-#
-# The fixtures below are a MINI-CAMPAIGN and not nine stubs. Each fake stage
-# returns the record its real node returns AND writes what its real node
-# writes: the screen writes the candidate row and its two verdict rows through
-# `triage_task._write_rows`, which is B6b's own writer, and stage 3 classifies a
-# recorded tool stderr through the real `classify_build`. That is what makes
-# `T-U-driver-32` a test of the driver's write path rather than of its own
-# fixtures: everything else in `loop.db` afterwards is the driver's.
-# ---------------------------------------------------------------------------
-
-
 def probe_spec(probe_id: str, arm: str = "seeded", **overrides) -> schema.ProbeSpec:
-    """One `ProbeSpec` a fake generator returns, valid at the seam on either arm.
-
-    The mutation arm's three conditional fields and its unmetered `turn_cost`
-    are 2.8's rule and not this fixture's choice: a spec that carried A3's turn
-    on the mutation arm would be refused by `validate` before the driver saw it.
-    """
+    """One `ProbeSpec` a fake generator returns, valid at the seam on either arm."""
     fields = dict(
         probe_id=probe_id, run_manifest_id=_RUN, seed_sha="a" * 40, arm=arm,
         iteration=1, input_filename="input.mlir", input_path="/artefacts/input.mlir",
@@ -988,14 +728,7 @@ def frame(index: int, function: str, file: str) -> Frame:
 
 
 def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages:
-    """Ten stand-in stages: the sequencing is real and the tools are not.
-
-    Every one returns the record shape its real node returns and writes what its
-    real node writes, so the driver's own handling of each return, and its own
-    write path around them, is what is under test. None of them needs a CIRCT
-    binary, a clone, a container or a model, which is what makes the whole
-    iteration tier 0.
-    """
+    """Ten stand-in stages: the sequencing is real and the tools are not."""
     seen = []
 
     def generate(seed, feedback, remaining, cfg):
@@ -1011,10 +744,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
                     stage="stage_2", started=1, completed=1, failed=0, seconds=0.1)}
 
     def execute(spec, image, limits, artefact_dir, **kwargs):
-        # The recorded stderr of a real firing and a real clean exit, classified
-        # by the real `classify_build`: FR-18.11's regeneration re-reads the file
-        # this copies and re-runs that function over it, so a fixture that made
-        # up either would make up the regeneration too.
+        # The recorded stderr of a real firing and a real clean exit, classified by the real `classify_build`.
         from circt_bug_loop.probe_task import classify_build
 
         firing = fires and spec.probe_id.endswith("1")
@@ -1089,8 +819,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
             recheck_matches=True)}
 
     def screen(candidate, seed, verdict, clone_path, db_path, top_n, **kwargs):
-        # B6b's own three rows, through B6b's own writer: §6.4 rule 4 makes them
-        # one transaction and the driver must not write them a second time.
+        # B6b's own three rows, through B6b's own writer.
         from circt_bug_loop.store import LoopStore
         from circt_bug_loop.triage_task import _screened, _write_rows
 
@@ -1193,15 +922,7 @@ def seed_record(seed_sha: str = "a" * 40) -> schema.SeedRecord:
 
 def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
                   **overrides) -> dict:
-    """Drive one whole campaign into a throwaway `loop.db`, with no Ray.
-
-    The store is the DRIVER's: `write_run_rows` writes the four tables §6.4 puts
-    down before the first probe and `campaign_drive` writes the rest as the
-    stages return them. Nothing here inserts a row of its own.
-
-    Returns:
-        {"store", "manifest", "outcome", "counters", "seed", "labelled_pairs"}.
-    """
+    """Drive one whole campaign into a throwaway `loop.db`, with no Ray."""
     loop = open_store(tmp_path)
     built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
     spec = image_spec("ok")
@@ -1229,22 +950,12 @@ def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
     bug_loop.finish_run(loop, built, "2026-09-19T09:00:00+00:00")
     return {"store": loop, "manifest": built, "outcome": outcome, "seed": seed,
             "counters": counters,
-            # FR-10.2's labelled set is the project's own external measurement
-            # (W-12): recorded failures labelled by hand before any fingerprint
-            # was computed, belonging to no campaign, so the driver passes the
-            # committed set and this store is asked about none of it.
+            # FR-10.2's labelled set is the project's own external measurement (W-12).
             "labelled_pairs": results_module.load_labelled_pairs()}
 
 
 def test_T_U_driver_30(tmp_path: Path, capsys):
-    """T-U-driver-30 (FR-14.5, FR-17.4, FR-18.10): one whole iteration, both arms, no Ray.
-
-    The seeded arm runs first and the mutation arm after it, each for the same
-    window; the two probes of the iteration go through stages 3 to the gate and
-    stop where their own verdict puts them; every dispatched stage contributes a
-    `CounterBlock`; and the arm's one `arm_window` ledger entry is written with
-    its stop reason. Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-30 (FR-14.5): one whole iteration, both arms, no Ray."""
     run = mini_campaign(tmp_path)
     loop, outcome, counters = run["store"], run["outcome"], run["counters"]
 
@@ -1254,8 +965,7 @@ def test_T_U_driver_30(tmp_path: Path, capsys):
     assert all(a["stop_reason"] == "seed_set_exhausted"
                for a in outcome["arms"].values())
 
-    # One seed record per arm; two probes each; the firing one reached the gate
-    # and the clean one went on to the differential, its argv being HW-terminal.
+    # One seed record per arm.
     assert len(outcome["seeds"]) == 2
     seeded = outcome["seeds"][0]
     assert seeded["arm"] == "seeded" and seeded["iterations"] == 1
@@ -1289,10 +999,7 @@ def test_T_U_driver_30(tmp_path: Path, capsys):
 
 
 def test_T_U_driver_31(tmp_path: Path):
-    """T-U-driver-31 (FR-18.10): the window stops an arm, and the USD cap stops both.
-
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-31 (FR-18.10): the window stops an arm, and the USD cap stops both."""
     loop = open_store(tmp_path)
     built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
     loop.insert("run", {
@@ -1312,21 +1019,8 @@ def test_T_U_driver_31(tmp_path: Path):
     assert outcome["arms"]["seeded"]["seeds"] == 0
 
 
-# ---------------------------------------------------------------------------
-# T-U-driver-32 to -34: the write path of 6.4
-# ---------------------------------------------------------------------------
-
-
 def test_T_U_driver_32(tmp_path: Path):
-    """T-U-driver-32 (FR-17.2, FR-17.6, FR-18.1): the driver's own store renders.
-
-    The store this reads is the one `T-U-driver-30` drove and nothing else: no
-    row of it was written by a test helper. `render_results` refuses an artefact
-    that is missing any element `03-LLD.md` §14.4 makes mandatory, so a single
-    table the driver forgot to write is a refusal here, which is what makes this
-    the end-to-end check on §6.4's write path rather than fourteen assertions
-    about tables. Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-32 (FR-17.2): the driver's own store renders."""
     from circt_bug_loop.results import render_results
 
     run = mini_campaign(tmp_path)
@@ -1339,22 +1033,12 @@ def test_T_U_driver_32(tmp_path: Path):
                     "Divergences observed",
                     "regenerated from its recorded artefacts"):
         assert element in rendered
-    # FR-18.11: nothing is MARKED. The recorded stderr reclassifies to the row
-    # the driver wrote and the gate's answers decide to the decision it wrote.
+    # FR-18.11: nothing is MARKED.
     assert "**MARKED**" not in rendered
 
 
 def test_T_U_driver_33(tmp_path: Path):
-    """T-U-driver-33 (FR-17.2, FR-17.8, FR-12.10): every table of §6.4, in its order.
-
-    One row per probe in `probe`, `build_result` and `probe_result`; one
-    `oracle_verdict` per firing and one `differential_verdict` per admitted
-    clean exit; the candidate rows B6b wrote and the differential ones the head
-    wrote; a `report` and a `gate_decision` where the probe reached them; the
-    per-stage ledger occupancy of every dispatched stage; and no PARTIAL marker
-    left behind, every probe directory having its completion row.
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-33 (FR-17.2): every table of §6.4, in its order."""
     run = mini_campaign(tmp_path)
     loop = run["store"]
 
@@ -1380,9 +1064,7 @@ def test_T_U_driver_33(tmp_path: Path):
             f"SELECT COUNT(*) AS n FROM {table} "
             "WHERE run_manifest_id <> ?", (_RUN,))["n"] == 0
 
-    # The differential candidates are report-only: FR-08.10 keeps them out of
-    # the reducer, the dedup and the gate, and their report is the other
-    # template.
+    # The differential candidates are report-only.
     differential = loop.query(
         "SELECT c.candidate_id, r.template FROM candidate c "
         "JOIN report r USING (candidate_id) WHERE c.oracle_class = 'differential'")
@@ -1392,20 +1074,17 @@ def test_T_U_driver_33(tmp_path: Path):
         "SELECT COUNT(*) AS n FROM gate_decision g JOIN candidate c "
         "USING (candidate_id) WHERE c.oracle_class = 'differential'")["n"] == 0
 
-    # §6.4 rule 4: the gate's decision and the candidate's bucket agree, having
-    # been written in one transaction.
+    # §6.4 rule 4: the gate's decision and the candidate's bucket agree.
     for row in loop.query("SELECT g.taxonomy_bucket AS gated, c.taxonomy_bucket "
                           "AS carried FROM gate_decision g "
                           "JOIN candidate c USING (candidate_id)"):
         assert row["gated"] == row["carried"] == "new_bug"
 
-    # FR-17.8: the marker is gone from every probe directory that completed, and
-    # 3.11's stage occupancy is one ledger entry per dispatched stage per probe.
+    # FR-17.8: the marker is gone from every probe directory that completed.
     for row in loop.query("SELECT artefact_dir FROM probe_result"):
         assert Path(row["artefact_dir"]).is_dir()
         assert not (Path(row["artefact_dir"]) / "PARTIAL").exists()
-    # A5's bundle is on disk at the path its row carries, and the driver's own
-    # write leaves no marker in a directory nothing could clear one from.
+    # A5's bundle is on disk at the path its row carries.
     for row in loop.query("SELECT path FROM feedback"):
         assert Path(row["path"]).is_file()
         assert not (Path(row["path"]).parent / "PARTIAL").exists()
@@ -1413,8 +1092,7 @@ def test_T_U_driver_33(tmp_path: Path):
                          "WHERE scope = 'stage' AND stage = 'stage_3'")
     assert len(stage_3) == 4 and {row["arm"] for row in stage_3} == {"seeded",
                                                                      "mutation"}
-    # A3 is one node and two stages, so its turns are charged apart, and the
-    # offline synthesis carries the date FR-05.8's declaration reads.
+    # A3 is one node and two stages.
     assert loop.query_one("SELECT COUNT(*) AS n FROM ledger_entry "
                           "WHERE scope = 'stage' AND stage = 'stage_1'")["n"] == 2
     assert loop.query_one("SELECT stage FROM ledger_entry WHERE arm = 'shared' "
@@ -1422,16 +1100,7 @@ def test_T_U_driver_33(tmp_path: Path):
 
 
 def test_T_U_driver_34(tmp_path: Path, monkeypatch):
-    """T-U-driver-34 (FR-17.3, §6.1): under Ray every write goes through the node.
-
-    `LoopStore` dispatches its members as Ray tasks when a session is running
-    and opens one direct connection when it is not (§6.1), and the driver takes
-    whichever it is given: every other test here takes the direct path, and this
-    one takes the SQLiteNode path against a stub, as `T-U-store-02` does. The
-    stub runs the same statements against the same file, so what is asserted is
-    that the driver reached the database through the node and nowhere else.
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-34 (FR-17.3): under Ray every write goes through the node."""
     import sys
     import types
 
@@ -1472,9 +1141,7 @@ def test_T_U_driver_34(tmp_path: Path, monkeypatch):
     monkeypatch.setitem(sys.modules, "chia.base.ChiaFunction",
                         types.SimpleNamespace(get=lambda value: value))
     monkeypatch.setattr(store_module, "_ray_initialised", lambda: True)
-    # The column cache is per process and the schema is fixed, so a later store
-    # reuses an earlier one's read; emptied here, the pragma read takes the same
-    # path as the writes and is asserted with them.
+    # The column cache is per process and the schema is fixed, so a later store reuses an earlier one's read.
     monkeypatch.setattr(bug_loop, "_TABLE_COLUMNS", {})
 
     loop = store_module.LoopStore(str(tmp_path / "loop.db"))
@@ -1492,14 +1159,7 @@ def test_T_U_driver_34(tmp_path: Path, monkeypatch):
 
 
 def test_T_U_driver_35(tmp_path: Path):
-    """T-U-driver-35 (FR-12.10, §6.4 rule 1): the loop's repair row before CHIA's.
-
-    The head mints the identifier, stamps it on the candidate and opens the
-    `repair` row at `dispatched` BEFORE B8 runs, and completes that same row
-    from the `RepairResult`; `chia_row_seen` stays 0 until the reconciliation
-    sets it, which is what `T-U-driver-18` then reads.
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-35 (FR-12.10): the loop's repair row before CHIA's."""
     run = mini_campaign(tmp_path, repair_enabled=True,
                         stages=fake_stages(repairs=True))
     loop = run["store"]
@@ -1514,8 +1174,7 @@ def test_T_U_driver_35(tmp_path: Path):
     assert [p["verdicts"]["stage_7"] for p in run["outcome"]["seeds"][0]["probes"]
             if "stage_7" in p["verdicts"]] == ["fixed"]
 
-    # A repair that never came back leaves the row it opened, which is the whole
-    # point of writing it first (FR-12.10).
+    # A repair that never came back leaves the row it opened.
     refused_root = tmp_path / "refused"
     refused_root.mkdir()
     other = mini_campaign(refused_root, repair_enabled=True)
@@ -1524,26 +1183,7 @@ def test_T_U_driver_35(tmp_path: Path):
 
 
 def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path):
-    """T-U-driver-36 (W1, W10): the pre-authorisation reaches the turn, and binds.
-
-    New id, W-20b. Three things, in one campaign.
-
-    W10: the `LedgerSnapshot` a generator reads was built ONCE per seed and
-    handed to every iteration, so a seed's third iteration read a `remaining`
-    that predated its first two; it is rebuilt per iteration now, from the same
-    `ledger.aggregate` the spend guard is built from.
-
-    W1: the cfg carries `llm.SpendGuard`, so every turn is authorised against
-    `campaign_spend_cap_usd` BEFORE it is sent, rather than the cap being tested
-    once per seed against spend already recorded.
-
-    And the refusal stops the ARM: a turn the guard refuses is recorded by A3
-    as `turn_failed:SpendCapRefused`, which is not a failed seed but the cap
-    binding, so `drive_seed` ends with `campaign_spend_cap` and `campaign_drive`
-    never starts the other arm.
-
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-36 (W1): the pre-authorisation reaches the turn, and binds."""
     from circt_bug_loop.llm import SpendCapRefused, SpendGuard
 
     seen = []
@@ -1590,13 +1230,7 @@ def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path
 
 
 def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
-    """T-U-driver-37 (W10): each iteration reads its own `LedgerSnapshot`.
-
-    New id, W-20b. Three iterations of one seed, each recording the object it
-    was handed: three distinct snapshots, each carrying the arm's elapsed window
-    as of that iteration rather than as of the seed's first. Fixture: a
-    throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-37 (W10): each iteration reads its own `LedgerSnapshot`."""
     handed = []
 
     def generate(seed, feedback, remaining, cfg):
@@ -1610,9 +1244,7 @@ def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
     mini_campaign(tmp_path, stages=stages,
                   budget={"per_seed_iteration_cap": 3})
 
-    # A seed with no probes ends at `no_probe_written` after one iteration, so
-    # the per-arm count here is one; what the test pins is that the object is
-    # built inside the loop and not before it.
+    # A seed with no probes ends at `no_probe_written` after one iteration, so the per-arm count here is one.
     source = inspect.getsource(bug_loop.drive_seed)
     body = source.split("for iteration in range")[1]
     assert "budget_module.snapshot(" in body, (
@@ -1623,19 +1255,7 @@ def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
 
 
 def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
-    """T-U-driver-38 (W2, FR-06.1, FR-03.15): the observations are the workers' own.
-
-    New id, W-20b. Both call sites built `observed` FROM the `ImageSpec` they
-    were comparing against, so each compared a value to itself and neither
-    could ever fail: FR-06.1's "every tool binary's SHA-256 on every worker"
-    and FR-03.15's Verilator check had no pre-flight at all, and the only real
-    hash check left was `probe_execute`'s per-probe one, which turns a wrong
-    image into `BinaryMismatch` on every probe rather than one refusal at
-    start-up. `tool_probe` is the node that asks; this runs it against a
-    throwaway bin directory and feeds both checks what it returns.
-
-    Fixture: a throwaway bin directory. Tier 0.
-    """
+    """T-U-driver-38 (FR-06.1): the observations are the workers' own."""
     spec = image_spec("ok")
     directory = tmp_path / "bin"
     directory.mkdir()
@@ -1661,8 +1281,7 @@ def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
     assert bug_loop.check_07_tool_hashes(
         image_spec=spec, observed={"bugloop_circt": dict(spec.tool_hashes)}) is None
 
-    # A tool the worker cannot read leaves no entry, so check 7 sees None and
-    # refuses rather than passing over a missing binary.
+    # A tool the worker cannot read leaves no entry.
     (directory / next(iter(spec.tool_hashes))).unlink()
     gapped = bug_loop.tool_probe(str(directory), tuple(spec.tool_hashes))
     assert len(gapped["unreadable"]) == 1
@@ -1676,8 +1295,7 @@ def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
             image_spec=spec, observed={"bugloop_circt": "Verilator 4.999"})
     assert raised.value.check == "verilator_version"
 
-    # And the cluster YAML says WHICH types are asked: the ones running the
-    # image, read off `docker.image` rather than guessed from a resource name.
+    # And the cluster YAML says WHICH types are asked.
     cluster = bug_loop.cluster_summary(str(Path(bug_loop.FLOW_DIR)
                                            / "cluster_single.yaml"))
     assert cluster["image_worker_types"] == ["bugloop_circt", "bugloop_repair"]
@@ -1685,22 +1303,14 @@ def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
 
 
 def test_T_U_driver_39_recorded_mode_needs_no_credential(monkeypatch, capsys):
-    """T-U-driver-39 (W4): `--generator recorded` skips check 12 entirely.
-
-    New id, W-20b. The mode exists so that the whole of `campaign_drive` can be
-    exercised ON THE CLUSTER with no model turn and no credential; check 12
-    refused the run unless the head AND both llm workers carried
-    BUGLOOP_ALLOW_LIVE_MODEL=1 and a usable key, which is the opposite of what
-    the mode is for. Fixture: none. Tier 0.
-    """
+    """T-U-driver-39 (W4): `--generator recorded` skips check 12 entirely."""
     import inspect as _inspect
 
     source = _inspect.getsource(bug_loop.run_campaign)
     guarded = source.split('if args.generator == "recorded":')[1]
     assert "check_12_live_model" not in guarded.split("else:")[0]
     assert "check_12_live_model" in guarded.split("else:")[1]
-    # And `repair_enabled` is already false in the mode, so no `repair` worker
-    # is asked for a key either (§3.8: stage 7 IS a turn, whatever the backend).
+    # And `repair_enabled` is already false in the mode.
     args = bug_loop.build_parser().parse_args(
         ["--mode", "discovery", "--generator", "recorded"])
     assert bug_loop.repair_enabled(args) is False
@@ -1708,17 +1318,7 @@ def test_T_U_driver_39_recorded_mode_needs_no_credential(monkeypatch, capsys):
 
 
 def test_T_U_driver_40_the_probe_record_carries_the_reason_it_stopped(tmp_path: Path):
-    """T-U-driver-40 (W3, FR-16): `stopping_reason` is the PROBE's, not stage 3's.
-
-    New id, W-20b. The driver assigned `result.stopping_stage` five times and
-    `result.stopping_reason` never, so the column carried stage 3's build
-    classification for the life of the probe: a candidate that reached the gate
-    carried `assertion_fired`, and `feedback._reason` renders
-    `f"{build_status}:{stopping_reason}"` into every `FeedbackEntry`, so the
-    model driving the seeded arm's next iteration was told the wrong thing
-    about what happened to its last probe - the signal FR-16 exists to carry.
-    Fixture: a throwaway `loop.db`. Tier 0.
-    """
+    """T-U-driver-40 (FR-16): `stopping_reason` is the PROBE's, not stage 3's."""
     run = mini_campaign(tmp_path)
     rows = run["store"].query(
         "SELECT probe_result.stopping_stage, probe_result.stopping_reason, "
@@ -1726,9 +1326,7 @@ def test_T_U_driver_40_the_probe_record_carries_the_reason_it_stopped(tmp_path: 
         (_RUN,))
     assert rows, "the campaign wrote no probe_result row"
     reached = {(row["stopping_stage"], row["stopping_reason"]) for row in rows}
-    # The fake stages take some probes to the gate and some down the
-    # differential path; no recorded reason is stage 3's classification, which
-    # is the whole of W3.
+    # The fake stages take some probes to the gate and some down the differential path.
     assert ("gate", "new_bug") in reached, reached
     assert any(stage != "stage_3" for stage, _ in reached), reached
     for row in rows:
@@ -1747,16 +1345,7 @@ def test_T_U_driver_40_the_probe_record_carries_the_reason_it_stopped(tmp_path: 
 
 def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written(
         tmp_path: Path):
-    """T-U-driver-41 (W-19b #4): the set has a non-test home and the driver reads it.
-
-    New id, W-20b. `run_campaign` called `render_results(store, manifest)` with
-    no way to pass FR-10.2's labelled set at all, `_dedup_rates`'s gap fired on
-    every run, `ResultsIncomplete` is a bare `Exception` and `main` caught four
-    other classes - so a campaign ran both four-hour arm windows and then died
-    with a traceback instead of writing its results artefact. The set is now
-    package data, which is also the only place `runtime_env` would ship it
-    from. Fixture: `circt_bug_loop/data/labelled_pairs.json`. Tier 0.
-    """
+    """T-U-driver-41 (W-19b #4): the set has a non-test home and the driver reads it."""
     # results_module is imported at module scope
 
     assert results_module.LABELLED_PAIRS.is_file()
@@ -1765,25 +1354,19 @@ def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written
     pairs = results_module.load_labelled_pairs()
     assert len(pairs) >= 20
     assert {p["label"] for p in pairs} == {"duplicate", "distinct"}
-    # W-12: a side is the RECORDED FAILURE and not a candidate id. The set is an
-    # external measurement of the project, so the renderer fingerprints it from
-    # the file and asks this run's store about none of it.
+    # W-12: a side is the RECORDED FAILURE and not a candidate id.
     assert all(isinstance(p["a"], dict) and isinstance(p["b"], dict) for p in pairs)
     assert all({"candidate_id", "oracle_class", "frame_names"} <= set(p[side])
                for p in pairs for side in ("a", "b"))
 
-    # The driver catches the refusal, writes it down and exits non-zero, with
-    # the ledger and the store already complete.
+    # The driver catches the refusal.
     source = inspect.getsource(bug_loop.run_campaign)
     assert "load_labelled_pairs()" in source
     assert "except results_module.ResultsIncomplete" in source
     assert "results_refused.txt" in source
     assert "return 3" in source
 
-    # And the labelled set no longer causes a refusal on a store that holds no
-    # fingerprint for either side, which is every campaign's. That refusal fired
-    # at the end of EVERY run and is the one `T-S-regen-01` recorded; the rates
-    # now render from the file. The refusal kept is a set that is not there.
+    # And the labelled set no longer causes a refusal on a store that holds no fingerprint for either side.
     run = mini_campaign(tmp_path)
     for missing in (
             _render_refusals(results_module, run, pairs),
@@ -1807,13 +1390,7 @@ def _render_refusals(results_module, run, pairs) -> list:
 
 
 def test_T_U_driver_42_the_trailer_names_no_model_that_did_not_run():
-    """T-U-driver-42 (W-19b #7, FR-11.6): `Assisted-by:` follows `stages_metered`.
-
-    New id, W-20b. `render_report` read the trailer off
-    `manifest.model_ids['triage_report']` in three places, so a
-    `--generator recorded` report whose FIRST line says no model turn was made
-    still ended `Assisted-by: vertex:gemini-3.8-flash`. Fixture: none. Tier 0.
-    """
+    """T-U-driver-42 (W-19b #7, FR-11.6): `Assisted-by:` follows `stages_metered`."""
     from circt_bug_loop.triage_task import assisted_by, assisted_by_model
 
     live = manifest(args=parsed_args())
@@ -1833,18 +1410,7 @@ def test_T_U_driver_42_the_trailer_names_no_model_that_did_not_run():
 
 
 def test_T_U_driver_43_only_seeds_on_the_images_pin_are_calibratable():
-    """T-U-driver-43 (W-19b #6, FR-02.7): the eligibility rule, and the refusal.
-
-    New id, W-20b. FR-02.7 wants each sampled seed probed at ITS OWN parent
-    commit; a run has one image and `probe_execute` runs and hashes that image's
-    binaries, so W-19b measured three calibration seeds whose manifest named
-    three different commits producing three `build_result` rows that all
-    recorded the image's. The rule is the pin: a seed is eligible exactly when
-    its parent's `llvm` gitlink is the run's, because only then can the image's
-    own SDK build that parent (FR-03.2's own equality).
-
-    Fixture: none; three constructed seeds. Tier 0.
-    """
+    """T-U-driver-43 (W-19b #6, FR-02.7): the eligibility rule, and the refusal."""
     pin, other = "1" * 40, "2" * 40
     mine = seed_record("a" * 40)
     mine.llvm_pin, mine.sdk_exact = pin, True
@@ -1861,15 +1427,13 @@ def test_T_U_driver_43_only_seeds_on_the_images_pin_are_calibratable():
     assert bug_loop.calibratable([mine, inexact, elsewhere], "9" * 40) == (
         [], ["a" * 40, "b" * 40, "c" * 40])
 
-    # And the draw is FROM the eligible set, refusing rather than sampling seeds
-    # no deployment can probe at their own commit.
+    # And the draw is FROM the eligible set.
     with pytest.raises(ValueError) as raised:
         bug_loop.draw_calibration(corpus_head_sha="d7e9", sample_size=20,
                                   exact_pin_shas=eligible)
     assert "eligible" in str(raised.value)
 
-    # The driver refuses a calibration run whose registered sample is all
-    # ineligible, by name and with both counts.
+    # The driver refuses a calibration run whose registered sample is all ineligible.
     source = inspect.getsource(bug_loop.run_campaign)
     assert 'PreflightFailed(\n            "calibration_sample"' in source
     assert "NOT_CALIBRATABLE" in source
@@ -1877,16 +1441,7 @@ def test_T_U_driver_43_only_seeds_on_the_images_pin_are_calibratable():
 
 @pytest.mark.t0
 def test_T_U_driver_44_the_pilots_seed_subset_is_named_ordered_and_refusable():
-    """T-U-driver-44 (W-18): `--seed-sha` narrows the DRIVEN list and nothing else.
-
-    New id, W-18. A pilot runs a short window over seeds it was designed around,
-    and taking the corpus's own first twelve would measure whichever seeds
-    `build_corpus` happens to order first. The subset is the named SHAs in the
-    named order, a repeat is one seed, and a SHA the corpus does not hold
-    REFUSES the run - a pilot that silently drove eleven of twelve would report
-    eleven as though twelve had been asked for. Fixture: three `SeedRecord`s
-    built here. Tier 0.
-    """
+    """T-U-driver-44 (W-18): `--seed-sha` narrows the DRIVEN list and nothing else."""
     first, second, third = (seed_record("a" * 40), seed_record("b" * 40),
                             seed_record("c" * 40))
     mined = [first, second, third]
@@ -1911,18 +1466,7 @@ def test_T_U_driver_44_the_pilots_seed_subset_is_named_ordered_and_refusable():
 
 @pytest.mark.t0
 def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_path):
-    """T-U-driver-45 (FR-01.1, FR-01.11): `since` is the head's date, two years back.
-
-    New id, W-18. The driver passed `budget.campaign_start_utc[:10]`, a date in
-    the FUTURE of every commit the corpus head reaches - 2026-09-20 against a
-    head dated 2026-09-11 - and `build_corpus` drops every commit older than it,
-    so the mined corpus was EMPTY on every campaign and both arms would have run
-    their windows over no seed at all. `test_corpus.py` passes its own
-    `SINCE = "2024-09-11"` and the tier-3 tests mine nothing, so nothing met it.
-    The window is now derived from the one date `corpus_head_sha` fixes, which
-    keeps it reproducible from the registered file plus the clone. Fixture: a
-    throwaway repository with one dated commit. Tier 0.
-    """
+    """T-U-driver-45 (FR-01.1): `since` is the head's date, two years back."""
     repo = tmp_path / "clone"
     repo.mkdir()
     git = ("git", "-C", str(repo))
@@ -1941,12 +1485,6 @@ def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_pat
     assert bug_loop.CORPUS_WINDOW_MONTHS == 24
 
     # And it is NOT the campaign start, which is what the driver used to pass.
-    # Read off the committed BYTES rather than through `load_budget`, which
-    # would also run check 1's registration ancestry: between W-22 landing the
-    # final `budget.yaml` and the architect cutting `registration/campaign-1`
-    # on that commit, the newest tag is `registration/pilot-2` and the campaign
-    # file is a DESCENDANT of it, which check 1 refuses and is meant to. This
-    # test is about the corpus window and not about the registration.
     document = yaml.safe_load(
         Path(budget_module.BUDGET_YAML).read_text(encoding="utf-8"))
     assert document["campaign_start_utc"][:10] > "2024-09-11"
@@ -1956,29 +1494,13 @@ def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_pat
 
 
 def test_T_U_driver_46_a_stale_ray_cluster_file_is_removed(tmp_path, monkeypatch):
-    """T-U-driver-46 (errata row 37): pre-flight clears what a `chia down` left.
-
-    `/tmp/ray/ray_current_cluster` is what `ray start` writes and what a
-    teardown leaves behind, and every reader of the Ray runtime context then
-    retries THAT address five seconds at a time - for ever in
-    `get_runtime_context`, and for sixty seconds and then a process-terminating
-    `QuickExit` in the client. It hung W-12c's first live turn for twelve
-    minutes and is W-19b §3.4 in a second place. The run rule is that the file
-    names a live cluster or does not exist; this is the half that enforces it,
-    and `NODE_ID_TIMEOUT_SECONDS` in `upstream/vertex-usage.patch` is the other.
-
-    Three cases: a file naming nothing that listens is removed and its address
-    returned, a file naming a socket that DOES answer is left alone, and an
-    absent file is not an error. Fixture: a real listening socket on a port the
-    kernel chose. Tier 0.
-    """
+    """T-U-driver-46 (errata row 37): pre-flight clears what a `chia down` left."""
     monkeypatch.setattr(bug_loop.ray, "is_initialized", lambda: False)
     stale = tmp_path / "ray_current_cluster"
 
     assert bug_loop.clear_stale_ray_cluster(str(stale)) is None, "no file, no error"
 
-    # A port nothing listens on. Bound, read back, then closed, so the number
-    # is real and free rather than guessed.
+    # A port nothing listens on.
     probe = socket.socket()
     probe.bind(("127.0.0.1", 0))
     dead_port = probe.getsockname()[1]

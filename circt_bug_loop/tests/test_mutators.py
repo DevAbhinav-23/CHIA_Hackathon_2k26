@@ -1,16 +1,4 @@
-"""`mutators/` (A4's frozen set): `04-Test-Plan.md` §1.7, `T-U-mut-01` to `-13`.
-
-Every test runs against the committed **development** set,
-`circt_bug_loop/mutators/set_dev.json`, and says so: A7 has not been run, there
-is no synthesised `set_v1.json` yet, and a set nobody synthesised may not be
-passed off as one. What is under test is the format, the loader's digest rule,
-the determinism and the round-robin, and none of those depends on which set is
-loaded, which is exactly why the format is fixed in `03-LLD.md` §8.1 and not in
-the file.
-
-No model, no network, no CIRCT tree and no git: the whole arm runs from
-`SeedRecord.test_files` and one JSON document (FR-05.1, FR-05.3).
-"""
+"""`mutators/` (A4's frozen set): `04-Test-Plan.md` §1.7, `T-U-mut-01` to `-13`."""
 import ast
 import inspect
 import json
@@ -52,12 +40,7 @@ def fixture_set(name: str) -> dict:
 @pytest.mark.t0
 def test_T_U_mut_01_the_digest_is_checked_before_a_mutant_is_produced(
         development_set, tmp_path):
-    """T-U-mut-01 (FR-05.2): a set that is not the one the run names stops the arm.
-
-    8.1's rule 1, and the point of it: the mutation arm is the baseline the
-    head-to-head is measured against, so a set edited after the registration
-    must stop the run rather than quietly change what the baseline is.
-    """
+    """T-U-mut-01 (FR-05.2): a set that is not the one the run names stops the arm."""
     real = mutators.set_sha256(mutators.DEVELOPMENT_SET)
     assert mutators.load_set(mutators.DEVELOPMENT_SET)["sha256"] == real
 
@@ -75,8 +58,7 @@ def test_T_U_mut_01_the_digest_is_checked_before_a_mutant_is_produced(
                   _snapshot(), config)
     assert not (tmp_path / "iter_0").exists()
 
-    # A development set cannot run a registered campaign at all, even when its
-    # digest is exactly the one the run names.
+    # A development set cannot run a registered campaign at all.
     with pytest.raises(mutators.MutatorSetError) as refused:
         mutators.load_set(mutators.DEVELOPMENT_SET, expected_sha=real)
     assert "not frozen" in str(refused.value)
@@ -94,9 +76,7 @@ def test_T_U_mut_02_every_mutator_is_deterministic_in_its_seed(development_set):
         second = mutators.apply(mutator["id"], text, seed_int,
                                 mutator_set=development_set, argv=argv)
         assert first == second, mutator["id"]
-        # The generator the seed integer feeds is a fresh `random.Random`, so
-        # nothing carries between calls and `random.seed()` is never called on
-        # the module-level generator (FR-05.3).
+        # The generator the seed integer feeds is a fresh `random.Random`.
         assert not [node for node in ast.walk(ast.parse(
             inspect.getsource(mutators)))
             if isinstance(node, ast.Call) and ast.unparse(node.func) == "random.seed"]
@@ -137,9 +117,7 @@ def test_T_U_mut_04_a_raising_mutator_is_attributed_and_survived():
     produced, no_ops, failures = mutators.mutate_seed(record, 0, 3,
                                                       fixture_set("raising"))
 
-    # Both raising mutators sort before the working one and are tried against
-    # every one of the nine test files; a failure costs no input-cap budget, so
-    # the working mutator still fills the cap behind them.
+    # Both raising mutators sort before the working one and are tried against every one of the nine test files.
     files = len(record.test_paths)
     assert failures == {"mlir.abort.pattern_uncompilable": files,
                         "mlir.abort.wrong_kind": files}
@@ -188,11 +166,7 @@ def test_T_U_mut_06_only_an_argv_mutator_may_change_the_argv(development_set,
 
 @pytest.mark.t0
 def test_T_U_mut_07_one_mutator_application_per_mutant(tmp_path):
-    """T-U-mut-07 (FR-05.3): a mutant is never the composition of two.
-
-    Proved rather than asserted: applying the recorded mutator to the SOURCE
-    text reproduces the mutant exactly, so no second mutator can have run.
-    """
+    """T-U-mut-07 (FR-05.3): a mutant is never the composition of two."""
     record = seed()
     development = mutators.load_set(mutators.DEVELOPMENT_SET)
     produced, _, _ = mutators.mutate_seed(record, 0, 8, development,
@@ -203,21 +177,13 @@ def test_T_U_mut_07_one_mutator_application_per_mutant(tmp_path):
             mutator_id, record.test_files[path], seed_int,
             mutator_set=development, argv=generate_task.seed_argv_template(record))
         assert (once, once_argv) == (text, argv)
-        # A mutant differs from its source in the text or, for an argument
-        # mutator, in the argv; a mutant that differs in neither is a no-op and
-        # never reaches this list (FR-05.6).
+        # A mutant differs from its source in the text or, for an argument mutator, in the argv.
         assert text != record.test_files[path] or argv is not None
 
 
 @pytest.mark.t0
 def test_T_U_mut_08_every_changed_test_file_supplies_a_starting_input():
-    """T-U-mut-08 (FR-05.1): nine test files, nine sources, each mutant named.
-
-    The text comes from `seed.test_files`, which contract 2.0 added for exactly
-    this: paths are not contents and the arm mutates bytes (K6). The cap is
-    taken round-robin across the files, so a seed with nine does not spend its
-    whole cap on the first.
-    """
+    """T-U-mut-08 (FR-05.1): nine test files, nine sources, each mutant named."""
     record = seed()
     assert len(record.test_paths) == 9
     development = mutators.load_set(mutators.DEVELOPMENT_SET)
@@ -231,7 +197,7 @@ def test_T_U_mut_08_every_changed_test_file_supplies_a_starting_input():
 
 @pytest.mark.t0
 def test_T_U_mut_09_the_set_matches_8_1s_format_field_by_field(development_set):
-    """T-U-mut-09 (FR-05.2, FR-05.8): the document, the provenance and the types."""
+    """T-U-mut-09 (FR-05.2): the document, the provenance and the types."""
     document = json.loads(mutators.DEVELOPMENT_SET.read_text(encoding="utf-8"))
 
     assert document["format_version"] == 1
@@ -242,8 +208,7 @@ def test_T_U_mut_09_the_set_matches_8_1s_format_field_by_field(development_set):
     assert set(document["synthesis_input"]) == {
         "repo", "query", "issues_used", "mirror_refreshed_utc",
         "issue_numbers_sha256"}
-    # The development set declares itself unfrozen; a synthesised one does not
-    # carry the field at all, and 8.1's provenance is filled from the run.
+    # The development set declares itself unfrozen.
     assert document["frozen"] is False
     assert document["synthesis_input"]["issues_used"] == 0
 
@@ -262,15 +227,7 @@ def test_T_U_mut_09_the_set_matches_8_1s_format_field_by_field(development_set):
 
 @pytest.mark.t0
 def test_T_U_mut_10_the_mutation_arm_touches_no_filesystem_and_no_git():
-    """T-U-mut-10 (FR-05.1, FR-05.3): the pure half is pure, and the loader is the only read.
-
-    §1.7's row says the walk finds no `open` and no `pathlib` read anywhere in
-    the module; §8.1's rule 1 requires this module to hash the set's own bytes
-    at load, which is a read. The rule as implemented is therefore: no
-    `subprocess` and no `git` anywhere, and no read at all inside `apply`,
-    `mutate_seed` or anything they call except `load_set`, which reads the one
-    committed set and nothing else (erratum).
-    """
+    """T-U-mut-10 (FR-05.1): the pure half is pure, and the loader is the only read."""
     source = Path(mutators.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
     assert "subprocess" not in source and "git" not in source
@@ -282,10 +239,7 @@ def test_T_U_mut_10_the_mutation_arm_touches_no_filesystem_and_no_git():
             if isinstance(node, ast.Call):
                 assert ast.unparse(node.func).split(".")[-1] not in readers, function
 
-    # THREE reads in the whole module, and this test names which function each
-    # is in rather than only how many there are: two that read the committed
-    # set's bytes, and W-12c's one directory LISTING, which resolves which
-    # `set_v<n>.json` is newest and opens none of them.
+    # THREE reads in the whole module.
     where = {name: sorted(ast.unparse(node.func).split(".")[-1]
                           for node in ast.walk(function)
                           if isinstance(node, ast.Call)
@@ -299,11 +253,6 @@ def test_T_U_mut_10_the_mutation_arm_touches_no_filesystem_and_no_git():
                if isinstance(node, ast.Call)
                and ast.unparse(node.func).split(".")[-1] in readers]
     assert len(loaders) == 3, "load_set, set_sha256, and frozen_sets' listing"
-
-
-# ---------------------------------------------------------------------------
-# helpers
-# ---------------------------------------------------------------------------
 
 
 def _feedback() -> schema.FeedbackBundle:
@@ -331,22 +280,7 @@ def _run_mutation(record: schema.SeedRecord, tmp_path, cap: int) -> dict:
 
 @pytest.mark.t0
 def test_T_U_mut_11_the_seed_int_fits_a_signed_sqlite_integer():
-    """T-U-mut-11 (W-19b #2, §8.2 rule 5): the derivation is masked to 63 bits.
-
-    New id, W-20b. `int.from_bytes(digest[:8], "big")` is an UNSIGNED 64-bit
-    integer and SQLite's INTEGER is SIGNED, so `write_probe` raised
-    `OverflowError` out of `SQLiteNode.execute` - OUTSIDE `drive_probe`'s try,
-    so it propagated through `drive_seed` and `campaign_drive` and stopped the
-    whole campaign. Measured then: 9998 of 20000 derivations exceeded
-    `2**63 - 1`, and the expected time to failure in a pilot's mutation arm was
-    the second probe.
-
-    Pass criterion: over the same 20000 derivations, none exceeds it; each is
-    still deterministic in its five inputs and distinct across them; and a real
-    `sqlite3` accepts the largest one this function can now produce.
-
-    Fixture: none. Tier 0.
-    """
+    """T-U-mut-11 (W-19b #2, §8.2 rule 5): the derivation is masked to 63 bits."""
     import sqlite3
 
     seen = set()
@@ -368,8 +302,7 @@ def test_T_U_mut_11_the_seed_int_fits_a_signed_sqlite_integer():
                     ("a" * 40, "t.mlir", "m.t.i.flip", 1, 1)):
         assert mutators.mutant_seed_int(*changed) != first
 
-    # The bound is SQLite's own, asserted against SQLite and not against a
-    # comment: the mask's value stores and the next integer up does not.
+    # The bound is SQLite's own, asserted against SQLite and not against a comment.
     connection = sqlite3.connect(":memory:")
     connection.execute("CREATE TABLE t (v INTEGER)")
     connection.execute("INSERT INTO t VALUES (?)", (mutators.SEED_INT_MASK,))
@@ -380,12 +313,7 @@ def test_T_U_mut_11_the_seed_int_fits_a_signed_sqlite_integer():
 
 @pytest.mark.t0
 def test_T_U_mut_12_every_committed_mutation_spec_fits():
-    """T-U-mut-12 (W-19b #2): no committed `ProbeSpec` carries an unstorable seed.
-
-    New id, W-20b. Both recorded mutation fixtures were over `2**63 - 1` when
-    the defect was found; they were re-recorded by the masked derivation.
-    Fixture: `contract/fixtures/**/probe_spec/*.json`. Tier 0.
-    """
+    """T-U-mut-12 (W-19b #2): no committed `ProbeSpec` carries an unstorable seed."""
     import json as _json
     from pathlib import Path as _Path
 
@@ -407,17 +335,7 @@ def test_T_U_mut_12_every_committed_mutation_spec_fits():
 @pytest.mark.t0
 def test_T_U_mut_13_the_newest_frozen_set_wins_and_the_dev_set_never_does(tmp_path,
                                                                          monkeypatch):
-    """T-U-mut-13 (FR-05.2, §8.1): `SET_PATH` resolves to the NEWEST frozen set.
-
-    New id, W-12c. A7's freeze is write-once, so a second synthesis writes a
-    second file rather than editing the first, and the campaign must draw from
-    the later one: `set_v1.json` stays committed because it is the record of
-    what the first synthesis produced, not because any run should still use it.
-    The ordering is by the INTEGER in the name, so `set_v10.json` sorts after
-    `set_v9.json`; `set_dev.json` matches no version at all and can therefore
-    never win a comparison, which is the property FR-05.2 needs. Fixture: files
-    written into a temporary directory. Tier 0.
-    """
+    """T-U-mut-13 (FR-05.2): `SET_PATH` resolves to the NEWEST frozen set."""
     monkeypatch.setattr(mutators, "DIRECTORY", tmp_path)
     assert mutators.frozen_sets() == [], "no frozen set before A7 has run"
 

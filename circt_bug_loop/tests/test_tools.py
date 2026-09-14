@@ -1,22 +1,4 @@
-"""The two agent-facing tools of `generate_task.py` (03-LLD.md 3.5, F-04).
-
-`04-Test-Plan.md` §1.6's tool half, `T-U-gen-11` to `T-U-gen-18`. The plan puts
-these rows in `test_generate_task.py`; they are here because W-13's brief asks
-for a module of their own, and the two files together cover §1.6's twenty-five
-rows (erratum).
-
-Two tier decisions, each stated rather than assumed. `SourceReadTool`'s three
-methods are tested at **T0** against a throwaway git repository built here,
-because what is under test is the argument vector and the error string and
-neither needs CIRCT's history; the **measured pair** of §3.5's table,
-`lib/Dialect/HW/HWTypes.cpp` and its missing sibling, is a tier-1 test against
-the real blobless clone and skips cleanly without one.
-
-No `ChiaTool` server starts: `__post_init__` is substituted, because it spins a
-Ray actor (`chia:chia/base/tools/ChiaTool.py:82-105`) and §0.4's rule is that no
-test below T3 starts a local Ray. The substitution is the only thing faked; the
-constructor, the path checks and every git call are the real ones.
-"""
+"""The two agent-facing tools of `generate_task.py` (03-LLD.md 3.5)."""
 import ast
 import os
 import subprocess
@@ -33,25 +15,14 @@ from circt_bug_loop.generate_task import ProbeWriteTool, SourceReadTool
 MEASURED_COMMIT = "b792c772819d"
 MEASURED_FILE = "lib/Dialect/HW/HWTypes.cpp"
 
-#: `ChiaTool.__init__` constructs a `FastMCP`, whose settings model raises this
-#: from `pydantic_settings` on an unresolved forward reference in ITS OWN
-#: `lifespan` field. It is third-party and unrelated to anything here, and
-#: `-W error` turns it into an error, so it is filtered by a mark, which is the
-#: one filter that outranks a command-line `-W` (pytest's own precedence order).
+#: `ChiaTool.__init__` constructs a `FastMCP`.
 pytestmark = pytest.mark.filterwarnings(
     "ignore::pydantic_settings.exceptions.IncompleteFieldDefinitionWarning")
 
 
 @pytest.fixture
 def tool_servers(monkeypatch):
-    """Construct `ChiaTool`s with no Ray actor behind them (04-Test-Plan.md 0.4).
-
-    `ChiaTool.__post_init__` starts a `_ToolServerActor` and `ray.get`s its
-    address, which starts a local Ray instance in a test process. The
-    substitute records the construction and fills the three fields the real one
-    fills, so `stop()` still removes the tool from CHIA's own registry and
-    `T-U-gen-19` can count it.
-    """
+    """Construct `ChiaTool`s with no Ray actor behind them (04-Test-Plan.md 0.4)."""
     built = []
 
     def _post_init(self):
@@ -116,21 +87,10 @@ def _pinned_clone() -> str:
     return ""
 
 
-# ---------------------------------------------------------------------------
-# ProbeWriteTool
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_gen_13_the_tool_is_constructed_with_its_directory_bound(
         tool_servers, tmp_path):
-    """T-U-gen-13 (FR-19.1): the probe directory is bound, not named by the agent.
-
-    The constructor is CHIA's own order, `super().__init__`, `mcp.add_tool` and
-    `super().__post_init__()` (`chia:chia/base/tools/BashTool.py:19-31`), read
-    off the source rather than asserted in prose, and the bound directory is
-    the realpath of what the node passed.
-    """
+    """T-U-gen-13 (FR-19.1): the probe directory is bound, not named by the agent."""
     tool = ProbeWriteTool(name="probe_x", probe_dir=str(tmp_path / "probes"))
     assert tool.probe_dir == os.path.realpath(str(tmp_path / "probes"))
     assert tool_servers == [tool], "the server is started exactly once"
@@ -143,7 +103,6 @@ def test_T_U_gen_13_the_tool_is_constructed_with_its_directory_bound(
              if isinstance(node, ast.Call)]
     assert calls.index("super().__init__") < calls.index("self.mcp.add_tool")
     assert calls.index("self.mcp.add_tool") < calls.index("super().__post_init__")
-
 
 
 @pytest.mark.t0
@@ -164,12 +123,7 @@ def test_T_U_gen_11_write_probe_refuses_every_name_that_is_not_bare(
 @pytest.mark.t0
 def test_T_U_gen_11b_a_symlink_out_of_the_probe_directory_is_refused(
         tool_servers, tmp_path):
-    """T-U-gen-11 (FR-06.8): a bare name whose realpath escapes is refused too.
-
-    The separator check alone would accept this one: the name is bare and the
-    escape is in the filesystem, which is why the tool resolves the destination
-    and compares common paths rather than trusting the string.
-    """
+    """T-U-gen-11 (FR-06.8): a bare name whose realpath escapes is refused too."""
     probe_dir = tmp_path / "probes"
     probe_dir.mkdir()
     outside = tmp_path / "outside"
@@ -193,14 +147,8 @@ def test_T_U_gen_12_a_second_write_of_one_name_is_byte_identical(
     second = tool.write_probe("probe.mlir", text)
     assert first == second
     assert Path(first).read_bytes() == text.encode("utf-8")
-    # The refusal is a RESULT, not an exception: the agent reads it as the
-    # tool's answer and the turn continues.
+    # The refusal is a RESULT, not an exception.
     assert tool.write_probe("a/b", text).startswith("Error:")
-
-
-# ---------------------------------------------------------------------------
-# SourceReadTool
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.t0
@@ -237,13 +185,7 @@ def test_T_U_gen_17_list_dir_lists_one_directory(source_tool):
 @pytest.mark.t0
 def test_T_U_gen_18_read_only_by_construction(source_tool, throwaway_repo,
                                               monkeypatch):
-    """T-U-gen-18 (FR-04.4, FR-17.7, NFR-03): three argument vectors, one commit.
-
-    Every recorded vector is `git -C <clone> ...` against the bound commit: no
-    shell, no write, no ref the caller chose, and no path outside the commit.
-    The cap is the third job of `artefact_inline_cap_bytes` (6.5) and the
-    truncation says so in the text the model reads.
-    """
+    """T-U-gen-18 (FR-04.4): three argument vectors, one commit."""
     path, head = throwaway_repo
     recorded = []
     original = SourceReadTool._git
@@ -277,12 +219,7 @@ def test_T_U_gen_18_read_only_by_construction(source_tool, throwaway_repo,
 
 @pytest.mark.t0
 def test_T_U_gen_18b_neither_tool_can_reach_a_shell():
-    """T-U-gen-18 (NFR-03): no shell, no `BashTool`, in the module that owns them.
-
-    FR-04.4's second clause is "shall not be able to REACH any tool that
-    computes a measured result", and the withdrawal of `BashTool` (W10) is what
-    makes it true by construction rather than by the prose of §7.3's rule 5.
-    """
+    """T-U-gen-18 (NFR-03): no shell, no `BashTool`, in the module that owns them."""
     source = Path(generate_task.__file__).read_text(encoding="utf-8")
     assert "BashTool" not in source
     tree = ast.parse(source)
@@ -297,13 +234,7 @@ def test_T_U_gen_18b_neither_tool_can_reach_a_shell():
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_gen_15b_the_measured_pair_of_the_real_clone(tool_servers):
-    """T-U-gen-15b (FR-04.4): §3.5's measured pair, against the real clone.
-
-    `lib/Dialect/HW/HWTypes.cpp` at `b792c772` returns bytes beginning
-    `//===- HWTypes.cpp`, its missing sibling returns git's own
-    `does not exist in` message, and `parseHWArray` under `lib/Dialect/HW`
-    returns the two hits §3.3 quotes.
-    """
+    """T-U-gen-15b (FR-04.4): §3.5's measured pair, against the real clone."""
     clone = _pinned_clone()
     if not clone:
         pytest.skip(f"no clone holding {MEASURED_COMMIT}; see "

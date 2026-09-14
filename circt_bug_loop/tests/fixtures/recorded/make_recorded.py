@@ -1,41 +1,4 @@
-"""Record the seam: one mini-campaign, in process, through the real nodes.
-
-`04-Test-Plan.md` §0.6 rule 2 and §2's production rule: a fixture is the output
-of a real run under `--record-fixtures`, written after `contract.validate`
-accepted it, and committed. `05-Work-Plan.md` §2.1 and `contract/FROZEN.md`'s
-fixture-replacement rule make W-17 the task that lands them.
-
-**What this script is and is not.** It drives the smallest campaign that
-produces one instance of every one of the seven members, IN PROCESS, with no
-Ray, no container and no model, and writes each through `bug_loop.FixtureRecorder`
-into `contract/fixtures/recorded/`. Every instance below is the return value of
-the node `03-LLD.md` names as its producer, running for real:
-
-| Member | Producer | What is real about it |
-|---|---|---|
-| `BudgetFile` | `budget.load_budget` | the committed `budget.yaml`, landed in a throwaway registration repository and taken through all six pre-registration checks of §9.2 |
-| `SeedRecord` | `corpus.build_corpus` | re-recorded from `fixtures/corpus/seeds/`, which is W-05's own recording against the blobless clone at the corpus head |
-| `ProbeSpec` | `generate_task.generate_mutation` | A4 for real: the committed mutator set applied to that seed's own test file, no model anywhere near it (FR-05.1) |
-| `ProbeResult` | `probe_task.probe_execute` | a real CIRCT binary, executed under the `prlimit` prefix, classified by `classify_build` from its own exit status and stderr |
-| `FeedbackBundle` | `feedback.build_feedback` | A5 over those `ProbeResult`s, one entry per dispatched probe |
-| `LedgerEntry` | `ledger.accrue` | priced by A6b from the committed file's two prices and read back out of `loop.db` |
-| `RunManifest` | `bug_loop.build_manifest` | every field from its named producer: A2's real pin walk over the clone, A6a's budget, B6a's mirror over the recorded response set, the cluster YAML's own digest, the mutator set's own digest |
-
-**The one thing that is not the campaign's.** The `ImageSpec` is this host's
-measured assertions-on build and NOT the published image: recording inside
-`chia-circt-assert:<tag>` is tier 2 and is the pilot's (`05-Work-Plan.md` W-18),
-and a fixture that named the published image's digest while a local binary
-produced its stderr would be a recording of something that did not happen. The
-`image_digest` says `local-build:` and the tool hashes are the binaries actually
-executed. The published image's own recorded identity is
-`analysis/measurements/raw/image-manifest.json` and is what the pilot's run will
-stamp.
-
-**Tier 1.** It needs the blobless `llvm/circt` clone and an assertions-on CIRCT
-build, both of `04-Test-Plan.md` §0.5's tier-1 row. Run it as a program:
-
-    python circt_bug_loop/tests/fixtures/recorded/make_recorded.py
-"""
+"""Record the seam: one mini-campaign, in process, through the real nodes."""
 from __future__ import annotations
 
 import hashlib
@@ -59,16 +22,12 @@ TESTS = HERE.parents[1]
 FLOW = Path(bug_loop.FLOW_DIR)
 REPO = FLOW.parent
 
-#: Where the recorded set lands: one document per file, under the schema's own
-#: directory, exactly as `contract/fixtures/` is laid out (§0.6 rule 2).
+#: Where the recorded set lands.
 OUT = FLOW / "contract" / "fixtures" / "recorded"
 
 #: The tier-1 resources of §0.5, in the order this script prefers them.
 CLONES = ("BUGLOOP_CORPUS_CLONE", "~/.cache/chia-pin-smoke/circt", "~/.cache/circt")
-#: A directory is only a build if its `circt-opt` RUNS: two of this host's four
-#: are linked against a `libz3.so.4` that is not installed, and a probe against
-#: one of those records a dynamic loader's exit status and calls it a parse
-#: error. `resolve` smoke-tests `--version` for exactly that reason.
+#: A directory is only a build if its `circt-opt` RUNS.
 BUILDS = ("BUGLOOP_BIN_DIR", "~/.cache/chia-pin-smoke/w09/b156/bin",
           "~/.cache/chia-pin-smoke/w09/b143/bin",
           "~/.cache/chia-pin-smoke/bassert_g/bin",
@@ -76,8 +35,7 @@ BUILDS = ("BUGLOOP_BIN_DIR", "~/.cache/chia-pin-smoke/w09/b156/bin",
 
 #: The seed the mini-campaign runs, which is W-05's own recording.
 SEED_FIXTURE = TESTS / "fixtures" / "corpus" / "seeds" / "nine_test_files.json"
-#: A3's two recorded-shape transcripts, replayed rather than re-generated: no
-#: model runs anywhere in this recording (§0.6, NFR-01).
+#: A3's two recorded-shape transcripts, replayed rather than re-generated.
 TURNS = TESTS / "fixtures" / "generate" / "turns"
 #: W-09's six real recorded failures, and the SDK build each was recorded under.
 CRASHES = TESTS / "fixtures" / "crashes"
@@ -85,13 +43,10 @@ SDKS = "~/.cache/chia-pin-smoke/w09/sdk-{version}/bin"
 #: B6a's recorded response set, fifty real `llvm/circt` issues (W-10).
 MIRROR_FIXTURE = TESTS / "fixtures" / "mirror" / "sample.json"
 
-#: The run this mini-campaign is, fixed so a re-recording is a diff and not a
-#: new set of file names.
+#: The run this mini-campaign is.
 RUN_ID = "0f3c1a7e5b294d8ea16c02f47db9e358"
 STARTED = "2026-09-14T00:00:00+00:00"
-#: The registration commit's date, fixed so `budget_file_sha` is a function of
-#: the committed bytes and of nothing else; a wall-clock date would give every
-#: re-recording a new `budget_file/<sha>.json`.
+#: The registration commit's date.
 REGISTERED_AT = "2026-09-01T00:00:00+00:00"
 
 #: §9.4's limits, at the committed file's values, read from it below.
@@ -99,8 +54,7 @@ _LIMIT_KEYS = ("probe_wall_seconds", "probe_address_space_bytes",
                "probe_cpu_seconds", "probe_output_byte_cap",
                "reduction_wall_seconds", "reduction_sigkill_grace_seconds")
 
-#: The probe limits the recorded failures run under, which are the committed
-#: file's own; a recorded crash that hit a limit would be a limit's recording.
+#: The probe limits the recorded failures run under, which are the committed file's own.
 RECORDED_LIMITS: dict = {}
 
 _IDENTITY = {"GIT_AUTHOR_NAME": "bugloop", "GIT_AUTHOR_EMAIL": "bugloop@invalid",
@@ -108,13 +62,7 @@ _IDENTITY = {"GIT_AUTHOR_NAME": "bugloop", "GIT_AUTHOR_EMAIL": "bugloop@invalid"
 
 
 def resolve(candidates: tuple, marker: str, *, runs: bool = False) -> str:
-    """The first of *candidates* that exists, an environment name or a path.
-
-    With *runs*, the marker must also EXECUTE: `--version` has to exit 0. A
-    CIRCT build whose shared libraries are missing exits 127 from the dynamic
-    loader, and a probe against it records that and classifies it, which would
-    be a recording of this host's library path and not of CIRCT.
-    """
+    """The first of *candidates* that exists, an environment name or a path."""
     for candidate in candidates:
         value = os.environ.get(candidate) if candidate.isupper() else candidate
         if not value:
@@ -133,17 +81,12 @@ def resolve(candidates: tuple, marker: str, *, runs: bool = False) -> str:
 
 
 def registration_repo(root: Path) -> tuple:
-    """Land the committed `budget.yaml` in a throwaway repository (FR-14.3).
-
-    The commit that lands the file IS the registration, so `load_budget` cannot
-    run its six checks against a working tree that never had one.
-    """
+    """Land the committed `budget.yaml` in a throwaway repository (FR-14.3)."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "circt_bug_loop").mkdir(exist_ok=True)
     target = root / "circt_bug_loop" / "budget.yaml"
     shutil.copyfile(budget_module.BUDGET_YAML, target)
-    # A FIXED date, so the registration commit's SHA is a function of the
-    # committed bytes alone and re-recording is a diff and not a new file.
+    # A FIXED date, so the registration commit's SHA is a function of the committed bytes alone and re-recording is a diff and not a new file.
     when = REGISTERED_AT
     environment = {**os.environ, **_IDENTITY,
                    "GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when}
@@ -156,12 +99,7 @@ def registration_repo(root: Path) -> tuple:
 
 
 def local_image_spec(bin_dir: str, tools: list) -> ImageSpec:
-    """This host's measured build, as an `ImageSpec`, saying that it is one.
-
-    Not the published image: see the module docstring. Every field is read off
-    the build, and `image_digest` names what it is so no reader can mistake the
-    recording for one made inside a container.
-    """
+    """This host's measured build, as an `ImageSpec`, saying that it is one."""
     hashes = {tool: hashlib.sha256((Path(bin_dir) / tool).read_bytes()).hexdigest()
               for tool in tools}
     version = subprocess.run([str(Path(bin_dir) / tools[0]), "--version"],
@@ -182,13 +120,7 @@ def local_image_spec(bin_dir: str, tools: list) -> ImageSpec:
 
 
 def mirror_block(db_path: str) -> dict:
-    """B6a for real, over the fifty recorded issues of `fixtures/mirror/`.
-
-    The transport is replaced and the node is not: `GithubIssuesNode._list`, its
-    paging, its pull-request filter and `_build_issue` all run, which is
-    `04-Test-Plan.md` §0.3's rule that a recorded response set is replayed and
-    nothing is mocked above it.
-    """
+    """B6a for real, over the fifty recorded issues of `fixtures/mirror/`."""
     from chia.github.github_client import GithubClient
 
     payload = json.loads(MIRROR_FIXTURE.read_text(encoding="utf-8"))
@@ -211,14 +143,7 @@ def mirror_block(db_path: str) -> dict:
 
 
 def offline_tools(monkey: list) -> None:
-    """Construct `ChiaTool`s with no Ray actor behind them (§0.4).
-
-    `ChiaTool.__post_init__` starts a `_ToolServerActor` and `ray.get`s its
-    address, which starts a local Ray. The recorder is not a cluster, so the
-    substitute fills the three fields the real one fills and starts nothing;
-    the constructor, the path checks and every git call are the real ones. It is
-    `tests/test_tools.py`'s own `tool_servers` fixture, as a plain function.
-    """
+    """Construct `ChiaTool`s with no Ray actor behind them (§0.4)."""
     from chia.base.tools.ChiaTool import ChiaTool, ToolInfo
 
     original = ChiaTool.__post_init__
@@ -234,18 +159,11 @@ def offline_tools(monkey: list) -> None:
 
 
 def replay_turns(monkey: list, texts: list, files: dict) -> None:
-    """Replay A3's two turns from the committed transcripts, and reach no model.
-
-    `04-Test-Plan.md` §0.6 and NFR-01 call this replaying an agent turn: the
-    emitter, the cap, the argv rule, the two `ChiaTool`s and the validator are
-    the code under test and the turn's TEXT is the recording.
-    """
+    """Replay A3's two turns from the committed transcripts, and reach no model."""
     pending = list(texts)
     original_dispatch = generate_task.dispatch_turn
 
-    # Since K2 the node builds no backend at all - the client is `llm_turn`'s,
-    # on the `llm` worker - so `dispatch_turn` is the one call to replace and
-    # what it receives is the turn request's fields.
+    # Since K2 the node builds no backend at all.
     def _dispatch(system_message, user_message, tools, *, stage,
                   timeout_seconds, model_id, guard=None):
         text = pending.pop(0)
@@ -262,18 +180,7 @@ def replay_turns(monkey: list, texts: list, files: dict) -> None:
 
 
 def record(root: Path) -> dict:
-    """Run the mini-campaign and write every instance it produced.
-
-    Returns:
-        {"recorder": FixtureRecorder, "manifest": RunManifest, ...}, so a caller
-        can print what was written and a test can assert over it.
-    Worker:
-        none; every node runs in this process through its undecorated body,
-        which is `04-Test-Plan.md` §0.4's plain-call path.
-    Raises:
-        SystemExit when a tier-1 resource is absent; ContractError from any
-        instance the seam refuses, which is a defect in its producer.
-    """
+    """Run the mini-campaign and write every instance it produced."""
     clone = resolve(CLONES, ".git")
     bin_dir = resolve(BUILDS, "circt-opt", runs=True)
     artefacts = root / "artefacts"
@@ -299,11 +206,7 @@ def record(root: Path) -> dict:
            "run_manifest_id": RUN_ID, "artefact_root": str(artefacts),
            "artefact_inline_cap_bytes": budget.artefact_inline_cap_bytes,
            "clone_path": clone, "run_commit": pin["run_commit"],
-           # No `mutator_set_sha`: `set_v1.json` does not exist, A7 has not
-           # run, and `load_set` refuses an unfrozen set to any run that NAMES a
-           # digest (8.1 rule 1, `04-Test-Plan.md` §16.8 item 8). The refusal is
-           # the campaign's and is left standing; this recording is not a
-           # campaign, so it names none and the development set applies.
+           # No `mutator_set_sha`.
            "mutator_set_path": str(mutators.SET_PATH)}
     snapshot = schema.LedgerSnapshot(arm="mutation", unit="wall_clock_seconds",
                                      spent=0.0, cap=float(budget.arm_window_seconds))
@@ -354,10 +257,7 @@ def record(root: Path) -> dict:
         recorder.record(executed["probe_result"])
 
     # --- A5, the feedback, both arms -----------------------------------------
-    # BOTH, because they differ by rule and not by accident: FR-16.2 empties the
-    # mutation arm's bundle and the seeded arm's carries one entry per
-    # dispatched probe, and a fixture set with only one of them cannot show
-    # that the two halves agree on the shape.
+    # BOTH: FR-16.2 empties the mutation arm's bundle and the seeded arm's does not.
     bundles = []
     for arm in ("seeded", "mutation"):
         remaining = schema.LedgerSnapshot(
@@ -382,8 +282,7 @@ def record(root: Path) -> dict:
     args = SimpleNamespace(
         mode="discovery", arm="both", artefact_root=str(artefacts),
         repair_backend="vertex", repair_model=None, no_repair=False,
-        # W-19b's flag, which `repair_enabled` reads: this run is the `model`
-        # one with its two turns replayed, not the recorded-generator mode.
+        # W-19b's flag, which `repair_enabled` reads.
         generator="model",
         forum_post_url="https://llvm.discourse.group/t/circt-bug-loop/0",
         forum_post_date="2026-09-14")
@@ -401,9 +300,7 @@ def record(root: Path) -> dict:
         "cluster_yaml_sha": manifest.cluster_yaml_sha,
         "artefact_root": manifest.artefact_root, "started_utc": STARTED,
         "ended_utc": None})
-    # All three `arm` values and both `scope` values, which is what
-    # `T-I-ledger-01` reconciles: one `arm_window` per arm (FR-14.4 permits
-    # exactly one), and one `shared` entry for the work neither arm owns.
+    # All three `arm` values and both `scope` values, which is what `T-I-ledger-01` reconciles.
     cpu = round(sum(b.cpu_seconds or 0.0 for b in builds), 6)
     written = []
     for arm, scope, stage, amount, tokens in (
@@ -415,8 +312,7 @@ def record(root: Path) -> dict:
                                 f"{RUN_ID}/{arm}/{scope}/{stage}").hex,
             run_manifest_id=RUN_ID, arm=arm, scope=scope, stage=stage,
             unit="wall_clock_seconds", amount=amount, metered=(scope == "arm_window"),
-            # The mutation arm runs no model, so its token counts are null by
-            # FR-14.6's own conditional and `accrue` prices them to a null cost.
+            # The mutation arm runs no model.
             observed={"cpu_seconds": cpu,
                       "tokens_in": 4096 if tokens else None,
                       "tokens_out": 512 if tokens else None, "cost_usd": None},
@@ -425,8 +321,7 @@ def record(root: Path) -> dict:
         ledger.accrue._chia_original(entry, store.db_path, budget)
         row = store.query_one("SELECT * FROM ledger_entry WHERE entry_id = ?",
                               (entry.entry_id,))
-        # Read BACK out of loop.db, so what is recorded is what A6b stored and
-        # priced and not what the caller handed it.
+        # Read BACK out of loop.db.
         stored = schema.LedgerEntry(
             entry_id=row["entry_id"], run_manifest_id=row["run_manifest_id"],
             arm=row["arm"], scope=row["scope"], stage=row["stage"],
@@ -447,9 +342,7 @@ def main(argv: list) -> int:
     """Record the set into `contract/fixtures/recorded/` and print what landed."""
     import tempfile
 
-    # A FIXED root, so the artefact paths a recording carries are the same on
-    # the next recording and a re-record is a diff of what changed and not of
-    # where the temporary directory landed.
+    # A FIXED root, so the artefact paths a recording carries are the same on the next recording and a re-record is a diff of what changed and not of where the temporary directory landed.
     root = Path(argv[0]) if argv else (
         Path(tempfile.gettempdir()) / f"bugloop-recorded-{RUN_ID[:12]}")
     if root.exists():

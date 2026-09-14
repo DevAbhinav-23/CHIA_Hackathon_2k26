@@ -1,18 +1,4 @@
-"""`store.py`: the DDL, the write order, the PARTIAL marker, the cap rule.
-
-`04-Test-Plan.md` §1.18, the thirteen `T-U-store-*` tests. Every one is tier 0:
-`03-LLD.md` §6.1 puts `loop.db` on the head's local disk and §3.11 makes the
-module head-side and pure but for the store, so the statements below run against
-a real SQLite file in a temporary directory with no Ray session anywhere.
-
-How the two dispatch paths are covered. `LoopStore` builds a `SQLiteNode` when
-Ray is initialised and opens a direct connection carrying the same PRAGMA
-defaults when it is not (`03-LLD.md` §6.1,
-`chia:chia/database/sqlite_node.py:105-143`). Every test below takes the second
-path, which is the one that needs no cluster; `T-U-store-02` takes the first,
-against a stub `chia.database.sqlite_node` installed in `sys.modules`, so the
-`pin_to_current_node=True` argument is asserted without importing Ray at all.
-"""
+"""`store.py`: the DDL, the write order, the PARTIAL marker, the cap rule."""
 import json
 import re
 import sqlite3
@@ -30,14 +16,10 @@ from circt_bug_loop.tests.conftest import call_node
 
 pytestmark = pytest.mark.t0
 
-#: `design/03-LLD.md`, reached from the imported package and not by walking up
-#: from this file (03-LLD.md §1.4). It is absent from the published tree, where
-#: the DDL-equality half of `T-U-store-01` is skipped rather than failed.
+#: `design/03-LLD.md`, reached from the imported package and not by walking up from this file (03-LLD.md §1.4).
 _LLD = Path(circt_bug_loop.__file__).resolve().parent.parent / "design" / "03-LLD.md"
 
-#: The synthetic values of `fixtures/secrets/known_values.txt`: one token of the
-#: `ghp_` shape and one of each Google shape. No real credential is ever
-#: committed and no test reads `~/.config/bugloop/gemini.env`.
+#: The synthetic values of `fixtures/secrets/known_values.txt`.
 _KNOWN_SECRETS = ("ghp_" + "A" * 36, "AQ." + "B" * 32, "AIza" + "C" * 35)
 
 _DEDUP_EVIDENCE_NULL = {k: None for k in store._DEDUP_EVIDENCE_KEYS}
@@ -97,11 +79,7 @@ def differential_candidate(**overrides) -> store.CandidateRecord:
 def seed_rows(loop: store.LoopStore, *, artefact_dir: str = "/artefacts/run-01/probe-01",
               probe_id: str = "probe-01", candidate_id: str = "cand-01",
               oracle_class: str = "assertion") -> None:
-    """Write the run, probe, probe_result and candidate rows one candidate needs.
-
-    In the order §6.4 rule 2 fixes: the referenced row before the referencing
-    one, which `PRAGMA foreign_keys = ON` enforces rather than discipline.
-    """
+    """Write the run, probe, probe_result and candidate rows one candidate needs."""
     if loop.query_one("SELECT 1 FROM run WHERE run_manifest_id = ?", ("run-01",)) is None:
         loop.insert("run", {
             "run_manifest_id": "run-01", "mode": "discovery", "seed_set": "171",
@@ -134,20 +112,13 @@ def seed_rows(loop: store.LoopStore, *, artefact_dir: str = "/artefacts/run-01/p
 
 
 def test_T_U_store_01(tmp_path: Path):
-    """T-U-store-01 (FR-17.2): `init_schema` creates §6.2 and §6.3; twice is once.
-
-    The DDL is additionally compared to `03-LLD.md`'s own text for equality, so
-    a table that drifts from the design fails here rather than in a query.
-    """
+    """T-U-store-01 (FR-17.2): `init_schema` creates §6.2 and §6.3; twice is once."""
     loop = open_store(tmp_path)
     rows = loop.query("SELECT type, name FROM sqlite_master "
                       "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
     tables = [r["name"] for r in rows if r["type"] == "table"]
     indexes = [r["name"] for r in rows if r["type"] == "index"]
-    # §6.2's twenty-one, plus `registration`, which §6.2 does NOT declare: W-12
-    # made the pre-registration an annotated tag, and the run records which one
-    # it was checked against. It is a statement of its own, so the two
-    # comparisons below still hold §6.2 and §6.3 to the letter (errata row 32).
+    # §6.2's twenty-one, plus `registration`, which §6.2 does NOT declare.
     assert len(tables) == 22 and "candidate" in tables and "registration" in tables
     assert len(indexes) == 9 and "ix_ledger_day" in indexes
     assert "registration" not in store._DDL_TABLES
@@ -167,12 +138,7 @@ def test_T_U_store_01(tmp_path: Path):
 
 
 def test_T_U_store_02(tmp_path: Path, monkeypatch):
-    """T-U-store-02 (FR-17.3): `pin_to_current_node=True`, absolute, local.
-
-    The Ray branch is taken against a stub `chia.database.sqlite_node`, so the
-    one argument FR-17.3 is about is asserted with no Ray session and no import
-    of it; the network-path refusal is driven by a recorded mount table.
-    """
+    """T-U-store-02 (FR-17.3): `pin_to_current_node=True`, absolute, local."""
     with pytest.raises(ValueError, match="absolute"):
         store.LoopStore("relative/loop.db")
 
@@ -209,12 +175,7 @@ def test_T_U_store_02(tmp_path: Path, monkeypatch):
 
 
 def test_T_U_store_03(tmp_path: Path):
-    """T-U-store-03 (FR-17.7): over the cap goes to disk and the row holds a path.
-
-    The cap is 262,144, which is 256 KiB and was 10,485,760; one key serves the
-    three places `03-LLD.md` §6.5 names, so the number is read from the
-    committed `budget.yaml` here rather than restated.
-    """
+    """T-U-store-03 (FR-17.7): over the cap goes to disk and the row holds a path."""
     committed = Path(circt_bug_loop.__file__).resolve().parent / "budget.yaml"
     cap = yaml.safe_load(committed.read_text(encoding="utf-8"))["artefact_inline_cap_bytes"]
     assert cap == 262144
@@ -272,14 +233,7 @@ def test_T_U_store_05(tmp_path: Path):
 
 
 def test_T_U_store_06(tmp_path: Path):
-    """T-U-store-06 (FR-17.6): every table traces to its run, by column or by key.
-
-    §6.2's prose says every table carries `run_manifest_id`; its own DDL gives
-    the column to eight tables and joins the rest by `probe_id` or
-    `candidate_id`. `image` and `issue_mirror` are keyed by neither, being
-    campaign-wide rather than per-run, and are named here rather than left to a
-    reader.
-    """
+    """T-U-store-06 (FR-17.6): every table traces to its run, by column or by key."""
     loop = open_store(tmp_path)
     tables = [r["name"] for r in loop.query(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -328,14 +282,7 @@ def test_T_U_store_07(tmp_path: Path):
 
 
 def test_T_U_store_08(tmp_path: Path):
-    """T-U-store-08 (FR-12.10): the loop's row before CHIA's, the candidate before its verdicts.
-
-    Rule 2 of §6.4 is enforced by SQLite: a `fingerprint` row before its
-    `candidate` row is a foreign-key violation. Rule 1 is enforced by order:
-    `repair_adapter` writes the loop's `repair` row before `run_issue_remote`
-    runs, so `chia_row_seen` is 0 until B12's reconciliation finds the
-    counterpart in CHIA's own `attempts` table.
-    """
+    """T-U-store-08 (FR-12.10): the loop's row before CHIA's, the candidate before its verdicts."""
     loop = open_store(tmp_path)
     with pytest.raises(sqlite3.IntegrityError):
         loop.insert("fingerprint", {
@@ -391,11 +338,7 @@ def test_T_U_store_08(tmp_path: Path):
 
 
 def test_T_U_store_09():
-    """T-U-store-09 (FR-08.10, FR-10.5, FR-13.14): §2.9's class table, row by row.
-
-    Both columns of every row, and the function asserted idempotent and side
-    effect free: four calls on one object behave as one.
-    """
+    """T-U-store-09 (FR-08.10): §2.9's class table, row by row."""
     assert validate_is_none(candidate())
     assert validate_is_none(differential_candidate())
 
@@ -444,8 +387,7 @@ def test_T_U_store_09():
     assert once == candidate(), "validate_candidate mutates nothing"
 
 
-#: One admissible value per conditional field, so the forbidden-column half of
-#: 2.9's table raises E006 and never E003 or E004 on the way there.
+#: One admissible value per conditional field.
 _ADMISSIBLE = {
     "reducer": "circt-reduce", "reduced": True, "fixpoint": True,
     "budget_truncated": False, "reduced_path": "/artefacts/reduced.mlir",
@@ -468,7 +410,7 @@ def validate_is_none(record: store.CandidateRecord) -> bool:
 
 
 def test_T_U_store_10(tmp_path: Path):
-    """T-U-store-10 (FR-17.5, NFR-06): no credential in any row or any file."""
+    """T-U-store-10 (FR-17.5): no credential in any row or any file."""
     loop = open_store(tmp_path)
     artefact_dir = tmp_path / "probe-01"
     call_node(store.artefact_write, str(artefact_dir), "stdout.txt", "assertion failed\n")
@@ -489,11 +431,7 @@ def test_T_U_store_10(tmp_path: Path):
 
 
 def test_T_U_store_11(tmp_path: Path):
-    """T-U-store-11 (FR-10.5, FR-17.2): `load_candidate` joins the six tables back.
-
-    One candidate of every oracle class round-trips, and what comes back passes
-    `validate_candidate`, which is the pairing NIT 3 asks for.
-    """
+    """T-U-store-11 (FR-10.5): `load_candidate` joins the six tables back."""
     loop = open_store(tmp_path)
     for i, oracle_class in enumerate(("assertion", "fatal_error", "crash", "differential")):
         probe_id, candidate_id = f"probe-{i}", f"cand-{i}"
@@ -547,7 +485,7 @@ def test_T_U_store_11(tmp_path: Path):
 
 
 def test_T_U_store_12():
-    """T-U-store-12 (FR-10.5, FR-10.8): the three codes `store.py` adds, and no other."""
+    """T-U-store-12 (FR-10.5): the three codes `store.py` adds, and no other."""
     extra = dict(_DEDUP_EVIDENCE_NULL)
     extra["cost"] = None
     with pytest.raises(schema.ContractError) as caught:

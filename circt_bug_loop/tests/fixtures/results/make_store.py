@@ -1,43 +1,4 @@
-"""Build `fixtures/results/`'s store: one coherent mini-campaign in one loop.db.
-
-`04-Test-Plan.md` §13 gives the results fixtures as `store_full.db` and three
-variants of it, produced from the pilot's own database. No pilot exists on
-2026-09-14 (`05-Work-Plan.md` W-18 is the first one), so this script builds the
-smallest campaign that exercises every element `03-LLD.md` §14.4 makes
-mandatory, and `tests/test_results.py` regenerates it into a temporary
-directory rather than committing 20 MB of SQLite. The three variants are the
-tests' own one-edit derivations of it, exactly as §13 describes them.
-
-**The campaign.** Two seeds, six probes over both arms, four candidates and two
-filings:
-
-| probe | arm | seed | outcome | candidate |
-|---|---|---|---|---|
-| `p-0001` | seeded | A | assertion | `c-0001`, repaired and confirmed upstream |
-| `p-0002` | seeded | B | clean exit | none |
-| `p-0003` | seeded | B | crash | `c-0002`, filed and not yet confirmed |
-| `p-0004` | mutation | A | fatal error | `c-0003`, gated out as a known issue |
-| `p-0005` | mutation | B | clean exit, arcilator and Verilator diverge | `c-0004`, informational |
-| `p-0006` | mutation | B | parse error, argv rejected | none |
-
-Every recorded stderr is one of `fixtures/stderr/`'s real captures, copied into
-the artefact tree at the path `build_result.stderr_path` names, so FR-18.11's
-regeneration check re-runs `probe_task.classify_build` over genuine tool output
-and not over a string written to make it pass.
-
-The labelled duplicate-pair set this store carries is **the committed one**,
-`data/labelled_pairs.json`, and no longer three pairs invented to name this
-store's own candidates. FR-10.2's set is an external measurement of the project
-(`04-Test-Plan.md` §10): its sides are recorded failures labelled by hand before
-any fingerprint was computed, they belong to no campaign, and the renderer
-fingerprints them from the file. A fixture set naming `c-0001` was the shape
-that made `render_results` demand the store hold them, which is the refusal
-`T-S-regen-01` recorded at the end of every run.
-
-Run it as a program to write the store somewhere for inspection:
-
-    python circt_bug_loop/tests/fixtures/results/make_store.py /tmp/results-fixture
-"""
+"""Build `fixtures/results/`'s store: one coherent mini-campaign in one loop.db."""
 from __future__ import annotations
 
 import json
@@ -61,17 +22,14 @@ CONTRACT_FIXTURES = Path(schema.__file__).resolve().parent / "fixtures"
 #: The recorded tool stderr of `04-Test-Plan.md` §13, one capture per outcome.
 STDERR_FIXTURES = Path(__file__).resolve().parents[1] / "stderr"
 
-#: FR-10.2's labelled set, as `render_results` takes it and as the driver passes
-#: it: the committed set itself, read through the one loader the driver uses, so
-#: this fixture cannot drift from what a campaign renders.
+#: FR-10.2's labelled set, as `render_results` takes it and as the driver passes it.
 def labelled_pairs() -> list:
     """The committed FR-10.2 set, which is the one a real render is given."""
     from circt_bug_loop.results import load_labelled_pairs
 
     return load_labelled_pairs()
 
-#: The six probes, in dispatch order: (probe id, arm, seed, iteration, tool,
-#: stderr capture, exit status, signal, build status, stopping reason).
+#: The six probes, in dispatch order.
 PROBES = (
     ("p-0001", "seeded", SEED_A, 1, "firtool", "assert_glibc.txt", None, "SIGABRT",
      "assertion", "assertion_fired"),
@@ -95,17 +53,7 @@ CRASH_FRAMES = ["LowerTypes::visitDecl", "FIRRTLVisitor::dispatchDeclVisitor",
 
 
 def manifest(artefact_root: str) -> schema.RunManifest:
-    """The committed discovery manifest, re-rooted at *artefact_root*.
-
-    Returns:
-        RunManifest, validated, carrying this run's id, its lag, its
-        confirmation cut-off and its mutator-set SHA.
-    Worker:
-        pure; reads one committed fixture file.
-    Raises:
-        ContractError when the committed fixture stops validating, which is the
-        contract freeze breaking rather than this script.
-    """
+    """The committed discovery manifest, re-rooted at *artefact_root*."""
     payload = json.loads(
         (CONTRACT_FIXTURES / "run_manifest" / "discovery_01.json").read_text())
     payload["artefact_root"] = artefact_root
@@ -128,11 +76,7 @@ def _seed(seed_sha: str, subject: str, *, exact: bool, tool: str) -> dict:
 
 
 def _probe_rows(store: LoopStore, root: Path) -> None:
-    """Write the six probes, their results and their build records.
-
-    The recorded stderr is copied into the artefact tree first, because
-    `build_result.stderr_path` is what FR-18.11's regeneration re-reads.
-    """
+    """Write the six probes, their results and their build records."""
     for (probe_id, arm, seed_sha, iteration, tool, capture, exit_status, signal,
          status, reason) in PROBES:
         artefact_dir = root / "artefacts" / RUN / probe_id
@@ -215,12 +159,7 @@ def _evidence(**over) -> str:
 
 
 def _ledger(store: LoopStore) -> None:
-    """The ledger: both arm windows, per-stage occupancy, and two shared stages.
-
-    The mutation arm is stopped by a safety cap rather than by its window, so
-    the artefact has an unspent balance to disclose (FR-18.10), and the offline
-    mutator synthesis carries the date FR-05.8's declaration names.
-    """
+    """The ledger: both arm windows, per-stage occupancy, and two shared stages."""
     def observed(cpu=0.0, tokens_in=None, tokens_out=None, cost=None,
                  authorised=None, ceiling=None, billed=None, calls=None) -> str:
         """§2.7's eight keys (contract 2.2); the last four are the turn's money."""
@@ -268,18 +207,7 @@ def _ledger(store: LoopStore) -> None:
 
 
 def build(root: Path) -> tuple:
-    """Create the mini-campaign under *root* and return what a render needs.
-
-    Returns:
-        (LoopStore, RunManifest, labelled_pairs): the store at
-        `<root>/loop.db`, the manifest rooted at `<root>/artefacts`, and
-        FR-10.2's labelled pair list.
-    Worker:
-        none; a test helper on the head, with no Ray and no cluster.
-    Raises:
-        sqlite3.IntegrityError when a row is written out of §6.4's order, which
-        is the foreign keys catching this script rather than a campaign.
-    """
+    """Create the mini-campaign under *root* and return what a render needs."""
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     artefact_root = root / "artefacts"
@@ -430,15 +358,7 @@ def build(root: Path) -> tuple:
 
 
 def main(argv: list) -> int:
-    """Write the store into the directory *argv*[0] names, for inspection.
-
-    Returns:
-        int, 0 on success and 2 when no directory was given.
-    Worker:
-        none; a command-line helper.
-    Raises:
-        whatever `build` raises.
-    """
+    """Write the store into the directory *argv*[0] names, for inspection."""
     if not argv:
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
         return 2

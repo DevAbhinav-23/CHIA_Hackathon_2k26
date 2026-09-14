@@ -1,25 +1,4 @@
-"""Every seam crossing: `04-Test-Plan.md` §2, the seventeen `T-I-*` tests.
-
-**The seam rule, and it is the whole point.** Each half is exercised against
-**recorded fixtures of the other half**, never against the other half running
-(`02-HLD.md` §2.13, `04-Test-Plan.md` §0.6 rule 1). The fixtures are
-`contract/fixtures/recorded/`, written by
-`tests/fixtures/recorded/make_recorded.py` from a real in-process mini-campaign
-under `bug_loop.FixtureRecorder`, after `contract.validate` accepted each one;
-that README says exactly what ran and what did not. Every test below names the
-document it replays.
-
-**No test here starts Ray**, for §0.4's reason: a `@ChiaFunction` called plainly
-runs in this process, and a seam crossing is a data crossing and not a dispatch.
-Dispatch is the system tier's, where it is the thing under test.
-
-**Tiers.** Nine of the seventeen are tier 0. Three are `t1` because the live
-side runs a real CIRCT binary or walks the blobless clone. §2's column says T2
-for the two `gen-app` rows; they run at **T1** here for the reason every other
-tier relabel of §16.7 gives: what crosses the seam is a `ProbeSpec` and what
-comes back is a `ProbeResult`, and the binary that produces one is the host's
-measured build rather than the image's. No test in this suite runs at T2 at all.
-"""
+"""Every seam crossing: `04-Test-Plan.md` §2, the seventeen `T-I-*` tests."""
 from __future__ import annotations
 
 import json
@@ -40,25 +19,17 @@ FIXTURES = TESTS / "fixtures"
 #: The recorded seam, which is what every test here replays.
 RECORDED = Path(schema.__file__).resolve().parent / "fixtures" / "recorded"
 
-#: The build the recording ran against, resolved the same way and for the same
-#: reason: a directory whose `circt-opt` does not EXECUTE is not a build.
+#: The build the recording ran against, resolved the same way and for the same reason.
 from circt_bug_loop.tests.fixtures.recorded.make_recorded import (  # noqa: E402
     BUILDS, resolve)
 
 
-#: FR-18.6's six buckets: `gate.TAXONOMY`'s own values, which are the failing
-#: five, plus `new_bug`, which no key maps to because it is what a candidate
-#: that answered every question gets.
+#: FR-18.6's six buckets.
 BUCKETS = set(gate.TAXONOMY.values()) | {"new_bug"}
 
 
 def replay(member: str, cls, **where):
-    """Every recorded document of one member, filtered, read back through the seam.
-
-    `from_json` and not `json.load`: a fixture that reached a consumer without
-    passing the version check and the validator would be a fixture the seam
-    never saw, which is the one thing §0.6 rule 1 exists to prevent.
-    """
+    """Every recorded document of one member, filtered, read back through the seam."""
     out = []
     for path in sorted((RECORDED / member).glob("*.json")):
         instance = schema.from_json(path.read_text(encoding="utf-8"), cls)
@@ -106,21 +77,11 @@ def limits() -> dict:
 
 
 def bumped(instance, major: str) -> str:
-    """One recorded document re-recorded at another MAJOR, as JSON text.
-
-    The one edit §2's two `version` rows describe, made here rather than
-    committed: a `3.0` document under `contract/fixtures/` would fail
-    `T-U-fixt-01`, which validates every file there.
-    """
+    """One recorded document re-recorded at another MAJOR, as JSON text."""
     document = json.loads(schema.to_json(instance))
     document["contract_version"] = major
     return json.dumps(document, sort_keys=True, indent=2,
                       ensure_ascii=False) + "\n"
-
-
-# ===========================================================================
-# T-I-gen-app-*: the generator to the apparatus
-# ===========================================================================
 
 
 @pytest.mark.t1
@@ -128,26 +89,13 @@ def bumped(instance, major: str) -> str:
 @pytest.mark.parametrize("arm,test_id", [("seeded", "T-I-gen-app-01"),
                                          ("mutation", "T-I-gen-app-02")])
 def test_T_I_gen_app_01_and_02(tmp_path, arm, test_id):
-    """T-I-gen-app-01 and -02 (FR-04.3, FR-05.4, FR-06.1, FR-18.1).
-
-    Every recorded spec of the arm is consumed with **no change**: the tool
-    binary resolves, the argv executes, a `BuildResult` and a `ProbeResult` come
-    back, and **no generator code is imported** by the live side, which is the
-    seam rule read as an import graph and asserted as one. The two arms'
-    outcomes differ only in the `arm` value they carry, which is FR-18.1.
-
-    Fixture: `contract/fixtures/recorded/probe_spec/`, the arm's own. Tier 1
-    (§2 says T2; the binary is the host's measured build, §16.7's relabel rule).
-    """
+    """T-I-gen-app-01 and -02 (FR-04.3)."""
     specs = replay("probe_spec", schema.ProbeSpec, arm=arm)
     image_spec = executing_image_spec([specs[0].tool])
 
     for spec in specs:
         before = schema.to_json(spec)
-        # The spec names the ABSOLUTE input path the recording wrote, so the
-        # replay restores that file from the spec's own `input_text` rather than
-        # editing the spec: a consumer that had to rewrite a path before it
-        # could read one would not be consuming the seam's document.
+        # The spec names the ABSOLUTE input path the recording wrote.
         source = Path(spec.input_path)
         source.parent.mkdir(parents=True, exist_ok=True)
         source.write_text(spec.input_text, encoding="utf-8")
@@ -164,8 +112,7 @@ def test_T_I_gen_app_01_and_02(tmp_path, arm, test_id):
             typing.get_type_hints(schema.ProbeResult)["build_status"]), build.status
         assert schema.validate(result) is None
         assert Path(build.stderr_path).is_file()
-        # The recorded outcome is reproduced, which is what makes the fixture a
-        # recording and not an illustration.
+        # The recorded outcome is reproduced.
         recorded = replay("probe_result", schema.ProbeResult,
                           probe_id=spec.probe_id)[0]
         assert result.build_status == recorded.build_status
@@ -179,17 +126,7 @@ def test_T_I_gen_app_01_and_02(tmp_path, arm, test_id):
 
 @pytest.mark.t0
 def test_T_I_gen_app_03(tmp_path):
-    """T-I-gen-app-03 (FR-05.4, FR-16.2): one `generate` interface, two arms.
-
-    Both generators implement §2.5's one signature, both return
-    `list[ProbeSpec]` the validator accepts, and A4 **ignores** `feedback`: the
-    identifier appears exactly once in its body, in the parameter list, which is
-    the whole of FR-16.2 as amended and is asserted on the source because a
-    parameter that is read once in a branch would pass any behavioural test.
-
-    Fixture: `recorded/seed_record/`, `recorded/feedback_bundle/` and a
-    constructed `LedgerSnapshot`, which is not a contract member. Tier 0.
-    """
+    """T-I-gen-app-03 (FR-05.4): one `generate` interface, two arms."""
     import inspect
 
     seed = replay("seed_record", schema.SeedRecord)[0]
@@ -217,18 +154,8 @@ def test_T_I_gen_app_03(tmp_path):
     assert body.count("feedback") == 1, "A4 reads the bundle it is handed"
 
 
-# ===========================================================================
-# T-I-app-tri-*: the apparatus to triage
-# ===========================================================================
-
-
 def candidate_from(result: schema.ProbeResult, verdict, tmp_path) -> tuple:
-    """One `CandidateRecord` and its `BuildResult` row, from a recorded probe.
-
-    `bug_loop._candidate` is the driver's own builder, so what crosses into
-    stage 6 is the record the driver would have handed it and not one this test
-    invented.
-    """
+    """One `CandidateRecord` and its `BuildResult` row, from a recorded probe."""
     from circt_bug_loop.store import BuildResult
 
     build = BuildResult(
@@ -246,19 +173,7 @@ def candidate_from(result: schema.ProbeResult, verdict, tmp_path) -> tuple:
 
 @pytest.mark.t1
 def test_T_I_app_tri_01(tmp_path):
-    """T-I-app-tri-01 (FR-10.1, FR-10.3, FR-10.4): all three screens, no request.
-
-    The live side is `triage_task.dedup_and_screen`, a **head** node reading the
-    head's clone; the replayed side is a recorded `ProbeResult` promoted to a
-    candidate through the driver's own builder, with a recorded issue mirror
-    behind it. Every verdict carries the evidence keys §2.9 closes the set at,
-    and **no GitHub request is made**: the screen reads the mirror as a table,
-    which is FR-10.3's network-trace criterion held by construction and asserted
-    here by failing the test on any request at all.
-
-    Fixture: `recorded/probe_result/`, `fixtures/mirror/sample.json`. Tier 1
-    (the two commit scans walk the blobless clone).
-    """
+    """T-I-app-tri-01 (FR-10.1): all three screens, no request."""
     from chia.github.github_client import GithubClient
 
     from circt_bug_loop.tests.test_triage_task import (_candidate, _mirror_rows,
@@ -308,18 +223,7 @@ def test_T_I_app_tri_01(tmp_path):
 
 @pytest.mark.t0
 def test_T_I_app_tri_02(tmp_path, monkeypatch):
-    """T-I-app-tri-02 (FR-11.2, FR-11.3, FR-11.4): the report, from the record.
-
-    The live side is `triage_task.triage_report`; the replayed sides are a
-    recorded stage-6 transcript and the recorded `RunManifest`, whose
-    `model_ids` is what the report's `assisted_by` must carry. **No number
-    originates in the transcript**: the render substitutes every count, hash and
-    verdict from the record, asserted by feeding a transcript that disagrees and
-    finding the tool's verdict in the report.
-
-    Fixture: `fixtures/triage/turns/report_write_disagree.jsonl`,
-    `recorded/run_manifest/`. Tier 0.
-    """
+    """T-I-app-tri-02 (FR-11.2): the report, from the record."""
     from circt_bug_loop.tests.test_triage_task import (_fake_generate,
                                                        _render_bundle,
                                                        _turn_text)
@@ -345,24 +249,9 @@ def test_T_I_app_tri_02(tmp_path, monkeypatch):
     assert "10500" in body, "the mirror's issue number, from the record"
 
 
-# ===========================================================================
-# T-I-tri-rep-*: triage to the repair adapter
-# ===========================================================================
-
-
 @pytest.mark.t0
 def test_T_I_tri_rep_01(tmp_path, monkeypatch):
-    """T-I-tri-rep-01 (FR-12.1, FR-12.2, FR-12.3): the whole `GithubIssue` object.
-
-    The live side is `repair_adapter.repair_adapt` with CHIA's chain stubbed at
-    `run_issue_remote`; the replayed side is a recorded `Report`, `ReducedCase`
-    and `OracleVerdict` for a `crash` candidate. The adapter mints the local id,
-    pre-writes `repro.sh` and the case **under the artefact root** and outside
-    the tree `git clean -fd` reaches, fills all sixteen `cfg` keys, and calls
-    `run_issue_remote(issue_md, local_id, cfg)` inline.
-
-    Fixture: `fixtures/repair/`, `recorded/run_manifest/`. Tier 0.
-    """
+    """T-I-tri-rep-01 (FR-12.1): the whole `GithubIssue` object."""
     from circt_bug_loop.tests.test_repair_adapter import _attempt
 
     run = _attempt(tmp_path, monkeypatch)
@@ -381,14 +270,7 @@ def test_T_I_tri_rep_01(tmp_path, monkeypatch):
 @pytest.mark.t0
 @pytest.mark.parametrize("kind", ["differential", "fatal_error", "out_of_scope_root"])
 def test_T_I_tri_rep_02(tmp_path, monkeypatch, kind):
-    """T-I-tri-rep-02 (FR-12.4, FR-12.5): refused by class or scope, chain untouched.
-
-    Each refusal is recorded with its reason and **the chain is never invoked**,
-    which is the half that matters: a candidate repair is not scoped to must not
-    reach a model at all, and the assertion is on the recorder's own call list.
-
-    Fixture: `fixtures/repair/`. Tier 0.
-    """
+    """T-I-tri-rep-02 (FR-12.4): refused by class or scope, chain untouched."""
     from circt_bug_loop.tests.test_repair_adapter import (_Recorder, _attempt,
                                                           _candidate)
 
@@ -404,31 +286,17 @@ def test_T_I_tri_rep_02(tmp_path, monkeypatch, kind):
     assert chain.calls == [], "a refused candidate reaches no chain"
 
 
-# ===========================================================================
-# T-I-rep-gate-*: the repair adapter to the gate
-# ===========================================================================
-
-
 @pytest.mark.t0
 @pytest.mark.parametrize("verdict", ["fixed.json", "attempted.json", "error.json",
                                      "no_repro.json", "not_a_bug.json",
                                      "unclear.json"])
 def test_T_I_rep_gate_01(tmp_path, monkeypatch, verdict):
-    """T-I-rep-gate-01 (FR-12.7, FR-12.8, FR-13.6): all six CHIA statuses.
-
-    `report_plus_patch` only for `fixed` with `lit_ok`; `report` otherwise. The
-    six recorded verdicts are CHIA's own six, one document each, and the gate
-    sees each as a `RepairResult` and never as a status string.
-
-    Fixture: `fixtures/repair/verdicts/`. Tier 0.
-    """
+    """T-I-rep-gate-01 (FR-12.7): all six CHIA statuses."""
     from circt_bug_loop.tests.test_gate import _decide, _repair
 
     status = json.loads(
         (FIXTURES / "repair" / "verdicts" / verdict).read_text())["status"]
-    # `fixed` is the FIELD and not the status string: FR-13.6 attaches a patch
-    # to a repair that fixed AND whose lit run was usable, and `_as_repair_result`
-    # sets the two from CHIA's own verdict document.
+    # `fixed` is the FIELD and not the status string.
     decision, _, _ = _decide(tmp_path, monkeypatch,
                              repair=_repair(status=status,
                                             fixed=(status == "fixed"),
@@ -442,26 +310,7 @@ def test_T_I_rep_gate_01(tmp_path, monkeypatch, verdict):
 
 @pytest.mark.t0
 def test_T_I_rep_gate_02(tmp_path, monkeypatch):
-    """T-I-rep-gate-02 (FR-13.1, FR-18.6): four questions, `gate_rerun` live.
-
-    The live side is `gate.gate_decide` **with `gate_rerun` really dispatched**,
-    against a candidate whose reproducing command still fires; all four answers
-    come from tool records, the decision is written and the taxonomy bucket is
-    set. The reproducing command is a shell stand-in, which is W-14's own tier
-    decision: `circt_exec_probe`'s `prlimit` prefix, `classify_build` and
-    `compute_fingerprint` all run unmocked and only the compiler is a stand-in.
-
-    **What this test does NOT assert, and why.** §6.2 has a `gate_decision`
-    table and §6.4 a write order for it, and **nothing writes the row**: B9a
-    returns the record and B12 was to persist it, and the driver writes no row
-    of any table (found here, recorded in
-    `design/reviews/implementation-errata-log.md` as owed to W-18). Asserting
-    the row would be asserting a stage this seam does not reach; asserting its
-    ABSENCE would fail the day it lands. The crossing this test owns is the
-    record, and the record is complete.
-
-    Fixture: `fixtures/gate/assertion.sh`, `fixtures/gate/case.mlir`. Tier 0.
-    """
+    """T-I-rep-gate-02 (FR-13.1): four questions, `gate_rerun` live."""
     import dataclasses
 
     from circt_bug_loop.tests.test_gate import ANSWER_KEYS, _decide, answers
@@ -479,28 +328,13 @@ def test_T_I_rep_gate_02(tmp_path, monkeypatch):
                for field in dataclasses.fields(decision)
                if field.name.startswith(("q1_reproduce", "q2_minimal",
                                           "q3_valid", "q4_new")))
-    # The two `{"circt": 1}` nodes were really dispatched, which is what makes
-    # question 1's "a fresh process" and question 3's parse-and-verify real.
+    # The two `{"circt": 1}` nodes were really dispatched.
     assert [call["node"] for call in seen] == ["gate_rerun", "gate_validate"]
-
-
-# ===========================================================================
-# T-I-gate-appr-*: the gate to approval
-# ===========================================================================
 
 
 @pytest.mark.t0
 def test_T_I_gate_appr_01(tmp_path):
-    """T-I-gate-appr-01 (FR-13.10, FR-13.12): `nothing` is never listed.
-
-    The live side is `approve.main` over a seeded store; the replayed side is a
-    recorded `GateDecision` of each of the three values. Only `report` and
-    `report_plus_patch` are presented, and `show` prints the four answers and
-    the stopping question, because a human approving a filing has to see what
-    the gate asked and where it stopped.
-
-    Fixture: the approval store `test_approve.py` builds. Tier 0.
-    """
+    """T-I-gate-appr-01 (FR-13.10): `nothing` is never listed."""
     from circt_bug_loop.tests.test_approve import _case, _run, _store
 
     store = _store(tmp_path)                       # cand-0001, decision "report"
@@ -520,19 +354,10 @@ def test_T_I_gate_appr_01(tmp_path):
 
 @pytest.mark.t0
 def test_T_I_gate_appr_02(tmp_path):
-    """T-I-gate-appr-02 (FR-13.7, FR-20.5): one filing row, and a downgrade.
-
-    Approval writes exactly one `filing` row carrying the approver, the
-    timestamp, the decision, the licence confirmation and where the URL came
-    from; a licence decline **downgrades** the decision rather than refusing the
-    filing, which is FR-20.5's own rule and the reason the row records both.
-
-    Fixture: the approval store `test_approve.py` builds. Tier 0.
-    """
+    """T-I-gate-appr-02 (FR-13.7): one filing row, and a downgrade."""
     from circt_bug_loop.tests.test_approve import _filing, _run, _store
 
-    # A `report_plus_patch`, so the licence question is asked at all: FR-20.5
-    # asks it only where a patch is being offered.
+    # A `report_plus_patch`, so the licence question is asked at all.
     store = _store(tmp_path, decision="report_plus_patch",
                    diff="--- a/lib/Dialect/HW/HWOps.cpp\n+  return failure();\n")
     status, _ = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
@@ -547,8 +372,7 @@ def test_T_I_gate_appr_02(tmp_path):
     assert row["licence_confirmed"] == 1
     assert row["licence_confirmed_at_utc"].endswith("+00:00")
 
-    # A DECLINE downgrades rather than refusing, and the decline is recorded,
-    # which is why the row carries both the decision and the confirmation.
+    # A DECLINE downgrades rather than refusing.
     (tmp_path / "b").mkdir()
     declined = _store(tmp_path / "b", decision="report_plus_patch",
                       diff="--- a/x\n+y\n")
@@ -560,23 +384,9 @@ def test_T_I_gate_appr_02(tmp_path):
     assert downgraded["licence_confirmed"] == 0
 
 
-# ===========================================================================
-# T-I-ledger-*: the ledger across the halves
-# ===========================================================================
-
-
 @pytest.mark.t0
 def test_T_I_ledger_01(tmp_path):
-    """T-I-ledger-01 (FR-14.4, FR-14.5): the aggregate reconciles.
-
-    The replayed side is the recorded `LedgerEntry` set, which **both** halves
-    wrote in one run and which covers all three `arm` values and both `scope`
-    values. One `arm_window` entry per arm, per-stage entries summing
-    independently, and `shared` reported beside the arms and never folded into
-    one of them, which is FR-14.5's own separation.
-
-    Fixture: `contract/fixtures/recorded/ledger_entry/`. Tier 0.
-    """
+    """T-I-ledger-01 (FR-14.4): the aggregate reconciles."""
     entries = replay("ledger_entry", schema.LedgerEntry)
     assert {entry.arm for entry in entries} == {"seeded", "mutation", "shared"}
     assert {entry.scope for entry in entries} == {"arm_window", "stage"}
@@ -612,17 +422,7 @@ def test_T_I_ledger_01(tmp_path):
 
 @pytest.mark.t0
 def test_T_I_ledger_02(tmp_path):
-    """T-I-ledger-02 (FR-16.4): the snapshot a generator sees is four fields.
-
-    `budget.snapshot` is what feeds A3 and A4, and what crosses is a
-    `LedgerSnapshot` and never the `BudgetLedger`: four fields, no result field,
-    and no way from the snapshot back to the aggregate. The generators are
-    handed one and the assertion is on the dataclass and on the supply half's
-    own import graph.
-
-    Fixture: `contract/fixtures/recorded/ledger_entry/`, and the same store.
-    Tier 0.
-    """
+    """T-I-ledger-02 (FR-16.4): the snapshot a generator sees is four fields."""
     import dataclasses
 
     budget = _registered_budget(tmp_path)
@@ -650,23 +450,9 @@ def test_T_I_ledger_02(tmp_path):
     assert "BudgetLedger" not in source, "a generator cannot reach the aggregate"
 
 
-# ===========================================================================
-# T-I-feed-*: the feedback bundle
-# ===========================================================================
-
-
 @pytest.mark.t0
 def test_T_I_feed_01(tmp_path):
-    """T-I-feed-01 (FR-16.1): one entry per probing input, from `ProbeResult`s alone.
-
-    The live side is `feedback.build_feedback`; the replayed side is the whole
-    iteration's recorded `ProbeResult` set, which carries clean exits and parse
-    errors and a firing assertion. No apparatus-internal schema is imported to
-    build the bundle, asserted on the supply half's own import graph, and every
-    field of every entry is one FR-16.1 lists.
-
-    Fixture: `contract/fixtures/recorded/probe_result/`. Tier 0.
-    """
+    """T-I-feed-01 (FR-16.1): one entry per probing input, from `ProbeResult`s alone."""
     results = replay("probe_result", schema.ProbeResult, arm="seeded")
     budget = _registered_budget(tmp_path)
     snapshot = schema.LedgerSnapshot(arm="seeded", unit="wall_clock_seconds",
@@ -700,16 +486,7 @@ def test_T_I_feed_01(tmp_path):
 
 @pytest.mark.t0
 def test_T_I_feed_02(tmp_path, monkeypatch):
-    """T-I-feed-02 (FR-16.2, FR-16.5): the bundle back into the generator.
-
-    The next iteration's prompt bytes are reproducible from the recorded
-    `SeedRecord` plus the bundle and from nothing else, which is FR-16.5's
-    replay: the same two inputs render the same bytes twice. And the mutation
-    arm receives a bundle whose `entries` list is empty and reads it not at all,
-    which is the recorded pair's own asymmetry.
-
-    Fixture: `recorded/seed_record/`, `recorded/feedback_bundle/`. Tier 0.
-    """
+    """T-I-feed-02 (FR-16.2): the bundle back into the generator."""
     seed = replay("seed_record", schema.SeedRecord)[0]
     seeded = replay("feedback_bundle", schema.FeedbackBundle, arm="seeded")[0]
     mutation = replay("feedback_bundle", schema.FeedbackBundle, arm="mutation")[0]
@@ -729,22 +506,9 @@ def test_T_I_feed_02(tmp_path, monkeypatch):
         "There was no previous iteration."
 
 
-# ===========================================================================
-# T-I-version-*: the contract version, both directions
-# ===========================================================================
-
-
 @pytest.mark.t0
 def test_T_I_version_01():
-    """T-I-version-01 (FR-04.3): downward, the apparatus refuses a `3.0` supply.
-
-    Every consumer raises `E001_MAJOR_MISMATCH` naming both versions; the
-    failure is hard and stops the reading stage, with no shim and no tolerance.
-    The supply half's four members are the ones the apparatus reads.
-
-    Fixture: `recorded/`, re-recorded at MAJOR `3.0` by the one edit §2 names.
-    Tier 0.
-    """
+    """T-I-version-01 (FR-04.3): downward, the apparatus refuses a `3.0` supply."""
     supply = [("seed_record", schema.SeedRecord),
               ("budget_file", schema.BudgetFile),
               ("probe_spec", schema.ProbeSpec),
@@ -757,23 +521,14 @@ def test_T_I_version_01():
         assert refused.value.code == "E001_MAJOR_MISMATCH"
         assert "3.0" in str(refused.value) and schema.CONTRACT_VERSION in \
             str(refused.value)
-        # And nothing shims: the same document at the package's own MAJOR is
-        # accepted, so the refusal is about the version and not about the bytes.
+        # And nothing shims: the same document at the package's own MAJOR is accepted.
         assert schema.validate(
             schema.from_json(bumped(instance, schema.CONTRACT_VERSION), cls)) is None
 
 
 @pytest.mark.t0
 def test_T_I_version_02():
-    """T-I-version-02 (FR-04.3): upward, and symmetric about `2.0`.
-
-    The same in the other direction, so a mismatch cannot be one-sided, and a
-    `1.0` document is exercised too: the rejection is symmetric about the
-    package's MAJOR and not merely forward-looking. `check_version` is called
-    before any key is read, which is why a COMPLETE document is used here.
-
-    Fixture: `recorded/`, re-recorded at MAJOR `3.0` and at `1.0`. Tier 0.
-    """
+    """T-I-version-02 (FR-04.3): upward, and symmetric about `2.0`."""
     apparatus = [("probe_result", schema.ProbeResult),
                  ("ledger_entry", schema.LedgerEntry),
                  ("run_manifest", schema.RunManifest)]
@@ -783,17 +538,11 @@ def test_T_I_version_02():
             with pytest.raises(schema.ContractError) as refused:
                 schema.from_json(bumped(instance, major), cls)
             assert refused.value.code == "E001_MAJOR_MISMATCH"
-        # `validate` refuses the same instance, so the check is not the
-        # deserialiser's alone and a half that built one in memory is stopped.
+        # `validate` refuses the same instance.
         instance.contract_version = "3.0"
         with pytest.raises(schema.ContractError) as caught:
             schema.validate(instance)
         assert caught.value.code == "E001_MAJOR_MISMATCH"
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _registered_budget(tmp_path):

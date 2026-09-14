@@ -1,36 +1,4 @@
-"""Record `tests/fixtures/system/seeds.json`, the tier-3 tier's eight seeds (W-19b).
-
-`04-Test-Plan.md` §13's rule - "`make_fixtures.py` is committed beside them" -
-and §0.6 rule 2's production rule as far as it can be kept here: every derived
-field below comes from A1's OWN pure functions (`corpus.extract_run_lines`,
-`corpus.normalise_run_line`, `corpus.dialect_buckets`) run over committed bytes,
-and each record is written only after `contract.validate` accepts it.
-
-WHAT IS REAL AND WHAT IS NOT, stated rather than hidden. These are NOT
-`corpus.build_corpus`'s output. A1 mines a blobless clone at
-`budget.yaml`'s `corpus_head_sha`; this host's clone is at another commit and
-the six crash seeds' blobs are not fetched, so mining them is a network task and
-not a fixture. Instead:
-
-  * the SIX crash seeds are assembled from two committed sources - W-09's
-    recorded failure set (`tests/fixtures/crashes/<class>_<nn>/`, which holds the
-    seed's own test input, its argv and its commit) and the committed 187-seed
-    corpus (`tests/fixtures/corpus/filtered_187.json`, which holds the subject,
-    the dates, the paths and the SDK pin). Every RUN:-derived field is A1's own
-    normalisation of the fixture's own bytes.
-  * the TWO ordinary seeds are copied UNCHANGED from
-    `tests/fixtures/corpus/seeds/`, which is W-05's own recording of
-    `build_corpus` against the blobless clone. Nothing here touches them.
-  * `SeedRecord.diff` is a REQUIRED field the clone alone can supply, and it is
-    NOT mined here. The six carry `DIFF_NOT_MINED` and say so in the value
-    itself, so no reader can take one for A1's. Nothing the tier-3 tests run
-    reads it: the only consumer is A3's prompt (§7.2), and `--generator
-    recorded` does not run A3.
-
-Run it as a program, from the repository root:
-
-    PYTHONPATH=. python circt_bug_loop/tests/fixtures/system/make_system.py
-"""
+"""Record `tests/fixtures/system/seeds.json`, the tier-3 tier's eight seeds (W-19b)."""
 from __future__ import annotations
 
 import json
@@ -44,19 +12,14 @@ FIXTURES = HERE.parent
 CRASHES = FIXTURES / "crashes"
 CORPUS = FIXTURES / "corpus"
 
-#: The value `SeedRecord.diff` carries for a seed assembled here. It is a
-#: sentence and not an empty string on purpose: a reader who greps the fixture
-#: finds the reason, and a consumer that substituted it into a prompt would
-#: substitute the reason too.
+#: The value `SeedRecord.diff` carries for a seed assembled here.
 DIFF_NOT_MINED = ("DIFF_NOT_MINED: this seed was assembled by "
                   "tests/fixtures/system/make_system.py from the committed "
                   "crash fixture and the committed corpus, not by "
                   "corpus.build_corpus over a clone. The commit's diff needs "
                   "the clone's blobs and is not part of this fixture.")
 
-#: The two ordinary seeds, W-05's own recordings, copied unchanged. Both are
-#: `circt-opt` on a `.mlir` test with an exact SDK pin, which is what makes them
-#: ordinary: neither names a crash and neither is in W-09's set.
+#: The two ordinary seeds, W-05's own recordings, copied unchanged.
 ORDINARY = ("nine_test_files.json", "not_wrapper.json")
 
 
@@ -67,19 +30,7 @@ def candidates() -> dict:
 
 
 def crash_seed(directory: Path, row: dict) -> SeedRecord:
-    """One `SeedRecord` for one of W-09's six recorded failures.
-
-    *directory* is the fixture's own, and *row* its `filtered_187.json` entry.
-    The RUN: lines are read out of the fixture's `input.mlir` and normalised by
-    A1's own function, so the tool, the argv template, the polarity and the
-    shape are the ones a mined seed would carry.
-
-    Returns:
-        SeedRecord, validated.
-    Raises:
-        ContractError when the assembled record is not a valid one; ValueError
-        when the fixture's input carries no RUN: line, which W-09's set does.
-    """
+    """One `SeedRecord` for one of W-09's six recorded failures."""
     commit = json.loads((directory / "commit.json").read_text(encoding="utf-8"))
     text = (directory / "input.mlir").read_text(encoding="utf-8")
     test_path = next((p for p in row["test"] if p.endswith(".mlir")), row["test"][0])
@@ -92,12 +43,7 @@ def crash_seed(directory: Path, row: dict) -> SeedRecord:
         polarity = [p for _, _, p, *_ in normalised]
         shape = [s for _, _, _, s, *_ in normalised]
     else:
-        # Two of W-09's six are a SPLIT PIECE of their seed's test file - the
-        # attempts recorded as "piece 1 of 9" and "piece 8 of 19" - so the piece
-        # carries no RUN: line of its own. W-09's own recorded argv is what its
-        # runner executed against that piece, and it is used here verbatim, with
-        # the input file put back as lit's `%s`: it is the same normalisation,
-        # already performed, rather than a second guess at one.
+        # Two of W-09's six are a SPLIT PIECE of their seed's test file.
         recorded = json.loads((directory / "argv.json").read_text(encoding="utf-8"))
         tools = [recorded[0]]
         argv_template = [["%s" if a == "input.mlir" else a for a in recorded[1:]]]

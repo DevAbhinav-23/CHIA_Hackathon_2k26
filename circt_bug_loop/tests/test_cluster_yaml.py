@@ -1,16 +1,4 @@
-"""Both cluster YAMLs (`03-LLD.md` §12), the `T-U-cluster-*` tests of §1.24.
-
-`T-U-cluster-01` is the tier-3 bring-up and lives with the cluster suite; every
-test here is tier 0 and reads the two committed files, once as YAML and once
-through `chia.cluster.config.load_config`, which is the loader `chia up` uses.
-
-**No test here sets `BUGLOOP_ALLOW_LIVE_MODEL`.** `T-U-cluster-07` as written
-asks for it "set to a dummy"; `T-U-layout-08` as W-16 rewrote it forbids any
-test outside `tests/system/` from putting that name into the process
-environment, and the two cannot both be obeyed. Leaving it unset is also the
-stronger check: it is exactly the second half of `T-U-cluster-08`, the loader
-leaving `${VAR}` as literal text, and the file loads either way (errata row 12).
-"""
+"""Both cluster YAMLs (`03-LLD.md` §12), the `T-U-cluster-*` tests of §1.24."""
 import os
 from pathlib import Path
 
@@ -25,8 +13,7 @@ FLOW = Path(bug_loop.FLOW_DIR)
 SINGLE = FLOW / "cluster_single.yaml"
 GCP = FLOW / "cluster_gcp.yaml"
 
-#: A synthetic key of the `AQ.` shape `T-N-nfr06-02`'s pattern is written
-#: against. It authenticates against nothing and is never a real credential.
+#: A synthetic key of the `AQ.` shape `T-N-nfr06-02`'s pattern is written against.
 SYNTHETIC_KEY = "AQ." + "0123456789abcdef0123456789abcdef"
 
 #: §12.1's three worker types, their resource names and their container counts.
@@ -41,11 +28,7 @@ def raw(path: Path) -> dict:
 
 @pytest.fixture
 def loader_env(monkeypatch, tmp_path):
-    """The operator's shell at `chia up`, minus the interlock (see the module docstring).
-
-    One literal name per line rather than a loop, so `T-U-layout-08`'s `ast`
-    walk can read every variable this file sets without resolving a loop.
-    """
+    """The operator's shell at `chia up`, minus the interlock (see the module docstring)."""
     monkeypatch.setenv("CHIA_HEAD", "127.0.0.1")
     monkeypatch.setenv("BUGLOOP_ARTEFACTS", str(tmp_path))
     monkeypatch.setenv("BUGLOOP_IMAGE_TAG", "eade0de61bc5")
@@ -58,12 +41,7 @@ def loader_env(monkeypatch, tmp_path):
 
 
 def test_T_U_cluster_02():
-    """T-U-cluster-02 (FR-12.11): three worker types, three resource names, 2/2/1.
-
-    `llm: 1` per container and not `llm: 2`, so the concurrent-prompt cap is the
-    container count, which is what `RunManifest.llm_concurrency` records.
-    Fixture: none. Tier 0.
-    """
+    """T-U-cluster-02 (FR-12.11): three worker types, three resource names, 2/2/1."""
     types = raw(SINGLE)["available_node_types"]
     assert set(types) == set(TYPES)
     for name, (resource, count) in TYPES.items():
@@ -73,13 +51,7 @@ def test_T_U_cluster_02():
 
 
 def test_T_U_cluster_03():
-    """T-U-cluster-03 (FR-14.5): the cluster is fixed-size on every type.
-
-    `min_workers == max_workers` is what makes `apparatus_concurrency` a
-    constant of the campaign rather than a number the autoscaler chooses, and
-    both arms run from this one file at this one concurrency.
-    Fixture: none. Tier 0.
-    """
+    """T-U-cluster-03 (FR-14.5): the cluster is fixed-size on every type."""
     document = raw(SINGLE)
     for name, node in document["available_node_types"].items():
         assert node["min_workers"] == node["max_workers"], name
@@ -87,18 +59,12 @@ def test_T_U_cluster_03():
 
 
 def test_T_U_cluster_04():
-    """T-U-cluster-04 (FR-17.9, NFR-05): the limits, the mount and `--user` on all three.
-
-    `bugloop_llm` carrying no `--cpus` and no `--memory` is deliberate and the
-    file's own comment says why. Fixture: none. Tier 0.
-    """
+    """T-U-cluster-04 (FR-17.9): the limits, the mount and `--user` on all three."""
     types = raw(SINGLE)["available_node_types"]
     for name in TYPES:
         options = types[name]["docker"]["run_options"]
         assert "--user $(id -u):$(id -g)" in options, name
-    # FR-17.9's one artefact root is on ALL THREE types, which is what pre-flight
-    # check 5 probes: it was missing from `bugloop_llm` and refused every run
-    # through `run_campaign` (W-18).
+    # FR-17.9's one artefact root is on ALL THREE types, which is what pre-flight check 5 probes.
     for name in TYPES:
         options = types[name]["docker"]["run_options"]
         assert "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}" in options, name
@@ -112,12 +78,7 @@ def test_T_U_cluster_04():
 
 
 def test_T_U_cluster_05():
-    """T-U-cluster-05 (FR-03.8, NFR-06, NFR-07): the setup lines, and no credential.
-
-    The one credential in either file is the literal reference
-    `${GEMINI_API_KEY}`, asserted as a reference by pattern and never resolved
-    here. Fixture: none. Tier 0.
-    """
+    """T-U-cluster-05 (FR-03.8): the setup lines, and no credential."""
     types = raw(SINGLE)["available_node_types"]
     for name in ("bugloop_circt", "bugloop_repair"):
         lines = types[name]["docker"]["run_setup_commands"]
@@ -128,9 +89,7 @@ def test_T_U_cluster_05():
     assert len(llm) == 2 and any("ssh-keyscan" in line for line in llm)
     assert not [line for line in llm if ".claude" in line]
 
-    # Over the DOCUMENT and not the text: `cluster_single.yaml`'s header comment
-    # names GITHUB_TOKEN to say that it appears in no key, and a grep over the
-    # raw text would fail on the sentence that states the rule.
+    # Over the DOCUMENT and not the text.
     for path in (SINGLE, GCP):
         document = yaml.safe_dump(raw(path))
         for forbidden in ("GITHUB_TOKEN", "~/.claude", "~/.gemini",
@@ -142,15 +101,7 @@ def test_T_U_cluster_05():
 
 
 def test_T_U_cluster_06():
-    """T-U-cluster-06 (NFR-10): the GCP skeleton names the same three worker types.
-
-    It is a SKELETON: §12.2 leaves `available_node_types` as a comment saying
-    "identical to cluster_single.yaml except the artefact mount", so the three
-    types appear under `gcp_nodes` and the images are in that comment rather
-    than in a key (errata row 13). What the test can assert is the three names,
-    the deferral being recorded, and that no loop code reads either file's node
-    names. Fixture: none. Tier 0.
-    """
+    """T-U-cluster-06 (NFR-10): the GCP skeleton names the same three worker types."""
     nodes = raw(GCP)["gcp_nodes"]
     assert set(nodes) - {"project", "zone"} == set(TYPES)
     text = GCP.read_text(encoding="utf-8")
@@ -160,12 +111,7 @@ def test_T_U_cluster_06():
 
 
 def test_T_U_cluster_07(loader_env):
-    """T-U-cluster-07 (NFR-10): both files load through `chia.cluster.config.load_config`.
-
-    The GCP file's `provider.head_ip` placeholder is what makes the second half
-    true: `load_config` raises `KeyError 'head_ip'` on a file without one, and
-    parsing is not readiness. Fixture: none. Tier 0.
-    """
+    """T-U-cluster-07 (NFR-10): both files load through `chia.cluster.config.load_config`."""
     from chia.cluster.config import ClusterConfig, load_config
 
     single = load_config(str(SINGLE))
@@ -180,13 +126,7 @@ def test_T_U_cluster_07(loader_env):
 
 
 def test_T_U_cluster_08(loader_env, monkeypatch):
-    """T-U-cluster-08 (NFR-06, FR-12.11): the LLM type, and what the loader does with `${...}`.
-
-    Loaded twice: with the key set the value is substituted, and with it unset
-    the literal `${GEMINI_API_KEY}` survives into the container's environment,
-    which is why `build_llm` refuses a key beginning `${`. Fixture: none
-    (the synthetic key is this module's own constant). Tier 0.
-    """
+    """T-U-cluster-08 (NFR-06): the LLM type, and what the loader does with `${...}`."""
     from chia.cluster.config import load_config
 
     llm = load_config(str(SINGLE)).node_types["bugloop_llm"]
@@ -204,19 +144,7 @@ def test_T_U_cluster_08(loader_env, monkeypatch):
 
 
 def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
-    """T-U-cluster-09 (NFR-10, FR-19.8): the head activates one real environment.
-
-    New id (W-17's ninth fix, errata row 25). §12.1 wrote `source ~/.bashrc &&
-    conda activate circtbugloop` and no machine of this project has that
-    environment, so every head command would have failed at `chia up` and the
-    cluster would have come up with Ray started from the system python. The
-    three head commands now activate `${BUGLOOP_HEAD_ENV}`, which the operator
-    sets to their own environment's activate script; YAML has no defaulting
-    form, so an unset variable survives as the literal and `chia up` fails
-    loudly rather than starting the wrong interpreter. `bug_loop_submit.sh`
-    holds the default, so the driver's job and the head's Ray are one
-    environment. Fixture: none. Tier 0.
-    """
+    """T-U-cluster-09 (NFR-10): the head activates one real environment."""
     from chia.cluster.config import load_config
 
     document = raw(SINGLE)
@@ -225,9 +153,7 @@ def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
     assert len(head) == 3
     assert all(command.startswith("source ${BUGLOOP_HEAD_ENV}")
                for command in head), head
-    # No command activates a conda environment or sources a login shell. The
-    # word survives in two COMMENTS, one naming the worker image's own lit path
-    # and one naming what this replaced, so the check is over the commands.
+    # No command activates a conda environment or sources a login shell.
     commands = [c for key, value in document.items()
                 if key.endswith(("_commands", "setup_commands"))
                 for c in (value or [])]
@@ -235,9 +161,7 @@ def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
                  for c in (node.get("run_setup_commands") or [])]
     assert not [c for c in commands if "conda" in c or "bashrc" in c]
 
-    # Expanded by CHIA's own loader from the operator's shell, and left as the
-    # literal when the shell has no value, which is the same rule the model key
-    # travels by (T-U-cluster-08).
+    # Expanded by CHIA's own loader from the operator's shell.
     activate = tmp_path / "venv" / "bin" / "activate"
     activate.parent.mkdir(parents=True)
     activate.write_text("# a head environment\n", encoding="utf-8")
@@ -251,8 +175,7 @@ def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
     unexpanded = load_config(str(SINGLE))
     assert unexpanded.head_setup_commands == ["source ${BUGLOOP_HEAD_ENV}"]
 
-    # The submit wrapper is where the default lives, and it derives the job's
-    # own interpreter from it rather than trusting whatever `python` resolves to.
+    # The submit wrapper is where the default lives.
     submit = (FLOW / "bug_loop_submit.sh").read_text(encoding="utf-8")
     assert 'export BUGLOOP_HEAD_ENV="${BUGLOOP_HEAD_ENV:-' in submit
     assert 'PYBIN="${BUGLOOP_PY:-$(dirname "$BUGLOOP_HEAD_ENV")/python}"' in submit
@@ -260,17 +183,7 @@ def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
 
 
 def test_T_U_cluster_10(loader_env):
-    """T-U-cluster-10 (K2, NFR-06): only `llm` and `repair` carry the credential.
-
-    New id, W-20b. K2 measured the other side of this: the seeded arm and stage
-    6 built their backend on the `circt` worker, which carries neither variable,
-    so every seeded generation and every triage report refused. Since the fix
-    the only node that constructs a client is `llm.llm_turn` at `{"llm": 1.0}`,
-    and stage 7's chain is CHIA's own on `{"repair": 1}`; every other type must
-    therefore see neither name, and a YAML that gave one to `bugloop_circt`
-    would be handing a key to the containers that run generated input.
-    Fixture: none. Tier 0.
-    """
+    """T-U-cluster-10 (NFR-06): only `llm` and `repair` carry the credential."""
     from chia.cluster.config import load_config
 
     keyed = {}

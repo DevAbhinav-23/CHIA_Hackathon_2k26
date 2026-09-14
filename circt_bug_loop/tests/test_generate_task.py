@@ -1,23 +1,4 @@
-"""`generate_task.py` (A3, A4, the backend glue): `04-Test-Plan.md` §1.6.
-
-`T-U-gen-01` to `-10`, `-14`, and `-19` to `-25`; the tool rows `-11` to `-18`
-are in `test_tools.py`, which W-13's brief asks for as a module of its own.
-
-**No model runs in any of these, and that is enforced rather than intended.**
-The five backend tests use `conftest.fake_vertex`, which is CHIA's own
-`chia/models/tests/test_vertex.py` recipe, and the seeded arm's two turns are
-driven by the recorded-shaped transcripts of `fixtures/generate/` replayed
-through a `dispatch_turn` substitute, so `_turn` itself, the prompts, the
-emitter, the two `ChiaTool`s and `corpus.resolve_sites` are all the real ones.
-
-**`BUGLOOP_ALLOW_LIVE_MODEL` is never set by anything in this file**, not even
-inside `monkeypatch`, which is stricter than §1.6's own sentence and is what
-the work-plan brief asks for. The allow path is exercised by substituting the
-NAME the interlock reads, `generate_task._LIVE_MODEL_ENV`, with the stub below:
-the refusal, the key check and the express construction all run, and the real
-variable stays absent from this process for the whole session (`T-U-layout-08`,
-and `conftest.no_live_model` asserts it).
-"""
+"""`generate_task.py` (A3): `04-Test-Plan.md` §1.6."""
 import ast
 import inspect
 import json
@@ -36,8 +17,7 @@ from circt_bug_loop.generate_task import (LiveModelRefused, ProbeWriteTool,
                                           llm_turn)
 from circt_bug_loop.tests.conftest import (call_node, vertex_call_part,
                                            vertex_response, vertex_text_part)
-# The throwaway git repository and the no-Ray tool construction are shared with
-# the tool tests rather than built twice.
+# The throwaway git repository and the no-Ray tool construction are shared with the tool tests rather than built twice.
 from circt_bug_loop.tests.test_tools import (throwaway_repo,  # noqa: F401
                                              tool_servers)
 
@@ -48,8 +28,7 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 TURNS = FIXTURES / "generate" / "turns"
 SEEDS = FIXTURES / "corpus" / "seeds"
 
-#: The variable name the interlock reads is substituted with this one wherever
-#: a test needs the ALLOW path. Nothing in this tree sets the real name.
+#: The variable name the interlock reads is substituted with this one wherever a test needs the ALLOW path.
 INTERLOCK_STUB = "BUGLOOP_TEST_INTERLOCK_STUB"
 
 #: A synthetic key, which is not a credential and never leaves this process.
@@ -101,16 +80,7 @@ def config(tmp_path, throwaway_repo) -> dict:  # noqa: F811
 
 @pytest.fixture
 def replay(monkeypatch, tool_servers):  # noqa: F811
-    """Replay recorded turn text through the one call that reaches a model.
-
-    `dispatch_turn` is the ONE function substituted, and nothing else is:
-    `_turn` still renders, writes FR-04.6's five files and records the usage,
-    the two `ChiaTool`s are constructed and stopped for real, and a turn's
-    declared files are written through `write_probe` itself, so a name the tool
-    would refuse is refused here too. Since K2 the node builds no backend at
-    all - the client is `llm_turn`'s, on the `llm` worker - so the substitute
-    receives the turn request's fields and never an LLM.
-    """
+    """Replay recorded turn text through the one call that reaches a model."""
     def install(turns: list) -> dict:
         state = {"calls": [], "pending": list(turns)}
 
@@ -151,20 +121,10 @@ def run_seeded(config: dict, feedback=None) -> dict:
                                            spent=0.0, cap=14400.0), config)
 
 
-# ---------------------------------------------------------------------------
-# The two turns, the emitter and the cap
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_gen_01_the_tool_list_is_exactly_the_two_tools(replay, config,
                                                            tool_servers):  # noqa: F811
-    """T-U-gen-01 (FR-04.4, NFR-03): `[source_read, probe_write]`, and no BashTool.
-
-    The withdrawal is what makes FR-04.4's second clause true by construction:
-    `BashTool` had no read-only mode and its `PATH` on a `circt` worker put
-    `/workspace/circt/build/bin` first (W10).
-    """
+    """T-U-gen-01 (FR-04.4): `[source_read, probe_write]`, and no BashTool."""
     state = replay([{"text": transcript("seed_read_ok")},
                     {"text": transcript("probe_write_ok"),
                      "files": probe_files(["array_element.mlir", "array_zero.mlir"])}])
@@ -199,12 +159,7 @@ def test_T_U_gen_02_the_cap_keeps_the_first_three_in_emission_order(replay, conf
 @pytest.mark.t0
 def test_T_U_gen_03_a_wrong_tool_is_the_emitters_E010_and_not_the_validators(
         replay, config):
-    """T-U-gen-03 (FR-04.2): `emit_specs` raises E010; `validate` accepts the same spec.
-
-    K10's correction, measured: `ProbeSpec.tool` is annotated `str` and not a
-    `Literal`, and `validate` is handed one object with no access to the
-    `SeedRecord`, so the check has to live where the seed is.
-    """
+    """T-U-gen-03 (FR-04.2): `emit_specs` raises E010; `validate` accepts the same spec."""
     replay([{"text": transcript("seed_read_ok")},
             {"text": transcript("probe_write_wrongtool"),
              "files": probe_files(["array_element.mlir"])}])
@@ -256,12 +211,7 @@ def test_T_U_gen_04_every_emitted_spec_validates_with_every_field_populated(
 
 @pytest.mark.t0
 def test_T_U_gen_05_sibling_sites_are_resolved_against_the_run_commit(replay, config):
-    """T-U-gen-05 (FR-04.1): a site that resolves stands, one that does not is counted.
-
-    The resolution is `corpus.resolve_sites`, a HEAD node, dispatched rather
-    than run inside A3, which sits on a `circt` worker with no clone (K5). Both
-    halves are asserted: the outcome here, and the dispatch on the source below.
-    """
+    """T-U-gen-05 (FR-04.1): a site that resolves stands, one that does not is counted."""
     replay([{"text": transcript("seed_read_ok")},
             {"text": transcript("probe_write_ok"),
              "files": probe_files(["array_element.mlir", "array_zero.mlir"])}])
@@ -290,8 +240,7 @@ def test_T_U_gen_06_a_failed_turn_is_recorded_charged_and_survived(replay, confi
 
     assert result["failure"] == "turn_failed:RuntimeError"
     assert result["specs"] == []
-    # The stage-1 spend is still returned for the ledger to charge, and the
-    # failed turn's own files are on disk.
+    # The stage-1 spend is still returned for the ledger to charge.
     assert result["logs"]["usage"]["seed_read"]["tokens_in"] == 11
     assert Path(result["logs"]["llm_probe_write.prompt.md"]).is_file()
     assert result["counters"].failed == 1 and result["counters"].completed == 0
@@ -331,7 +280,7 @@ def test_T_U_gen_08_all_five_files_are_written_for_both_turns(replay, config):
 
 @pytest.mark.t0
 def test_T_U_gen_14_the_argv_is_the_seeds_and_never_the_agents(replay, config):
-    """T-U-gen-14 (FR-04.2, NFR-03): the declared argv is ignored, the template wins."""
+    """T-U-gen-14 (FR-04.2): the declared argv is ignored, the template wins."""
     replay([{"text": transcript("seed_read_ok")},
             {"text": transcript("probe_write_argv"),
              "files": probe_files(["array_element.mlir"])}])
@@ -340,8 +289,7 @@ def test_T_U_gen_14_the_argv_is_the_seeds_and_never_the_agents(replay, config):
     spec, = result["specs"]
     assert spec.argv == ["-lower-handshake-to-hw", spec.input_path]
     assert "--mlir-print-ir-after-all" not in spec.argv
-    # `--split-input-file` is in the seed's own template and is stripped,
-    # because a single generated input has nothing to split.
+    # `--split-input-file` is in the seed's own template and is stripped.
     assert "--split-input-file" in seed().argv_template[0]
     assert not any(token.startswith("--split-input-file") for token in spec.argv)
 
@@ -349,12 +297,7 @@ def test_T_U_gen_14_the_argv_is_the_seeds_and_never_the_agents(replay, config):
 @pytest.mark.t0
 def test_T_U_gen_19_both_tools_are_stopped_in_a_finally(replay, config,
                                                         monkeypatch, tool_servers):  # noqa: F811
-    """T-U-gen-19 (FR-19.1): no live tool server survives a turn, or a raising turn.
-
-    Without it, 187 seeds at up to 3 iterations is up to 561 orphaned actors
-    plus 561 orphaned servers in one arm window, on a cluster whose whole point
-    is a fixed size (W11).
-    """
+    """T-U-gen-19 (FR-19.1): no live tool server survives a turn, or a raising turn."""
     from chia.base.tools.ChiaTool import ChiaTool
 
     before = len(ChiaTool._tool_registry)
@@ -368,8 +311,7 @@ def test_T_U_gen_19_both_tools_are_stopped_in_a_finally(replay, config,
     assert run_seeded(config)["failure"] == "turn_failed:RuntimeError"
     assert len(ChiaTool._tool_registry) == before, "a turn that raised leaked a tool"
 
-    # A stop() that itself raises is swallowed, which is CHIA's own choice at
-    # the same place: a tool that will not stop must not mask the result.
+    # A stop() that itself raises is swallowed, which is CHIA's own choice at the same place.
     def _angry_stop(self):
         raise RuntimeError("the actor is gone")
 
@@ -383,12 +325,7 @@ def test_T_U_gen_19_both_tools_are_stopped_in_a_finally(replay, config,
 @pytest.mark.t0
 def test_T_U_gen_20_the_two_tools_are_placed_on_different_nodes(replay, config,
                                                                 tool_servers):  # noqa: F811
-    """T-U-gen-20 (FR-04.4, FR-06.8): the source tool on the head, the writer here.
-
-    The clone is the head's, and a write has to land in the filesystem
-    namespace the probe directory lives in, so the two differ in every
-    construction.
-    """
+    """T-U-gen-20 (FR-04.4): the source tool on the head, the writer here."""
     replay([{"text": transcript("seed_read_ok")},
             {"text": transcript("probe_write_ok"),
              "files": probe_files(["array_element.mlir", "array_zero.mlir"])}])
@@ -400,20 +337,10 @@ def test_T_U_gen_20_the_two_tools_are_placed_on_different_nodes(replay, config,
     assert source_read.task_options != probe_write.task_options
 
 
-# ---------------------------------------------------------------------------
-# The mutation arm, and the one code path both arms take
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_gen_09_the_mutation_arms_body_does_not_read_its_feedback(  # noqa: D403
         ):
-    """T-U-gen-09 (FR-16.2): the identifier appears exactly once, in the parameters.
-
-    The rule is enforced on the BODY and not on the signature, because FR-05.4
-    requires both arms' output to travel one code path and two signatures for
-    one `Generator` protocol is a second code path (K11).
-    """
+    """T-U-gen-09 (FR-16.2): the identifier appears exactly once, in the parameters."""
     source = inspect.getsource(generate_mutation)
     assert len(re.findall(r"\bfeedback\b", source)) == 1
     assert re.search(r"def generate_mutation\([^)]*\bfeedback\b", source,
@@ -422,12 +349,7 @@ def test_T_U_gen_09_the_mutation_arms_body_does_not_read_its_feedback(  # noqa: 
 
 @pytest.mark.t0
 def test_T_U_gen_10_one_spec_from_each_arm_takes_one_code_path(config, tmp_path):
-    """T-U-gen-10 (FR-05.4, FR-18.1): one builder, one validator, no arm branch.
-
-    `arm` is carried into the record and is read by nothing here; the only
-    place it decides anything is `contract.validate`'s conditional rule, which
-    §14.5 exempts by name.
-    """
+    """T-U-gen-10 (FR-05.4): one builder, one validator, no arm branch."""
     both = {}
     for arm in ("seeded", "mutation"):
         extra = {} if arm == "seeded" else {
@@ -455,12 +377,7 @@ def test_T_U_gen_10_one_spec_from_each_arm_takes_one_code_path(config, tmp_path)
 
 @pytest.mark.t0
 def test_generate_mutation_emits_validated_specs_with_no_model(config, monkeypatch):
-    """A4 end to end on the development set: specs, no-ops and attributed failures.
-
-    FR-05.1's isolation is structural here: the node is handed the same
-    `SeedRecord` the seeded arm gets and reads only `test_files`, and nothing
-    in `mutators/` can reach a backend.
-    """
+    """A4 end to end on the development set: specs, no-ops and attributed failures."""
     from circt_bug_loop import llm as llm_module
 
     monkeypatch.setattr(llm_module, "build_llm", lambda *a, **k: pytest.fail(
@@ -482,18 +399,9 @@ def test_generate_mutation_emits_validated_specs_with_no_model(config, monkeypat
         assert Path(spec.input_path).is_file()
 
 
-# ---------------------------------------------------------------------------
-# 7.2 and 7.3, the two renderings
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_the_stage_one_prompt_is_a_pure_function_of_the_seed(config):
-    """FR-16.5: every stage-1 variable comes from the `SeedRecord` (7.2).
-
-    That is what contract 2.0 bought: before it, `$diff` and `$test_files` had
-    no source in either object and FR-16.5 was unsatisfiable (K6).
-    """
+    """FR-16.5: every stage-1 variable comes from the `SeedRecord` (7.2)."""
     record = seed()
     rendered = generate_task.render_seed_read(record, config)
 

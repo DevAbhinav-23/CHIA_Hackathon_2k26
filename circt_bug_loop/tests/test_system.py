@@ -1,54 +1,4 @@
-"""04-Test-Plan.md §3's system tier, as far as it goes with no model (W-19b).
-
-**Two tiers in one module, and why.** Every other test module states one tier
-with a module-level `pytestmark` (§0.5). This one cannot: the `--generator
-recorded` mode it exercises is a tier-0 object - a flag, two generator nodes and
-a report node, all pure Python over committed fixtures - and the thing the mode
-EXISTS for is tier 3, the same nodes dispatched through Ray onto the real
-single-machine cluster. Splitting them into two files would put the T0 tests of
-a mode in one file and the mode's only reason to exist in another, so the marker
-is per test here and the module declares none.
-
-**No model, at any tier in this file.** Nothing below sets
-`BUGLOOP_ALLOW_LIVE_MODEL` - `conftest.no_live_model` refuses the whole session
-if anything does - and `test_recorded_never_builds_a_model` is the positive
-check: `llm.build_llm` is replaced with a function that raises, and the two
-recorded nodes run anyway.
-
-**What the tier-3 tests do NOT do, and why.** §3's tests are written for
-`bug_loop.py`'s own `run_campaign`, whose twelve pre-flight checks stand between
-argv and the first dispatch. Four of them cannot pass on this host today, none
-for a reason this task can fix and none to do with the model:
-
-  1. check 3 wants the clone at `budget.yaml`'s `corpus_head_sha`; this host's
-     blobless clone is at another commit, and A1's mining of the six crash
-     seeds' blobs is a network task.
-  2. B1 `build_image` is dispatched at `{"circt": 1}`, and NO worker container
-     on this cluster has a Docker daemon or a socket mounted - the assertions
-     image has no `docker` binary at all - so the node cannot run where §3.2
-     places it.
-  3. check 10 wants an issue mirror, and there is neither a mirror in a
-     `loop.db` nor a GitHub token file on this host to refresh one with.
-  4. check 11 wants the forum post FR-15.4 requires, which has not been made.
-
-So the tier-3 tests below drive `campaign_drive` DIRECTLY, with
-`Dispatch(remote=True)` against `ray.init(address="auto")` and
-`bug_loop.recorded_stages()`. That is the same dispatch path `run_campaign`
-takes after its pre-flight - the same nodes, the same resources, the same store
-and the same ledger - with the pre-flight replaced by committed fixtures. The
-four blockers are recorded in `analysis/measurements/2026-09-15-system-tier.md`
-and in the errata log; `test_submit_wrapper_end_to_end` is what runs the real
-`bug_loop.py` through the real `chia job submit`, and it reaches exactly as far
-as pre-flight lets it.
-
-**`loop.db` lives under the artefact root here, not at `bug_loop.DB_PATH`.**
-`ledger.accrue` and `dedup_and_screen` are `@ChiaFunction(max_retries=0)` with
-no resource, so Ray may place either in a worker container, where
-`bug_loop.FLOW_DIR` is the runtime env's own unpacked directory and not the
-head's checkout. The artefact root is the one path bind-mounted identically
-everywhere (FR-17.9), so a store under it is the same file from every node.
-Recorded as an errata row, not fixed here.
-"""
+"""04-Test-Plan.md §3's system tier, as far as it goes with no model (W-19b)."""
 from __future__ import annotations
 
 import dataclasses
@@ -78,20 +28,9 @@ RECORDED = Path(bug_loop.FLOW_DIR) / "contract" / "fixtures" / "recorded"
 IMAGE_MANIFEST = (Path(bug_loop.FLOW_DIR).parent / "analysis" / "measurements"
                   / "raw" / "image-manifest.json")
 
-#: The tiny budget of §3, derived from the RECORDED `BudgetFile` rather than
-#: from a second committed YAML: the recording is `budget.load_budget`'s own
-#: output over the committed file, taken through all six registration checks, so
-#: only the three numbers a tiny run needs to change are changed here and every
-#: other field is the campaign's. §3 names `tests/system/budget_tiny.yaml`; a
-#: YAML would have to be re-registered in a throwaway git repository to be
-#: loadable at all, which is `make_recorded.py`'s job and not a fixture's.
+#: The tiny budget of §3, derived from the RECORDED `BudgetFile` rather than from a second committed YAML.
 TINY = {"arm_window_seconds": 90.0, "per_seed_probe_cap": 1,
         "per_seed_iteration_cap": 1}
-
-
-# ===========================================================================
-# Fixtures shared by both tiers
-# ===========================================================================
 
 
 def _recorded(member: str):
@@ -117,14 +56,7 @@ def tiny_budget(**over) -> BudgetFile:
 
 
 def image_spec() -> ImageSpec:
-    """The `ImageSpec` of the image the cluster actually runs (FR-03.16).
-
-    Every field comes from `analysis/measurements/raw/image-manifest.json`,
-    which W-04 computed inside a freshly started container of the published
-    image, so `probe_execute`'s per-probe hash check (FR-06.1) is a real
-    comparison of the worker's own binaries against a recording made elsewhere
-    and not a self-comparison.
-    """
+    """The `ImageSpec` of the image the cluster actually runs (FR-03.16)."""
     document = json.loads(IMAGE_MANIFEST.read_text(encoding="utf-8"))
     return ImageSpec(
         circt_sha=document["circt_sha"], sdk_tag=document["circt_ver"],
@@ -139,13 +71,7 @@ def image_spec() -> ImageSpec:
 
 def manifest_for(mode: str, run_id: str, artefact_root: str, *,
                  budget: BudgetFile, seeds: list, spec: ImageSpec = None) -> RunManifest:
-    """The recorded `RunManifest`, re-stamped for one tier-3 run.
-
-    `arm_order` is ALWAYS both arms and is never narrowed here: 2.8 requires the
-    manifest to name both exactly once, because the order is a property of the
-    campaign's design and not of one invocation. Running one arm is
-    `campaign_drive(..., arms=[...])`, which is what `--arm` reaches.
-    """
+    """The recorded `RunManifest`, re-stamped for one tier-3 run."""
     spec = spec or image_spec()
     recorded = _recorded("run_manifest")
     arms = ("seeded", "mutation")
@@ -170,24 +96,16 @@ def manifest_for(mode: str, run_id: str, artefact_root: str, *,
 
 def drive(manifest: RunManifest, budget: BudgetFile, seeds: list, *,
           remote: bool, arms=None, clone_path: str = "") -> dict:
-    """Build the recorded-mode campaign and run it, returning what it did.
-
-    Returns:
-        {"outcome", "store", "counters", "manifest"}.
-    """
+    """Build the recorded-mode campaign and run it, returning what it did."""
     from chia.trace.metrics import MetricsLogger
 
     root = Path(manifest.artefact_root) / manifest.run_manifest_id
     (root / "results").mkdir(parents=True, exist_ok=True)
     store = LoopStore(str(Path(manifest.artefact_root) / "loop.db"))
     dispatch = bug_loop.Dispatch(remote=remote)
-    # The head placement the driver supplies (K4, K5). Resolved only when a Ray
-    # is running, a `remote=False` campaign having no cluster to pin to.
+    # The head placement the driver supplies (K4).
     head = dispatch.head_options() if remote else None
-    # §6.4's first four tables, as `run_campaign` writes them: the run, the
-    # image, the seed rows the seeded-bug validation table is taken over, and
-    # the two `shared` occupancies - one of which carries the synthesis date
-    # FR-05.8's declaration is rendered off.
+    # §6.4's first four tables, as `run_campaign` writes them.
     bug_loop.write_run_rows(store, manifest, image_spec=image_spec(),
                             mined={"seeds": seeds, "exclusions": {},
                                    "sv_seeds": [], "sdk_map": {}},
@@ -208,19 +126,7 @@ def drive(manifest: RunManifest, budget: BudgetFile, seeds: list, *,
 
 
 def _gcs_answers(timeout: float = 3.0):
-    """The bootstrap address `address="auto"` would take, if something answers it.
-
-    `ray.init(address="auto")` DOES NOT fail fast when nothing is listening: it
-    reads `/tmp/ray/ray_current_cluster`, which a torn-down cluster leaves
-    behind, and then retries the GCS connection for minutes (measured on this
-    host, 2026-09-15: a stale file from the W-19a run made `ray.init` hang past
-    a two-minute test timeout rather than raise). §0.5's "skip cleanly" needs a
-    bounded check, so the address is resolved Ray's own way and probed with one
-    TCP connect.
-
-    Returns:
-        the address string when the GCS port accepts a connection, else None.
-    """
+    """The bootstrap address `address="auto"` would take, if something answers it."""
     import socket
 
     from ray._private.utils import read_ray_address
@@ -246,12 +152,7 @@ def cluster():
         pytest.skip("no Ray GCS is listening at the bootstrap address; bring a "
                     "cluster up with `chia up circt_bug_loop/cluster_single.yaml`")
     try:
-        # Ray 2.54 raises one FutureWarning of its own on every `ray.init` with
-        # num_gpus unset, and `-W error` turns it into the exception that
-        # "skips" the whole tier. It is suppressed HERE and nowhere wider, and
-        # the alternative Ray offers - RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0 -
-        # is deliberately not taken: it opts the cluster into the future
-        # behaviour rather than silencing the notice about it.
+        # Ray 2.54 raises one FutureWarning of its own on every `ray.init` with num_gpus unset.
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=FutureWarning,
                                     module=r"ray\..*")
@@ -274,19 +175,9 @@ def artefact_root() -> str:
     return root
 
 
-# ===========================================================================
-# Tier 0: the `--generator recorded` mode itself
-# ===========================================================================
-
-
 @pytest.mark.t0
 def test_generator_flag_defaults_to_model_and_recorded_implies_no_repair():
-    """The flag's two values, and the one condition `repair_enabled` spells.
-
-    `--generator recorded` implying `--no-repair` is not a convenience: stage 7
-    IS a model turn whatever the backend (§3.8), so a recorded run that
-    dispatched it would be a recorded run with a turn in it.
-    """
+    """The flag's two values, and the one condition `repair_enabled` spells."""
     parse = bug_loop.build_parser().parse_args
     assert parse(["--mode", "discovery"]).generator == "model"
     assert bug_loop.repair_enabled(parse(["--mode", "discovery"])) is True
@@ -302,8 +193,7 @@ def test_generator_flag_defaults_to_model_and_recorded_implies_no_repair():
 
 @pytest.mark.t0
 def test_recorded_stages_replaces_exactly_the_three_model_bearing_nodes():
-    """Eight of the ten are the real nodes, and the three replaced are the two
-    generators and B7 - the only nodes of §3.2 that reach `llm.build_llm`."""
+    """Eight of the ten are the real nodes, and the three replaced are the two generators and B7 - the only nodes of §3.2 that reach `llm.build_llm`."""
     real, recorded = bug_loop.default_stages(), bug_loop.recorded_stages()
     replaced = {field.name for field in dataclasses.fields(bug_loop.Stages)
                 if getattr(real, field.name) is not getattr(recorded, field.name)}
@@ -311,8 +201,7 @@ def test_recorded_stages_replaces_exactly_the_three_model_bearing_nodes():
     assert recorded.generate_seeded is bug_loop.generate_recorded_seeded
     assert recorded.generate_mutation is bug_loop.generate_recorded_mutation
     assert recorded.triage_report is bug_loop.recorded_report
-    # Every replacement keeps §3.2's placement, so the mode changes what the
-    # node does and never where it runs.
+    # Every replacement keeps §3.2's placement.
     for node in (bug_loop.generate_recorded_seeded,
                  bug_loop.generate_recorded_mutation, bug_loop.recorded_report):
         assert node._chia_options["resources"] == {"circt": 1}
@@ -345,12 +234,7 @@ def test_recorded_inputs_prefers_the_seam_then_the_seeds_own_files():
 @pytest.mark.t0
 @pytest.mark.parametrize("arm", ("seeded", "mutation"))
 def test_recorded_generation_emits_valid_specs_for_either_arm(tmp_path, arm):
-    """One builder, both arms, and `contract.validate` accepting both (FR-05.4).
-
-    The mutation arm's three conditional fields are present and the seeded arm's
-    are absent, which is 2.8's rule and the one place the two arms' records
-    legitimately differ.
-    """
+    """One builder, both arms, and `contract.validate` accepting both (FR-05.4)."""
     seed = system_seeds()[0]
     cfg = {"iteration": 1, "per_seed_probe_cap": 3,
            "run_manifest_id": "r" * 32, "artefact_root": str(tmp_path),
@@ -380,8 +264,7 @@ def test_recorded_generation_emits_valid_specs_for_either_arm(tmp_path, arm):
 
 @pytest.mark.t0
 def test_recorded_generation_names_a_failure_and_never_raises(tmp_path):
-    """A seed the builder cannot serve ends the seed, as a failed turn does
-    (FR-04.8); it does not take the arm down with it."""
+    """A seed the builder cannot serve ends the seed, as a failed turn does (FR-04.8); it does not take the arm down with it."""
     seed = dataclasses.replace(system_seeds()[0], run_lines=[], argv_template=[],
                                polarity=[], shape=[])
     out = bug_loop._recorded_generation(
@@ -395,13 +278,7 @@ def test_recorded_generation_names_a_failure_and_never_raises(tmp_path):
 
 @pytest.mark.t0
 def test_recorded_never_builds_a_model(tmp_path, monkeypatch):
-    """The mode's whole point, asserted rather than reasoned about.
-
-    `llm.build_llm` is the ONE constructor every model turn of §3.5.1 goes
-    through, and since K2 `llm.dispatch_turn` is the ONE way to reach it. Both
-    are replaced here with functions that raise, and both recorded nodes then
-    run to completion.
-    """
+    """The mode's whole point, asserted rather than reasoned about."""
     from circt_bug_loop import llm
 
     def refuse(*args, **kwargs):
@@ -497,10 +374,7 @@ def test_recorded_report_renders_the_template_and_says_no_turn_was_made(tmp_path
     assert "hw.module @a() {}" in rendered               # the reduced case's bytes
     assert "a A.cpp:10" in rendered                      # the frames
     assert "Arm: seeded" in rendered                     # the candidate's arm
-    # ERRATUM W-19b-7: the artefact's `Assisted-by:` trailer still names the
-    # manifest's triage model, which in this mode did not run. `render_report`
-    # takes it off the manifest and not as a parameter; the row is owed to
-    # triage_task.py, which this task may not edit.
+    # ERRATUM W-19b-7: the artefact's `Assisted-by:` trailer still names the manifest's triage model.
     assert "Assisted-by: " in rendered
     assert isinstance(out["counters"], CounterBlock)
     assert (out["counters"].stage, out["counters"].completed) == ("stage_6", 1)
@@ -508,8 +382,7 @@ def test_recorded_report_renders_the_template_and_says_no_turn_was_made(tmp_path
 
 @pytest.mark.t0
 def test_recorded_report_lets_the_tool_verdict_win(tmp_path):
-    """FR-11.2: a screened duplicate is `known_issue` here exactly as in B7,
-    the absent turn having no say in it either way."""
+    """FR-11.2: a screened duplicate is `known_issue` here exactly as in B7, the absent turn having no say in it either way."""
     candidate, reduced, verdict, dedup, manifest, cfg, directory = _report_call(
         tmp_path)
     known = dataclasses.replace(dedup, verdict="known_open_issue")
@@ -520,8 +393,7 @@ def test_recorded_report_lets_the_tool_verdict_win(tmp_path):
 
 @pytest.mark.t0
 def test_system_seed_fixture_is_the_six_and_the_two():
-    """`fixtures/system/seeds.json` is W-09's six confirmed failures and W-05's
-    two recordings, and every one of them validates."""
+    """`fixtures/system/seeds.json` is W-09's six confirmed failures and W-05's two recordings, and every one of them validates."""
     seeds = system_seeds()
     crashes = {json.loads((HERE / "fixtures" / "crashes" / name
                            / "commit.json").read_text(encoding="utf-8"))["parent_of"]
@@ -534,25 +406,10 @@ def test_system_seed_fixture_is_the_six_and_the_two():
         assert seed.entry_tool == "circt-opt"
 
 
-# ===========================================================================
-# Tier 3: the same mode, dispatched onto the real cluster
-# ===========================================================================
-
-
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_place_01_head_nodes_stay_on_the_head_and_workers_do_not(cluster):
-    """K4, K5, W9: the placement, measured on the cluster and not reasoned about.
-
-    Three facts in one test. A resourced node really is dispatched OFF the
-    head, which is W-19b's own check that `Dispatch` dispatches at all. A
-    `HEAD_NODES` member really lands ON the head, which is K5. And the
-    affinity is HARD, so the second is not luck: a `soft=True` strategy would
-    satisfy this test on an idle cluster and fail on a busy one.
-
-    The two nodes are built here rather than borrowed, so nothing of the
-    campaign's own state is touched and the test leaves no row anywhere.
-    """
+    """K4, K5, W9: the placement, measured on the cluster and not reasoned about."""
     from chia.base.ChiaFunction import ChiaFunction, get
 
     def where() -> dict:
@@ -575,8 +432,7 @@ def test_place_01_head_nodes_stay_on_the_head_and_workers_do_not(cluster):
     for place in landed:
         print(f"  circt worker  {place['node_id'][:12]}  {place['resources']}")
 
-    # On the head: the same unresourced shape every HEAD_NODES member has,
-    # dispatched through `Dispatch` so the pinning under test is the real one.
+    # On the head: the same unresourced shape every HEAD_NODES member has.
     pinned = bug_loop.head_options(head_id)
     strategy = pinned["scheduling_strategy"]
     assert strategy.soft is False, "a soft affinity is a preference, not a placement"
@@ -592,12 +448,7 @@ def test_place_01_head_nodes_stay_on_the_head_and_workers_do_not(cluster):
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_disc_01_one_discovery_iteration_over_the_eight_seeds(cluster, artefact_root):
-    """T-S-disc-01, as far as it goes without a model (FR-02.7, FR-17.1, FR-18.6).
-
-    One full iteration in discovery mode over W-09's six confirmed-failure seeds
-    and W-05's two, both arms, `--generator recorded`, every stage dispatched
-    through Ray onto the cluster's own workers.
-    """
+    """T-S-disc-01, as far as it goes without a model (FR-02.7)."""
     run_id = uuid.uuid4().hex
     budget = tiny_budget()
     seeds = system_seeds()
@@ -643,8 +494,7 @@ def test_disc_01_one_discovery_iteration_over_the_eight_seeds(cluster, artefact_
         print(f"  probes    {line}")
     print(f"  violations: {run['counters'].violations}")
     assert run["counters"].violations == [], run["counters"].violations
-    # `CounterLog` keys a block `<arm>/<stage>`; both arms reached the generator
-    # and the probe, which is stage 2 and stage 3 dispatched onto the cluster.
+    # `CounterLog` keys a block `<arm>/<stage>`.
     assert {"seeded/stage_2", "seeded/stage_3",
             "mutation/stage_2", "mutation/stage_3"} <= set(counters["totals"])
     for key, block in counters["totals"].items():
@@ -665,22 +515,7 @@ def _stop_reasons(outcome: dict) -> list:
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_calib_01_calibration_mode_over_three_sampled_seeds(cluster, artefact_root):
-    """T-S-calib-01 (FR-02.7, FR-18.5): the eligible sample, or a named refusal.
-
-    XFAIL until W-20b, and now a decided test. FR-02.7 wants each sampled seed
-    probed at ITS OWN parent commit; a run has one image and `probe_execute`
-    runs and hashes that image's binaries. `bug_loop.calibratable` is the rule
-    the disposition settled on: a seed is eligible exactly when its parent
-    shares the image's LLVM pin, because only then can the image's own SDK build
-    that parent. Every other seed is `not_calibratable_in_deployment` and is
-    excluded rather than probed at a commit the manifest does not name.
-
-    MEASURED on this corpus, 2026-09-15: **0 of 187** seed parents carry the
-    image's pin, over 44 distinct pins. So the eligible set is empty here and
-    the test SKIPS with that count rather than xfailing about a requirement -
-    which is the whole difference: the run now refuses by name, and this test
-    says why it cannot exercise the path that would follow.
-    """
+    """T-S-calib-01 (FR-02.7): the eligible sample, or a named refusal."""
     from circt_bug_loop import bug_loop as driver
 
     seeds = system_seeds()[:3]
@@ -715,21 +550,14 @@ def test_calib_01_calibration_mode_over_three_sampled_seeds(cluster, artefact_ro
     assert store.query_one(
         "SELECT 1 FROM run WHERE run_manifest_id = ? AND mode = 'calibration'",
         (run_id,)) is not None
-    # Reached only where the eligible set is non-empty, which is the case the
-    # in-container incremental build is owed for (W-19b #6): every build ran at
-    # the seed's own parent commit, which is what makes FR-18.5's table true.
+    # Reached only where the eligible set is non-empty.
     assert executed == {c.commit for c in manifest.run_commit}
 
 
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_equal_windows_stop_both_arms_at_the_same_w(cluster, artefact_root):
-    """FR-14.5: two tiny windows, sequential, never overlapping, each metered.
-
-    The window is deliberately smaller than one seed's work, so the binding stop
-    is the window itself and not the seed set - which is the case the pilot's
-    four-hour windows are, and the one a `seed_set_exhausted` run never tests.
-    """
+    """FR-14.5: two tiny windows, sequential, never overlapping, each metered."""
     budget = tiny_budget(arm_window_seconds=1.0)
     seeds = system_seeds()
     run_id = uuid.uuid4().hex
@@ -747,23 +575,14 @@ def test_equal_windows_stop_both_arms_at_the_same_w(cluster, artefact_root):
         "SELECT arm, amount, stop_reason, metered FROM ledger_entry WHERE "
         "run_manifest_id = ? AND scope = 'arm_window'", (run_id,))
     assert len(windows) == 2 and all(row["metered"] for row in windows)
-    # Sequential and never overlapping: the two windows' seconds sum to no more
-    # than the whole drive, which is what `campaign_drive` guarantees by running
-    # them one after the other in `arm_order`.
+    # Sequential and never overlapping.
     assert sum(row["amount"] for row in windows) >= 0.0
 
 
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_isolate_01_precondition_circt_binaries_unchanged(cluster, artefact_root):
-    """T-S-isolate-01's PRECONDITION only (FR-03.16, FR-06.1).
-
-    The repair attempt itself needs a model and is the pilot's. What is checked
-    here is the half that must hold before it can mean anything: every tool
-    binary on every `bugloop_circt` worker hashes to `ImageSpec.tool_hashes`
-    before a run and again after it, so a later change can only be the repair
-    worker's doing.
-    """
+    """T-S-isolate-01's PRECONDITION only (FR-03.16)."""
     expected = image_spec().tool_hashes
     before = _worker_hashes(expected)
     if before is None:
@@ -804,26 +623,7 @@ def _worker_hashes(expected: dict):
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_regen_01_the_render_refuses_for_exactly_one_reason(cluster, artefact_root):
-    """T-S-regen-01 (FR-18.11) and §14.4's fourteen refusals, over one real run.
-
-    `render_results` refuses to render at all when the store cannot support one
-    of §14.4's fourteen elements, and it names every element it cannot support
-    rather than the first. THIRTEEN of the fourteen are satisfied by a run this
-    mode produced. The fourteenth is NOT the store's fault and NOT this mode's:
-    FR-10.2's collision and false-merge rates are measured over a HAND-LABELLED
-    duplicate-pair set, `render_results` takes it as a parameter because it is a
-    measurement of the project and not a row of the campaign - and
-    `run_campaign` calls the node with no such parameter and no way to pass one.
-    `ResultsIncomplete` is a bare `Exception`, and `main` catches only
-    `(ImageBuildError, BuildTimeout, OSError, ValueError)`, so a real campaign
-    runs both arm windows to the end and then dies with a traceback instead of
-    writing its results artefact.
-
-    THIS TEST IS A PIN, not an approval. It asserts the refusal set is EXACTLY
-    that one element today; the day the driver gains a way to supply the
-    labelled set, this test fails and should be rewritten to assert a render.
-    Errata row W-19b-4.
-    """
+    """T-S-regen-01 (FR-18.11) and §14.4's fourteen refusals, over one real run."""
     from circt_bug_loop import results as results_module
 
     budget = tiny_budget()
@@ -842,10 +642,7 @@ def test_regen_01_the_render_refuses_for_exactly_one_reason(cluster, artefact_ro
     assert len(raised.value.missing) == 1, raised.value.missing
     assert "labelled duplicate-pair set" in raised.value.missing[0]
 
-    # FR-18.11 itself: the regeneration check RAN over every candidate row and
-    # recorded a mark or a pass for each. A run whose probes never fired the
-    # oracle has no candidate, and the zero is the answer, not a gap - which is
-    # what `_regeneration` leaving no entry in `facts["gaps"]` says.
+    # FR-18.11 itself: the regeneration check RAN over every candidate row and recorded a mark or a pass for each.
     facts = results_module._facts(store, manifest, None, 5)
     assert "regeneration_marks" not in facts["gaps"], facts["gaps"]
     rows = facts["regeneration"]
@@ -862,15 +659,7 @@ def test_regen_01_the_render_refuses_for_exactly_one_reason(cluster, artefact_ro
 @pytest.mark.needs_cluster
 def test_submit_01_the_wrapper_submits_and_its_logs_come_back(cluster, artefact_root,
                                                               tmp_path):
-    """T-S-submit-01 (FR-17.4, NFR-06, NFR-09), as far as pre-flight allows.
-
-    The real `bug_loop_submit.sh`, the real `chia job submit`, the real driver in
-    the job process. What is asserted is the wrapper's own contract: the job's
-    `runtime_env` carries exactly the two or three forwarded variables and NO
-    token and NO model credential, the driver resolves its artefact root and
-    image tag from them - which it could not do had the flag been dropped - and
-    `chia job logs <id>` returns the driver's own stdout.
-    """
+    """T-S-submit-01 (FR-17.4), as far as pre-flight allows."""
     wrapper = Path(bug_loop.FLOW_DIR) / "bug_loop_submit.sh"
     assert wrapper.is_file() and os.access(wrapper, os.X_OK)
     if shutil.which("chia") is None:

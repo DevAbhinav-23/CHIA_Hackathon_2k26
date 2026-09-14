@@ -1,15 +1,4 @@
-"""`corpus.py` (A1, F-01): the mine, the `RUN:` normalisation and the SDK map.
-
-`04-Test-Plan.md` §1's `corpus` table. The tier-0 half runs against the
-recorded fixtures of `fixtures/corpus/`, every one of which is a real `RUN:`
-line of a real CIRCT test file or a real `SeedRecord` the builder emitted; each
-test names the file it came from. The tier-1 half mines the blobless clone
-reset to `d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2` and reproduces FR-01.1's
-counts, and skips cleanly when no such clone is at hand.
-
-`fixtures/corpus/README.md` records where every fixture came from and how to
-make the pinned clone the tier-1 tests want.
-"""
+"""`corpus.py` (A1): the mine, the `RUN:` normalisation and the SDK map."""
 import json
 import os
 import statistics
@@ -24,15 +13,11 @@ from circt_bug_loop import corpus
 from circt_bug_loop.contract import schema
 from circt_bug_loop.tests.conftest import call_node
 
-#: This module's own fixture root. Reached from `__file__` and never above it,
-#: which is `conftest.py`'s rule: the flow lives at two depths (`03-LLD.md`
-#: §1.4) and only paths inside the test tree are the same in both.
+#: This module's own fixture root.
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "corpus"
 RUNLINES = FIXTURES / "runlines"
 
-#: PIN §1's repo state, which is where `analysis/pin_window_raw.json` was
-#: computed and the one HEAD at which FR-01.1's counts are asserted rather than
-#: recorded.
+#: PIN §1's repo state, which is where `analysis/pin_window_raw.json` was computed and the one HEAD at which FR-01.1's counts are asserted rather than recorded.
 CORPUS_HEAD_SHA = "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2"
 SINCE = "2024-09-11"
 
@@ -60,23 +45,9 @@ def filtered_187() -> list[dict]:
         "candidates"]
 
 
-# --------------------------------------------------------------------------
-# Tier 0: the pure functions, against real RUN: lines.
-# --------------------------------------------------------------------------
-
 @pytest.mark.t0
 def test_T_U_corpus_06():
-    """T-U-corpus-06 (FR-01.2, FR-01.3): the acceptance line, verbatim.
-
-    `test/Conversion/HWToLLVM/convert_aggregates.mlir:1` at `f2b15a44ec70`, the
-    commit FR-01.2's acceptance criterion names. Two notes, both errata
-    candidates and neither a defect here: the real line carries TWO spaces
-    before `--convert-hw-to-llvm`, where the requirement quotes one, so the
-    verbatim text is asserted against the file rather than against the prose;
-    and `f2b15a44ec70` is one of PIN's 1,103 shape candidates and NOT one of
-    the 187, its subject "[HWToLLVM] Use correctly typed constant attributes"
-    carrying no bug-ish word.
-    """
+    """T-U-corpus-06 (FR-01.2): the acceptance line, verbatim."""
     line = logical_line("pipe_plain")
     assert line == ("circt-opt %s --split-input-file  "
                     "--convert-hw-to-llvm=spill-arrays-early=false | FileCheck %s")
@@ -85,20 +56,13 @@ def test_T_U_corpus_06():
         "%s", "--split-input-file", "--convert-hw-to-llvm=spill-arrays-early=false"]
     assert (polarity, shape, env) == ("expect_zero", "plain", {})
     assert notes["dropped_tail"] == "| FileCheck %s"
-    # FR-01.3 reads the tool off the line. The source path of this commit is
-    # `lib/Conversion/HWToLLVM/HWToLLVM.cpp` and nothing here looks at it.
+    # FR-01.3 reads the tool off the line.
     assert corpus.classify_entry_tool(corpus.entry_tool_of_line(line)) == "circt-opt"
 
 
 @pytest.mark.t0
 def test_T_U_corpus_07():
-    """T-U-corpus-07 (FR-01.10 step 1): the `not` wrapper and `not --crash`.
-
-    Both fixtures are `test/Conversion/ExportVerilog/verilog-errors-prop.mlir`
-    lines 3 and 10, which are the corpus's only two `not`-wrapped lines (M1: 2
-    lines on 1 seed). `not --crash` occurs nowhere in the corpus, so that third
-    case is constructed inline rather than pretended to be recorded.
-    """
+    """T-U-corpus-07 (FR-01.10 step 1): the `not` wrapper and `not --crash`."""
     for name, expected in (("not_plain", ["-export-verilog", "%s"]),
                            ("not_quoted", ["-export-split-verilog=dir-name=%t",
                                            "%s"])):
@@ -119,14 +83,7 @@ def test_T_U_corpus_07():
 
 @pytest.mark.t0
 def test_T_U_corpus_08():
-    """T-U-corpus-08 (FR-01.10 step 2): the `env` wrapper and its assignments.
-
-    `integration_test/circt-test/basic-circt-bmc.mlir:1`, the corpus's own
-    spelling of the wrapper and the only `env` line in either test tree. It
-    spells the two wrappers in the order `env ... not ...`, which is the
-    reverse of FR-01.10's step order, so this fixture is also what says the
-    stripping is order-free while the recording is not.
-    """
+    """T-U-corpus-08 (FR-01.10 step 2): the `env` wrapper and its assignments."""
     tool, argv, polarity, shape, env, _notes = corpus.normalise_run_line(
         logical_line("env"))
     assert env == {"Z3LIB": "%libz3"}
@@ -138,15 +95,7 @@ def test_T_U_corpus_08():
 
 @pytest.mark.t0
 def test_T_U_corpus_09():
-    """T-U-corpus-09 (FR-01.10 step 3): `split-file`, the corpus's only one.
-
-    `test/Dialect/Arc/inline-arcs.mlir:1`. M1 measured exactly 1 such line over
-    the corpus and this is it. Erratum candidate: after the wrapper is dropped
-    the remainder, `%s %t`, is not a tool invocation at all, so `tool` is `%s`
-    and the argv is meaningless; the seed's real invocations are the sibling
-    `RUN:` lines that read `%t/<part>`. `shape=split_file` is the flag that
-    says so, and is what FR-01.10 asks this step to record.
-    """
+    """T-U-corpus-09 (FR-01.10 step 3): `split-file`, the corpus's only one."""
     tool, argv, _polarity, shape, _env, _notes = corpus.normalise_run_line(
         logical_line("splitfile"))
     assert shape == "split_file"
@@ -155,15 +104,7 @@ def test_T_U_corpus_09():
 
 @pytest.mark.t0
 def test_T_U_corpus_10():
-    """T-U-corpus-10 (FR-01.10 step 4): the first UNQUOTED pipe, and no other.
-
-    `pipe_plain` is the acceptance line; `pipe_quoted` is
-    `test/Dialect/FIRRTL/Reduction/issue-3555.mlir:3`, whose first `|` sits
-    inside a single-quoted `/bin/sh -c` script and whose second is the real
-    `| FileCheck %s`. A scanner that split on the first `|` would truncate the
-    line mid-argument and lose `--keep-best=0 --include root-port-pruner`.
-    M1: 234 of 331 lines carry a pipe.
-    """
+    """T-U-corpus-10 (FR-01.10 step 4): the first UNQUOTED pipe, and no other."""
     _t, _a, _p, _s, _e, notes = corpus.normalise_run_line(logical_line("pipe_plain"))
     assert notes["dropped_tail"] == "| FileCheck %s"
 
@@ -178,16 +119,7 @@ def test_T_U_corpus_10():
 
 @pytest.mark.t0
 def test_T_U_corpus_11():
-    """T-U-corpus-11 (FR-01.10 step 5): `%s`, `%t` and `%S`.
-
-    Three real lines: `test/circt-verilog/redundant-files.sv:1` at seed
-    `9f021153418e`, the one corpus line carrying `%s` twice before the pipe;
-    `test/Dialect/Arc/insert-runtime.mlir:1`; and
-    `test/Dialect/LLHD/Transforms/mem2reg-scaling.mlir:7`, which carries `%S`
-    and `%t` and no `%s` (M1: 52 lines use `%t`, 10 use `%S`). Unbound, the
-    three stay as themselves so `argv_template` remains a template; bound, the
-    substitution is textual, so `%t.1.mlir` becomes `<probe dir>/t.1.mlir`.
-    """
+    """T-U-corpus-11 (FR-01.10 step 5): `%s`, `%t` and `%S`."""
     _t, argv, _p, _s, _e, notes = corpus.normalise_run_line(
         logical_line("subst_s_twice"))
     assert argv == ["%s", "%s"] and notes["substitutions"] == {"%s": 2}
@@ -220,21 +152,7 @@ def test_T_U_corpus_11():
     ("unsupported_brace", "%{"),
 ])
 def test_T_U_corpus_12(name: str, construct: str):
-    """T-U-corpus-12 (FR-01.10 step 6): the five shell constructs.
-
-    Two are real: `&&` from
-    `test/Conversion/ExportVerilog/verilog-errors-prop.mlir:9` (M1: 5 lines)
-    and `;` from `test/Dialect/Arc/insert-runtime.mlir:2`. Three are
-    constructed, because no `RUN:` line in either test tree at `b792c772`
-    carries a backtick, a `$(` or a `%{` (M1 measured 0 for `%{`; the other two
-    were searched for here and found nowhere).
-
-    Erratum candidate on the `;` case: that line's semicolon sits inside a
-    quoted option value, `extra-args='debug;bar'`, and the line is perfectly
-    runnable. FR-01.10 step 6 says "still carrying a `;`" and this
-    implementation says exactly that, so the line is rejected conservatively;
-    the cost is one seed, `27fdf5525cdc` keeping its other lines.
-    """
+    """T-U-corpus-12 (FR-01.10 step 6): the five shell constructs."""
     _tool, _argv, _polarity, shape, _env, notes = corpus.normalise_run_line(
         logical_line(name))
     assert shape == "unsupported"
@@ -243,13 +161,7 @@ def test_T_U_corpus_12(name: str, construct: str):
 
 @pytest.mark.t0
 def test_T_U_corpus_13():
-    """T-U-corpus-13 (FR-01.10 step 0): lit's `\\` continuations.
-
-    `test/Conversion/ImportVerilog/proximate-source-locations.sv:1-2`, two
-    physical lines that are one logical one. The verbatim `run_lines` entry
-    keeps both, because FR-01.2 says verbatim and a continuation has no
-    single-line spelling; step 0 folds them and records how many it folded.
-    """
+    r"""T-U-corpus-13 (FR-01.10 step 0): lit's `\\` continuations."""
     text = (RUNLINES / "cont.txt").read_text(encoding="utf-8")
     assert len(text.splitlines()) == 2
     lines = corpus.extract_run_lines(text)
@@ -264,12 +176,7 @@ def test_T_U_corpus_13():
 
 @pytest.mark.t0
 def test_T_U_corpus_14():
-    """T-U-corpus-14 (FR-01.10): `strip_probe_only_options`, both spellings.
-
-    The bare pair is taken off the acceptance line itself; the `=`-valued pair
-    is constructed from §4.2's verified `--split-input-file[=<string>]` and
-    `--verify-diagnostics=<value>`. M1's reach: 29.9% and 28.3% of seeds.
-    """
+    """T-U-corpus-14 (FR-01.10): `strip_probe_only_options`, both spellings."""
     _t, argv, _p, _s, _e, _n = corpus.normalise_run_line(logical_line("pipe_plain"))
     kept, removed = corpus.strip_probe_only_options(argv)
     assert kept == ["%s", "--convert-hw-to-llvm=spill-arrays-early=false"]
@@ -296,23 +203,7 @@ def test_T_U_corpus_14():
      ["-verify-diagnostics", "--split-input-file"]),
 ])
 def test_T_U_corpus_37(fixture: str, survivors: list, taken: list):
-    """T-U-corpus-37 (FR-01.10): the single-dash spellings, on real RUN: lines.
-
-    LLVM's option parser takes one dash or two for every long option and
-    CIRCT's tests write both, so `-verify-diagnostics` is `--verify-diagnostics`
-    and must be stripped alike; the same for `-split-input-file`. 46 of M1's
-    331 corpus `RUN:` lines carry a single-dash form
-    (`analysis/measurements/raw/m1-per-runline.csv`), which is not an edge case
-    (errata W-09 #3). The three lines are recorded verbatim:
-
-    - `single_dash_verify`: `test/Dialect/SV/sv-trace-iverilog-errors.mlir`
-      line 1 at `88d9a5ad7a3a`, the seed `fixtures/crashes/assertion_02/` was
-      mined from;
-    - `single_dash_both`: `test/Conversion/CoreToFSM/errors.mlir` line 1 at
-      `838a8bb29106`, carrying both options single-dashed;
-    - `mixed_dash`: `test/Conversion/FIRRTLToHW/lower-to-hw.mlir` line 1 at
-      `3f65acfd617b`, carrying one of each dash count in the same line.
-    """
+    """T-U-corpus-37 (FR-01.10): the single-dash spellings, on real RUN: lines."""
     _t, argv, _p, _s, _e, _n = corpus.normalise_run_line(logical_line(fixture))
     kept, removed = corpus.strip_probe_only_options(argv)
     assert kept == survivors
@@ -321,16 +212,7 @@ def test_T_U_corpus_37(fixture: str, survivors: list, taken: list):
 
 @pytest.mark.t0
 def test_T_U_corpus_38():
-    """T-U-corpus-38 (FR-01.10): the survivor recorded in `crashes/assertion_02/`.
-
-    That fixture's `argv.json` is what the two-spelling strip let through, and
-    its `-verify-diagnostics` is what turned the diagnostic the tool emitted
-    into exit status 0 at the seed commit, which is a probe whose oracle reads
-    the wrong outcome. The recorded argv is fed back through the function: the
-    option is taken now and nothing else is. The `=`-valued single-dash forms
-    are asserted beside it against §4.2's two verified value shapes, with
-    `-split-input-files` as the control that a prefix is not a match.
-    """
+    """T-U-corpus-38 (FR-01.10): the survivor recorded in `crashes/assertion_02/`."""
     argv = json.loads((FIXTURES.parent / "crashes" / "assertion_02"
                        / "argv.json").read_text(encoding="utf-8"))
     assert "-verify-diagnostics" in argv
@@ -348,12 +230,7 @@ def test_T_U_corpus_38():
 
 @pytest.mark.t0
 def test_T_U_corpus_25():
-    """T-U-corpus-25 (FR-01.1): PIN §2's shape filter, in both directions.
-
-    1-2 files under `lib/` or `include/`, AND at least one ADDED or MODIFIED
-    file under `test/` or `integration_test/`. A test file that is only
-    DELETED does not count, which is `pin_window.py:135`'s status set.
-    """
+    """T-U-corpus-25 (FR-01.1): PIN §2's shape filter, in both directions."""
     passes = corpus.mining_filter([("M", "lib/Dialect/HW/HWOps.cpp"),
                                    ("M", "test/Dialect/HW/basic.mlir")])
     assert passes == (["lib/Dialect/HW/HWOps.cpp"], ["test/Dialect/HW/basic.mlir"])
@@ -393,8 +270,7 @@ def test_T_U_corpus_27():
         "MooreToCore", "MooreToCore")
     assert corpus.dialect_buckets("include/circt/Support/LLVM.h") == (
         "Support", "Support")
-    # A path shallower than three components buckets as its own last component
-    # rather than raising, which is what keeps a stray `lib/Foo.cpp` countable.
+    # A path shallower than three components buckets as its own last component rather than raising.
     assert corpus.dialect_buckets("lib/Foo.cpp") == ("Foo.cpp", "Foo.cpp")
 
 
@@ -429,13 +305,7 @@ def test_T_U_corpus_29():
 
 @pytest.mark.t0
 def test_T_U_corpus_30():
-    """T-U-corpus-30 (FR-01.7): pin windows, and the nearest-tag rule.
-
-    Constructed history, oldest pin last, because a `--first-parent` log is
-    newest first. Window ids are assigned oldest to newest, so a difference IS
-    a count of LLVM bumps; an exact match takes the OLDEST tag sharing the pin,
-    and a non-exact one takes the nearest by bumps, ties broken by days.
-    """
+    """T-U-corpus-30 (FR-01.7): pin windows, and the nearest-tag rule."""
     from datetime import datetime, timezone
 
     def when(day):
@@ -467,10 +337,6 @@ def test_T_U_corpus_36():
         assert doc.index("Returns:") < doc.index("Worker:") < doc.index("Raises:")
 
 
-# --------------------------------------------------------------------------
-# Tier 0: the five recorded seeds.
-# --------------------------------------------------------------------------
-
 _RECORDED = ("nine_test_files", "sdk_inexact", "no_run_line", "unsupported_shape",
              "not_wrapper")
 
@@ -492,13 +358,7 @@ def test_T_U_corpus_31(name: str):
 @pytest.mark.t0
 @pytest.mark.parametrize("name", _RECORDED)
 def test_T_U_corpus_32(name: str):
-    """T-U-corpus-32 (FR-01.10): the record agrees with the pure functions.
-
-    Re-normalising each recorded verbatim `run_lines` entry reproduces that
-    seed's `argv_template`, `polarity` and `shape` entry for entry, which is
-    what makes the tier-0 fixtures evidence about the tier-1 mine and not only
-    about themselves.
-    """
+    """T-U-corpus-32 (FR-01.10): the record agrees with the pure functions."""
     record = recorded_seed(name)
     assert len(record.run_lines) == len(record.argv_template) == len(
         record.polarity) == len(record.shape)
@@ -512,13 +372,7 @@ def test_T_U_corpus_32(name: str):
 @pytest.mark.t0
 @pytest.mark.parametrize("name", _RECORDED)
 def test_T_U_corpus_33(name: str):
-    """T-U-corpus-33 (FR-01.12, FR-01.1): `test_files` and `diff`, contract 2.0.
-
-    `test_files` is keyed and ordered by `test_paths` and never collapsed; the
-    diff carries the seed's `lib/` and `include/` half and NOT its test half,
-    because the test text is already in `test_files` and §7.2's prompt would
-    otherwise send it twice.
-    """
+    """T-U-corpus-33 (FR-01.12): `test_files` and `diff`, contract 2.0."""
     record = recorded_seed(name)
     assert list(record.test_files) == record.test_paths
     assert 1 <= len(record.source_paths) <= 2
@@ -534,10 +388,7 @@ def test_T_U_corpus_33(name: str):
 
 @pytest.mark.t0
 def test_T_U_corpus_34():
-    """T-U-corpus-34 (FR-01.7, FR-01.9, FR-01.10, FR-01.12): the five shapes.
-
-    One assertion per recorded seed, each the reason that seed is in the set.
-    """
+    """T-U-corpus-34 (FR-01.7): the five shapes."""
     nine = recorded_seed("nine_test_files")
     assert len(nine.test_paths) == 9 and len(set(nine.test_paths)) == 9
 
@@ -561,12 +412,7 @@ def test_T_U_corpus_34():
 
 @pytest.mark.t0
 def test_T_U_corpus_35():
-    """T-U-corpus-35 (FR-01.1, FR-01.7): the committed acceptance set itself.
-
-    `filtered_187.json` is derived from `analysis/pin_window_raw.json` by PIN
-    §2's subject rule, so before it is used as an oracle for the mine it is
-    checked against the rule it claims to encode.
-    """
+    """T-U-corpus-35 (FR-01.1): the committed acceptance set itself."""
     rows = filtered_187()
     assert len(rows) == 187
     assert sum(1 for r in rows if r["exact"]) == 171
@@ -580,18 +426,8 @@ def test_T_U_corpus_35():
         assert all(p.startswith(("test/", "integration_test/")) for p in row["test"])
 
 
-# --------------------------------------------------------------------------
-# Tier 1: the mine itself, against the clone pinned at the corpus HEAD.
-# --------------------------------------------------------------------------
-
 def _pinned_clone() -> str:
-    """The first candidate path that is a repository at the corpus HEAD, or "".
-
-    `03-LLD.md` §13.1's `--clone` default is `~/.cache/circt`; this host's
-    blobless clone is under `~/.cache/chia-pin-smoke` and its own HEAD is a
-    later commit, so the worktree `fixtures/corpus/README.md` describes is
-    tried first and the environment overrides both.
-    """
+    """The first candidate path that is a repository at the corpus HEAD, or ""."""
     for candidate in (os.environ.get("BUGLOOP_CORPUS_CLONE"),
                       "~/.cache/chia-pin-smoke/w05/corpus-head", "~/.cache/circt"):
         if not candidate:
@@ -633,13 +469,7 @@ def mined(clone: str) -> dict:
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_01(mined: dict):
-    """T-U-corpus-01 (FR-01.1): 187 records and 171 non-null tags at the HEAD.
-
-    The two counts hold at `d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2` and
-    nowhere else by right; FR-01.11 is what makes them executable more than
-    once. The wall clock and the git-call count are recorded rather than
-    asserted tightly, because both are properties of the host's object store.
-    """
+    """T-U-corpus-01 (FR-01.1): 187 records and 171 non-null tags at the HEAD."""
     seeds = mined["seeds"]
     counts = mined["counts"]
     print(f"\nmined {len(seeds)} seeds in {mined['wall_seconds']:.1f} s, "
@@ -661,13 +491,7 @@ def test_T_U_corpus_01(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_02(mined: dict):
-    """T-U-corpus-02 (FR-01.1): the SHA set is PIN's own filtered candidate set.
-
-    Compared as sets against `filtered_187.json`, which is
-    `analysis/pin_window_raw.json` reduced by PIN §2's subject rule, and then
-    per seed on the two path lists and the pin match, because equal sets with
-    different paths would still be a different corpus.
-    """
+    """T-U-corpus-02 (FR-01.1): the SHA set is PIN's own filtered candidate set."""
     rows = {row["sha"]: row for row in filtered_187()}
     assert {s.seed_sha for s in mined["seeds"]} == set(rows)
     for seed in mined["seeds"]:
@@ -714,13 +538,7 @@ def test_T_U_corpus_04(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_05(mined: dict):
-    """T-U-corpus-05 (FR-01.4): both bucketings, and the 16-way split.
-
-    The dialect-level table is normative and the unmerged one is FINAL Appendix
-    A's printed list; both are FR-01.4's acceptance criterion verbatim, and the
-    split is how the 16 `include/circt/Dialect` seeds distribute under the
-    normative rule.
-    """
+    """T-U-corpus-05 (FR-01.4): both bucketings, and the 16-way split."""
     counts = mined["counts"]
     dialect = counts["dialect_bucket"]
     for name, n in (("FIRRTL", 42), ("ImportVerilog", 31), ("MooreToCore", 12),
@@ -746,11 +564,7 @@ def test_T_U_corpus_05(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_17(mined: dict):
-    """T-U-corpus-17 (FR-01.9): the no-`RUN:`-line seeds, counted and excluded.
-
-    Both are Python scaling scripts the commit also touched, which have no lit
-    line of their own. The seeded arm's eligible set is 187 minus the count.
-    """
+    """T-U-corpus-17 (FR-01.9): the no-`RUN:`-line seeds, counted and excluded."""
     counts = mined["counts"]
     empty = [s for s in mined["seeds"] if not s.run_lines]
     assert len(empty) == counts["no_run_line"] == 2
@@ -780,16 +594,7 @@ def test_T_U_corpus_18(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_20(mined: dict):
-    """T-U-corpus-20 (FR-01.3, FR-01.10): every count, against M1's own tables.
-
-    The three tool rows and the four language rows are M1's "seeds per entry
-    tool" and "seeds per input language" tables, which count seed MEMBERSHIP
-    and do not sum to 187 because a seed may enter through several tools and
-    touch several languages. The per-seed partition beside them does sum to
-    187 and is recorded rather than asserted against M1: FR-01.3 does not say
-    which line's tool a multi-tool seed takes, and M1's report partitions by a
-    tool priority order that its own script does not compute.
-    """
+    """T-U-corpus-20 (FR-01.3): every count, against M1's own tables."""
     counts = mined["counts"]
     assert counts["run_lines"] == 331
     assert counts["polarity"] == {"expect_zero": 329, "expect_nonzero": 2}
@@ -810,11 +615,7 @@ def test_T_U_corpus_20(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_21(mined: dict, clone: str):
-    """T-U-corpus-21 (FR-01.1): `diff` is that git command's output, verbatim.
-
-    Re-run here for one seed with the argument vector §3.3 prescribes, and
-    compared byte for byte. The test half is absent from every seed's diff.
-    """
+    """T-U-corpus-21 (FR-01.1): `diff` is that git command's output, verbatim."""
     seed = next(s for s in mined["seeds"] if len(s.source_paths) == 2)
     argv = ["git", "-C", clone, "show", "--format=", "--unified=3", "--no-renames",
             seed.seed_sha, "--", *seed.source_paths]
@@ -830,13 +631,7 @@ def test_T_U_corpus_21(mined: dict, clone: str):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_22(mined: dict):
-    """T-U-corpus-22 (FR-01.12, FR-05.1): one batched `cat-file`, not 228.
-
-    Asserted by counting the subprocesses the mine launched: one `rev-parse`,
-    one `for-each-ref`, one `ls-tree` per tag, two `log` passes, one `ls-tree
-    HEAD`, one `log --name-status`, ONE `cat-file --batch` and one `show` per
-    seed. A per-file `git show` would add 228 - 1 more.
-    """
+    """T-U-corpus-22 (FR-01.12): one batched `cat-file`, not 228."""
     counts = mined["counts"]
     assert counts["git_calls"] == 7 + counts["tags"] + counts["filtered"]
     assert counts["test_files"] == 228          # one `show` each would add 227
@@ -850,14 +645,7 @@ def test_T_U_corpus_22(mined: dict):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_23(mined: dict, clone: str):
-    """T-U-corpus-23 (FR-01.9, FR-17.7): the over-cap exclusion, driven for real.
-
-    At the real cap of 262,144 bytes no seed is over it, so the rule is driven
-    by mining the same clone again with a cap of one byte: every seed is then
-    excluded for both arms with `seed_text_over_cap`, and NEITHER `diff` nor
-    `test_files` is truncated, because both are required fields and
-    `bound_text` would return None for them.
-    """
+    """T-U-corpus-23 (FR-01.9): the over-cap exclusion, driven for real."""
     assert mined["counts"]["seed_text_over_cap"] == 0
     capped = call_node(corpus.build_corpus, clone, CORPUS_HEAD_SHA, SINCE, 1)
     assert capped["counts"]["seed_text_over_cap"] == 187
@@ -873,12 +661,7 @@ def test_T_U_corpus_23(mined: dict, clone: str):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_19(mined: dict, clone: str):
-    """T-U-corpus-19 (FR-01.6): two runs on one clone are byte-identical.
-
-    Byte-identical means the serialised records and every count; the only field
-    that may differ is the `CounterBlock`'s own wall clock, which is a
-    measurement of the run and not of the corpus.
-    """
+    """T-U-corpus-19 (FR-01.6): two runs on one clone are byte-identical."""
     again = call_node(corpus.build_corpus, clone, CORPUS_HEAD_SHA, SINCE, INLINE_CAP_BYTES)
     first = "".join(schema.to_json(s) for s in mined["seeds"])
     second = "".join(schema.to_json(s) for s in again["seeds"])
@@ -904,14 +687,7 @@ def test_T_U_corpus_16(clone: str):
 
 @pytest.mark.t1
 def test_T_U_corpus_15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """T-U-corpus-15 (FR-01.8): no tags fails loudly, naming the refspec.
-
-    Driven against a repository with one commit and no tags at all, built here,
-    which is the same observable as the shell-glob failure PIN §1 records and
-    needs no network. The refspec cannot be eaten here in any case: the second
-    assertion reads the argument vector `_Git` builds and finds the glob in one
-    element of it, never in a shell word.
-    """
+    """T-U-corpus-15 (FR-01.8): no tags fails loudly, naming the refspec."""
     repo = tmp_path / "clone_notags"
     repo.mkdir()
 
@@ -950,13 +726,7 @@ def test_T_U_corpus_15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_corpus_24(clone: str):
-    """T-U-corpus-24 (FR-04.1): `resolve_sites`, the head's one tree query.
-
-    The two commands are argument vectors and neither takes a shell. A site
-    whose file and symbol both resolve stands; a bad symbol is `no_symbol`, a
-    bad file `no_such_file`. `git grep` exits 1 when it matches nothing, which
-    is an answer and not a failure, and the rejection carries it as the former.
-    """
+    """T-U-corpus-24 (FR-04.1): `resolve_sites`, the head's one tree query."""
     sites = [{"file": "lib/Dialect/HW/HWTypes.cpp", "symbol": "parseHWArray"},
              {"file": "lib/Dialect/HW/HWTypes.cpp", "symbol": "zzzNoSuchSymbol"},
              {"file": "lib/Dialect/HW/NoSuchFile.cpp", "symbol": "anything"}]
@@ -970,18 +740,7 @@ def test_T_U_corpus_24(clone: str):
 
 
 def test_T_U_corpus_39_the_clone_is_fetched_by_a_committed_script() -> None:
-    """T-U-corpus-39 (FR-01.11, FR-14.1): `fetch_clone.sh` and its one SHA.
-
-    New id (W-17, `04-Test-Plan.md` §16.8 item 9). §13 says the 400 MB clone is
-    **not** committed and that `tests/fixtures/fetch_clone.sh` is what a fresh
-    checkout runs to get it, so the script is the fixture. It reads the corpus
-    head out of `budget.yaml` rather than repeating it, which is the one way the
-    two cannot disagree, and it quotes the tag refspec, which is the one line
-    that goes wrong silently: an unquoted `refs/tags/firtool-*` is globbed by
-    the shell against the working directory and fetches nothing.
-
-    Fixture: `fixtures/fetch_clone.sh`, `budget.yaml`. Tier 0.
-    """
+    """T-U-corpus-39 (FR-01.11): `fetch_clone.sh` and its one SHA."""
     import subprocess
 
     script = FIXTURES.parent / "fetch_clone.sh"

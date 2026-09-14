@@ -1,16 +1,4 @@
-"""`feedback.py` (A5): one entry per probe, the abandonment rule, the deny-list.
-
-`04-Test-Plan.md` §1.17's eight `T-U-feed-*` rows, plus three this
-implementation added and §16.7 records: the cap rule of FR-17.7 as the bundle
-applies it, the byte-determinism FR-16.5 rests on, and FR-16.2's empty bundle.
-All tier 0: `feedback.py` is head-side and pure, and no test here opens a file,
-a database or a socket.
-
-The budget every test meters against is the committed `budget_file/` fixture,
-whose per-seed caps are 3 iterations and 10 probes; the arm's own allowance
-arrives as a `LedgerSnapshot`, which is the only view of the budget a generator
-half ever gets (§2.5).
-"""
+"""`feedback.py` (A5): one entry per probe, the abandonment rule, the deny-list."""
 from __future__ import annotations
 
 import ast
@@ -31,8 +19,7 @@ pytestmark = pytest.mark.t0
 _RUN = "7c1f4a9d6e2b48c0a53f81d27e6b09c4"
 _SEED = "3f9a1c0e7b4d2a68f05c9e13b7a4d820c6e5f9a1"
 
-#: The generator half's modules, which FR-16.1 keeps clear of every apparatus
-#: schema. `mutators/` is A4's frozen set and holds no import of its own.
+#: The generator half's modules, which FR-16.1 keeps clear of every apparatus schema.
 _SUPPLY_MODULES = ("feedback.py", "generate_task.py", "budget.py", "ledger.py")
 
 #: The three apparatus-internal schemas the supply half may not import.
@@ -79,12 +66,7 @@ def assertion_result(probe_id: str, **overrides) -> schema.ProbeResult:
 def build(results, previous=None, *, iteration: int = 2, dispatched=None,
           arm: str = "seeded", funds=None, spent: float = 0.0, cap: float = 14400.0,
           probes: int = 0) -> schema.FeedbackBundle:
-    """Call A5 the way the driver does, through `conftest.call_node` (§0.4).
-
-    The node returns `{"bundle", "counters"}` since the join (W-17, errata row
-    22); what every test below reads is the bundle, so the helper unwraps it
-    and asserts the block here, at every call site.
-    """
+    """Call A5 the way the driver does, through `conftest.call_node` (§0.4)."""
     ids = dispatched if dispatched is not None else [r.probe_id for r in results]
     out = call_node(build_feedback, list(results), previous, _SEED, iteration,
                     ids, run_manifest_id=_RUN, budget=funds or budget(),
@@ -99,14 +81,7 @@ def stage_3(probe_id: str, status: str, reason: str) -> schema.ProbeResult:
 
 
 def test_T_U_feed_01():
-    """T-U-feed-01 (FR-16.1): one entry per probing input, whatever its outcome.
-
-    Every input of the previous iteration appears exactly once, including the
-    ones that exited cleanly, parsed badly, timed out or exhausted memory, and
-    each carries the four things FR-16.1 lists: the stage, the reason, the
-    oracle verdict where one exists and the reduced case where one exists. The
-    bundle is built from `ProbeResult`s and from nothing else.
-    """
+    """T-U-feed-01 (FR-16.1): one entry per probing input, whatever its outcome."""
     results = [
         assertion_result("p-1", reduced_text="firrtl.circuit \"T\" {}\n",
                          reduced_path="/artefacts/p-1/reduced.fir"),
@@ -132,12 +107,7 @@ def test_T_U_feed_01():
 
 
 def test_T_U_feed_02():
-    """T-U-feed-02 (FR-16.1): a dispatched probe with no result is present, not absent.
-
-    The set difference is the honest one only if the bundle is keyed on what
-    was dispatched rather than on what came back, so a probe whose result never
-    arrived carries `result_missing` and the generator can see that it did.
-    """
+    """T-U-feed-02 (FR-16.1): a dispatched probe with no result is present, not absent."""
     bundle = build([result("p-1")], dispatched=["p-1", "p-2"])
 
     assert [e.probe_id for e in bundle.entries] == ["p-1", "p-2"]
@@ -149,15 +119,7 @@ def test_T_U_feed_02():
 
 
 def test_T_U_feed_03():
-    """T-U-feed-03 (FR-16.6, FR-06.6): the abandonment rule, spelled as a multiset.
-
-    Two consecutive iterations of stage-3 deaths abandon the seed only when the
-    multiset of `(build_status, stopping_reason)` pairs is equal between them.
-    The negative case is the point: two iterations of `parse_error` whose
-    reasons differ must NOT abandon, because `parse_error` covers both a
-    rejected input and a rejected argv and abandoning for the second would hide
-    an apparatus defect as a seed property.
-    """
+    """T-U-feed-03 (FR-16.6): the abandonment rule, spelled as a multiset."""
     first = build([stage_3("p-1", "parse_error", "tool_rejected_input"),
                    stage_3("p-2", "timeout", "wall_limit")], iteration=2)
     assert first.abandoned is False
@@ -184,11 +146,7 @@ def test_T_U_feed_03():
 
 
 def test_T_U_feed_04():
-    """T-U-feed-04 (FR-16.6): `abandon_reason` is non-null exactly when abandoned.
-
-    Enforced twice: by the builder, which writes the repeated pair and nothing
-    else, and by `contract.validate`, which refuses either half alone.
-    """
+    """T-U-feed-04 (FR-16.6): `abandon_reason` is non-null exactly when abandoned."""
     previous = build([stage_3("p-1", "oom", "allocation_failure")], iteration=2)
     abandoned = build([stage_3("p-2", "oom", "allocation_failure")], previous, iteration=3)
     assert abandoned.abandoned and abandoned.abandon_reason == "stage_3:oom:allocation_failure x1"
@@ -208,14 +166,7 @@ def test_T_U_feed_04():
 
 
 def test_T_U_feed_05():
-    """T-U-feed-05 (FR-16.4): the deny-list, over names and over values.
-
-    No field name of `FeedbackBundle` or `FeedbackEntry`, at any nesting depth,
-    is one of `_FEEDBACK_DENY`'s twenty-one; and a result carrying every one of
-    those names as an extra attribute produces a bundle whose canonical JSON
-    holds none of them. The second half is the one that matters: the deny-list
-    is a rule about what A5 copies, not only about what the schema declares.
-    """
+    """T-U-feed-05 (FR-16.4): the deny-list, over names and over values."""
     assert len(_FEEDBACK_DENY) == 21
     declared = set()
     for cls in (schema.FeedbackBundle, schema.FeedbackEntry):
@@ -238,13 +189,7 @@ def test_T_U_feed_05():
 
 
 def test_T_U_feed_06():
-    """T-U-feed-06 (FR-16.1): the supply half imports no apparatus schema.
-
-    An `ast` walk over the generator half's modules: none of them imports
-    `OracleVerdict`, `ReducedCase` or `CandidateRecord`, and `feedback.py`
-    imports nothing of the loop but the contract package, which is what makes
-    the seam one-directional rather than merely tidy.
-    """
+    """T-U-feed-06 (FR-16.1): the supply half imports no apparatus schema."""
     root = Path(feedback_module.__file__).resolve().parent
     for name in _SUPPLY_MODULES:
         tree = ast.parse((root / name).read_text(encoding="utf-8"))
@@ -262,13 +207,7 @@ def test_T_U_feed_06():
 
 
 def test_T_U_feed_07():
-    """T-U-feed-07 (FR-16.3): all three terminating conditions, and the fourth.
-
-    The per-seed iteration cap, the per-seed input cap and the arm's allowance
-    on the primary unit, each exercised and recorded; abandonment is the fourth
-    and takes precedence, being the one condition that is about the seed rather
-    than about the budget.
-    """
+    """T-U-feed-07 (FR-16.3): all three terminating conditions, and the fourth."""
     assert TERMINATING_CONDITIONS == ("abandoned", "iteration_cap", "probe_cap",
                                       "arm_allowance")
     caps = budget(per_seed_iteration_cap=3, per_seed_probe_cap=5)
@@ -283,12 +222,7 @@ def test_T_U_feed_07():
 
 
 def test_T_U_feed_08():
-    """T-U-feed-08 (FR-16.5): the bundle replays into the same prompt bytes.
-
-    A5's output is the only per-iteration input stage 2's prompt has, so
-    replaying iteration k from its recorded `SeedRecord` and `FeedbackBundle`
-    through `Template.safe_substitute` must reproduce the prompt byte for byte.
-    """
+    """T-U-feed-08 (FR-16.5): the bundle replays into the same prompt bytes."""
     from circt_bug_loop.generate_task import render_feedback
 
     results = [assertion_result("p-1", reduced_text="hw.module @t() {}\n",
@@ -304,13 +238,7 @@ def test_T_U_feed_08():
 
 
 def test_T_U_feed_09():
-    """T-U-feed-09 (FR-17.7): the bundle's reduced text obeys the one cap rule.
-
-    `contract.bound_text` is the one place FR-17.7 is applied, so a reduced case
-    over `artefact_inline_cap_bytes` travels as its path and not as its text,
-    and a text over the cap with no companion path raises rather than being
-    silently dropped.
-    """
+    """T-U-feed-09 (FR-17.7): the bundle's reduced text obeys the one cap rule."""
     small = budget(artefact_inline_cap_bytes=64)
     big = "x" * 100
 
@@ -329,12 +257,7 @@ def test_T_U_feed_09():
 
 
 def test_T_U_feed_10():
-    """T-U-feed-10 (FR-16.5, NFR-02): the same inputs give byte-identical JSON.
-
-    Determinism is what FR-16.5's replay rests on: two builds from one input
-    set serialise to the same bytes, entry order following the dispatched order
-    and not the order results happened to arrive in.
-    """
+    """T-U-feed-10 (FR-16.5): the same inputs give byte-identical JSON."""
     results = [stage_3("p-2", "timeout", "cpu_limit"), assertion_result("p-1")]
     dispatched = ["p-1", "p-2", "p-3"]
 
@@ -346,13 +269,7 @@ def test_T_U_feed_10():
 
 
 def test_T_U_feed_11():
-    """T-U-feed-11 (FR-16.2): the first iteration and the mutation arm get nothing.
-
-    Iteration 1 has no previous iteration to report, and the mutation arm
-    receives no feedback at all; both are an empty entry list rather than an
-    absent bundle, because the driver's call into a generator takes one
-    (`Generator`, §2.5). The stop rules still apply to both.
-    """
+    """T-U-feed-11 (FR-16.2): the first iteration and the mutation arm get nothing."""
     results = [assertion_result("p-1"), result("p-2")]
 
     first_iteration = build(results, iteration=1)

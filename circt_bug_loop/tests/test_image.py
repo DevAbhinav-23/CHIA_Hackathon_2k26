@@ -1,21 +1,4 @@
-"""The Dockerfile and the `ImageSpec` it emits (`03-LLD.md` §1.2, §4.11, §4.11.1).
-
-`04-Test-Plan.md` §1.22, the `T-U-image-*` tests, under the name §1.3's
-exemption list carries since W-16 (`test_image_spec.py` -> `test_image.py`).
-
-The unit under test is an image, so most of the plan's rows are tier 2. Two
-things make a tier-0 half real anyway and this module is built on both: the
-Dockerfile is a committed text whose seven deviations can be read off it, and
-the image W-04 published left a recorded manifest,
-`analysis/measurements/raw/image-manifest.json`, taken from a freshly started
-container of the published image (FR-03.16). Every tier-0 test below reads one
-of those two; every tier-2 test starts a container from
-`chia-circt-assert:eade0de61bc5` and is skipped, never passed, without it.
-
-Nothing here builds an image. `build_image`'s own argument list, its tag rule
-and its lit-discovery parser are `T-U-driver-24` and `T-U-driver-25` in
-`test_bug_loop.py`, at tier 0 and with no daemon.
-"""
+"""The Dockerfile and the `ImageSpec` it emits (`03-LLD.md` §1.2)."""
 import json
 import shutil
 import subprocess
@@ -68,20 +51,9 @@ needs_image = pytest.mark.skipif(not image_present(),
                                  reason=f"no {IMAGE} on this machine (tier 2)")
 
 
-# ---------------------------------------------------------------------------
-# Tier 0: the recorded manifest, and the Dockerfile's own text
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_image_10():
-    """T-U-image-10 (FR-03.10): the recorded manifest fills every `ImageSpec` field.
-
-    The `ImageSpec` is built from W-04's own manifest rather than from a
-    fixture written by hand, so the record under test is the one the published
-    image produced, and the eight keys of §2.11 are the ones that reach
-    `RunManifest.image_spec`. Fixture: `raw/image-manifest.json`. Tier 0.
-    """
+    """T-U-image-10 (FR-03.10): the recorded manifest fills every `ImageSpec` field."""
     recorded = manifest()
     spec = ImageSpec(
         circt_sha=recorded["circt_sha"], sdk_tag=recorded["circt_ver"],
@@ -101,13 +73,7 @@ def test_T_U_image_10():
 
 @pytest.mark.t0
 def test_T_U_image_16_recorded():
-    """T-U-image-16 (FR-03.16): the recorded hashes name every target, and only paths in the build tree.
-
-    The hashes' own provenance is asserted too: the manifest records that it was
-    computed from a freshly started container of the published image, which is
-    §5.2's rule and is what stops a hash being taken from a build tree that no
-    worker will ever run. Fixture: `raw/image-manifest.json`. Tier 0.
-    """
+    """T-U-image-16 (FR-03.16): the recorded hashes name every target, and only paths in the build tree."""
     recorded = manifest()
     assert list(recorded["targets"]) == list(bug_loop.IMAGE_TARGETS)
     assert set(recorded["tool_hashes"]) == set(bug_loop.IMAGE_TARGETS)
@@ -120,12 +86,7 @@ def test_T_U_image_16_recorded():
 
 @pytest.mark.t0
 def test_T_U_image_04_recorded():
-    """T-U-image-04, -14, -15 (FR-03.4, FR-03.14, FR-03.15): the flags, slang and Verilator.
-
-    Read off the recorded manifest: the flag string is FR-03.4's exactly, the
-    image is ADR-D-13 branch (a) with slang from source, and one Verilator
-    version serves the campaign. Fixture: `raw/image-manifest.json`. Tier 0.
-    """
+    """T-U-image-04, -14, -15 (FR-03.4): the flags, slang and Verilator."""
     recorded = manifest()
     assert recorded["flag_string"] == bug_loop.IMAGE_FLAG_STRING
     assert "-UNDEBUG" in recorded["flag_string"]
@@ -139,15 +100,7 @@ def test_T_U_image_04_recorded():
 
 @pytest.mark.t0
 def test_T_U_image_19_deviations():
-    """T-U-image-19 (FR-03.3, FR-03.4, FR-03.14): §4.11's seven deviations, off the file.
-
-    Six of the seven are readable in the Dockerfile itself; the seventh, the
-    absent `--progress=plain`, is asserted on `build_image`'s argument list,
-    which is where the flag would have been. The two `same RUN` deviations are
-    asserted as one `RUN` and not as two nearby lines, because a separate layer
-    is exactly what they exist to avoid. Fixture:
-    `upstream/dockerfiles/ChiaCirctAssertDockerfile`. Tier 0.
-    """
+    """T-U-image-19 (FR-03.3): §4.11's seven deviations, off the file."""
     text = dockerfile()
     runs = [block.strip() for block in text.split("\nRUN ")[1:]]
 
@@ -189,14 +142,7 @@ def test_T_U_image_19_deviations():
 
 @pytest.mark.t0
 def test_T_U_image_01_fetch_recipe():
-    """T-U-image-01, -18 (FR-03.1, FR-03.2): three fetch commands, and no `git init`.
-
-    `git init` on the base's already-populated clone prints "Reinitialized" and
-    the `git remote add` after it fails, aborting the layer, so both are
-    asserted absent; the second fetch is what makes `${CIRCT_VER}` a name
-    `ls-tree` can resolve, which is what the pin check needs. Fixture: the
-    Dockerfile. Tier 0.
-    """
+    """T-U-image-01, -18 (FR-03.1): three fetch commands, and no `git init`."""
     text = dockerfile()
     assert "git init" not in text and "git remote add" not in text
     for command in (
@@ -208,21 +154,11 @@ def test_T_U_image_01_fetch_recipe():
     assert "ls-tree ${CIRCT_VER} llvm" in text or "ls-tree" in text
 
 
-# ---------------------------------------------------------------------------
-# Tier 2: the published image itself
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t2
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_16_reproduces():
-    """T-U-image-16 (FR-03.16): the recorded hashes reproduce in a fresh container.
-
-    One container, six `sha256sum`s, compared against the committed manifest.
-    This is the check pre-flight 7 makes on every worker before a campaign
-    starts, run here against the image that manifest was taken from. Tier 2.
-    """
+    """T-U-image-16 (FR-03.16): the recorded hashes reproduce in a fresh container."""
     recorded = manifest()["tool_hashes"]
     done = in_image("sha256sum", *[entry["path"] for entry in recorded.values()])
     assert done.returncode == 0, done.stderr
@@ -235,11 +171,7 @@ def test_T_U_image_16_reproduces():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_07_versions():
-    """T-U-image-07 (FR-03.7): every target exists in the image and runs `--version`.
-
-    The target list is read from the recorded manifest and is a parameter, not
-    a constant. Tier 2.
-    """
+    """T-U-image-07 (FR-03.7): every target exists in the image and runs `--version`."""
     for name, entry in manifest()["tool_hashes"].items():
         done = in_image(entry["path"], "--version")
         assert done.returncode == 0, (name, done.stderr[-400:])
@@ -250,10 +182,7 @@ def test_T_U_image_07_versions():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_03_12_sdk_strip():
-    """T-U-image-03, -12 (FR-03.3, FR-03.12): the strip holds and LLVM's assertions stay off.
-
-    Tier 2.
-    """
+    """T-U-image-03, -12 (FR-03.3): the strip holds and LLVM's assertions stay off."""
     stripped = in_image("bash", "-c",
                         "ls -d /opt/circt-sdk/include/circt "
                         "/opt/circt-sdk/lib/cmake/circt 2>&1; true")
@@ -267,12 +196,7 @@ def test_T_U_image_03_12_sdk_strip():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_04_in_image():
-    """T-U-image-04 (FR-03.4): the flags in the build tree, and the debug section.
-
-    `CMakeCache.txt` carries the flag string, no compile command carries
-    `-DNDEBUG`, and `circt-opt` carries `.debug_line`, which is what makes the
-    symboliser able to resolve file and line. Tier 2.
-    """
+    """T-U-image-04 (FR-03.4): the flags in the build tree, and the debug section."""
     cache = in_image("grep", "CMAKE_CXX_FLAGS_RELEASE:STRING",
                      "/workspace/circt/build/CMakeCache.txt")
     assert cache.returncode == 0
@@ -292,14 +216,7 @@ def test_T_U_image_04_in_image():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_05_assertions_on():
-    """T-U-image-05 (FR-03.5): every target references `__assert_fail`.
-
-    The set comparison against the committed baseline of non-referencing
-    objects needs the build tree's object list, which is `T-U-image-05`'s other
-    half and W-04's own measurement; what runs here is the six binaries' own
-    undefined-symbol check, which is the part a container answers in seconds.
-    Tier 2.
-    """
+    """T-U-image-05 (FR-03.5): every target references `__assert_fail`."""
     for name, entry in manifest()["tool_hashes"].items():
         done = in_image("bash", "-c", f"nm -u {entry['path']} | grep -c __assert_fail")
         assert done.stdout.strip() == "1", (name, done.stdout)
@@ -309,13 +226,7 @@ def test_T_U_image_05_assertions_on():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_17_lit_discovery():
-    """T-U-image-17 (FR-03.17): lit discovers the tree with no configuration error.
-
-    `mlir_src_root` points at the SDK, discovery exits 0, `circt-tblgen` tests
-    are among what it lists, and no `fatal: unable to parse config file` line
-    appears. It is `build_image` step 4, run against the published image, and
-    the parser it feeds is `T-U-driver-25`'s. Tier 2.
-    """
+    """T-U-image-17 (FR-03.17): lit discovers the tree with no configuration error."""
     root = in_image("grep", "mlir_src_root",
                     "/workspace/circt/build/test/lit.site.cfg.py")
     assert root.returncode == 0 and "/opt/circt-sdk" in root.stdout
@@ -332,13 +243,7 @@ def test_T_U_image_17_lit_discovery():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_08_09_19_environment():
-    """T-U-image-08, -09, -19 (FR-03.8, FR-03.9): lit, ssh, rsync, and the ENV block.
-
-    `lit` at the one path `circt_warm_build` checks; `ssh` and `rsync`, which
-    CHIA's own CIRCT base does not carry; and the five `BUGLOOP_*` variables,
-    readable from inside a running container, which is what lets a report state
-    the commit and the flag string without re-deriving them. Tier 2.
-    """
+    """T-U-image-08, -09, -19 (FR-03.8): lit, ssh, rsync, and the ENV block."""
     lit = in_image("/home/ray/anaconda3/envs/py_worker/bin/lit", "--version")
     assert lit.returncode == 0
     for command in (("ssh", "-V"), ("rsync", "--version"), ("verilator", "--version")):
@@ -359,10 +264,7 @@ def test_T_U_image_08_09_19_environment():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_01_in_image():
-    """T-U-image-01 (FR-03.1): the image's own checkout is the commit it claims.
-
-    Tier 2.
-    """
+    """T-U-image-01 (FR-03.1): the image's own checkout is the commit it claims."""
     recorded = manifest()
     head = in_image("git", "-C", "/workspace/circt", "rev-parse", "HEAD")
     assert head.stdout.strip() == recorded["circt_sha"]
@@ -372,14 +274,7 @@ def test_T_U_image_01_in_image():
 
 @pytest.mark.t0
 def test_T_U_image_02_pin_line():
-    """T-U-image-02 (FR-03.2): the phrase step 3 looks for is the phrase the file prints.
-
-    `build_image` fails the build when the pin check did not RUN, which is
-    distinct from the check failing, and it decides that by reading one line out
-    of the build log. The line is the Dockerfile's own, so the two are asserted
-    against each other here rather than being kept in step with by hand.
-    Fixture: the Dockerfile. Tier 0.
-    """
+    """T-U-image-02 (FR-03.2): the phrase step 3 looks for is the phrase the file prints."""
     text = dockerfile()
     assert bug_loop.PIN_CHECK_LINE in text
     assert "PIN CHECK FAILED" in text and "exit 1" in text
@@ -391,13 +286,7 @@ def test_T_U_image_02_pin_line():
 @pytest.mark.needs_image
 @needs_image
 def test_T_U_image_05_objects():
-    """T-U-image-05 (FR-03.5): the object scan, and the nineteen W-04 measured.
-
-    `_assertion_objects`' own command, run against the published image: 555
-    `obj.CIRCT` objects, 19 of which do not reference `__assert_fail`, which is
-    the set `ImageSpec.assertion_nonreferencing` carries and the baseline a
-    later build is compared against. Tier 2.
-    """
+    """T-U-image-05 (FR-03.5): the object scan, and the nineteen W-04 measured."""
     scan = in_image("sh", "-c", bug_loop._OBJECT_SCAN, timeout=900)
     assert scan.returncode == 0, scan.stderr[-400:]
     nonreferencing = sorted(scan.stdout.split())

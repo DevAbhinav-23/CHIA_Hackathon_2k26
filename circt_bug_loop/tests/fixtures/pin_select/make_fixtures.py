@@ -1,21 +1,5 @@
 #!/usr/bin/env python3
-"""Record the five `pin_select` fixtures from the blobless `llvm/circt` clone.
-
-`04-Test-Plan.md` §13's rule for this directory: the fixtures are derived by
-selecting rows from real git output and the derivation script is committed
-beside them. Nothing here is hand-written. Each fixture is a replay of the
-six git commands `03-LLD.md` §4.11.1's table gives `pin_select.py`, keyed by
-the argument vector the module passes, so the tier-0 tests drive the real
-`select_release_pinned_main` body against recorded bytes and no clone.
-
-Usage:
-    python3 make_fixtures.py [<clone>]        # default ~/.cache/chia-pin-smoke/circt
-
-The clone must have `origin/main` and `refs/tags/firtool-*` fetched. Re-running
-it against a moved `main` rewrites `head_pin_unreleased.json` and the numbers
-the tests assert; that is deliberate, and the fixture records the `origin/main`
-head it was taken at so a rewrite is visible in the diff.
-"""
+"""Record the five `pin_select` fixtures from the blobless `llvm/circt` clone."""
 import json
 import os
 import subprocess

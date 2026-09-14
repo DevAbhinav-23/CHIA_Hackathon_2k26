@@ -1,15 +1,4 @@
-"""`budget.py`: the schema, the pre-registration rule, the six checks.
-
-`04-Test-Plan.md` §1.15, the thirteen `T-U-budget-*` tests. All tier 0: the
-module is head-side and its one external read is `git` against a throwaway
-repository this file builds in a temporary directory (§13's `repo/` row, whose
-repositories are produced at test time and never committed).
-
-The complete file of `03-LLD.md` §9.5 is the repository's own committed
-`budget.yaml`, read rather than copied: a second copy under `fixtures/budget/`
-could disagree with the pre-registration, and the malformed variants below are
-each that file with **one** edit, which is the derivation §13 specifies.
-"""
+"""`budget.py`: the schema, the pre-registration rule, the six checks."""
 import os
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -68,12 +57,7 @@ class Repo:
         return self.git("rev-parse", f"{name}^{{commit}}").strip()
 
     def load(self, **kwargs):
-        """`load_budget` against this repository's budget file.
-
-        The node returns `{"budget", "counters"}` since the join (W-17, errata
-        row 22) and what every test below reads is the `BudgetFile`, so the
-        helper unwraps it and asserts the block here, at every call site.
-        """
+        """`load_budget` against this repository's budget file."""
         kwargs.setdefault("run_start_utc", _RUN_START)
         out = call_node(budget_module.load_budget, str(self.budget),
                         str(self.root), **kwargs)
@@ -82,11 +66,7 @@ class Repo:
 
 
 def edited(**changes) -> str:
-    """§9.5's file with one edit each, as YAML text.
-
-    A key set to the sentinel `_DROP` is removed rather than changed, which is
-    how the 27 one-key-short copies of `fixtures/budget/missing/` are made.
-    """
+    """§9.5's file with one edit each, as YAML text."""
     document = yaml.safe_load(COMPLETE.read_text(encoding="utf-8"))
     for key, value in changes.items():
         if value is _DROP:
@@ -108,11 +88,7 @@ def repo(tmp_path: Path) -> Repo:
 
 
 def test_T_U_budget_01(repo: Repo):
-    """T-U-budget-01 (FR-14.1): a file missing any key of §9.1 is rejected, naming it.
-
-    All 29 keys one at a time, the four of 2026-09-14 and the two of contract
-    2.2 included.
-    """
+    """T-U-budget-01 (FR-14.1): a file missing any key of §9.1 is rejected, naming it."""
     assert len(budget_module._KEYS) == 29
     for key in budget_module._KEYS:
         repo.commit("circt_bug_loop/budget.yaml", edited(**{key: _DROP}))
@@ -121,9 +97,7 @@ def test_T_U_budget_01(repo: Repo):
         assert key in str(caught.value), f"the refusal does not name {key}"
     for key in ("model_id", "campaign_spend_cap_usd", "price_usd_per_m_input_tokens",
                 "price_usd_per_m_output_tokens",
-                # W-18b: the tool-loop cap and the minimality threshold are
-                # REGISTERED parameters, so a file that omits either is refused
-                # exactly as one that omits a price is (errata rows 38 and 46).
+                # W-18b: the tool-loop cap and the minimality threshold are REGISTERED parameters.
                 "max_tool_iterations", "minimal_case_lines"):
         assert key in budget_module._KEYS
 
@@ -203,16 +177,7 @@ def test_T_U_budget_06(repo: Repo):
 
 
 def test_T_U_budget_07(repo: Repo, tmp_path: Path):
-    """T-U-budget-07 (FR-05.2, FR-14.3): the registration is a TAG, and it must reach the set.
-
-    W-12's architect decision, in the three states that matter. UNREGISTERED: a
-    campaign is refused and every other reader is not, which is what lets A7
-    synthesise and the calibration sample be drawn before the tag exists.
-    TAGGED, with the set committed BEFORE the tag's commit: accepted. TAGGED,
-    with the set committed after it: refused, naming the set's commit and the
-    tag. Ancestry decides, not the two commit dates: a rebase rewrites a date
-    and cannot rewrite reachability.
-    """
+    """T-U-budget-07 (FR-05.2): the registration is a TAG, and it must reach the set."""
     assert budget_module.registration(str(repo.root)) == ("", "")
     assert repo.load().budget_file_sha, "an unregistered repository still loads"
     with pytest.raises(budget_module.BudgetError) as caught:
@@ -230,10 +195,7 @@ def test_T_U_budget_07(repo: Repo, tmp_path: Path):
     assert out["budget"].budget_file_sha == repo.git(
         "log", "-1", "--format=%H", "--", "circt_bug_loop/budget.yaml").strip()
 
-    # The set the RUN hashes, which since W-12c is the newest frozen one and is
-    # read off `budget.MUTATOR_SET`: spelling a version here would check a file
-    # no campaign loads, and `mutators/set_v1.json`'s commit is an ancestor of
-    # everything once a `set_v2.json` exists, so the literal passed vacuously.
+    # The set the RUN hashes, which since W-12c is the newest frozen one and is read off `budget.MUTATOR_SET`.
     frozen = f"circt_bug_loop/{budget_module.MUTATOR_SET}"
     later = repo.commit(frozen, '{"set_version": "vN"}\n',
                         when=_EARLY - timedelta(days=1))
@@ -262,9 +224,7 @@ def test_T_U_budget_08(repo: Repo):
         repo.load(manifest_budget_file_sha=stamped)
     assert stamped in str(caught.value) and amended in str(caught.value)
 
-    # W-12: registered at the amendment, then edited again. The file's own
-    # commit is then one the tag cannot reach, and that refuses the run on its
-    # own, before any manifest has been stamped.
+    # W-12: registered at the amendment, then edited again.
     registered = repo.register()
     assert repo.load(campaign=True).budget_file_sha == amended
     again = repo.commit("circt_bug_loop/budget.yaml", edited(filings_total=98))
@@ -298,12 +258,7 @@ def test_T_U_budget_09(repo: Repo):
 
 
 def test_T_U_budget_10(repo: Repo):
-    """T-U-budget-10 (FR-14.1, FR-14.5): §9.5's file is accepted, complete and closed.
-
-    Equality on the unit and on both safety caps is structural: one value per
-    key, and no per-arm value to be unequal. The two figures this revision moved
-    are asserted at their new values.
-    """
+    """T-U-budget-10 (FR-14.1): §9.5's file is accepted, complete and closed."""
     document = yaml.safe_load(COMPLETE.read_text(encoding="utf-8"))
     assert sorted(document) == sorted(budget_module._KEYS)
 
@@ -311,8 +266,7 @@ def test_T_U_budget_10(repo: Repo):
     assert loaded.reduction_wall_seconds == 600
     assert loaded.artefact_inline_cap_bytes == 262144
     assert loaded.arm_order == ["seeded", "mutation"]
-    # 7200 since W-22: the pilot measured about USD 0.6 a minute on the seeded
-    # arm, so a four-hour arm run twice cannot be paid for out of a cap of 200.
+    # 7200 since W-22: the pilot measured about USD 0.6 a minute on the seeded arm.
     assert isinstance(loaded.arm_window_seconds, float) and loaded.arm_window_seconds == 7200.0
     assert set(loaded.acceptance) == budget_module._ACCEPTANCE_KEYS
 
@@ -323,17 +277,7 @@ def test_T_U_budget_10(repo: Repo):
 
 
 def test_T_U_budget_11(repo: Repo):
-    """T-U-budget-11 (FR-14.1, FR-14.2): check 5, the calibration sample.
-
-    The sample is part of the pre-registration, so a file whose declared size
-    and drawn list disagree is refused.
-
-    THE COMMITTED FILE'S OWN SAMPLE IS EMPTY since W-22, and legitimately: 0 of
-    the 187 seed parents carry this deployment's pin (`bug_loop.calibratable`,
-    measured 2026-09-15), so the eligible set is empty and the campaign is
-    registered as discovery mode. The check is therefore exercised here over a
-    drawn sample this test supplies, rather than over the file's own.
-    """
+    """T-U-budget-11 (FR-14.1): check 5, the calibration sample."""
     empty = yaml.safe_load(COMPLETE.read_text(encoding="utf-8"))
     assert empty["calibration_sample_shas"] == [] == empty["calibration_sample_size"] * []
     assert empty["calibration_sample_size"] == 0
@@ -372,20 +316,13 @@ def test_T_U_budget_11(repo: Repo):
         repo.load(exact_pin_shas=set(drawn[:19]))
     assert "exact-pin" in str(caught.value)
 
-    # And the COMMITTED file, whose sample is empty, loads against any pin set:
-    # an empty sample has no entry that could fail check 5 (W-22, errata 52).
+    # And the COMMITTED file, whose sample is empty, loads against any pin set.
     repo.commit("circt_bug_loop/budget.yaml", COMPLETE.read_text(encoding="utf-8"))
     assert repo.load(exact_pin_shas=set()).calibration_sample_shas == []
 
 
 def test_T_U_budget_12(repo: Repo):
-    """T-U-budget-12 (FR-14.1, FR-14.6, NFR-08): check 6, the pair of prices.
-
-    The pair is the point: a file carrying one price and not the other would
-    value half the campaign's tokens at zero, so the ledger would under-report
-    the spend it is meant to stop on. `budget.py` makes six checks and the count
-    is asserted here.
-    """
+    """T-U-budget-12 (FR-14.1): check 6, the pair of prices."""
     assert len(budget_module._CHECKS) == 6
 
     prices = ("price_usd_per_m_input_tokens", "price_usd_per_m_output_tokens")
@@ -418,13 +355,7 @@ def test_T_U_budget_12(repo: Repo):
 
 
 def test_T_U_budget_13(repo: Repo):
-    """T-U-budget-13 (FR-14.1, FR-14.6): the four keys of 2026-09-14 reach consumers.
-
-    `model_id` is the model half of the `vertex:<id>` pair `RunManifest.model_ids`
-    records; `campaign_spend_cap_usd` is what `ledger.stop_reason` compares
-    against; the two prices are what `ledger.price` multiplies by. `build_llm`,
-    the fourth consumer, is `generate_task.py`'s and is W-07's to land.
-    """
+    """T-U-budget-13 (FR-14.1): the four keys of 2026-09-14 reach consumers."""
     ledger_module = pytest.importorskip("circt_bug_loop.ledger")
     loaded = repo.load()
 

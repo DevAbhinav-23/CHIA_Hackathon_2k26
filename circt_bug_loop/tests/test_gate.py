@@ -1,24 +1,4 @@
-"""`04-Test-Plan.md` §1's `gate` rows: `gate.py` (B9a, B9b), F-13 and FR-18.6.
-
-**Nothing here reaches a model**, and nothing here can: not one of the four
-questions takes a model's opinion, which is FR-13.1 and NFR-03 and which
-`test_gate_15` asserts on the source as well as on the answers.
-
-The two worker-side nodes run for real against **stand-in tools**: shell scripts
-that print the recorded assertion and die by `SIGABRT`, or reject an input with
-an ordinary diagnostic. `circt_exec_probe`'s `prlimit` prefix, its process group,
-`classify_build`, `oracle_primary`'s parse and `compute_fingerprint` all run
-unmocked; only the compiler is a stand-in, and the question the gate asks is
-about a recorded class, text and site, which are read off stderr whatever
-produced them. §1's column marks the question-3 rows T1 for that reason; they are
-**T0** here and the deviation is recorded as an erratum rather than hidden.
-
-The one thing that is mocked is the **dispatch**: `gate_decide` holds no worker
-resource and reaches both nodes through `gate._dispatch`, which a test replaces
-with a direct call so that no test starts a Ray. The soft anti-affinity of
-FR-13.2 is asserted on `rerun_options`, which builds the real
-`NodeAffinitySchedulingStrategy`.
-"""
+"""`04-Test-Plan.md` §1's `gate` rows: `gate.py` (B9a), F-13 and FR-18.6."""
 from __future__ import annotations
 
 import ast
@@ -52,28 +32,20 @@ MANIFEST = FIXTURES / "triage" / "run_manifest" / "calibration_two.json"
 ASSERT_TEXT = 'op && "null op"'
 ASSERT_SITE = "/workspace/circt/lib/Dialect/HW/HWOps.cpp:412"
 FRAME_FILE = "/workspace/circt/lib/Dialect/HW/HWOps.cpp"
-#: Ray validates a node id's shape, so the two below are real 28-byte hex
-#: strings and not the readable placeholders a fixture would otherwise carry.
+#: Ray validates a node id's shape.
 NODE_A = "a1" * 28
 NODE_B = "b2" * 28
 LIMITS = {"probe_wall_seconds": 60, "probe_address_space_bytes": 4 << 30,
           "probe_cpu_seconds": 45, "probe_output_byte_cap": 1_000_000}
 TOP_N = 3
 
-#: `budget.yaml`'s own `minimal_case_lines` (W-18b, errata row 46). The gate
-#: fixture's `case.mlir` is three lines, which is BELOW it, so a reducer that
-#: reached a fixpoint without shrinking it has proved it minimal.
+#: `budget.yaml`'s own `minimal_case_lines` (W-18b).
 MINIMAL_CASE_LINES = 12
 
 #: The eight keys `DedupVerdict.evidence` is closed at (§2.9).
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
             "duplicate_of_candidate_id")
-
-
-# ---------------------------------------------------------------------------
-# Builders
-# ---------------------------------------------------------------------------
 
 
 def _manifest(tmp_path, bin_dir):
@@ -247,12 +219,7 @@ def _store(tmp_path, candidate, *, argv=None, frame_file=FRAME_FILE):
 
 
 def _direct(monkeypatch):
-    """Replace the one dispatch seam with a direct call to each node's original.
-
-    `gate_decide` holds no worker resource and reaches both `{"circt": 1}` nodes
-    through `gate._dispatch`; a unit test runs them in process, which is what
-    `conftest.call_node` does everywhere else and what keeps a local Ray out.
-    """
+    """Replace the one dispatch seam with a direct call to each node's original."""
     seen = []
 
     def _run(node, options, *args, **kwargs):
@@ -264,8 +231,7 @@ def _direct(monkeypatch):
     return seen
 
 
-#: `None` is a value question 2 must answer, so the builder needs a sentinel
-#: that is not it.
+#: `None` is a value question 2 must answer.
 _UNSET = object()
 
 
@@ -277,9 +243,7 @@ def _decide(tmp_path, monkeypatch, *, candidate=None, reduced=_UNSET, dedup=None
     candidate = candidate or _candidate(tmp_path, bin_dir)
     store = store or _store(tmp_path, candidate, argv=argv, frame_file=frame_file)
     seen = _direct(monkeypatch)
-    # `{"decision", "counters"}` since the join (W-17, errata row 22); what the
-    # tests below read is the GateDecision, so it is unwrapped here and the
-    # block is asserted at every call site.
+    # `{"decision", "counters"}` since the join (W-17).
     out = call_node(
         gate_decide, candidate,
         _reduced(candidate.reduced_path) if reduced is _UNSET else reduced,
@@ -290,15 +254,9 @@ def _decide(tmp_path, monkeypatch, *, candidate=None, reduced=_UNSET, dedup=None
     return out["decision"], store, seen
 
 
-# ===========================================================================
-# T-U-gate-01 to -04: the order, the placement and the two identities
-# ===========================================================================
-
-
 def test_gate_01_four_questions_in_order_stopping_at_the_first_no(tmp_path,
                                                                   monkeypatch):
-    """T-U-gate-01 (FR-13.1): all four answered in order, the stopping point
-    recorded, and no question after the first "no" is asked at all."""
+    """T-U-gate-01 (FR-13.1): all four answered in order, the stopping point recorded, and no question after the first "no" is asked at all."""
     decision, _, _ = _decide(tmp_path, monkeypatch)
     assert decision.stopped_at_question is None
     assert [decision.q1_reproduce, decision.q2_minimal, decision.q3_valid,
@@ -315,8 +273,7 @@ def test_gate_01_four_questions_in_order_stopping_at_the_first_no(tmp_path,
 
 
 def test_gate_02_the_decision_stage_holds_no_worker_resource():
-    """T-U-gate-02 (FR-13.2): `gate_decide` declares none, so it can never hold a
-    `circt` slot while waiting for one; the two workers are nodes of their own."""
+    """T-U-gate-02 (FR-13.2): `gate_decide` declares none, so it can never hold a `circt` slot while waiting for one; the two workers are nodes of their own."""
     assert gate_decide._chia_options == {"max_retries": 0}
     assert gate_rerun._chia_options == {"resources": {"circt": 1},
                                         "max_retries": 0}
@@ -329,9 +286,7 @@ def test_gate_02_the_decision_stage_holds_no_worker_resource():
 
 
 def test_gate_03_the_pin_is_soft_and_prefers_another_node():
-    """T-U-gate-03 (FR-13.2): `NodeAffinitySchedulingStrategy(node_id=<other>,
-    soft=True)`; with only one live `circt` node there is no other, the re-run
-    still happens, and `same_worker=True` is recorded truthfully."""
+    """T-U-gate-03 (FR-13.2): `NodeAffinitySchedulingStrategy(node_id=<other>, soft=True)`; with only one live `circt` node there is no other, the re-run still happens, and `same_worker=True` is recorded truthfully."""
     assert preferred_node([NODE_A, NODE_B], NODE_A) == NODE_B
     assert preferred_node([NODE_A], NODE_A) is None
     assert preferred_node([], None) is None
@@ -344,9 +299,7 @@ def test_gate_03_the_pin_is_soft_and_prefers_another_node():
 
 
 def test_gate_04_both_worker_identities_are_recorded(tmp_path, monkeypatch):
-    """T-U-gate-04 (FR-13.2): the original half from `BuildResult`'s three
-    recorded fields and the re-run half from `gate_rerun`'s own return, with
-    `q1_same_worker` computable from the two node ids."""
+    """T-U-gate-04 (FR-13.2): the original half from `BuildResult`'s three recorded fields and the re-run half from `gate_rerun`'s own return, with `q1_same_worker` computable from the two node ids."""
     decision, _, _ = _decide(tmp_path, monkeypatch)
     assert decision.q1_original_worker == "worker-a"
     assert decision.q1_original_pid == 4242
@@ -357,8 +310,7 @@ def test_gate_04_both_worker_identities_are_recorded(tmp_path, monkeypatch):
 
 
 def test_gate_05_question_one_fails_on_a_different_failure(tmp_path, monkeypatch):
-    """T-U-gate-05 (FR-13.1, FR-18.6): a re-run whose class, text or site differs
-    fails question 1 and buckets as `unreproducible`."""
+    """T-U-gate-05 (FR-13.1): a re-run whose class, text or site differs fails question 1 and buckets as `unreproducible`."""
     decision, _, _ = _decide(tmp_path, monkeypatch, entry="other_assertion.sh")
     assert decision.q1_reproduce is False
     assert decision.stopped_at_question == 1
@@ -367,8 +319,7 @@ def test_gate_05_question_one_fails_on_a_different_failure(tmp_path, monkeypatch
 
 
 def test_gate_21_the_rerun_gets_a_fresh_directory_every_call(tmp_path, monkeypatch):
-    """T-U-gate-21 (FR-13.2): `mkdtemp` under `<artefact_root>/<run>/gate/`, one
-    per call and never reused, carrying no state from the original run."""
+    """T-U-gate-21 (FR-13.2): `mkdtemp` under `<artefact_root>/<run>/gate/`, one per call and never reused, carrying no state from the original run."""
     bin_dir = _tools(tmp_path)
     manifest = _manifest(tmp_path, bin_dir)
     candidate = _candidate(tmp_path, bin_dir)
@@ -389,9 +340,7 @@ def test_gate_21_the_rerun_gets_a_fresh_directory_every_call(tmp_path, monkeypat
 
 
 def test_gate_22_the_rerun_checks_the_hash_manifest(tmp_path, monkeypatch):
-    """T-U-gate-22 (FR-06.1): `gate_rerun` raises `BinaryMismatch` exactly as
-    `probe_execute` does, for the same reason: a mutated tree makes every verdict
-    from that worker suspect."""
+    """T-U-gate-22 (FR-06.1): `gate_rerun` raises `BinaryMismatch` exactly as `probe_execute` does, for the same reason: a mutated tree makes every verdict from that worker suspect."""
     bin_dir = _tools(tmp_path)
     manifest = _manifest(tmp_path, bin_dir)
     manifest.image_spec["tool_hashes"]["entry-tool"] = "0" * 64
@@ -406,9 +355,7 @@ def test_gate_22_the_rerun_checks_the_hash_manifest(tmp_path, monkeypatch):
 
 
 def test_gate_24_the_rerun_sets_fingerprint_stable(tmp_path, monkeypatch):
-    """T-U-gate-24 (FR-10.1, FR-13.1): the fingerprint is recomputed from the
-    re-run's own stderr and compared; a difference records `false` and does NOT
-    fail question 1, which asks only whether the failure reproduces."""
+    """T-U-gate-24 (FR-10.1): the fingerprint is recomputed from the re-run's own stderr and compared; a difference records `false` and does NOT fail question 1, which asks only whether the failure reproduces."""
     decision, store, _ = _decide(tmp_path, monkeypatch)
     row = store.query_one("SELECT fingerprint_stable FROM fingerprint "
                           "WHERE candidate_id = ?", ("cand-0001",))
@@ -424,32 +371,20 @@ def test_gate_24_the_rerun_sets_fingerprint_stable(tmp_path, monkeypatch):
     assert other.q1_reproduce is True, "an unstable fingerprint is not a no"
 
 
-# ===========================================================================
-# T-U-gate-06 to -09: question 2, total over every reducer record
-# ===========================================================================
-
-
 @pytest.mark.parametrize("over,passes,reason", [
     ({}, True, None),
-    # W-18b: a fixpoint with NO progress on a case at or below the threshold
-    # is the reducer proving the case minimal, and passes.
+    # W-18b: a fixpoint with NO progress on a case at or below the threshold is the reducer proving the case minimal, and passes.
     ({"reduced": False, "reason": "no_progress"}, True, "already_minimal"),
     ({"recheck_matches": False}, False, "reduction_changed_failure"),
     ({"reducer": "none", "reduced": False}, False, "no_reducer"),
     ({"fixpoint": False}, False, "not_fixpoint"),
-    # No fixpoint AND no progress keeps the reducer's own free text (FR-09.12),
-    # because the reducer did not finish and proved nothing.
+    # No fixpoint AND no progress keeps the reducer's own free text (FR-09.12).
     ({"reduced": False, "fixpoint": False, "reason": "budget_truncated"},
      False, "budget_truncated"),
 ])
 def test_gate_06_to_09_question_two_is_total(tmp_path, monkeypatch, over, passes,
                                              reason):
-    """T-U-gate-06 to -09 (FR-09.7, FR-09.12, FR-13.3): a fixpoint with a
-    preserved re-check passes, and so does a fixpoint that removed nothing from
-    a case already at or below `minimal_case_lines` (W-18b, errata row 46);
-    `reduction_changed_failure`, no reducer at all, no fixpoint and a
-    truncated reduction each fail as `not_minimal` with the reason recorded,
-    and no input to this question is ever null."""
+    """T-U-gate-06 to -09 (FR-09.7): a fixpoint with a preserved re-check passes, and so does a fixpoint that removed nothing from a case already at or below `minimal_case_lines` (W-18b); `reduction_changed_failure`, no reducer at all, no fixpoint and a truncated reduction each fail as `not_minimal` with the reason recorded, and no input to this question is ever null."""
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir)
     decision, _, _ = _decide(tmp_path, monkeypatch, candidate=candidate,
@@ -464,15 +399,7 @@ def test_gate_06_to_09_question_two_is_total(tmp_path, monkeypatch, over, passes
 
 def test_gate_09c_the_threshold_is_what_decides_an_unshrunk_case(tmp_path,
                                                                  monkeypatch):
-    """W-18b, errata row 46: the pilot's own case passes, and a big one does not.
-
-    The pilot's `circt-reduce` made 20 interestingness calls on a six-line
-    `moore.net` module, removed nothing, reported `no_progress` with
-    `fixpoint=1`, and question 2 answered `not_minimal` for all three of its
-    candidates. Here the same record over a case BELOW `minimal_case_lines`
-    passes and over one ABOVE it fails, so the threshold is what decides and
-    not the flag. Fixture: the pilot's own reduced case, written here. Tier 0.
-    """
+    """W-18b, errata row 46: the pilot's own case passes, and a big one does not."""
     # Two roots, because each `_decide` builds a `loop.db` with its own run row.
     small, large = tmp_path / "small", tmp_path / "large"
     small.mkdir(), large.mkdir()
@@ -506,22 +433,14 @@ def test_gate_09c_the_threshold_is_what_decides_an_unshrunk_case(tmp_path,
 
 
 def test_gate_09b_no_reduced_case_at_all_is_still_an_answer(tmp_path, monkeypatch):
-    """FR-13.3's "no reducer could run at all", in its extreme form: a candidate
-    with no `ReducedCase` row is refused with a reason and not with a crash."""
+    """FR-13.3's "no reducer could run at all", in its extreme form: a candidate with no `ReducedCase` row is refused with a reason and not with a crash."""
     decision, _, _ = _decide(tmp_path, monkeypatch, reduced=None)
     assert (decision.q2_minimal, decision.q2_reason) == (False, "no_reducer")
     assert decision.taxonomy_bucket == "not_minimal"
 
 
-# ===========================================================================
-# T-U-gate-10 to -13, -23, -26: question 3, mechanical
-# ===========================================================================
-
-
 def test_gate_13_the_three_check_commands_are_exactly_section_4_8():
-    """T-U-gate-13 (FR-13.15): `circt-opt <case> -o /dev/null`,
-    `firtool --parse-only <case>` and `circt-verilog --import-only <case>`; no
-    pass pipeline and no `--allow-unregistered-dialect` anywhere."""
+    """T-U-gate-13 (FR-13.15): `circt-opt <case> -o /dev/null`, `firtool --parse-only <case>` and `circt-verilog --import-only <case>`; no pass pipeline and no `--allow-unregistered-dialect` anywhere."""
     assert validity_command("x.mlir") == ("circt-opt", ["-o", "/dev/null"])
     assert validity_command("x.fir") == ("firtool", ["--parse-only"])
     assert validity_command("x.sv") == ("circt-verilog", ["--import-only"])
@@ -537,8 +456,7 @@ def test_gate_13_the_three_check_commands_are_exactly_section_4_8():
 
 
 def test_gate_10_question_three_passes_on_exit_zero(tmp_path, monkeypatch):
-    """T-U-gate-10 (FR-13.15): exit 0 passes, with `validity_basis=parsed`, and
-    the recorded argv carries the `prlimit` prefix a probe carries."""
+    """T-U-gate-10 (FR-13.15): exit 0 passes, with `validity_basis=parsed`, and the recorded argv carries the `prlimit` prefix a probe carries."""
     decision, _, _ = _decide(tmp_path, monkeypatch)
     assert (decision.q3_valid, decision.q3_validity_basis) == (True, "parsed")
     assert decision.q3_exit_status == 0
@@ -546,9 +464,7 @@ def test_gate_10_question_three_passes_on_exit_zero(tmp_path, monkeypatch):
 
 
 def test_gate_11_the_checker_firing_is_still_a_pass(tmp_path, monkeypatch):
-    """T-U-gate-11 (FR-13.15): where the check itself fires the primary oracle
-    the candidate is a parser or verifier bug, so it passes with
-    `validity_basis=checker_failed`."""
+    """T-U-gate-11 (FR-13.15): where the check itself fires the primary oracle the candidate is a parser or verifier bug, so it passes with `validity_basis=checker_failed`."""
     decision, _, _ = _decide(tmp_path, monkeypatch, check="assertion.sh")
     assert (decision.q3_valid, decision.q3_validity_basis) == (True, "checker_failed")
     assert decision.q3_exit_status is None, "it died by signal"
@@ -556,8 +472,7 @@ def test_gate_11_the_checker_firing_is_still_a_pass(tmp_path, monkeypatch):
 
 
 def test_gate_12_a_clean_non_zero_exit_is_invalid_input(tmp_path, monkeypatch):
-    """T-U-gate-12 (FR-13.15, FR-18.6): a clean non-zero exit with a diagnostic
-    fails as `invalid_input`, and the exit status and stderr are persisted."""
+    """T-U-gate-12 (FR-13.15): a clean non-zero exit with a diagnostic fails as `invalid_input`, and the exit status and stderr are persisted."""
     decision, _, _ = _decide(tmp_path, monkeypatch, check="diagnostic.sh")
     assert decision.q3_valid is False
     assert decision.q3_exit_status == 1
@@ -568,10 +483,7 @@ def test_gate_12_a_clean_non_zero_exit_is_invalid_input(tmp_path, monkeypatch):
 
 
 def test_gate_23_the_second_conjunct_after_parse(tmp_path, monkeypatch):
-    """T-U-gate-23 (FR-13.15): `q3_after_parse` is answered from the record and
-    runs **no fourth command**. A fingerprint frame outside the parser is True; a
-    frame inside it with no pass pipeline is False and fails question 3; no frame
-    at all with no pipeline evidence is None, and None does not fail."""
+    """T-U-gate-23 (FR-13.15): `q3_after_parse` is answered from the record and runs **no fourth command**."""
     assert in_parser("/w/circt/lib/Parser/Parser.cpp") is True
     assert in_parser("/w/circt/lib/AsmParser/AsmParser.cpp") is True
     assert in_parser("/w/circt/tools/circt-translate/circt-translate.cpp") is True
@@ -589,8 +501,7 @@ def test_gate_23_the_second_conjunct_after_parse(tmp_path, monkeypatch):
     assert inside.q3_valid is False, "the conjunct fails question 3"
     assert inside.taxonomy_bucket == "invalid_input"
 
-    # The same parser frame, but the probe's argv carried a pass pipeline and the
-    # check exited 0, which puts the failure downstream of the parse.
+    # The same parser frame.
     pipeline, _, _ = _decide(
         tmp_path / "c", monkeypatch, argv=["--lower-seq-to-sv", "in.mlir"],
         frame_file="/workspace/circt/lib/Parser/Parser.cpp")
@@ -599,17 +510,7 @@ def test_gate_23_the_second_conjunct_after_parse(tmp_path, monkeypatch):
 
 def test_gate_23b_no_frame_and_no_pipeline_refuses_as_undecided(tmp_path,
                                                                 monkeypatch):
-    """W5, FR-13.10: an undecidable conjunct leaves question 3 UNANSWERED.
-
-    Rewritten by W-20b. `_after_parse` returns None when there is no in-scope
-    frame with a line and no pass pipeline, which is the ordinary shape of a
-    `fatal_error` candidate whose frames are empty; `gate_decide` downgraded
-    only on an explicit False, so an undecidable second conjunct was neither a
-    refusal nor an `undecided` bucket - it PASSED question 3 and the candidate
-    went on to question 4 and to a human. FR-13.10's rule is that an unanswered
-    question refuses, and `decide` already turns a null answer into question 3
-    and the `undecided` bucket; what was missing was the null.
-    """
+    """W5, FR-13.10: an undecidable conjunct leaves question 3 UNANSWERED."""
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir)
     store = _store(tmp_path, candidate, argv=["-o", "/dev/null"])
@@ -621,17 +522,14 @@ def test_gate_23b_no_frame_and_no_pipeline_refuses_as_undecided(tmp_path,
     assert decision.stopped_at_question == 3
     assert decision.decision == "nothing"
     assert decision.taxonomy_bucket == "undecided"
-    # The CHECK itself passed, which is why the refusal has to come from the
-    # conjunct: `q3_validity_basis` records what the check said.
+    # The CHECK itself passed, which is why the refusal has to come from the conjunct.
     assert decision.q3_validity_basis in ("parsed", "checker_failed")
     assert decision.q4_new is None, "question 4 is not reached"
 
 
 def test_gate_26_question_three_runs_at_the_candidates_own_commit(tmp_path,
                                                                   monkeypatch):
-    """T-U-gate-26 (FR-02.7, FR-13.15): against a calibration manifest with two
-    entries, the check runs against the candidate's own commit's binaries and
-    never `manifest.run_commit[0]`'s, which is another seed's (K14)."""
+    """T-U-gate-26 (FR-02.7): against a calibration manifest with two entries, the check runs against the candidate's own commit's binaries and never `manifest.run_commit[0]`'s, which is another seed's (K14)."""
     bin_dir = _tools(tmp_path)
     manifest = _manifest(tmp_path, bin_dir)
     candidate = _candidate(tmp_path, bin_dir)
@@ -647,19 +545,13 @@ def test_gate_26_question_three_runs_at_the_candidates_own_commit(tmp_path,
     assert decision.q3_valid is True
 
 
-# ===========================================================================
-# T-U-gate-14, -25: question 4
-# ===========================================================================
-
-
 @pytest.mark.parametrize("verdict,passes", [
     ("new", True), ("duplicate_of_candidate", False), ("known_open_issue", False),
     ("known_closed_issue", False), ("fixed_post_pin", False),
     ("dedup_unavailable", False)])
 def test_gate_14_question_four_reads_the_dedup_verdict(tmp_path, monkeypatch,
                                                        verdict, passes):
-    """T-U-gate-14 (FR-10.7, FR-10.8, FR-13.5): `new` passes and every other
-    value fails, `dedup_unavailable` included."""
+    """T-U-gate-14 (FR-10.7): `new` passes and every other value fails, `dedup_unavailable` included."""
     decision, _, _ = _decide(tmp_path, monkeypatch, dedup=_dedup(verdict))
     assert decision.q4_new is passes
     if not passes:
@@ -669,8 +561,7 @@ def test_gate_14_question_four_reads_the_dedup_verdict(tmp_path, monkeypatch,
 
 
 def test_gate_14b_an_insufficient_basis_fails_question_four(tmp_path, monkeypatch):
-    """FR-10.8: a fingerprint of basis `insufficient` merges nothing, so it can
-    never be `new`, and it buckets as `undecided` rather than as a duplicate."""
+    """FR-10.8: a fingerprint of basis `insufficient` merges nothing, so it can never be `new`, and it buckets as `undecided` rather than as a duplicate."""
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir, dedup_basis="insufficient",
                            fingerprint=None)
@@ -684,9 +575,7 @@ def test_gate_14b_an_insufficient_basis_fails_question_four(tmp_path, monkeypatc
 def test_gate_25_both_mirror_verdicts_fail_with_the_issue_number(tmp_path,
                                                                  monkeypatch,
                                                                  verdict):
-    """T-U-gate-25 (FR-10.3, FR-13.5): both of §3.7.3's mirror verdicts fail
-    question 4, and the evidence that names the issue is carried into the
-    record's own reason through the `DedupVerdict`."""
+    """T-U-gate-25 (FR-10.3): both of §3.7.3's mirror verdicts fail question 4, and the evidence that names the issue is carried into the record's own reason through the `DedupVerdict`."""
     dedup = _dedup(verdict, matched_token="LowerTypes", issue_number=10681,
                    issue_url="https://github.com/llvm/circt/issues/10681",
                    issue_state=verdict.split("_")[1], issue_labels=["bug"])
@@ -696,18 +585,11 @@ def test_gate_25_both_mirror_verdicts_fail_with_the_issue_number(tmp_path,
     assert dedup.evidence["issue_number"] == 10681
 
 
-# ===========================================================================
-# T-U-gate-15 to -20: the decision, the default and the taxonomy
-# ===========================================================================
-
-
 @pytest.mark.parametrize("triage_class",
                          ["bug", "invalid_input", "known_issue", "untriaged"])
 def test_gate_15_the_triage_classification_changes_nothing(tmp_path, monkeypatch,
                                                            triage_class):
-    """T-U-gate-15 (FR-11.8, FR-13.4, NFR-03): every other field held fixed, the
-    four classifications produce identical answers and an identical decision, and
-    no gate question reads the field, asserted by an `ast` search."""
+    """T-U-gate-15 (FR-11.8): every other field held fixed, the four classifications produce identical answers and an identical decision, and no gate question reads the field, asserted by an `ast` search."""
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir, triage_class=triage_class)
     decision, _, _ = _decide(tmp_path / triage_class, monkeypatch,
@@ -723,9 +605,7 @@ def test_gate_15_the_triage_classification_changes_nothing(tmp_path, monkeypatch
 
 
 def test_gate_16_report_plus_patch_needs_fixed_and_lit_ok(tmp_path, monkeypatch):
-    """T-U-gate-16 (FR-13.6): `report_plus_patch` when a `RepairResult` has
-    `fixed=true` AND `lit_ok=true`; `report` otherwise. Both branches, plus the
-    two ways a patch is withheld."""
+    """T-U-gate-16 (FR-13.6): `report_plus_patch` when a `RepairResult` has `fixed=true` AND `lit_ok=true`; `report` otherwise."""
     good, _, _ = _decide(tmp_path, monkeypatch, repair=_repair())
     assert good.decision == "report_plus_patch"
 
@@ -740,8 +620,7 @@ def test_gate_16_report_plus_patch_needs_fixed_and_lit_ok(tmp_path, monkeypatch)
 
 
 def test_gate_17_any_null_answer_refuses(tmp_path, monkeypatch):
-    """T-U-gate-17 (FR-13.10): the gate defaults to `nothing`, so a candidate
-    with any unanswered question is refused whatever the other three say."""
+    """T-U-gate-17 (FR-13.10): the gate defaults to `nothing`, so a candidate with any unanswered question is refused whatever the other three say."""
     passing = dict.fromkeys(ANSWER_KEYS)
     passing.update(q1_reproduce=True, q2_minimal=True, q3_valid=True, q4_new=True)
     assert decide(passing, None) == ("report", None, "new_bug")
@@ -753,9 +632,7 @@ def test_gate_17_any_null_answer_refuses(tmp_path, monkeypatch):
 
 
 def test_gate_18_a_refused_candidate_is_persisted_in_full(tmp_path, monkeypatch):
-    """T-U-gate-18 (FR-13.11, FR-18.6): a candidate refused at any question still
-    carries all fifteen answers, its failing question and exactly one bucket, so
-    the taxonomy's counts sum to the candidate count."""
+    """T-U-gate-18 (FR-13.11): a candidate refused at any question still carries all fifteen answers, its failing question and exactly one bucket, so the taxonomy's counts sum to the candidate count."""
     for entry, check, expected in (("clean.sh", "clean.sh", "unreproducible"),
                                    ("assertion.sh", "diagnostic.sh", "invalid_input")):
         decision, _, _ = _decide(tmp_path / expected, monkeypatch, entry=entry,
@@ -769,8 +646,7 @@ def test_gate_18_a_refused_candidate_is_persisted_in_full(tmp_path, monkeypatch)
 
 def test_gate_19_a_differential_candidate_never_enters_the_gate(tmp_path,
                                                                 monkeypatch):
-    """T-U-gate-19 (FR-08.10, FR-13.14): one fed deliberately is refused before
-    question 1 and carries no `GateDecision` at all."""
+    """T-U-gate-19 (FR-08.10): one fed deliberately is refused before question 1 and carries no `GateDecision` at all."""
     bin_dir = _tools(tmp_path)
     differential = CandidateRecord(
         candidate_id="cand-diff", probe_id="p-01", run_manifest_id="r" * 32,
@@ -789,9 +665,7 @@ def test_gate_19_a_differential_candidate_never_enters_the_gate(tmp_path,
 
 
 def test_gate_20_every_stopping_value_lands_in_its_stated_bucket():
-    """T-U-gate-20 (FR-18.6): every one of the table's stopping values is
-    produced by some path and buckets as stated, no path produces a value absent
-    from the table, and the six buckets are exactly the six FR-18.6 names."""
+    """T-U-gate-20 (FR-18.6): every one of the table's stopping values is produced by some path and buckets as stated, no path produces a value absent from the table, and the six buckets are exactly the six FR-18.6 names."""
     six = {"unreproducible", "not_minimal", "invalid_input", "duplicate",
            "undecided", "new_bug"}
     assert set(TAXONOMY.values()) | {"new_bug"} == six
@@ -808,8 +682,7 @@ def test_gate_20_every_stopping_value_lands_in_its_stated_bucket():
             fields["q4_reason"] = value
         assert decide(fields, None) == ("nothing", number, bucket), value
 
-    # A question-2 reason FR-09.12 lets B5 write freely still buckets, and as
-    # `not_minimal`, because that is the row it came from.
+    # A question-2 reason FR-09.12 lets B5 write freely still buckets.
     free = dict.fromkeys(ANSWER_KEYS)
     free.update(q1_reproduce=True, q2_minimal=False, q2_reason="already_minimal")
     assert decide(free, None) == ("nothing", 2, "not_minimal")

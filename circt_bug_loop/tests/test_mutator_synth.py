@@ -1,18 +1,4 @@
-"""`mutator_synth.py` (A7): `04-Test-Plan.md` §1.8, `T-U-msyn-01` to `-10`.
-
-The turn is mocked at the one call that reaches a model, `llm.dispatch_turn`,
-and
-the three constructed transcripts of `fixtures/synth/` are what it returns; the
-refusal, the query, the six drop checks, the provenance and the write-once
-freeze are all the real code. No model runs, no GitHub request is made, and
-`BUGLOOP_ALLOW_LIVE_MODEL` is never set: `build_llm` is substituted alongside
-the turn, so the interlock is never even reached.
-
-The mirror is a real `loop.db` built through `store.LoopStore` and filled with
-constructed rows at M9's two measured counts, 487 closed `label:bug` issues and
-101 open ones. The counts are the measurement; the rows are not recordings and
-`fixtures/synth/README.md` says so.
-"""
+"""`mutator_synth.py` (A7): `04-Test-Plan.md` §1.8, `T-U-msyn-01` to `-10`."""
 import json
 import subprocess
 from pathlib import Path
@@ -26,8 +12,7 @@ from circt_bug_loop.tests.conftest import call_node
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "synth"
 
-#: M9, measured 2026-09-13: the full closed `label:bug` history of llvm/circt,
-#: and the open ones it is counted against (`03-LLD.md` §8.3 step 2).
+#: M9, measured 2026-09-13.
 CLOSED_BUG_ISSUES = 487
 OPEN_BUG_ISSUES = 101
 
@@ -55,8 +40,7 @@ def mirror(tmp_path) -> str:
             "state": "closed" if closed else "open",
             "url": f"https://github.com/llvm/circt/issues/{number}",
             "mirrored_utc": "2026-09-13T00:00:00+00:00"})
-    # One closed issue that is NOT a bug, so the label filter has something to
-    # exclude rather than merely something to pass.
+    # One closed issue that is NOT a bug.
     rows.append({"issue_number": 9001, "title": "docs typo",
                  "body": "a docs typo", "labels_json": json.dumps(["docs"]),
                  "state": "closed", "url": "https://example.invalid/9001",
@@ -121,23 +105,10 @@ def set_directory(tmp_path):
     return tmp_path / "sets"
 
 
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.t0
 def test_T_U_msyn_01_a_registered_campaign_refuses_before_any_turn(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-01 (FR-05.2, FR-14.3): step 1 is first, and the turn count for it is zero.
-
-    The refusal is first so that no model turn is spent discovering it, and the
-    fix for it is to synthesise before registering, never to edit the
-    registration (FR-14.3, FR-14.7).
-
-    W-12: the registration is an annotated `registration/*` TAG, so a repository
-    that has merely COMMITTED `budget.yaml` is not registered and the synthesis
-    runs in it - which is the state A7 is specified to run in, and which the
-    previous reading of step 1 had made unreachable for good.
-    """
+    """T-U-msyn-01 (FR-05.2): step 1 is first, and the turn count for it is zero."""
     state = turn(transcript("mutator_synth_ok"))
     root = Path(unregistered_repo)
     (root / "circt_bug_loop").mkdir()
@@ -168,7 +139,7 @@ def test_T_U_msyn_01_a_registered_campaign_refuses_before_any_turn(
 @pytest.mark.t0
 def test_T_U_msyn_02_the_provenance_comes_from_the_run_and_never_from_the_model(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-02 (FR-05.2, FR-05.8): five fields, all filled from the run."""
+    """T-U-msyn-02 (FR-05.2): five fields, all filled from the run."""
     turn(transcript("mutator_synth_ok"))
     result = run(mirror, unregistered_repo, tmp_path)
     document = json.loads(Path(result["path"]).read_text(encoding="utf-8"))
@@ -182,22 +153,14 @@ def test_T_U_msyn_02_the_provenance_comes_from_the_run_and_never_from_the_model(
             [{"issue_number": n} for n in range(1, CLOSED_BUG_ISSUES + 1)])}
     assert document["synthesis_model"] == MODEL_ID
     assert document["synthesised_utc"] == "2026-09-15T12:00:00+00:00"
-    # None of the five is anything the model wrote: the turn's own text names
-    # neither a repo, nor a count, nor a date.
+    # None of the five is anything the model wrote.
     assert "llvm/circt" not in transcript("mutator_synth_ok")
 
 
 @pytest.mark.t0
 def test_T_U_msyn_03_the_declaration_names_its_input_its_date_and_its_digest(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-03 (FR-05.8): the one place the mutation arm sees bug reports.
-
-    FR-05.1 isolates the arm at RUN time, which is the isolation the
-    head-to-head needs; D-05 feeds a model bug reports at SYNTHESIS time, which
-    is Mut4All's design and is symmetric to the seeded arm's exposure to the
-    same project's fixes. The set carries what the results artefact and the
-    paper then have to state.
-    """
+    """T-U-msyn-03 (FR-05.8): the one place the mutation arm sees bug reports."""
     turn(transcript("mutator_synth_ok"))
     result = run(mirror, unregistered_repo, tmp_path)
     document = json.loads(Path(result["path"]).read_text(encoding="utf-8"))
@@ -223,12 +186,7 @@ def test_T_U_msyn_04_a_malformed_footer_freezes_nothing(mirror, unregistered_rep
 @pytest.mark.t0
 def test_T_U_msyn_05_the_freeze_is_canonical_json_and_records_the_count(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-05 (FR-05.2): 2.3's canonical form, and A-21's measured 487.
-
-    The mirror holds 487 closed and 101 open `label:bug` issues, which is what
-    M9 counted, so ADR-D-05's fallback to the 24-month fix-commit set is not
-    taken and `issues_used` is the whole closed history.
-    """
+    """T-U-msyn-05 (FR-05.2): 2.3's canonical form, and A-21's measured 487."""
     turn(transcript("mutator_synth_ok"))
     result = run(mirror, unregistered_repo, tmp_path)
 
@@ -240,15 +198,10 @@ def test_T_U_msyn_05_the_freeze_is_canonical_json_and_records_the_count(
     assert result["mutators_written"] == 3 and result["dropped"] == {}
     assert Path(result["path"]).name == "set_v1.json"
     assert document["format_version"] == 1 and document["set_version"] == "v1"
-    # 8.1's `frozen`, which A7 is the only thing that sets (W-12). `load_set`
-    # refuses a set declaring itself unfrozen once a run names a digest, and a
-    # set carrying no such field at all passed that guard only because `is
-    # False` is not `is not True`. The freeze is write-once, so the field has to
-    # be right the first time or the model turn is paid for twice.
+    # 8.1's `frozen`, which A7 is the only thing that sets (W-12).
     assert document["frozen"] is True
     assert result["counters"].stage == "synthesis"
-    # The written set is loadable by the arm that will run it, digest and all,
-    # which is the check a campaign makes (8.1 rule 1).
+    # The written set is loadable by the arm that will run it.
     loaded = mutators.load_set(result["path"], expected_sha=result["set_sha256"])
     assert [mutator["id"] for mutator in loaded["mutators"]] == [
         "mlir.attr.int.off_by_one", "sv.range.msb.zero", "any.line.duplicate"]
@@ -257,11 +210,7 @@ def test_T_U_msyn_05_the_freeze_is_canonical_json_and_records_the_count(
 @pytest.mark.t0
 def test_T_U_msyn_06_the_input_is_the_mirror_and_the_prompt_carries_it(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-06 (FR-05.2, NFR-04): the closed bug rows, ordered, and no request.
-
-    The query is the only source: nothing here reaches api.github.com, for the
-    same reason 3.7.3's screen makes no request either.
-    """
+    """T-U-msyn-06 (FR-05.2): the closed bug rows, ordered, and no request."""
     state = turn(transcript("mutator_synth_ok"))
     issues = mutator_synth.read_mirror(mirror)
 
@@ -284,7 +233,7 @@ def test_T_U_msyn_06_the_input_is_the_mirror_and_the_prompt_carries_it(
 def test_T_U_msyn_07_each_check_drops_exactly_its_own_entry(mirror,
                                                             unregistered_repo,
                                                             turn, tmp_path):
-    """T-U-msyn-07 (FR-05.2, FR-05.5): eight failures, eight drops, one survivor."""
+    """T-U-msyn-07 (FR-05.2): eight failures, eight drops, one survivor."""
     turn(transcript("mutator_synth_drops"))
     result = run(mirror, unregistered_repo, tmp_path)
 
@@ -307,13 +256,7 @@ def test_T_U_msyn_07_each_check_drops_exactly_its_own_entry(mirror,
 @pytest.mark.t0
 def test_T_U_msyn_08_the_freeze_is_write_once(mirror, unregistered_repo, turn,
                                               tmp_path):
-    """T-U-msyn-08 (FR-05.2): a second call raises and leaves the file untouched.
-
-    What is reproducible is the REFERENCE and not the synthesis: a model turn is
-    not a deterministic function of its prompt, so the digest
-    `RunManifest.mutator_set_sha` names can never be allowed to change under a
-    run.
-    """
+    """T-U-msyn-08 (FR-05.2): a second call raises and leaves the file untouched."""
     turn(transcript("mutator_synth_ok"))
     first = run(mirror, unregistered_repo, tmp_path)
     before = Path(first["path"]).read_bytes()
@@ -343,16 +286,7 @@ def test_T_U_msyn_09_an_empty_mirror_refuses(unregistered_repo, turn, tmp_path):
 @pytest.mark.t0
 def test_T_U_msyn_10_the_prompt_is_versioned_with_the_set_it_freezes(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-10 (FR-05.2, §8.3): `set_v2` renders `mutator_synth_v2.md`.
-
-    New id, W-12c. The freeze is WRITE-ONCE, so the text that produced a frozen
-    set's bytes may not be edited afterwards and a later synthesis brings its
-    own file. `set_version` is what selects it, so the pairing is a fact about
-    two file names rather than a flag a caller has to remember; a version with
-    no file of its own falls back to §8.3's original, which is what keeps `v1`
-    rendering the text `set_v1.json` came from. Fixture: the committed prompts
-    and A7's mirror. Tier 0.
-    """
+    """T-U-msyn-10 (FR-05.2): `set_v2` renders `mutator_synth_v2.md`."""
     assert mutator_synth.prompt_path("v2").name == "mutator_synth_v2.md"
     assert mutator_synth.prompt_path("v1").name == "mutator_synth.md"
     assert mutator_synth.prompt_path("v99").name == "mutator_synth.md"
