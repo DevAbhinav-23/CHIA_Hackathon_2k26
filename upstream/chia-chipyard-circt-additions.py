@@ -38,33 +38,16 @@ from typing import Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 #: The gap between `prlimit --cpu`'s soft and hard values (`03-LLD.md` §9.4).
-#: With soft equal to hard the kernel escalates past SIGXCPU straight to
-#: SIGKILL and the limit is not identifiable; measured 2026-09-14,
-#: `prlimit --cpu=1 -- python3 -c 'while True: pass'` returns 137 and
-#: `--cpu=1:6` returns 152, which is 128 + 24, SIGXCPU.
 CPU_HARD_MARGIN_SECONDS = 5
 
-#: The three allocation-failure literals FR-06.7 names and `03-LLD.md` §3.6
-#: fixes verbatim. The third is a prefix-extension of the second and is listed
-#: because it is a real literal in the SDK's libLLVMSupport.so and can arrive
-#: without the bare phrase ever appearing on its own line. They are the NAMES of
-#: the failure; `ALLOCATION_FAILURE_LINES` below is how one is recognised, and
-#: since W-20b a bare substring of the stream is not (K9).
+#: The three allocation-failure literals FR-06.7 names and `03-LLD.md` §3.6 fixes verbatim.
 ALLOCATION_FAILURE_LITERALS = ("std::bad_alloc", "out of memory",
                                "LLVM ERROR: out of memory")
 
-#: `RLIMIT_AS` does not kill, it makes allocation fail, and CPython reports that
-#: as this word (measured: `prlimit --as=104857600 -- python3 -c
-#: 'b=bytearray(500*1024*1024)'` exits 1 with it on stderr and no signal).
+#: `RLIMIT_AS` does not kill.
 _MEMORY_ERROR_LINE = "MemoryError"
 
-#: The same failures as the LINE OPENINGS a failing runtime actually prints,
-#: which is what `allocation_evidence` tests (K9). `std::bad_alloc` never
-#: appears on its own: glibc reports an uncaught one as a `terminate called ...`
-#: line followed by a `what():` line, and LLVM's own handler prints
-#: `LLVM ERROR: out of memory`. A quoted source line or an appended note may
-#: contain any of the three and can begin with none of them, which is exactly
-#: the difference between an exhausted machine and a diagnostic about one.
+#: The same failures as the LINE OPENINGS a failing runtime actually prints.
 ALLOCATION_FAILURE_LINES = (
     "terminate called after throwing an instance of 'std::bad_alloc'",
     "what():  std::bad_alloc",
@@ -79,8 +62,7 @@ CIRCT_BIN_DIR = "/workspace/circt/build/bin"
 #: The `in_circt_object` default, which is the image's one CIRCT root.
 CIRCT_ROOTS = ("/workspace/circt/",)
 
-#: How long the drain is allowed to continue after the wall-clock killer fires,
-#: so that a killed child's last diagnostics are not lost.
+#: How long the drain is allowed to continue after the wall-clock killer fires.
 _POST_KILL_DRAIN_SECONDS = 2.0
 
 #: The select() slice, which bounds how late the wall-clock killer can fire.
@@ -94,26 +76,8 @@ def circt_exec_probe(tool: str, argv: list, *, cwd: str,
                      output_byte_cap: int = 1_000_000) -> dict:
     """Run one CIRCT binary on one input, bounded, with no shell anywhere.
 
-    Builds ["prlimit", "--as=...", "--cpu=<soft>:<hard>", "--nofile=...", "--",
-    tool, *argv], starts it in its own process group, and SIGKILLs the group on
-    the wall-clock expiry. prlimit sets the limits in its own process and then
-    execs the tool, so they are in force from the tool's first instruction. The
-    child is reaped with os.wait4, so its rusage comes back with its status.
-
-    `--cpu` carries a soft:hard pair, the hard value being the soft one plus
-    CPU_HARD_MARGIN_SECONDS: with the two equal the kernel escalates past
-    SIGXCPU straight to SIGKILL and `limit_hit` is underivable. `--rss` is never
-    passed; RLIMIT_RSS has had no effect on Linux since kernel 2.4.30.
-
-    The child is started with os.fork plus os.setsid plus os.execvp rather than
-    with subprocess.Popen, for one reason: subprocess does not surface
-    getrusage, and without it a CPU kill cannot be told from a wall-clock kill.
-
     Returns:
-        {"exit_status": int | None, "signal": str | None, "limit_hit": str | None,
-         "cpu_seconds": float, "peak_rss_bytes": int, "wall_seconds": float,
-         "stdout": str, "stderr": str, "truncated": bool, "argv": list[str],
-         "worker_hostname": str, "worker_node_id": str, "child_pid": int}
+        {"exit_status": int | None, "signal": str | None, "limit_hit": str | None, "cpu_seconds": float, "peak_rss_bytes": int, "wall_seconds": float, "stdout": str, "stderr": str, "truncated": bool, "argv": list[str], "worker_hostname": str, "worker_node_id": str, "child_pid": int}.
     Worker:
         {"circt": 1}.
     Raises:
@@ -187,17 +151,9 @@ def circt_reduce_run(input_path: str, test_script: str, output_path: str, *,
                      binary: str = CIRCT_BIN_DIR + "/circt-reduce") -> dict:
     """Run circt-reduce with an interestingness script and an output path.
 
-    Builds [binary, input_path, f"--test={test_script}",
-    *(f"--test-arg={a}" for a in test_args), "--keep-best", "-o", output_path],
-    in its own process group, SIGTERMed at wall_seconds and SIGKILLed
-    sigkill_grace_seconds later. --test-must-fail is never passed: the script's
-    polarity is exit 0 for interesting (FR-09.2).
-
-    `output_valid` is the non-emptiness half of §10.2's post-exit validation and
-    is computed only once the process has exited, never while it is running,
-    because --keep-best defaults to true and a kill can land mid-write. The
-    parse half and the re-run of the script are the caller's, which is where the
-    input language is known.
+    --test-must-fail is never passed: the script's polarity is exit 0 for
+    interesting (FR-09.2). `output_valid` is computed once the process has
+    exited, because --keep-best defaults to true and a kill can land mid-write.
 
     Returns:
         {"success": bool, "returncode": int, "wall_seconds": float,
@@ -239,36 +195,12 @@ def circt_symbolize(frames: list, *, tool_path: str = "",
                     timeout_seconds: int = 120) -> list:
     """Resolve LLVM crash-trace frames against the objects they actually lie in.
 
-    Each input frame is {"index", "address", "shape", "module", "offset",
-    "function", "file", "line"} as `03-LLD.md` §3.6.2's _FRAME parsed it. Frames
-    whose shape is "module_offset" are GROUPED BY MODULE and resolved with one
-    llvm-symbolizer --obj=<module> --demangle --output-style=JSON call per
-    module, that module's offsets on stdin; frames whose shape is "attributed"
-    are returned unchanged, because LLVM already resolved them at print time and
-    there is no module to ask.
-
-    Feeding runtime addresses with --obj=<the tool> asks the symboliser about an
-    object those addresses are not in and resolves nothing at all (§3.6.2,
-    measured). The offset from the parentheses is the value it wants.
-
-    JSON is used rather than the default line format because the default emits a
-    two-line record per address separated by blank lines. --functions is left at
-    its default, linkage, because --functions=short returns "??" under
-    -gline-tables-only; --inlines is not passed, an inlined frame changing a
-    frame tuple's length without changing the bug.
-
-    `in_circt_object` is computed for both shapes: a module_offset frame is in a
-    CIRCT object when its module is *tool_path* or its basename matches
-    libCIRCT*.so*, and an attributed frame when its file lies under one of
-    *circt_roots*, which covers the generated .inc files as well as the sources.
-
     Returns:
-        one dict per input frame, in input order, with the same keys plus
-        "in_circt_object"; unresolved fields are "" and 0.
+        one dict per input frame, in input order, with the same keys plus "in_circt_object".
     Worker:
         {"circt": 1} - the objects are the worker's.
     Raises:
-        nothing. An unparseable line yields an unresolved record.
+        nothing.
     """
     out = [dict(f) for f in frames]
     by_module: dict = {}
@@ -280,9 +212,7 @@ def circt_symbolize(frames: list, *, tool_path: str = "",
                                     [out[i].get("offset", "") for i in indexes],
                                     timeout_seconds)
         for i, record in zip(indexes, records):
-            # MERGE, never replace: LLVM prints a function name beside the
-            # module and offset on most frames, and a symboliser that resolves
-            # nothing must not delete the one name the trace already had.
+            # MERGE, never replace.
             out[i].update({key: value for key, value in record.items() if value})
     for frame in out:
         frame["in_circt_object"] = _in_circt_object(frame, tool_path, circt_roots)
@@ -333,29 +263,7 @@ def _in_circt_object(frame: dict, tool_path: str, circt_roots: tuple) -> bool:
 
 
 def allocation_evidence(stderr: str) -> bool:
-    """Whether *stderr* REPORTS an allocation failure, rather than mentioning one.
-
-    FR-06.7's three literals were matched as substrings of the whole stream
-    until W-20b, and that is not a test for exhaustion at all (K9): MLIR echoes
-    the offending source line in every diagnostic and the probing input is
-    written by a model, so `{tag = "out of memory"}` put the literal on stderr
-    with nothing exhausted (measured against the real `circt-opt`), and an
-    assertion whose expression text contained it was thrown away as an `oom`.
-
-    The refinement is the smallest one that separates the two: a literal is
-    evidence when it BEGINS a line, which is what a runtime that has failed to
-    allocate prints and what neither a quoted source line nor an appended note
-    can do. The literals themselves are FR-06.7's, unchanged, with the two
-    runtime prefixes that actually carry `std::bad_alloc` spelled out, glibc
-    reporting an uncaught one as `terminate called ...` / `  what():  ...`.
-
-    Returns:
-        bool.
-    Worker:
-        pure; it reads one string.
-    Raises:
-        nothing.
-    """
+    """Whether *stderr* REPORTS an allocation failure, rather than mentioning one."""
     return any(line.strip().startswith(ALLOCATION_FAILURE_LINES)
                for line in stderr.splitlines())
 
@@ -363,35 +271,7 @@ def allocation_evidence(stderr: str) -> bool:
 def _limit_hit(killed: bool, sig: Optional[str], cpu_used: float,
                cpu_seconds: int, stderr: str, *, peak_rss_bytes: int = 0,
                address_space_bytes: int = 0) -> Optional[str]:
-    """§3.10's three rules, tested in this order, and the only place they live.
-
-    `address_space` needs EVIDENCE THAT SOMETHING RAN OUT, which until W-20b it
-    did not: any stderr containing one of the three literals returned it, so an
-    ordinary diagnostic quoting the phrase was recorded as an exhausted machine
-    and - the worse half - a genuine SIGABRT assertion whose expression text
-    contained it was classified `oom`, which is not one of the statuses that
-    reach stage 4. Both directions were wrong numbers in the results artefact's
-    probe-outcome table, and one of them dropped a real firing (K9).
-
-    The two admissible kinds of evidence, and no third:
-
-      * a runtime REPORTED the failure, which is `allocation_evidence` above:
-        an allocation literal that BEGINS a line, as a failing allocator prints
-        it and as neither a quoted source line nor a diagnostic about one can;
-        and
-      * peak RSS reached the address-space limit `prlimit --as` set. RSS is
-        bounded by the address space by construction, so reaching it is the
-        rusage observation that `RLIMIT_AS` bound, and it is the arm that
-        catches a failure whose message the loop does not recognise at all.
-
-    Death by signal is deliberately NOT one of them. K9's disposition names it
-    as the first conjunct, but the measured `RLIMIT_AS` case exits 1 with
-    `MemoryError` and NO signal (T-U-core-15), so requiring one would lose the
-    only case the address-space limit actually produces; and requiring it does
-    not help with the case K9 is about, a `SIGSEGV` whose stderr merely mentions
-    the phrase. The line rule is what separates those, and it separates them
-    whether the child died by signal or not.
-    """
+    """§3.10's three rules, tested in this order, and the only place they live."""
     if killed:
         return "wall"
     if sig == "SIGXCPU" or cpu_used >= cpu_seconds:
@@ -404,13 +284,7 @@ def _limit_hit(killed: bool, sig: Optional[str], cpu_used: float,
 
 
 def _drain(fds: dict, deadline: float, cap: int, pgid: int) -> tuple:
-    """Read both streams to EOF or to *deadline*, killing the group at expiry.
-
-    Returns ({stream number: text}, whether either stream passed *cap*, whether
-    the wall-clock killer fired). Reading concurrently is not an optimisation: a
-    child that fills a pipe the parent is not reading deadlocks before it can be
-    timed out.
-    """
+    """Read both streams to EOF or to *deadline*, killing the group at expiry."""
     buffers = {key: bytearray() for key in fds}
     seen = {key: 0 for key in fds}
     open_fds = {fd: key for key, fd in fds.items()}
@@ -442,8 +316,7 @@ def _drain(fds: dict, deadline: float, cap: int, pgid: int) -> tuple:
                 os.close(fd)
             except OSError:                         # pragma: no cover
                 pass
-    # backslashreplace, never replace: a non-UTF-8 byte in a diagnostic must
-    # survive the seam recoverably, and U+FFFD does not (T-U-schema-18).
+    # backslashreplace, never replace.
     return ({key: bytes(buf).decode("utf-8", "backslashreplace")
              for key, buf in buffers.items()},
             any(seen[key] > cap for key in fds),
@@ -479,12 +352,7 @@ def _killpg(pgid: int, sig: int = signal.SIGKILL) -> None:
 
 
 def _node_id() -> str:
-    """This Ray node's id, or "" outside a session.
-
-    ray.get_runtime_context() STARTS a local Ray instance when none is running,
-    which a unit test must not pay for, so the session is read out of
-    sys.modules exactly as store.py reads it.
-    """
+    """This Ray node's id, or "" outside a session."""
     ray = sys.modules.get("ray")
     if ray is None or not ray.is_initialized():
         return ""
