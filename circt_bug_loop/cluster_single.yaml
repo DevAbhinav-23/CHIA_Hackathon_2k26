@@ -152,8 +152,8 @@ available_node_types:
                 # under max_retries=0, fails the task with no probe status at all,
                 # which section 6 of 02-HLD.md has a row for.
                 - --cpus=6
-                - --memory=24g
-                - --memory-swap=24g
+                - --memory=5g          # host has 15 GiB; 2x5 + 4 + head fits (W-19a finding, 2026-09-15)
+                - --memory-swap=5g
                 # FR-17.9's artefact mount: one host directory, bind-mounted at the
                 # IDENTICAL absolute path in every container, so a worker-produced
                 # file reaches the head's tree with no copy step and
@@ -186,9 +186,9 @@ available_node_types:
                 - --ulimit nofile=65536:65536
                 - --shm-size=10.24gb
                 - "--user $(id -u):$(id -g)"
-                - --cpus=8
-                - --memory=32g
-                - --memory-swap=32g
+                - --cpus=6
+                - --memory=4g          # repair chain builds with -j4 (see repair cfg); 15 GiB host
+                - --memory-swap=4g
                 - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
                 - "-v $SSH_AUTH_SOCK:/ssh-agent"
                 - "-e SSH_AUTH_SOCK=/ssh-agent"
