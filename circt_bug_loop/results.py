@@ -415,7 +415,7 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
     totals = {arm: {"cpu_seconds": 0.0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
                     "null_token_entries": 0}
               for arm in ARMS + ("shared",)}
-    unpriced = 0
+    unpriced = refused = 0
     for row in ledger_rows:
         block = json.loads(row["observed_json"])
         bucket = totals[row["arm"]]
@@ -424,14 +424,25 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
         if block["tokens_in"] is None or block["tokens_out"] is None:
             bucket["null_token_entries"] += 1
             # K10: an entry the manifest says is METERED and whose tokens are null is a turn the run paid for and did not observe.
+            # D-9: unless it never reached the backend at all, and then it paid nothing.
             if row["metered"] and row["stage"] in MODEL_STAGES:
-                unpriced += 1
+                if _dispatched(block):
+                    unpriced += 1
+                else:
+                    refused += 1
         else:
             bucket["tokens_in"] += int(block["tokens_in"])
             bucket["tokens_out"] += int(block["tokens_out"])
     facts["observed"] = totals
     facts["unpriced_turns"] = unpriced
+    facts["refused_turns"] = refused
     facts["authorisation"] = _authorisation(ledger_rows)
+
+
+def _dispatched(block: dict) -> bool:
+    """Whether an observed block shows its turn reached the backend at all (D-9)."""
+    return any(block.get(key) is not None
+               for key in ("calls", "authorised_usd", "billed_usd"))
 
 
 def _authorisation(ledger_rows: list) -> dict:
@@ -890,12 +901,21 @@ def _render(facts: dict) -> str:
             "the model object dies with the worker.",
             "",
             f"**Unpriced turns: {facts['unpriced_turns']}.** That is the number of "
-            "metered model-stage entries whose token counts were never observed, so "
-            "they carry a null cost rather than a zero and the USD total above "
-            "excludes every one of them. A turn that raised inside the tool loop "
+            "metered model-stage entries for turns that WERE dispatched, carrying an "
+            "authorisation, a bill or a call count, and whose token counts were never "
+            "observed, so they hold a null cost rather than a zero and the USD total "
+            "above excludes every one of them. A turn that raised inside the tool loop "
             "reports nothing at all, however many model calls it had already made, "
             "and so does every stage-7 attempt by construction; the figure is what "
             "the lower bound is a lower bound BY, counted rather than described.",
+            "",
+            f"**Turns refused before dispatch: {facts['refused_turns']}.** Those "
+            "entries are metered model stages whose turn never reached the backend: "
+            "no authorisation, no bill and no call count, because a screen or a stop "
+            "rule ran in its place, as a stage 6 the duplicate verdict skips does, an "
+            "arm that ends at `stale_at_build`, or a turn the pre-authorisation "
+            "refuses. They consumed no tokens, so they are not money the lower bound "
+            "is missing and they are counted here rather than above (D-9).",
             "",
         ]
         authorisation = facts["authorisation"]

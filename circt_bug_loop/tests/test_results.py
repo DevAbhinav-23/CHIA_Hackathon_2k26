@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from circt_bug_loop.gate import TAXONOMY
-from circt_bug_loop.results import (ARMS, BUCKETS, TURN_FAILURE_DETAIL_CAP,
+from circt_bug_loop.results import (ARMS, BUCKETS, OBSERVED_KEYS,
+                                    TURN_FAILURE_DETAIL_CAP,
                                     _facts, _REFUSALS, _require_qualifiers,
                                     ResultsIncomplete, render_results)
 from circt_bug_loop.tests.conftest import call_node
@@ -305,10 +306,10 @@ def test_T_U_results_13(tmp_path):
     store, manifest, pairs = campaign(tmp_path)
     text = render(store, manifest, pairs)
     windows = arm_tables(text)[-2]
-    assert windows["seeded"] == ["14400", "14400", "0", "its own window", "0.13"]
+    assert windows["seeded"] == ["14400", "14400", "0", "its own window", "1.93"]
     assert windows["mutation"] == ["14400", "9000", "5400",
                                    "generated_inputs_per_day", "0.00"]
-    assert "The campaign spent USD 0.30 in total" in text
+    assert "The campaign spent USD 2.10 in total" in text
 
 
 def test_T_U_results_13a(tmp_path):
@@ -323,7 +324,7 @@ def test_T_U_results_13a(tmp_path):
 
     text = render(store, manifest, pairs)
     windows = arm_tables(text)[-2]
-    assert windows["seeded"] == ["14400", "14400", "0", "campaign_spend_cap", "0.13"]
+    assert windows["seeded"] == ["14400", "14400", "0", "campaign_spend_cap", "1.93"]
     assert windows["mutation"] == ["14400", "not started", "not started",
                                    "not started", "0.00"]
     assert ("mutation never opened a window: the seeded arm stopped on "
@@ -447,6 +448,35 @@ def test_the_turn_failure_table_renders_for_a_store_with_no_rows(tmp_path):
     failures = tables(taxonomy)[-1]
     assert failures["rows"] == [["none", "", "", "0", ""]]
     assert "0 turns produced no probing input at all." in taxonomy
+
+
+def test_a_never_dispatched_turn_is_refused_and_not_unpriced(tmp_path):
+    """D-9 (pilot 8): the three rows of a turn that never happened, counted apart."""
+    store, manifest, pairs = campaign(tmp_path)
+    before = _facts(store, manifest, pairs, 5)
+    observed = section(render(store, manifest, pairs), "7. Observed, and not the budget")
+    assert "**Unpriced turns: 1.**" in observed, "stage 7 is dispatched and unpriced"
+    assert "**Turns refused before dispatch: 0.**" in observed
+
+    # Pilot 8's shape: a stage 6 the duplicate verdict skipped, twice, and the
+    # mutation arm's `stale_at_build`. Metered, and every money field null.
+    store.insert_many("ledger_entry", [
+        {"entry_id": entry_id, "run_manifest_id": _RUN, "arm": arm, "scope": "stage",
+         "stage": stage, "unit": "wall_clock_seconds", "amount": 0.19,
+         "metered": 1,
+         "observed_json": json.dumps(dict.fromkeys(OBSERVED_KEYS), sort_keys=True),
+         "timestamp_utc": "2026-09-19T03:00:00+00:00", "stop_reason": None}
+        for entry_id, arm, stage in (("l-0014", "seeded", "stage_6"),
+                                     ("l-0015", "seeded", "stage_6"),
+                                     ("l-0016", "mutation", "stage_2"))])
+
+    facts = _facts(store, manifest, pairs, 5)
+    assert facts["refused_turns"] == 3 and facts["unpriced_turns"] == 1
+    text = render(store, manifest, pairs)
+    assert "**Turns refused before dispatch: 3.**" in text
+    assert "**Unpriced turns: 1.**" in text, "a refused turn is not an unpriced one"
+    assert all(facts["observed"][arm]["cost_usd"] == before["observed"][arm]["cost_usd"]
+               for arm in ARMS), "a turn that never happened moved no money"
 
 
 def test_T_U_results_18(tmp_path):

@@ -136,10 +136,10 @@ This table is separate from the discovery result above and contributes nothing t
 
 | arm | window (s) | elapsed (s) | unspent (s) | stopped by | spend (USD) |
 |---|---|---|---|---|---|
-| seeded | 14400 | 14400 | 0 | its own window | 0.13 |
+| seeded | 14400 | 14400 | 0 | its own window | 1.93 |
 | mutation | 14400 | 9000 | 5400 | generated_inputs_per_day | 0.00 |
 
-The campaign spent USD 0.30 in total, both arms and the shared stages together, against the pre-registered cap. Where an arm was stopped by a safety cap rather than by its window, the unspent balance above is what it did not get to use, and the comparison is qualified by exactly that much.
+The campaign spent USD 2.10 in total, both arms and the shared stages together, against the pre-registered cap. Where an arm was stopped by a safety cap rather than by its window, the unspent balance above is what it did not get to use, and the comparison is qualified by exactly that much.
 
 **Shared stages, charged to no arm** (mode discovery, seed set 187)
 
@@ -160,7 +160,9 @@ The campaign spent USD 0.30 in total, both arms and the shared stages together, 
 
 None of these four is the budget. The budget is one elapsed wall-clock second of an arm's fixed window, and the table above is what the run was observed to consume while spending it. The USD total is a **lower bound excluding stage 7**, whose per-turn token counts the repair chain does not return: its turns are dispatched remotely and the counting copy of the model object dies with the worker.
 
-**Unpriced turns: 1.** That is the number of metered model-stage entries whose token counts were never observed, so they carry a null cost rather than a zero and the USD total above excludes every one of them. A turn that raised inside the tool loop reports nothing at all, however many model calls it had already made, and so does every stage-7 attempt by construction; the figure is what the lower bound is a lower bound BY, counted rather than described.
+**Unpriced turns: 1.** That is the number of metered model-stage entries for turns that WERE dispatched, carrying an authorisation, a bill or a call count, and whose token counts were never observed, so they hold a null cost rather than a zero and the USD total above excludes every one of them. A turn that raised inside the tool loop reports nothing at all, however many model calls it had already made, and so does every stage-7 attempt by construction; the figure is what the lower bound is a lower bound BY, counted rather than described.
+
+**Turns refused before dispatch: 0.** Those entries are metered model stages whose turn never reached the backend: no authorisation, no bill and no call count, because a screen or a stop rule ran in its place, as a stage 6 the duplicate verdict skips does, an arm that ends at `stale_at_build`, or a turn the pre-authorisation refuses. They consumed no tokens, so they are not money the lower bound is missing and they are counted here rather than above (D-9).
 
 **Billed against authorised, over 2 turn(s): max 0.200x, mean 0.175x; 0 turn(s) billed more than they were authorised for and 0 reached the backend's own per-turn ceiling.** `SpendGuard` authorises a turn before it is sent and this is how close the estimate came. A ratio above 1.0 is money the cap did not stop: W-18 measured 19.7x, 32.3x and 64.1x, because the authorisation bounded one model call and a turn with tools makes up to `max_tool_iterations` of them (errata row 38).
 

@@ -185,8 +185,11 @@ def _ledger(store: LoopStore) -> None:
          observed(11.0), "2026-09-19T01:12:00+00:00", None),
         ("l-0007", "seeded", "stage", "stage_3", 16.0, 1,
          observed(12.0), "2026-09-19T01:14:00+00:00", None),
+        # Stage 7 is DISPATCHED and unpriced: `repair_adapter.stage7_observed`
+        # records the five phases' authorisation and no token counts at all.
         ("l-0008", "seeded", "stage", "stage_7", 900.0, 1,
-         observed(780.0), "2026-09-19T02:30:00+00:00", None),
+         observed(780.0, authorised=1.8, ceiling=0.36),
+         "2026-09-19T02:30:00+00:00", None),
         ("l-0009", "mutation", "stage", "stage_3", 11.0, 1,
          observed(8.0), "2026-09-19T05:10:00+00:00", None),
         ("l-0010", "mutation", "stage", "stage_3", 13.0, 1,
