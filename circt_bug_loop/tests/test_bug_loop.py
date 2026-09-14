@@ -1175,6 +1175,11 @@ def test_T_U_driver_33(tmp_path: Path):
     for row in loop.query("SELECT artefact_dir FROM probe_result"):
         assert Path(row["artefact_dir"]).is_dir()
         assert not (Path(row["artefact_dir"]) / "PARTIAL").exists()
+    # A5's bundle is on disk at the path its row carries, and the driver's own
+    # write leaves no marker in a directory nothing could clear one from.
+    for row in loop.query("SELECT path FROM feedback"):
+        assert Path(row["path"]).is_file()
+        assert not (Path(row["path"]).parent / "PARTIAL").exists()
     stage_3 = loop.query("SELECT arm, amount FROM ledger_entry "
                          "WHERE scope = 'stage' AND stage = 'stage_3'")
     assert len(stage_3) == 4 and {row["arm"] for row in stage_3} == {"seeded",

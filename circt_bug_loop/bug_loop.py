@@ -1581,9 +1581,15 @@ def write_feedback(store: LoopStore, bundle: FeedbackBundle, path: str) -> None:
     The bundle is on disk as `feedback.json` in the iteration directory and the
     row carries the path, which is §6.5's cap rule applied to the one artefact
     the seeded arm reads back.
+
+    Written directly and not through `artefact_write`, as the manifest and the
+    budget copy are: the marker protocol belongs to a directory a STAGE owns and
+    no completion record is keyed on an iteration directory, so a marker created
+    here could never be cleared by anything.
     """
-    write_artefact(str(Path(path).parent), Path(path).name,
-                   schema.to_json(bundle))
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(schema.to_json(bundle), encoding="utf-8")
     store.insert("feedback", _row(store, "feedback", bundle, path=path))
 
 
