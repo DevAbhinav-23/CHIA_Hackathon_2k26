@@ -3,8 +3,22 @@
 # A COPY of budget.yaml with eight values changed, listed below. It is a separate
 # file because FR-14.7 forbids editing a registered budget file, and because the
 # pilot and the campaign are two pre-registrations with two tags: this one is
-# `registration/pilot-5` and the campaign's is W-22's. `bug_loop.py --budget
+# `registration/pilot-6` and the campaign's is W-22's. `bug_loop.py --budget
 # circt_bug_loop/budget-pilot.yaml` selects it; the flag already existed.
+#
+# PILOT 6 (2026-09-15), registered as `registration/pilot-6`. NO VALUE CHANGES
+# from pilot 5, for the same reason: this registration measures code. Pilot 5's
+# stage-2 turn reached the model, spent all twelve of its iterations reading
+# source, never called `write_probe`, and its forced final answer came back as a
+# `function_call` part that nothing executes, so the turn wrote no probe and its
+# footer failed with `no_block` (D-3). A turn whose deliverable is TEXT can be
+# salvaged by asking for text; a turn whose deliverable is a TOOL CALL cannot.
+# This tag registers two fixes - a second tool budget in the patched backend, in
+# which only the write tool may be called at all and which stage 2 asks for at
+# `per_seed_probe_cap + 1` calls, and a `turn_failure` table so a turn that
+# produced nothing appears in `results.md` instead of nowhere. `stage_2: 12`
+# below is now the READING budget alone and the write calls are on top of it,
+# which is why `max_tool_iterations` still may not shrink.
 #
 # PILOT 5 (2026-09-15), registered as `registration/pilot-5`. NO VALUE CHANGES
 # from pilot 4: this registration measures code, not caps. Pilot 4's stage-1
