@@ -54,10 +54,17 @@ from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
 LOCAL_ID_BASE = 900_000_000
 LOCAL_ID_MAX = 999_999_999
 
-#: §9.4: CHIA's own two, reused verbatim. `bugloop_repair`'s `--cpus=8` is what
-#: bounds the sixteen (`chia:examples/circt_issue_solver/circt_issue_loop.py:77`,
-#: `98`).
-BUILD_JOBS = 16
+#: §9.4 took CHIA's own two verbatim, and `bugloop_repair`'s `--cpus=8` was what
+#: bounded the sixteen (`chia:examples/circt_issue_solver/circt_issue_loop.py:77`,
+#: `98`). FOUR, not sixteen, since W-19b: the bound that binds on the
+#: implementation machine is MEMORY and not cores. A `ninja -j16` link of the
+#: CIRCT targets peaks far past the 4 GiB `cluster_single.yaml` gives
+#: `bugloop_repair` on its 15 GiB host, and an OOM-killed link fails the `fix`
+#: phase with a build error that is not the agent's diff's fault - the one
+#: failure mode FR-12.7's `failing_phase` cannot tell apart from a real one.
+#: `cluster_single.yaml`'s `--cpus=4` on that container matches, so the CPU
+#: bound and the job count say the same thing.
+BUILD_JOBS = 4
 PHASE_TIMEOUTS = {"assess": 1800, "repro": 1800, "fix": 7200,
                   "regression": 3600, "writeup": 1200}
 

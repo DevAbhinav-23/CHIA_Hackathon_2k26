@@ -52,7 +52,7 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
-                                  validate_candidate, write_artefact)
+                                  Report, validate_candidate, write_artefact)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -1110,7 +1110,7 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
                             repair_model=args.repair_model),
         stages_metered=stages_metered(arms=arms,
                                       repair_backend=args.repair_backend,
-                                      repair_enabled=not args.no_repair),
+                                      repair_enabled=repair_enabled(args)),
         mutator_set_sha=mutator_set_sha,
         x_policy=probe_task.X_POLICY,
         issue_mirror={k: mirror[k]
@@ -1645,6 +1645,243 @@ def default_stages() -> Stages:
                   triage_report=triage_task.triage_report,
                   repair_adapt=repair_adapter.repair_adapt,
                   gate_decide=gate.gate_decide)
+
+
+# ---------------------------------------------------------------------------
+# `--generator recorded`: the Ray-dispatch path with no model at all (W-19b)
+# ---------------------------------------------------------------------------
+#
+# The mode exists so that the whole of `campaign_drive` - the dispatch, the two
+# arm windows, every stage's CounterBlock, the artefact tree, `loop.db` and the
+# results render - can be exercised ON THE CLUSTER with no model turn and no
+# credential. It is NOT `--dry-run`, which stops after the manifest and
+# dispatches nothing; it is the real dispatch path with the two model-bearing
+# nodes replaced. Every other node - B2 to B6b and the gate - is the real one.
+#
+# Two nodes of 3.2 reach a model, and both are replaced here:
+#
+#   A3 `generate_seeded`  two turns; replaced by `generate_recorded_seeded`
+#   B7 `triage_report`    one turn;  replaced by `recorded_report`
+#
+# A4 `generate_mutation` reaches no model (FR-05.1) and would have been left
+# alone, but it CANNOT run in a registered campaign at all: `mutators.load_set`
+# refuses a set whose `frozen` field is false to any run naming a digest (8.1
+# rule 1), the committed set is `set_dev.json` with `frozen: false`, and A7 has
+# not run. So the mutation arm is served by the same recorded generator, which
+# stamps `arm` and never branches on it, and the errata log carries the row.
+
+#: `--generator recorded`'s first source: the seam's own recorded ProbeSpecs,
+#: one document per file, written by a real `--record-fixtures` run (§0.6 rule 2).
+RECORDED_SPEC_DIR = FLOW_DIR / "contract" / "fixtures" / "recorded" / "probe_spec"
+
+#: The mutator id a REPLAYED test file carries on the mutation arm. `ProbeSpec`'s
+#: conditional rule requires the three mutation fields (2.8), and a replay is not
+#: a mutant, so the id says so in its own name rather than borrowing a real
+#: mutator's and making the spec unreadable.
+RECORDED_MUTATOR_ID = "recorded.replay.identity"
+
+#: What `recorded_report` writes where the agent's three prose fields would be.
+#: `render_report` refuses an empty substitution point (FR-11.3), so the mode
+#: fills them with a sentence that says no agent wrote them - which is FR-11.4's
+#: rule pushed to its limit, the report carrying no agent's number AND no
+#: agent's prose.
+NO_TURN_PROSE = ("NO MODEL TURN WAS MADE. This run was driven with "
+                 "`--generator recorded`, so stage 6's agent turn did not "
+                 "happen and this field is the driver's own sentence and not "
+                 "an agent's. The classification is `untriaged`, which is what "
+                 "FR-11.8 gives a candidate whose turn did not produce one.")
+
+
+def recorded_inputs(seed: SeedRecord, cap: int) -> list:
+    """The probing inputs `--generator recorded` replays for one seed, in order.
+
+    Two sources and never a model. FIRST the seam's own recorded `ProbeSpec`s,
+    where one names this seed: those carry an `input_text` a real generator
+    produced, so a seed the recording covers is probed with the bytes the
+    recording holds. THEN the seed's own test files, replayed unchanged - which
+    is what makes the mode work over ANY seed, the recording covering exactly
+    one. `SeedRecord.test_files` is a required field carrying the full text of
+    every test path at the seed commit (2.0), so the second source needs no
+    clone, no git and no network.
+
+    Returns:
+        list[tuple[str, str, str]], at most *cap* of (text, source test path,
+        expected outcome); the source path is "" for a recorded spec that names
+        none.
+    Worker:
+        the caller's; it reads committed files and runs no process.
+    Raises:
+        nothing. An unreadable recorded document is skipped, the seed's own
+        files remaining.
+    """
+    out = []
+    for document in sorted(RECORDED_SPEC_DIR.glob("*.json")):
+        try:
+            spec = json.loads(document.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if spec.get("seed_sha") == seed.seed_sha and spec.get("input_text"):
+            out.append((spec["input_text"], spec.get("source_test_path") or "",
+                        f"recorded ProbeSpec {spec.get('probe_id')} replayed"))
+    for path, text in sorted(seed.test_files.items()):
+        out.append((text, path, f"{path} replayed unchanged at the run commit"))
+    return out[:max(0, cap)]
+
+
+def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
+    """Build one seed's recorded `ProbeSpec`s for one arm, through A3/A4's builder.
+
+    `generate_task._spec` is the builder BOTH real generators use, so the
+    filename rule, the argv rule, `check_tool` and `contract.validate` are the
+    real ones here too and a spec this mode emits is one the apparatus cannot
+    tell from a generated one except by reading `expected_outcome` (FR-18.1).
+
+    Returns:
+        the Generator return shape: {"specs", "logs", "failure", "counters"}.
+    Worker:
+        the calling node's, `{"circt": 1}`.
+    Raises:
+        nothing. A seed whose spec cannot be built - no run line, a tool the
+        seed does not own - ends the seed with a named `failure`, exactly as a
+        failed turn does (FR-04.8).
+    """
+    from circt_bug_loop.generate_task import _spec, iteration_dir as generator_dir
+
+    started = time.monotonic()
+    iteration = int(cfg["iteration"])
+    cap_bytes = int(cfg.get("artefact_inline_cap_bytes", 262144))
+    probe_root = str(Path(generator_dir(cfg, seed.seed_sha, iteration)) / "probes")
+    mutation = arm == "mutation"
+    specs: list = []
+    failure = None
+    try:
+        for index, (text, source, expected) in enumerate(
+                recorded_inputs(seed, int(cfg["per_seed_probe_cap"]))):
+            specs.append(_spec(
+                seed=seed, arm=arm, iteration=iteration,
+                run_manifest_id=cfg["run_manifest_id"], probe_dir=probe_root,
+                text=text, tool=seed.entry_tool, expected_outcome=expected,
+                turn_cost={"turn": None, "wall_seconds": 0.0, "metered": False,
+                           "tokens_in": None, "tokens_out": None,
+                           "cost_usd": None},
+                key=f"recorded:{index}", cap_bytes=cap_bytes,
+                mutator_id=RECORDED_MUTATOR_ID if mutation else None,
+                mutator_seed_int=(int(hashlib.sha256(text.encode("utf-8"))
+                                      .hexdigest()[:16], 16) if mutation else None),
+                source_test_path=(source or seed.test_paths[0]) if mutation else None))
+    except Exception as error:                      # noqa: BLE001 - FR-04.8
+        failure = f"recorded_generator_failed:{type(error).__name__}:{error}"
+    return {"specs": specs, "logs": {"usage": {}, "wall_seconds": {}},
+            "failure": failure,
+            "counters": CounterBlock(stage="stage_2", started=1,
+                                     completed=0 if failure else 1,
+                                     failed=1 if failure else 0,
+                                     seconds=time.monotonic() - started)}
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def generate_recorded_seeded(seed: SeedRecord, feedback: FeedbackBundle,
+                             remaining, cfg: dict) -> dict:
+    """A3's signature and placement, with recorded inputs and no turn (W-19b).
+
+    The second and third arguments are accepted and never read, which is the
+    same rule A4 already keeps for *feedback* (FR-16.2): one `Generator`
+    signature, one call site, and the difference in the body.
+    """
+    return _recorded_generation(seed, cfg, "seeded")
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def generate_recorded_mutation(seed: SeedRecord, feedback: FeedbackBundle,
+                               remaining, cfg: dict) -> dict:
+    """A4's signature and placement, with recorded inputs and no mutator set."""
+    return _recorded_generation(seed, cfg, "mutation")
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
+                    manifest: RunManifest, cfg: dict, artefact_dir: str, *,
+                    differential=None) -> dict:
+    """B7's signature and placement, rendering 7.4.1's template with no turn.
+
+    The report IS rendered - every count, size, time, hash, SHA and verdict of
+    it is read off the record by `triage_task.render_report`, which is FR-11.4's
+    rule and needs no agent - and the three prose fields carry `NO_TURN_PROSE`
+    instead of an agent's. The classification is `untriaged`, which is what
+    FR-11.8 gives a candidate whose turn did not produce one, and the TOOL
+    VERDICT still WINS: a candidate the screen matched to an issue is
+    `known_issue` here exactly as it is in B7 (FR-11.2).
+
+    Returns:
+        B7's shape: {"report": Report, "logs", "failure", "counters"}.
+    Worker:
+        `{"circt": 1}`, B7's own; no `{"llm": 1}` turn is dispatched.
+    Raises:
+        nothing. A record that cannot fill the template yields B7's own
+        failure-shaped empty Report, as an unparseable answer does.
+    """
+    from circt_bug_loop.triage_task import ReportIncomplete, render_report
+
+    started = time.monotonic()
+    validate_candidate(candidate)
+    template = "differential" if candidate.oracle_class == "differential" else "primary"
+    classification = "untriaged"
+    if dedup is not None and dedup.verdict in ("known_open_issue",
+                                               "known_closed_issue",
+                                               "fixed_post_pin"):
+        classification = "known_issue"
+    logs = {"usage": {}, "no_turn": True, "generator": "recorded"}
+    try:
+        rendered = render_report(template, candidate, reduced, verdict, differential,
+                                 dedup, manifest,
+                                 dict.fromkeys(("title", "summary",
+                                                "why_it_matters"), NO_TURN_PROSE))
+    except (ReportIncomplete, ValueError) as error:
+        return {"report": Report(
+                    candidate_id=candidate.candidate_id, path="", template=template,
+                    title="", classification="untriaged", classification_reason="",
+                    rendered_sha256="",
+                    assisted_by=manifest.model_ids["triage_report"],
+                    fields_present=[]),
+                "logs": logs, "failure": f"report_incomplete:{error}",
+                "counters": CounterBlock(stage="stage_6", started=1, completed=0,
+                                         failed=1,
+                                         seconds=time.monotonic() - started)}
+    path = str(Path(artefact_dir) / "report.md")
+    write_artefact(artefact_dir, "report.md", rendered.encode("utf-8"))
+    from circt_bug_loop.triage_task import DIFFERENTIAL_POINTS, PRIMARY_POINTS
+
+    points = PRIMARY_POINTS if template == "primary" else DIFFERENTIAL_POINTS
+    return {"report": Report(
+                candidate_id=candidate.candidate_id, path=path, template=template,
+                title=NO_TURN_PROSE, classification=classification,
+                classification_reason=NO_TURN_PROSE,
+                rendered_sha256=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
+                assisted_by=manifest.model_ids["triage_report"],
+                fields_present=list(points)),
+            "logs": logs, "failure": None,
+            "counters": CounterBlock(stage="stage_6", started=1, completed=1,
+                                     failed=0, seconds=time.monotonic() - started)}
+
+
+def recorded_stages() -> Stages:
+    """`default_stages()` with the two model-bearing nodes replaced (W-19b).
+
+    Eight of the ten are the real nodes, untouched. `dataclasses.replace` and
+    not a second constructor call, so a node added to `Stages` reaches this mode
+    without being named here twice.
+
+    Returns:
+        Stages, in which no field reaches `llm.build_llm`.
+    Worker:
+        head; it imports and dispatches nothing.
+    Raises:
+        ImportError when a stage module is missing, which is a broken checkout.
+    """
+    return dataclasses.replace(default_stages(),
+                               generate_seeded=generate_recorded_seeded,
+                               generate_mutation=generate_recorded_mutation,
+                               triage_report=recorded_report)
 
 
 def probe_limits(budget: BudgetFile) -> dict:
@@ -2497,6 +2734,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repair-backend", default="vertex", choices=REPAIR_BACKENDS)
     parser.add_argument("--repair-model", default=None)
     parser.add_argument("--no-repair", action="store_true")
+    # W-19b. `model` is every real node and is what a campaign runs; `recorded`
+    # replaces the two model-bearing nodes with the recorded ones above, so the
+    # whole dispatch path runs on the cluster with no turn and no credential.
+    # It implies --no-repair: stage 7 IS a model, whatever the backend, and a
+    # recorded run that dispatched it would be a run with a turn in it.
+    parser.add_argument("--generator", default="model",
+                        choices=("model", "recorded"))
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument("--resume", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--dry-run", action="store_true")
@@ -2551,7 +2795,18 @@ def resolved_config(args) -> dict:
             "model_credential_dir": str(Path.home() / ".config" / "bugloop"),
             "chia_package": str(_CHIA_PKG), "issue_solver": str(_ISSUE_SOLVER),
             "repair_backend": args.repair_backend,
-            "repair_enabled": not args.no_repair}
+            "generator": args.generator,
+            "repair_enabled": repair_enabled(args)}
+
+
+def repair_enabled(args) -> bool:
+    """Whether stage 7 runs: `--no-repair` and `--generator recorded` both stop it.
+
+    One function and not two spellings of the same condition, because the two
+    places that ask - `resolved_config` and the `Campaign` - would otherwise be
+    free to disagree about what a recorded run does.
+    """
+    return not args.no_repair and args.generator != "recorded"
 
 
 def check_issue_solver(chia_root: str) -> None:
@@ -2684,7 +2939,7 @@ def run_campaign(args, out) -> int:
                         forum_post_date=args.forum_post_date)
     model_resources = {name: resource for name, resource in resources.items()
                        if "llm" in resource
-                       or ("repair" in resource and not args.no_repair)}
+                       or ("repair" in resource and repair_enabled(args))}
     check_12_live_model(head=interlock_probe(),
                         workers=interlock_probes(dispatch, model_resources))
 
@@ -2727,11 +2982,16 @@ def run_campaign(args, out) -> int:
     counters = CounterLog(manifest.run_manifest_id,
                           str(run_root / "results"),
                           MetricsLogger.from_config(None))
+    recorded = args.generator == "recorded"
+    print(f"generator {args.generator}: stage 2 and stage 6 are "
+          + ("the recorded nodes and no model is reached; stage 7 is off"
+             if recorded else "the live nodes"), file=out)
     campaign = Campaign(manifest=manifest, budget=budget, store=store,
-                        stages=default_stages(), dispatch=dispatch,
+                        stages=recorded_stages() if recorded else default_stages(),
+                        dispatch=dispatch,
                         counters=counters, recorder=recorder,
                         clone_path=args.clone, image_spec=image_spec,
-                        repair_enabled=not args.no_repair)
+                        repair_enabled=repair_enabled(args))
     arms = None if args.arm == "both" else [args.arm]
     outcome = campaign_drive(campaign, seeds, arms=arms)
     outcome["reconciliation"] = reconcile(store, ISSUES_DB_PATH)

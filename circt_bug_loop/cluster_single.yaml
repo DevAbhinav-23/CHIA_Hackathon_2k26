@@ -186,7 +186,7 @@ available_node_types:
                 - --ulimit nofile=65536:65536
                 - --shm-size=10.24gb
                 - "--user $(id -u):$(id -g)"
-                - --cpus=6
+                - --cpus=4             # == repair_adapter.BUILD_JOBS (W-19b)
                 - --memory=4g          # repair chain builds with -j4 (see repair cfg); 15 GiB host
                 - --memory-swap=4g
                 - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"

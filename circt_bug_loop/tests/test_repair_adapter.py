@@ -495,7 +495,9 @@ def test_repair_16_every_one_of_the_sixteen_cfg_keys(tmp_path):
     assert set(cfg) == set(CFG_KEYS) and len(CFG_KEYS) == 16
     assert cfg["tool_targets"] == tuple(manifest.image_spec["targets"])
     assert cfg["require_repro"] is True
-    assert cfg["build_jobs"] == BUILD_JOBS == 16
+    # FOUR since W-19b, and the cluster YAML's `bugloop_repair --cpus`
+    # matches it: the bound that binds on a 15 GiB host is memory.
+    assert cfg["build_jobs"] == BUILD_JOBS == 4
     assert cfg["timeouts"] == PHASE_TIMEOUTS
     assert cfg["vertex"] == {"project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
                              "location": "global"}
