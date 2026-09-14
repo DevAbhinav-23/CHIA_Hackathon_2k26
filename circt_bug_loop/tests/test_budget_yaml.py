@@ -141,7 +141,7 @@ def test_T_U_byaml_05_the_registration_rule_holds_on_the_committed_bytes(tmp_pat
 PILOT = COMMITTED.with_name("budget-pilot.yaml")
 
 #: The eight values the pilot changes, and the whole of what it changes.
-PILOT_CHANGES = {"arm_window_seconds": 600.0, "campaign_spend_cap_usd": 3.0,
+PILOT_CHANGES = {"arm_window_seconds": 900.0, "campaign_spend_cap_usd": 3.0,
                  "generated_inputs_per_day": 200, "filings_per_day": 0,
                  "filings_total": 0, "per_seed_probe_cap": 3,
                  "per_seed_iteration_cap": 1}
@@ -171,5 +171,5 @@ def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_seven_values(tmp_path
     loaded = call_node(budget_module.load_budget, str(repo.budget), str(repo.root),
                        run_start_utc=_RUN_START, campaign=True)
     assert loaded["budget"].campaign_spend_cap_usd == 3.0
-    assert loaded["budget"].arm_window_seconds == 600.0
+    assert loaded["budget"].arm_window_seconds == 900.0
     assert loaded["registration"]["tag"] == "registration/campaign-01"
