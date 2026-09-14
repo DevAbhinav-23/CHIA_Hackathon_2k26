@@ -1,4 +1,4 @@
-"""`mutators/` (A4's frozen set): `04-Test-Plan.md` §1.7, `T-U-mut-01` to `-10`.
+"""`mutators/` (A4's frozen set): `04-Test-Plan.md` §1.7, `T-U-mut-01` to `-13`.
 
 Every test runs against the committed **development** set,
 `circt_bug_loop/mutators/set_dev.json`, and says so: A7 has not been run, there
@@ -282,10 +282,23 @@ def test_T_U_mut_10_the_mutation_arm_touches_no_filesystem_and_no_git():
             if isinstance(node, ast.Call):
                 assert ast.unparse(node.func).split(".")[-1] not in readers, function
 
+    # THREE reads in the whole module, and this test names which function each
+    # is in rather than only how many there are: two that read the committed
+    # set's bytes, and W-12c's one directory LISTING, which resolves which
+    # `set_v<n>.json` is newest and opens none of them.
+    where = {name: sorted(ast.unparse(node.func).split(".")[-1]
+                          for node in ast.walk(function)
+                          if isinstance(node, ast.Call)
+                          and ast.unparse(node.func).split(".")[-1] in readers)
+             for function in tree.body if isinstance(function, ast.FunctionDef)
+             for name in [function.name]}
+    assert {name: calls for name, calls in where.items() if calls} == {
+        "frozen_sets": ["glob"], "set_sha256": ["read_bytes"],
+        "load_set": ["read_bytes"]}
     loaders = [node for node in ast.walk(tree)
                if isinstance(node, ast.Call)
                and ast.unparse(node.func).split(".")[-1] in readers]
-    assert len(loaders) == 2, "one read in load_set, one in set_sha256"
+    assert len(loaders) == 3, "load_set, set_sha256, and frozen_sets' listing"
 
 
 # ---------------------------------------------------------------------------
@@ -389,3 +402,34 @@ def test_T_U_mut_12_every_committed_mutation_spec_fits():
         mutation += 1
         assert 0 <= value <= mutators.SEED_INT_MASK, (path.name, value)
     assert mutation >= 2, "the mutation arm's fixtures are the ones at risk"
+
+
+@pytest.mark.t0
+def test_T_U_mut_13_the_newest_frozen_set_wins_and_the_dev_set_never_does(tmp_path,
+                                                                         monkeypatch):
+    """T-U-mut-13 (FR-05.2, §8.1): `SET_PATH` resolves to the NEWEST frozen set.
+
+    New id, W-12c. A7's freeze is write-once, so a second synthesis writes a
+    second file rather than editing the first, and the campaign must draw from
+    the later one: `set_v1.json` stays committed because it is the record of
+    what the first synthesis produced, not because any run should still use it.
+    The ordering is by the INTEGER in the name, so `set_v10.json` sorts after
+    `set_v9.json`; `set_dev.json` matches no version at all and can therefore
+    never win a comparison, which is the property FR-05.2 needs. Fixture: files
+    written into a temporary directory. Tier 0.
+    """
+    monkeypatch.setattr(mutators, "DIRECTORY", tmp_path)
+    assert mutators.frozen_sets() == [], "no frozen set before A7 has run"
+
+    for name in ("set_dev.json", "set_v2.json", "set_v10.json", "set_v1.json",
+                 "set_v9.json", "set_vx.json", "set_v2.json.bak"):
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+    assert [path.name for path in mutators.frozen_sets()] == [
+        "set_v1.json", "set_v2.json", "set_v9.json", "set_v10.json"]
+
+    # And the committed tree's own resolution, which is what a run reads.
+    assert mutators.SET_PATH == mutators.FROZEN_SET
+    assert mutators.FROZEN_SET == mutators.FROZEN_SETS[-1]
+    assert mutators.SET_PATH != mutators.DEVELOPMENT_SET, \
+        "a frozen set exists, so the development set is out of reach"
+    assert mutators.load_set()["frozen"] is True

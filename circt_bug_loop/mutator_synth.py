@@ -82,6 +82,30 @@ def registration_commit(repo_root: str) -> str:
     return budget.registration(repo_root)[1]
 
 
+def prompt_path(set_version: str) -> Path:
+    """The prompt file that synthesises *set_version*: versioned, or 8.3's own.
+
+    A frozen set is WRITE-ONCE and the repository must hold the text that
+    produced its bytes, so a prompt may not be edited once a set has been frozen
+    from it: `mutator_synth.md` is the text `set_v1.json` came from and stays
+    exactly as it was. A later version brings its own file beside it, named for
+    the set it produces, and the set's `set_version` is what selects it - so the
+    pairing is a fact about the two file names and not a flag someone remembered
+    to pass (W-12c; errata rows 33 and 36).
+
+    Returns:
+        Path, `prompts/mutator_synth_<set_version>.md` where that exists and
+        `prompts/mutator_synth.md` otherwise.
+    Worker:
+        pure; one `exists` and no read.
+    Raises:
+        nothing. A missing file raises at the caller's `read_text`, which names
+        the path it could not read.
+    """
+    versioned = PROMPTS / f"mutator_synth_{set_version}.md"
+    return versioned if versioned.exists() else PROMPTS / "mutator_synth.md"
+
+
 def read_mirror(db_path: str) -> list:
     """Return every closed `label:bug` issue of the mirror, ordered by number.
 
@@ -245,8 +269,8 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
     if target.exists():
         raise MutatorSynthError("set_exists", str(target))
 
-    text = (cfg.get("mutator_synth")
-            or (PROMPTS / "mutator_synth.md").read_text(encoding="utf-8"))
+    text = cfg.get("mutator_synth") or prompt_path(set_version).read_text(
+        encoding="utf-8")
     prompt = Template(text).safe_substitute(
         issue_count=len(issues), issue_digest=issue_digest(issues),
         issues=render_issues(issues),
@@ -297,5 +321,6 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
 
 
 __all__ = ["PROMPTS", "SYNTH_SYSTEM_MESSAGE", "MutatorSynthError",
-           "check_entry", "issue_digest", "parse_mutators", "read_mirror",
-           "registration_commit", "render_issues", "synthesise_mutators"]
+           "check_entry", "issue_digest", "parse_mutators", "prompt_path",
+           "read_mirror", "registration_commit", "render_issues",
+           "synthesise_mutators"]

@@ -1,4 +1,4 @@
-"""`mutator_synth.py` (A7): `04-Test-Plan.md` §1.8, `T-U-msyn-01` to `-09`.
+"""`mutator_synth.py` (A7): `04-Test-Plan.md` §1.8, `T-U-msyn-01` to `-10`.
 
 The turn is mocked at the one call that reaches a model, `llm.dispatch_turn`,
 and
@@ -338,3 +338,27 @@ def test_T_U_msyn_09_an_empty_mirror_refuses(unregistered_repo, turn, tmp_path):
     assert raised.value.reason == "empty_mirror"
     assert state["calls"] == [], "no turn is spent on an empty mirror"
     assert not list((tmp_path / "sets").iterdir())
+
+
+@pytest.mark.t0
+def test_T_U_msyn_10_the_prompt_is_versioned_with_the_set_it_freezes(
+        mirror, unregistered_repo, turn, tmp_path):
+    """T-U-msyn-10 (FR-05.2, §8.3): `set_v2` renders `mutator_synth_v2.md`.
+
+    New id, W-12c. The freeze is WRITE-ONCE, so the text that produced a frozen
+    set's bytes may not be edited afterwards and a later synthesis brings its
+    own file. `set_version` is what selects it, so the pairing is a fact about
+    two file names rather than a flag a caller has to remember; a version with
+    no file of its own falls back to §8.3's original, which is what keeps `v1`
+    rendering the text `set_v1.json` came from. Fixture: the committed prompts
+    and A7's mirror. Tier 0.
+    """
+    assert mutator_synth.prompt_path("v2").name == "mutator_synth_v2.md"
+    assert mutator_synth.prompt_path("v1").name == "mutator_synth.md"
+    assert mutator_synth.prompt_path("v99").name == "mutator_synth.md"
+
+    state = turn(transcript("mutator_synth_ok"))
+    run(mirror, unregistered_repo, tmp_path, set_version="v2")
+    prompt = state["calls"][0]["prompt"]
+    assert "python 3.10's `re`" in prompt.lower(), "v2's own text reached the turn"
+    assert "$issues" not in prompt and "$issue_count" not in prompt

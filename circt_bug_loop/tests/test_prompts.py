@@ -26,7 +26,8 @@ from string import Template
 
 import pytest
 
-from circt_bug_loop import generate_task, llm, mutator_synth, triage_task
+from circt_bug_loop import (generate_task, llm, mutator_synth, mutators,
+                            triage_task)
 from circt_bug_loop.contract import schema
 from circt_bug_loop.llm import PromptContractError, parse_json_footer
 # §8.3's prompt is rendered INSIDE A7, so A7's own mirror and its unregistered
@@ -42,15 +43,27 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 #: §1.1's four prompt files, and the section of `03-LLD.md` that gives each in
 #: full. There is no fifth: a prompt with no section is a prompt nobody reviewed.
+#:
+#: §8.3's is VERSIONED, and that is the one exception (W-12c, errata row 36). A
+#: frozen mutator set is write-once, so the text that produced its bytes may not
+#: be edited afterwards: `mutator_synth.md` stays exactly as `set_v1.json` was
+#: synthesised from it, and `mutator_synth_v2.md` is the amended text `set_v2`
+#: comes from. Both answer to §8.3 and `mutator_synth.prompt_path` pairs each
+#: with its `set_version`.
 PROMPT_FILES = {"seed_read.md": "7.2", "probe_write.md": "7.3",
-                "report_write.md": "7.4", "mutator_synth.md": "8.3"}
+                "report_write.md": "7.4", "mutator_synth.md": "8.3",
+                "mutator_synth_v2.md": "8.3"}
+
+#: The `set_version` each §8.3 prompt file synthesises, which is what selects it.
+SYNTH_VERSIONS = {"mutator_synth.md": "v1", "mutator_synth_v2.md": "v2"}
 
 #: The two variables §7.3 and §8.3 DECLARE and no prompt text carries, named
 #: here because `04-Test-Plan.md` §16.7 names them: both are supplied by their
 #: caller anyway, so `safe_substitute` leaves nothing unbound either way, and
 #: removing the declarations is a `03-LLD.md` change this revision did not make.
 DECLARED_UNUSED = {"probe_write.md": {"probe_dir"},
-                   "mutator_synth.md": {"issue_digest"}}
+                   "mutator_synth.md": {"issue_digest"},
+                   "mutator_synth_v2.md": {"issue_digest"}}
 
 #: FR-04.6's five per-turn files, by the suffix each takes (§6.5, W-13 #13).
 TURN_SUFFIXES = (".prompt.md", ".md", ".stderr", ".jsonl", ".usage.json")
@@ -334,6 +347,46 @@ def test_T_U_prompt_06_five_files_per_turn_for_stages_1_2_and_6():
     assert len(TURN_SUFFIXES) == 5
 
 
+@pytest.mark.t0
+def test_T_U_prompt_09_the_v2_synthesis_prompt_names_the_engine_and_the_kinds():
+    """T-U-prompt-09 (FR-05.2, FR-05.5): what set_v1 was lost to, said out loud.
+
+    §8.3's first prompt never named the engine that compiles `pattern`, and the
+    model answered with ten variable-width look-behinds PCRE accepts and
+    Python's `re` refuses, so step 4 dropped ten of twenty-two mutators for one
+    unstated sentence (errata row 33). The v2 file names Python's `re`, gives
+    the refused construct as an example, and asks for the two kinds v1 produced
+    none of. This test is what stops the sentence being edited back out; it does
+    NOT assert the model obeys it, which is §10 of the measurement. Fixture: the
+    committed prompt. Tier 0.
+    """
+    text = prompt_text("mutator_synth_v2.md")
+    lowered = text.lower()
+
+    # The engine, by name, with the construct that was actually refused.
+    assert "python 3.10's `re`" in lowered
+    assert "look-behind" in lowered and "fixed width" in lowered
+    assert "(?<=depth" in text, "the refused example, as the turn wrote it"
+    assert "\\K" in text, "and the other PCRE-only forms it must not use"
+
+    # The three kinds, and the two minimums v1 had none of.
+    for kind in mutators.KINDS:
+        assert f'`{kind}`' in text or f'"{kind}"' in text, kind
+    assert "AT LEAST TWO `argv`" in text and "AT LEAST TWO `line`" in text
+    for language in mutators.LANGUAGES:
+        assert f"`{language}`" in text, language
+
+    # And the replacement rules, which are `mutator_synth.check_entry`'s own.
+    assert "never empty" in lowered
+    for operation in mutators.SEQUENCE_OPERATIONS:
+        assert f"`{operation}`" in text, operation
+    for operation in mutators.NUMERIC_OPERATIONS:
+        assert f"`{operation}`" in text, operation
+
+    # v1's text is UNTOUCHED: it is the record of the bytes set_v1.json holds.
+    assert "python 3.10" not in prompt_text("mutator_synth.md").lower()
+
+
 def test_T_U_prompt_08_no_prompt_offers_a_shell():
     """T-U-prompt-08 (FR-04.4, NFR-03): three read methods, and no fourth.
 
@@ -388,7 +441,7 @@ def _render_one(name: str, monkeypatch, tmp_path, mirror, repo) -> str:  # noqa:
     monkeypatch.setattr(llm, "dispatch_turn", _dispatch)
     with pytest.raises(PromptContractError):
         mutator_synth.synthesise_mutators._chia_original(
-            mirror, repo, "v1", ("mlir", "fir", "sv"), 20,
+            mirror, repo, SYNTH_VERSIONS[name], ("mlir", "fir", "sv", "any"), 20,
             {"model_id": "gemini-3.8-flash", "set_dir": str(tmp_path / "sets"),
              "mirror_refreshed_utc": "2026-09-13T00:00:00+00:00"})
     return rendered["text"]

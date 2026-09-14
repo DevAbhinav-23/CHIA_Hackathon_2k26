@@ -38,6 +38,7 @@ import yaml
 
 from chia.base.ChiaFunction import ChiaFunction
 
+from circt_bug_loop import mutators
 from circt_bug_loop.contract.schema import (Arm, BudgetFile, ContractError,
                                             CounterBlock,
                                             LedgerSnapshot, validate)
@@ -47,8 +48,13 @@ from circt_bug_loop.contract.schema import (Arm, BudgetFile, ContractError,
 #: 1.4 forbids a longer walk, the flow living at two depths in two trees.
 BUDGET_YAML = str(Path(__file__).resolve().parent / "budget.yaml")
 
-#: 8.1 rule 2's file, relative to the flow directory.
-MUTATOR_SET = os.path.join("mutators", "set_v1.json")
+#: 8.1 rule 2's file, relative to the flow directory: the set the RUN hashes,
+#: which since W-12c is the NEWEST frozen one and was `set_v1.json` by name. It
+#: is read off `mutators` and not spelled a second time here, because rule 2
+#: checks the ancestry of the very file `RunManifest.mutator_set_sha` is computed
+#: over: a second spelling could name an older set whose commit is an ancestor of
+#: everything, and would then pass whatever the newest set's commit is.
+MUTATOR_SET = os.path.join("mutators", mutators.SET_PATH.name)
 
 #: THE PRE-REGISTRATION, since W-12 (architect decision, 2026-09-16): an
 #: ANNOTATED git tag `registration/<campaign-id>` on the commit that lands the

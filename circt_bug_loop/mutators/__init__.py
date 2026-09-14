@@ -62,12 +62,42 @@ _INTEGER = re.compile(r"\d+")
 _LANGUAGE_BY_SUFFIX = {".mlir": "mlir", ".fir": "fir", ".sv": "sv",
                        ".svh": "sv", ".v": "sv"}
 
-#: The frozen set the campaign runs, and the development set that stands in for
-#: it until A7 has been run. The frozen name wins wherever it exists, so a
-#: campaign can never pick up the development set by accident.
 DIRECTORY = Path(__file__).resolve().parent
-FROZEN_SET = DIRECTORY / "set_v1.json"
 DEVELOPMENT_SET = DIRECTORY / "set_dev.json"
+
+#: `set_v<n>.json`, and nothing else: the development set is `set_dev.json` and
+#: does not match, which is what keeps it out of this resolution entirely.
+_FROZEN_NAME = re.compile(r"^set_v(\d+)\.json$")
+
+
+def frozen_sets() -> list:
+    """Every frozen set beside this module, oldest version first (8.1).
+
+    Ordered by the INTEGER in the name and not by the string, so `set_v10.json`
+    sorts after `set_v9.json` rather than between `set_v1` and `set_v2`.
+
+    Returns:
+        list[Path], possibly empty before A7 has ever run.
+    Worker:
+        the caller's; one directory listing and no read.
+    Raises:
+        nothing.
+    """
+    found = [(int(match.group(1)), path) for path in DIRECTORY.glob("set_v*.json")
+             for match in [_FROZEN_NAME.match(path.name)] if match]
+    return [path for _version, path in sorted(found)]
+
+
+#: The frozen set the campaign runs, and the development set that stands in for
+#: it until A7 has been run. A frozen set wins wherever one exists, so a campaign
+#: can never pick up the development set by accident, and the NEWEST frozen set
+#: wins among them (W-12c): a later synthesis supersedes an earlier one, and the
+#: earlier file stays committed because it is the record of what an earlier run
+#: measured, not because any run should still draw from it. Only `set_v<n>.json`
+#: is resolved; `load_set(path)` takes any path a caller names explicitly, which
+#: is how an older set is replayed.
+FROZEN_SETS = frozen_sets()
+FROZEN_SET = FROZEN_SETS[-1] if FROZEN_SETS else DIRECTORY / "set_v1.json"
 SET_PATH = FROZEN_SET if FROZEN_SET.exists() else DEVELOPMENT_SET
 
 
@@ -344,8 +374,8 @@ def mutate_seed(seed, iteration: int, cap: int, mutator_set: dict,
     return mutants, no_ops, failures
 
 
-__all__ = ["DEVELOPMENT_SET", "FROZEN_SET", "ID", "KINDS", "LANGUAGES",
-           "MAX_INT", "NAMED_OPERATIONS", "NUMERIC_OPERATIONS", "SEED_INT_MASK",
-           "SEQUENCE_OPERATIONS", "SET_PATH", "MutatorError", "MutatorSetError",
-           "apply", "eligible", "language_of", "load_set", "mutant_seed_int",
-           "mutate_seed", "set_sha256"]
+__all__ = ["DEVELOPMENT_SET", "FROZEN_SET", "FROZEN_SETS", "ID", "KINDS",
+           "LANGUAGES", "MAX_INT", "NAMED_OPERATIONS", "NUMERIC_OPERATIONS",
+           "SEED_INT_MASK", "SEQUENCE_OPERATIONS", "SET_PATH", "MutatorError",
+           "MutatorSetError", "apply", "eligible", "frozen_sets", "language_of",
+           "load_set", "mutant_seed_int", "mutate_seed", "set_sha256"]
