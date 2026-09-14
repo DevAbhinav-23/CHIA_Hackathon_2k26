@@ -342,12 +342,13 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
     # The system message is re-sent on every call and counts.
     assert (guard.worst_case_usd({**one_call, "system_message": "y" * 1000})
             > guard.worst_case_usd(one_call))
-    # The cap is 65536 tokens.
-    assert cap == 65536
-    assert cap > (1.58e6 - 14 * 6087 / 2.0) / 91
-    for tokens_in, prompt_chars in ((459484, 6271), (576454, 10722)):
-        measured = (tokens_in - 6 * prompt_chars / 2.0) / 15.0
-        assert cap > measured, f"{cap} does not cover {measured:.0f}"
+    # W-18d: one tool result is bounded by the tool itself, so the price of one
+    # is that bound and not a measurement of what an unbounded read returned.
+    from circt_bug_loop import generate_task
+
+    assert cap == 32768
+    assert cap >= generate_task.SOURCE_READ_CAP_BYTES / llm_module.CHARS_PER_TOKEN
+    assert generate_task.SOURCE_READ_CAP_BYTES == 65536
 
     # W-12c, closing errata row 34.
     assert llm_module.CHARS_PER_TOKEN == 2.0

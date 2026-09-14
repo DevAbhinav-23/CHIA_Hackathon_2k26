@@ -220,11 +220,12 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
     seen = {}
 
     class SourceReadTool:
-        # §3.5's five parameters, which is what the call site now passes by keyword.
-        def __init__(self, name, clone_path, run_commit,
-                     cap_bytes=262144, task_options=None):
+        # §3.5's six parameters, which is what the call site now passes by keyword.
+        def __init__(self, name, clone_path, run_commit, cap_bytes=262144,
+                     read_cap_bytes=65536, task_options=None):
             self.name, self.clone_path, self.run_commit = name, clone_path, run_commit
             self.cap_bytes, self.task_options, self.stopped = cap_bytes, task_options, False
+            self.read_cap_bytes = read_cap_bytes
 
         def stop(self):
             self.stopped = True
@@ -246,6 +247,7 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
     monkeypatch.setattr(triage_task, "dispatch_turn", dispatch_turn)
     module = types.ModuleType("circt_bug_loop.generate_task")
     module.SourceReadTool = SourceReadTool
+    module.SOURCE_READ_CAP_BYTES = 65536
     monkeypatch.setitem(sys.modules, "circt_bug_loop.generate_task", module)
     monkeypatch.setattr(circt_bug_loop, "generate_task", module, raising=False)
     return seen

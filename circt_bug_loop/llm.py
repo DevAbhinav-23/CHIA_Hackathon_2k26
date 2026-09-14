@@ -100,8 +100,9 @@ MAX_OUTPUT_TOKENS = 16000
 #: Characters per token, for the pre-authorisation only.
 CHARS_PER_TOKEN = 2.0
 
-#: The tokens ONE tool result may add to the conversation.
-TOOL_OUTPUT_TOKENS_CAP = 65536
+#: The tokens ONE tool result may add to the conversation, which is the read
+#: cap of `generate_task.SOURCE_READ_CAP_BYTES` at `CHARS_PER_TOKEN`.
+TOOL_OUTPUT_TOKENS_CAP = 32768
 
 _NO_TOOL_ITERATIONS = 1
 

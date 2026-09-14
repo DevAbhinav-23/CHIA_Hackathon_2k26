@@ -42,6 +42,10 @@ _TURN_STAGE = {"seed_read": "stage_1", "probe_write": "stage_2"}
 #: 3.2's tool row: 60 s [DEFAULT] per git call, enforced by subprocess.
 SOURCE_READ_TIMEOUT_SECONDS = 60
 
+#: What ONE `read_file` or `grep` may return, which is what the turn's
+#: pre-authorisation prices a tool result at (`llm.TOOL_OUTPUT_TOKENS_CAP`).
+SOURCE_READ_CAP_BYTES = 65536
+
 
 def _truncate(text: str, cap_bytes: int) -> str:
     """Cap one tool return at *cap_bytes*, stating the truncation in the text."""
@@ -61,12 +65,15 @@ class SourceReadTool(ChiaTool):
     """MCP tool: read CIRCT's source at the run's commit."""
 
     def __init__(self, name: str, clone_path: str, run_commit: str,
-                 cap_bytes: int = 262144, task_options: Optional[dict] = None):
+                 cap_bytes: int = 262144,
+                 read_cap_bytes: int = SOURCE_READ_CAP_BYTES,
+                 task_options: Optional[dict] = None):
         """Bind one clone and one commit, and register the three read methods."""
         super().__init__(name, task_options=task_options)
         self.clone_path = str(clone_path)
         self.run_commit = str(run_commit)
         self.cap_bytes = int(cap_bytes)
+        self.read_cap_bytes = int(read_cap_bytes)
         self.mcp.add_tool(self.read_file, name=f"{name}_read_file")
         self.mcp.add_tool(self.grep, name=f"{name}_grep")
         self.mcp.add_tool(self.list_dir, name=f"{name}_list_dir")
@@ -83,27 +90,56 @@ class SourceReadTool(ChiaTool):
             return 1, "", str(error)
         return done.returncode, done.stdout, done.stderr
 
-    def read_file(self, path: str) -> str:
-        """Return one CIRCT source file's text at the run's commit.
+    def _page(self, lines: list) -> tuple:
+        """The leading lines of *lines* that fit the read cap, and how many did not."""
+        kept, size = [], 0
+        for line in lines:
+            size += len(line.encode("utf-8")) + 1
+            if size > self.read_cap_bytes and kept:
+                break
+            kept.append(line)
+        return kept, len(lines) - len(kept)
+
+    def read_file(self, path: str, first_line: int = 1) -> str:
+        """Return one CIRCT source file's text at the run's commit, one page at a time.
 
         path is repository-relative, for example lib/Dialect/HW/HWTypes.cpp.
-        Returns the file's text, truncated with a marked tail if it is very
-        large, or a one-line string beginning 'Error:' if the path does not
-        exist at that commit.
+        Returns the file's lines from first_line (1 by default) up to
+        65536 bytes; when more remain the text ends
+        '... [truncated: continue with first_line=N of M lines]', and calling
+        again with that first_line returns the next page. A path that does not
+        exist at that commit, or a first_line past the end of the file, returns
+        a one-line string beginning 'Error:'.
         """
         if _outside(path):
             return f"Error: {path!r} is not a repository-relative path"
+        try:
+            start = int(first_line)
+        except (TypeError, ValueError):
+            return f"Error: first_line must be a line number, got {first_line!r}"
+        if start < 1:
+            return f"Error: first_line must be 1 or more, got {start}"
         code, out, err = self._git("show", f"{self.run_commit}:{path}")
         if code != 0:
             return f"Error: {err.strip() or 'no such path at the run commit'}"
-        return _truncate(out, self.cap_bytes)
+        lines = out.splitlines()
+        if start > len(lines):
+            return (f"Error: first_line {start} is past the end of {path!r}, "
+                    f"which has {len(lines)} lines")
+        kept, dropped = self._page(lines[start - 1:])
+        text = "\n".join(kept)
+        if dropped:
+            text += (f"\n... [truncated: continue with first_line={start + len(kept)}"
+                     f" of {len(lines)} lines]")
+        return text
 
     def grep(self, pattern: str, path_prefix: str) -> str:
         """Search CIRCT's source at the run's commit for a fixed string.
 
         pattern is a literal, not a regular expression; path_prefix limits the
         search, for example lib/Dialect/HW. Returns matching lines as
-        '<path>:<line>:<text>', or 'Error:' if nothing matched.
+        '<path>:<line>:<text>', capped at 65536 bytes and saying how many
+        further matches were dropped, or 'Error:' if nothing matched.
         """
         if _outside(path_prefix):
             return f"Error: {path_prefix!r} is not a repository-relative path"
@@ -117,7 +153,12 @@ class SourceReadTool(ChiaTool):
         prefix = f"{self.run_commit}:"
         lines = [line[len(prefix):] if line.startswith(prefix) else line
                  for line in out.splitlines()]
-        return _truncate("\n".join(lines), self.cap_bytes)
+        kept, dropped = self._page(lines)
+        text = "\n".join(kept)
+        if dropped:
+            text += (f"\n... [truncated: {dropped} further matches of {len(lines)}; "
+                     "narrow path_prefix or the pattern]")
+        return text
 
     def list_dir(self, path: str) -> str:
         """List one directory's entries in CIRCT at the run's commit.
@@ -479,7 +520,8 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
         source_read = SourceReadTool(
             name=f"src_{seed.seed_sha[:12]}_{iteration}",
             clone_path=cfg["clone_path"], run_commit=cfg["run_commit"],
-            cap_bytes=cap_bytes, task_options=cfg.get("head_options"))
+            cap_bytes=cap_bytes, read_cap_bytes=SOURCE_READ_CAP_BYTES,
+            task_options=cfg.get("head_options"))
         probe_write = ProbeWriteTool(
             name=f"probe_{seed.seed_sha[:12]}_{iteration}",
             probe_dir=probe_dir, task_options=cfg.get("here_options"))

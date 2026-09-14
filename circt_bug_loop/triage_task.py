@@ -1016,6 +1016,7 @@ def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
     tool = generate_task.SourceReadTool(
         name=name, clone_path=cfg["clone_path"], run_commit=cfg["run_commit"],
         cap_bytes=int(cfg.get("artefact_inline_cap_bytes", 262144)),
+        read_cap_bytes=generate_task.SOURCE_READ_CAP_BYTES,
         task_options=cfg.get("head_options"))
     try:
         return dispatch_turn(TRIAGE_SYSTEM_MESSAGE, prompt, [tool],

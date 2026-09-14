@@ -212,9 +212,38 @@ def test_T_U_gen_18_read_only_by_construction(source_tool, throwaway_repo,
         assert source_tool.read_file(argument).startswith("Error:")
         assert source_tool.list_dir(argument).startswith("Error:")
 
-    source_tool.cap_bytes = 20
-    capped = source_tool.read_file(MEASURED_FILE)
-    assert "truncated at 20 bytes of" in capped
+    source_tool.cap_bytes = 3
+    assert "truncated at 3 bytes of" in source_tool.list_dir("lib")
+
+
+@pytest.mark.t0
+def test_T_U_gen_18c_a_read_is_paged_and_a_grep_says_what_it_dropped(source_tool):
+    """T-U-gen-18 (W-18d): `read_file` pages at its own cap and `grep` states the drop."""
+    whole = source_tool.read_file(MEASURED_FILE).splitlines()
+    assert len(whole) > 1 and "truncated" not in whole[-1]
+
+    # One line at a time, and the tail says how to ask for the next page.
+    source_tool.read_cap_bytes = 1
+    first = source_tool.read_file(MEASURED_FILE).splitlines()
+    assert first[0] == whole[0]
+    assert first[-1] == (f"... [truncated: continue with first_line=2 "
+                         f"of {len(whole)} lines]")
+
+    # And that first_line returns the next page, not the same one.
+    second = source_tool.read_file(MEASURED_FILE, first_line=2).splitlines()
+    assert second[0] == whole[1]
+
+    # The last page has no tail, and one past the end is an error, not an empty read.
+    last = source_tool.read_file(MEASURED_FILE, first_line=len(whole)).splitlines()
+    assert last == [whole[-1]]
+    past = source_tool.read_file(MEASURED_FILE, first_line=len(whole) + 1)
+    assert past.startswith("Error:") and f"{len(whole)} lines" in past
+    assert source_tool.read_file(MEASURED_FILE, first_line=0).startswith("Error:")
+
+    # A capped grep says how many matches it did not show.
+    matches = source_tool.grep("Type", "lib").splitlines()
+    assert matches and "truncated" in matches[-1]
+    assert f"{len(matches) - 1} further matches" in matches[-1]
 
 
 @pytest.mark.t0
