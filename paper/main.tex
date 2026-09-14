@@ -25,7 +25,7 @@
 
 \begin{document}
 
-\title{Seed, Generate, Reduce, Repair, Gate:\\A Closed CIRCT Bug Loop}
+\title{From Mined Fixes to Gated Repair:\\Closed-Loop Defect Synthesis for CIRCT}
 
 \author{\IEEEauthorblockN{Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla}
 \IEEEauthorblockA{International Institute of Information Technology, Hyderabad\\
@@ -34,23 +34,21 @@
 \maketitle
 
 \begin{abstract}
-CIRCT is an open-source compiler that turns hardware descriptions into Verilog,
-so a defect in it can corrupt a chip unnoticed. Agents that repair CIRCT feed on
-its issue tracker, which only scarce maintainer attention drains. We built a
-loop that makes its own supply: an agent reads one of 187 CIRCT fix commits
-mined from 24 months, % 187 fix-shaped commits over 24 months: analysis/pin-window-analysis.md, headline table and lines 112-113
-171 rebuildable from a prebuilt SDK, % 171 of 187 have an exactly matching prebuilt-LLVM SDK: analysis/pin-window-analysis.md line 14
-names the class of mistake it corrected, and writes inputs probing for it
-elsewhere. Fixed tools, not the model, build, judge, minimise, deduplicate and
-repair; a named person approves every filing. CHIA's CIRCT image compiles
-out the compiler's own consistency checks, so nothing can fire; % CHIA's published chia-circt image: 606 of 606 compile commands carry -DNDEBUG, circt-opt has 0 undefined __assert_fail: analysis/measurements/2026-09-13-frd-followups.md lines 469-470, A-10
-restored, they reach 536 of 555 compiler objects % 536 of 555 obj.CIRCT objects reference the assertion handler: analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
-and CHIA's test gate passes the same 1,119 tests with them on and off. % 1,119 passed / 0 failed of 1,127 considered, identical in both images: analysis/measurements/2026-09-14-image-build.md 5 run 2 and W-04b 3
-We release the loop as CHIA nodes and tools. A capped pilot fired the restored
-assertions on all three inputs it wrote for its first seed, matched them to an
-open issue and filed nothing, % pilot: 1 seed driven, 3 probes, 3 of 3 fired the primary oracle, dedup known_open_issue #8508, 0 filings: analysis/measurements/2026-09-16-pilot.md 0, 4 and 5
-and every live model call, two mutator syntheses and two pilots, cost under
-ten US dollars together. % 0.486733 + 0.490623 + 7.163957 + 0.814315 = 8.96, plus one unmeasured attempt bounded 0.47-0.53: 2026-09-16-mutator-synthesis.md 9.3, 10.4 (bounds), 2026-09-16-pilot.md 0 and P2.2
+Software bugs in hardware compilers like CIRCT risk injecting silent defects
+into physical chips. AI repair agents can fix known issues, but they are
+constrained by the slow trickle of human-reported bugs. We present a closed
+loop, built on the CHIA agent framework, that mines historical CIRCT commits to
+generate its own defect supply: a model learns the mistake pattern behind each
+of 187 past fixes % 187 fix-shaped commits over 24 months: analysis/pin-window-analysis.md
+and synthesises novel, bug-exposing inputs. The loop offloads building, judging,
+test reduction and deduplication entirely to deterministic tools, hands patch
+generation to CHIA's existing repair chain, and reserves human effort
+exclusively for final filing approval. It restores the compiler's internal
+assertions, compiled out of CHIA's published image, in 536 of 555 objects, % 606/606 compile commands -DNDEBUG in the published image (frd-followups A-10); 536 of 555 objects reference the assertion handler: 2026-09-14-image-build.md 4
+so defects become observable where none could fire before. In pilot
+deployments the loop reproduced a live open CIRCT issue from its first seed and
+withheld it as a duplicate, % pilot 1: 3 of 3 probes fired, dedup known_open_issue #8508, 0 filings: 2026-09-16-pilot.md 0, 4, 5
+at a total inference cost of about ten US dollars across all model calls. % 0.4867 + 0.4906 + 7.1640 + 0.8143 + 0.6416 = 9.60, plus one unmeasured attempt bounded 0.47-0.53: synthesis 9.3/10.4, pilot.md 0 and P2.2, pilot-3.md
 \end{abstract}
 
 % =====================================================================
@@ -287,7 +285,7 @@ excluding it.
 
 % =====================================================================
 \section{Results}\label{sec:res}
-Four live runs have been made and Table~\ref{tab:res} is all of them, read from
+Five live runs have been made and Table~\ref{tab:res} is all of them, read from
 the loop's own database and ledger; the ledger prices the SDK's own token
 counts at Google's published rates. % ledger = SDK counts x budget.yaml prices: 2026-09-16-pilot.md 7
 
@@ -312,6 +310,8 @@ Pilot 1, seeded, cap 5.00 & 3 & 1 & 3 & 3 & 0 & 7.16 & 19.7 to 64.1 \\
 Pilot 2, seeded, cap 3.00 & 2 & 2 & 0 & 0 & 0 & 0.81 & 0.50 to 0.59 \\
 % pilot 2 mutation: 0 model turns, 2 seeds, 5 probes (4 parse_error, 1 clean_exit), 0 firings, 1.7 s: same file P2 tables
 Pilot 2, mutation & 0 & 2 & 5 & 0 & 0 & 0 & -- \\
+% pilot 3: 1 turn, 13 calls incl. the forced final answer (empty), 1 seed, 0 probes, USD 0.641623, authorised 2.729162: analysis/measurements/2026-09-14-pilot-3.md
+Pilot 3, seeded, cap 3.00 & 1 & 1 & 0 & 0 & 0 & 0.64 & 0.24 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -350,6 +350,8 @@ of the bill.
 turn, both of pilot 2's seed-reading turns spent all six reading source and
 returned no answer, so no probe was written; the turn that read pilot 1's firing
 seed had taken fourteen. % both stage-1 turns exhausted at 6, final_text empty, 0 seeded probes; pilot 1 stage_1 14 calls: implementation-errata-log.md row 47; 2026-09-16-pilot.md 7
+At twelve, with one extra tool-free call demanding an answer, pilot 3's turn
+made thirteen calls and that answer came back empty. % pilot 3: 12 + 1 calls, "[DEBUG] the final answer was empty": 2026-09-14-pilot-3.md
 The cap is registered, and this is the measurement it is chosen with.
 
 \textbf{Seven defects no test could see.} The first run driven end to end on the
@@ -407,7 +409,7 @@ simulation harness and a Verilator testbench printing identical 112-line
 sequences, and one changed constant makes them disagree at a named cycle and
 signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
 
-\textbf{Limitations.} Model time across the four live runs totals USD 9.5, and
+\textbf{Limitations.} Model time across the five live runs totals USD 10.1, and
 the repair stage, CHIA's chain, ran in none of them, because it returns no token
 counts and would spend outside the ledger. % 8.96 measured + one unmeasured attempt bounded 0.47-0.53; every pilot --no-repair; TOKEN_CAPTURE unavailable_remote_dispatch: repair_adapter.py
 The second oracle applies to 6 of the 187 seeds. % A-19: analysis/measurements/2026-09-15-a19-differential-applicability.md
