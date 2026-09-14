@@ -100,7 +100,6 @@ DEFAULT_CLONE = str(Path.home() / ".cache" / "circt")
 DEFAULT_TOKEN_FILE = str(Path.home() / ".config" / "circt_bug_loop" / "github_token")
 DEFAULT_ARTEFACT_ROOT = os.environ.get("BUGLOOP_ARTEFACTS", "")
 DEFAULT_IMAGE_TAG = os.environ.get("BUGLOOP_IMAGE_TAG", "")
-DEFAULT_REGISTRY = "ghcr.io/ucb-bar"
 DEFAULT_BASE_IMAGE = "ghcr.io/ucb-bar/chia-circt:latest"
 
 #: loop.db, at 6.1's path, and CHIA's own unchanged issues.db beside its example.
@@ -226,6 +225,7 @@ def head_options(node_id: str) -> dict:
 #: membership rule is the node's own docstring: `T-U-layout-11` asserts this
 #: set is exactly the nodes whose `Worker:` paragraph says head.
 HEAD_NODES = frozenset({
+    "circt_bug_loop.bug_loop.build_image",
     "circt_bug_loop.budget.load_budget",
     "circt_bug_loop.corpus.build_corpus",
     "circt_bug_loop.corpus.resolve_sites",
@@ -387,20 +387,46 @@ def image_manifest(circt_sha: str, sdk_tag: str, targets, flag_string: str,
             "slang": bool(slang), "base_image": base_image}
 
 
-def image_tag(registry: str, manifest: dict) -> str:
-    """Return `<registry>/chia-circt-assert:<first 12 hex of the manifest digest>`.
+def manifest_digest(manifest: dict) -> str:
+    """SHA-256 over 4.11.1's six-key manifest, which is 3.2's idempotency key.
+
+    It is recorded on the `ImageSpec` and is NOT the tag (K1): the tag has to be
+    the one the Dockerfile's own header declares, and that names the CIRCT
+    commit alone, so the other five inputs - the SDK tag, the target list, the
+    flag string, slang and the base image - would otherwise be unrecorded. Two
+    images of one commit built with different flags share a tag and differ here.
 
     Returns:
-        str, the tag, which is 3.2's idempotency key made addressable.
+        str, 64 hex characters.
     Worker:
         pure; no resource, no process, no database handle.
     Raises:
         TypeError from json.dumps on a manifest holding a non-serialisable value.
     """
-    digest = hashlib.sha256(
+    return hashlib.sha256(
         json.dumps(manifest, sort_keys=True, separators=(",", ":"))
         .encode("utf-8")).hexdigest()
-    return f"{registry}/chia-circt-assert:{digest[:12]}"
+
+
+def image_tag(manifest: dict) -> str:
+    """Return `chia-circt-assert:<CIRCT_SHA[:12]>`, the Dockerfile's own scheme.
+
+    K1: this returned `<registry>/chia-circt-assert:<manifest digest[:12]>`
+    until 2026-09-15, and the Dockerfile's header has always said
+    `chia-circt-assert:<CIRCT_SHA[:12]>`. Two naming schemes that cannot agree:
+    step 1's reuse lookup therefore always missed, a full rebuild was attempted
+    on every run, and `${BUGLOOP_IMAGE_TAG}` (`eade0de61bc5`, a CIRCT SHA
+    prefix) could never match `--image-tag`. The scheme is now the Dockerfile's
+    and the manifest digest is recorded beside it.
+
+    Returns:
+        str, the local tag; there is no registry and nothing is pushed.
+    Worker:
+        pure; no resource, no process, no database handle.
+    Raises:
+        KeyError when *manifest* carries no `circt_sha`.
+    """
+    return f"chia-circt-assert:{manifest['circt_sha'][:12]}"
 
 
 def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
@@ -426,6 +452,40 @@ def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
             "--build-arg", f"SLANG={'ON' if manifest['slang'] else 'OFF'}",
             "--build-arg", f"BASE_IMAGE={manifest['base_image']}",
             context]
+
+
+#: B1's Dockerfile, by name. It lives at two paths in the two trees of 1.4.
+DOCKERFILE_NAME = "ChiaCirctAssertDockerfile"
+
+
+def dockerfile_and_context() -> tuple:
+    """B1's Dockerfile and its build context, in whichever tree this is (1.4).
+
+    In this repository the file is `upstream/dockerfiles/` and the context is
+    the repository root; in a CHIA checkout `sync-to-chia.sh` copies it to
+    `dockerfiles/` and the context is CHIA's root, which is what the file's own
+    header says to build from. K1 measured the third possibility and it is not
+    one: `~/.cache/chia-src/dockerfiles/ChiaCirctAssertDockerfile` does not
+    exist, because nothing runs the sync script against the installed checkout.
+
+    Returns:
+        (dockerfile path, context directory), both absolute strings.
+    Worker:
+        head; two `os.path.isfile` calls and no process.
+    Raises:
+        ImageBuildError("dockerfile", detail) when neither path holds it, which
+        is a refusal at start-up rather than a `docker build` that cannot start.
+    """
+    for root, relative in ((FLOW_DIR.parent, Path("upstream") / "dockerfiles"),
+                           (_CHIA_ROOT, Path("dockerfiles"))):
+        candidate = root / relative / DOCKERFILE_NAME
+        if candidate.is_file():
+            return str(candidate), str(root)
+    raise ImageBuildError(
+        "dockerfile",
+        f"{DOCKERFILE_NAME} is neither at {FLOW_DIR.parent}/upstream/dockerfiles "
+        f"nor at {_CHIA_ROOT}/dockerfiles; run upstream/sync-to-chia.sh, or run "
+        "the driver from this repository")
 
 
 def parse_hash_manifest(document: dict) -> dict:
@@ -502,43 +562,55 @@ def _in_container(tag: str, command: list, *, timeout: int) -> dict:
     return _run(["docker", "run", "--rm", tag] + command, timeout=timeout)
 
 
-@ChiaFunction(resources={"circt": 1}, max_retries=0)
+@ChiaFunction(max_retries=0)
 def build_image(circt_sha: str, sdk_tag: str, targets: tuple, flag_string: str,
-                dockerfile: str, registry: str, *, slang: bool = True,
-                push: bool = True, base_image: str = DEFAULT_BASE_IMAGE,
+                dockerfile: str, *, slang: bool = True,
+                base_image: str = DEFAULT_BASE_IMAGE,
                 context: str = ".", artefact_dir: Optional[str] = None,
                 baseline_objects: Optional[list] = None,
+                inspect_only: bool = False,
                 timeout_seconds: int = 10800) -> dict:
-    """Build, check and publish the assertions-on CIRCT image, or reuse it.
+    """Build and check the assertions-on CIRCT image, or reuse the one that exists.
 
-    4.11.1's eight steps in its order, stopping at the first failure: tag and
-    reuse; `docker build` with the six build arguments; the pin check's own line
-    in the build log; FR-03.17's lit discovery; every target's `--version`; the
-    hash manifest from a FRESHLY STARTED container and never from the build
-    tree; FR-03.5's non-referencing `obj.CIRCT` objects compared as a SET
-    against the committed baseline; and the push, which nothing reaches unless
-    every step above passed, so a partial build leaves no image under the
-    requested tag.
+    4.11.1's steps in its order, stopping at the first failure: tag and reuse;
+    `docker build` with the six build arguments; the pin check's own line in the
+    build log; FR-03.17's lit discovery; every target's `--version`; the hash
+    manifest from a FRESHLY STARTED container and never from the build tree; and
+    FR-03.5's non-referencing `obj.CIRCT` objects compared as a SET against the
+    committed baseline.
+
+    NOTHING IS PUSHED (K1). The step-8 `docker push` to ghcr was measured
+    `denied` by W-19a, and a campaign does not need a registry: the cluster runs
+    the image from the host's own daemon and FR-06.1's per-probe hash check is
+    what proves a worker ran the recorded binaries.
+
+    *inspect_only* is `--dry-run`'s: an existing image is inspected and nothing
+    is ever built, so the one command whose purpose is "confirm a cluster is
+    ready to spend money without spending any" cannot start a three-hour build.
 
     Returns:
         {"image_spec": ImageSpec, "reused": bool, "counters": CounterBlock},
         where reused is True exactly when step 1 short-circuited.
     Worker:
-        {"circt": 1} - it needs a Docker daemon and the CIRCT worker type is the
-        one that has one. It holds the slot for the whole build, which is why B1
-        runs once, before the arms, and never inside an arm window.
+        head. It needs a DOCKER DAEMON and the head is where one is: the CIRCT
+        worker type is itself a container of the image B1 would build, mounts no
+        docker socket and carries no docker binary, so `build_image` at
+        `{"circt": 1}` raised `FileNotFoundError` out of the node on its first
+        line (K1). The head is also where the build context lives. It is not an
+        arm's occupancy: B1 runs once, before the arms, and never inside a
+        window.
     Raises:
-        ImageBuildError(step, detail) for a failure at any of steps 2 to 8, with
-            *step* the name above and *detail* the command's stderr tail.
+        ImageBuildError(step, detail) for a failure at any step, with *step* the
+            name above and *detail* the command's stderr tail; step "reuse" when
+            *inspect_only* and no image carries the tag.
         BuildTimeout(timeout_seconds) when the whole sequence exceeds its
-            timeout; the partial image is not pushed and the local tag is
-            removed, so a later run does not find a half-built image under the
-            key it would have reused.
+            timeout; the local tag is removed, so a later run does not find a
+            half-built image under the key it would have reused.
     """
     started = time.monotonic()
     manifest = image_manifest(circt_sha, sdk_tag, targets, flag_string,
                               slang=slang, base_image=base_image)
-    tag = image_tag(registry, manifest)
+    tag = image_tag(manifest)
     deadline = started + timeout_seconds
 
     existing = _run(["docker", "image", "inspect", tag], timeout=60)
@@ -547,6 +619,11 @@ def build_image(circt_sha: str, sdk_tag: str, targets: tuple, flag_string: str,
                            artefact_dir=artefact_dir, baseline=baseline_objects)
         return {"image_spec": spec, "reused": True,
                 "counters": _counter_block("image", 1, 1, 0, started)}
+    if inspect_only:
+        raise ImageBuildError(
+            "reuse", f"no image is tagged {tag!r} and --dry-run never builds "
+            f"one: build it first, or point the run at the commit whose image "
+            f"this host holds")
 
     try:
         build = _run(build_argv(dockerfile, tag, manifest, context),
@@ -560,11 +637,6 @@ def build_image(circt_sha: str, sdk_tag: str, targets: tuple, flag_string: str,
                            timeout=int(deadline - time.monotonic()),
                            artefact_dir=artefact_dir, baseline=baseline_objects,
                            build_log=log)
-        if push:
-            pushed = _run(["docker", "push", tag],
-                          timeout=int(deadline - time.monotonic()))
-            if pushed["rc"] != 0:
-                raise ImageBuildError("publish", pushed["stderr"][-4000:])
     except (ImageBuildError, BuildTimeout):
         _run(["docker", "image", "rm", "-f", tag], timeout=120)
         raise
@@ -583,6 +655,13 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         Path(artefact_dir).mkdir(parents=True, exist_ok=True)
         Path(artefact_dir, "lit_discovery.txt").write_text(
             lit["stdout"] + lit["stderr"], encoding="utf-8")
+        # The six build inputs and their digest, which the tag cannot carry
+        # (K1) and which `image`'s columns have no home for until the design
+        # pass adds one. One file, beside the lit log, under the artefact root.
+        Path(artefact_dir, "image_manifest.json").write_text(
+            json.dumps({**manifest, "image_tag": tag,
+                        "manifest_digest": manifest_digest(manifest)},
+                       indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not ok:
         raise ImageBuildError("lit_discovery", (lit["stderr"] or lit["stdout"])[-4000:])
 
@@ -613,12 +692,16 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         raise ImageBuildError("assertion_objects",
                               f"non-referencing objects differ by {difference}")
 
-    digest = _run(["docker", "image", "inspect",
-                   "--format={{index .RepoDigests 0}}", tag], timeout=60)
+    # `.RepoDigests` is empty for an image that was never pushed, which since
+    # K1 is every image this loop builds, so the LOCAL content id is what
+    # identifies it. Both are stable and neither is the tag's own text.
+    digest = _run(["docker", "image", "inspect", "--format={{.Id}}", tag],
+                  timeout=60)
     return ImageSpec(
         circt_sha=manifest["circt_sha"], sdk_tag=manifest["sdk_tag"],
         targets=list(targets), flag_string=manifest["flag_string"],
         cmake_args=[], image_digest=digest["stdout"].strip() or tag,
+        manifest_digest=manifest_digest(manifest),
         image_tag=tag, verilator_version=verilator["stdout"].strip(),
         slang_enabled=manifest["slang"], lit_discovery_ok=ok,
         lit_discovered_count=discovered,
@@ -3068,16 +3151,17 @@ def run_campaign(args, out) -> int:
                         ref="origin/main")
     check_09_pin_stamped(pin=pin)
 
+    dockerfile, context = dockerfile_and_context()
     built = dispatch.call(build_image, pin["run_commit"], pin["pin_tag"],
-                          IMAGE_TARGETS, IMAGE_FLAG_STRING,
-                          str(_CHIA_ROOT / "dockerfiles" / "ChiaCirctAssertDockerfile"),
-                          DEFAULT_REGISTRY, context=str(_CHIA_ROOT))
+                          IMAGE_TARGETS, IMAGE_FLAG_STRING, dockerfile,
+                          context=context, inspect_only=args.dry_run)
     image_spec = built["image_spec"]
-    if args.image_tag and not image_spec.image_tag.endswith(args.image_tag):
+    if args.image_tag and args.image_tag != image_spec.circt_sha[:12]:
         raise PreflightFailed(
-            "image_tag", f"--image-tag {args.image_tag!r} is not the tag the "
-            f"manifest names, {image_spec.image_tag!r}: the cluster would run a "
-            "different image from the one this run records")
+            "image_tag", f"--image-tag {args.image_tag!r} is not the CIRCT SHA "
+            f"prefix this run pinned, {image_spec.circt_sha[:12]!r} "
+            f"({image_spec.image_tag!r}): the cluster would run a different "
+            "image from the one this run records")
     check_06_image_lit_discovery(image_spec=image_spec)
     check_07_tool_hashes(image_spec=image_spec,
                          observed={cluster["worker_type"]: image_spec.tool_hashes})

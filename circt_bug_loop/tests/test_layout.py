@@ -109,7 +109,10 @@ NODES = {
     "llm.llm_turn": {"llm": 1.0},
     "feedback.build_feedback": None, "budget.load_budget": None,
     "ledger.accrue": None, "mutator_synth.synthesise_mutators": None,
-    "bug_loop.build_image": {"circt": 1},
+    # Head-side since W-20b: the Docker daemon and the build context are the
+    # head's, and the CIRCT worker type is itself a container of the image B1
+    # would build (K1). §3.2's row said `{"circt": 1}`.
+    "bug_loop.build_image": None,
     "probe_task.probe_execute": {"circt": 1},
     "probe_task.oracle_primary": {"circt": 1},
     "probe_task.oracle_differential": {"circt": 1},

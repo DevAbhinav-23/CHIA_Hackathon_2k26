@@ -413,13 +413,23 @@ class ImageSpec:
     flag_string: str
     cmake_args: list[str]             # the full configure line of 4.10, for the record
     image_digest: str
-    image_tag: str
+    image_tag: str                    # `chia-circt-assert:<CIRCT_SHA[:12]>` (K1)
     verilator_version: str
     slang_enabled: bool
     lit_discovery_ok: bool            # FR-03.17
     lit_discovered_count: int         # FR-03.17
     assertion_nonreferencing: list[str]   # FR-03.5's named objects, compared as a set
     tool_hashes: dict                 # tool name -> SHA-256 hex of the published binary
+    #: SHA-256 over 4.11.1's six-key build manifest. The TAG names the CIRCT
+    #: commit alone, which is the Dockerfile's own scheme, so two images of one
+    #: commit built with a different SDK tag, target list, flag string, slang
+    #: setting or base image share a tag and differ HERE (K1). It is NOT a
+    #: column of `image`: 6.2's DDL is frozen against 03-LLD 6.2 by
+    #: `T-U-store-01` and the design pass is what adds one, so the digest is
+    #: durable as `<artefact_dir>/image_manifest.json`, which B1 writes beside
+    #: `lit_discovery.txt` (errata W-20b). Defaulted so a record built from a
+    #: stored row, which carries no such column, still constructs.
+    manifest_digest: str = ""
 
 
 @dataclass(kw_only=True)

@@ -14,6 +14,7 @@ of this module are what make that possible and each is a decision recorded in
     iteration runs in this process against a fixture store and a fake
     generator, which is the dry-run iteration this module's last test drives.
 """
+import inspect
 import json
 import os
 import subprocess
@@ -435,29 +436,89 @@ def test_T_U_driver_21():
 
 
 def test_T_U_driver_24():
-    """T-U-driver-24 (FR-03.7, FR-03.10, FR-03.13): the tag is the manifest's digest.
+    """T-U-driver-24 (K1, FR-03.7, FR-03.10, FR-03.13): the tag, and the digest beside it.
 
-    Changing any one of the six inputs changes the tag, `slang` and
-    `base_image` included, so a branch-(b) image can never answer for a
-    branch-(a) run; the argument ORDER of the target list does not, because the
-    manifest sorts it. Fixture: none. Tier 0.
+    Two naming schemes used to be in the tree and they could not agree: the
+    Dockerfile's header says `chia-circt-assert:<CIRCT_SHA[:12]>` and
+    `image_tag` returned `<registry>/chia-circt-assert:<manifest digest[:12]>`,
+    so step 1's reuse lookup always missed and `--image-tag eade0de61bc5` could
+    never match. The TAG is now the Dockerfile's, and the property that used to
+    be the tag's - any one of the six inputs changing it, `slang` and
+    `base_image` included - is `manifest_digest`'s, which the `ImageSpec`
+    records. The argument ORDER of the target list changes neither, the
+    manifest sorting it. Fixture: none. Tier 0.
     """
     base = dict(circt_sha="e" * 40, sdk_tag="firtool-1.159.0",
                 targets=("circt-opt", "firtool"), flag_string="-O3 -UNDEBUG")
-    tag = bug_loop.image_tag("reg", bug_loop.image_manifest(**base))
-    reordered = bug_loop.image_tag("reg", bug_loop.image_manifest(
-        **{**base, "targets": ("firtool", "circt-opt")}))
-    assert tag == reordered
-    assert tag.startswith("reg/chia-circt-assert:") and len(tag.split(":")[-1]) == 12
+    manifest = bug_loop.image_manifest(**base)
+    tag, digest = bug_loop.image_tag(manifest), bug_loop.manifest_digest(manifest)
+
+    assert tag == f"chia-circt-assert:{'e' * 12}"
+    assert "/" not in tag, "nothing is pushed, so there is no registry (K1)"
+    reordered = bug_loop.image_manifest(**{**base, "targets": ("firtool", "circt-opt")})
+    assert bug_loop.image_tag(reordered) == tag
+    assert bug_loop.manifest_digest(reordered) == digest
 
     for key, value in (("circt_sha", "f" * 40), ("sdk_tag", "firtool-1.158.0"),
                        ("targets", ("circt-opt",)), ("flag_string", "-O2")):
-        assert bug_loop.image_tag("reg", bug_loop.image_manifest(
-            **{**base, key: value})) != tag
-    assert bug_loop.image_tag("reg", bug_loop.image_manifest(
-        **base, slang=False)) != tag
-    assert bug_loop.image_tag("reg", bug_loop.image_manifest(
-        **base, base_image="other")) != tag
+        assert bug_loop.manifest_digest(
+            bug_loop.image_manifest(**{**base, key: value})) != digest
+    assert bug_loop.manifest_digest(
+        bug_loop.image_manifest(**base, slang=False)) != digest
+    assert bug_loop.manifest_digest(
+        bug_loop.image_manifest(**base, base_image="other")) != digest
+    # The five inputs other than the commit share a tag and differ in the digest,
+    # which is exactly why the digest is recorded rather than folded into a name.
+    assert bug_loop.image_tag(bug_loop.image_manifest(**base, slang=False)) == tag
+
+
+def test_T_U_driver_24b(monkeypatch):
+    """T-U-driver-24 (K1): B1 is a head node, it never pushes, and --dry-run inspects.
+
+    New half, W-20b. `build_image` ran at `{"circt": 1}`, inside a container of
+    the very image it would build: no docker binary, no socket, and `_run`
+    catches only `TimeoutExpired`, so its first line raised `FileNotFoundError`
+    out of the node - and `--dry-run` returns AFTER all of that, so the one
+    command that is supposed to spend nothing died before printing anything.
+    Fixture: none. Tier 0.
+    """
+    from circt_bug_loop.bug_loop import ImageBuildError
+
+    assert bug_loop.build_image._chia_options == {"max_retries": 0}
+    assert "circt_bug_loop.bug_loop.build_image" in bug_loop.HEAD_NODES
+    # Read off the parsed body and not the text, the docstring naming the step
+    # that was removed: no literal anywhere under `build_image` is a push.
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(
+        inspect.getsource(bug_loop.build_image._chia_original)))
+    tree.body[0].body.pop(0)                       # the docstring
+    assert "push" not in ast.unparse(tree)
+    assert not hasattr(bug_loop, "DEFAULT_REGISTRY")
+
+    # --dry-run's path: the tag is inspected and no build is ever started.
+    calls = []
+
+    def _no_docker(argv, *, timeout, cwd=None):
+        calls.append(list(argv))
+        return {"rc": 1, "stdout": "", "stderr": "No such image"}
+
+    monkeypatch.setattr(bug_loop, "_run", _no_docker)
+    with pytest.raises(ImageBuildError) as raised:
+        bug_loop.build_image._chia_original(
+            "e" * 40, "firtool-1.159.0", bug_loop.IMAGE_TARGETS,
+            bug_loop.IMAGE_FLAG_STRING, "Dockerfile", inspect_only=True)
+    assert raised.value.step == "reuse"
+    assert calls == [["docker", "image", "inspect", f"chia-circt-assert:{'e' * 12}"]]
+
+    # And the Dockerfile it would have built from exists in THIS tree, which is
+    # the path K1 measured as absent under `~/.cache/chia-src/dockerfiles/`.
+    dockerfile, context = bug_loop.dockerfile_and_context()
+    assert Path(dockerfile).is_file()
+    assert dockerfile == str(Path(bug_loop.FLOW_DIR).parent / "upstream"
+                             / "dockerfiles" / bug_loop.DOCKERFILE_NAME)
+    assert context == str(Path(bug_loop.FLOW_DIR).parent)
 
 
 def test_T_U_driver_25a():
