@@ -77,3 +77,139 @@ def no_local_ray():
 def fixtures_dir() -> Path:
     """The committed contract fixture directory."""
     return FIXTURES
+
+
+# ---------------------------------------------------------------------------
+# The model layer, mocked with CHIA's own recipe (04-Test-Plan.md 0.3)
+# ---------------------------------------------------------------------------
+
+
+def vertex_text_part(text: str):
+    """One text part of a fake Gemini response, built from the real types."""
+    from google.genai import types
+
+    return types.Part(text=text)
+
+
+def vertex_call_part(name: str, args: dict):
+    """One `function_call` part, which is what drives the backend's tool loop."""
+    from google.genai import types
+
+    return types.Part(function_call=types.FunctionCall(name=name, args=args))
+
+
+def vertex_response(parts, finish: str = "STOP", in_tok: int = 0, out_tok: int = 0):
+    """One real `GenerateContentResponse`, so the token fields are the genuine ones."""
+    from google.genai import types
+
+    return types.GenerateContentResponse(
+        candidates=[types.Candidate(
+            content=types.Content(role="model", parts=list(parts)),
+            finish_reason=getattr(types.FinishReason, finish))],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=in_tok, candidates_token_count=out_tok,
+            total_token_count=in_tok + out_tok))
+
+
+class _DisabledProfiler:
+    """CHIA's profiler, off: `get_profiler` otherwise starts a local Ray (0.4).
+
+    `ChiaFunction._wrapper` and `VertexGeminiLLM.prompt` both call
+    `chia.trace.profiler.get_profiler`, which looks the collector actor up with
+    `ray.get_actor` and starts a local Ray instance doing it
+    (`chia:chia/trace/profiler.py:200-214`, measured 2026-09-14). A turn driven
+    offline needs no profiler at all, so the fixture substitutes this.
+    """
+
+    enabled = False
+
+    def add_info(self, info: dict) -> None:
+        """Accept and discard, as the disabled profiler does."""
+
+
+@pytest.fixture
+def fake_vertex(monkeypatch):
+    """CHIA's own offline vertex harness, as one fixture (04-Test-Plan.md 0.3).
+
+    It is `chia/models/tests/test_vertex.py:78-145` in behaviour: a fake
+    `google.genai.Client` returning pre-built REAL response objects in order and
+    capturing the client kwargs and every request, and a fake MCP transport and
+    `ClientSession` so the whole tool round trip runs with no server. Nothing of
+    the loop's own code is faked: `build_llm`, `llm_turn`, the prompts, the
+    emitter and the two `ChiaTool`s all run for real.
+
+    Yields:
+        (install, capture), where install(responses, tool_result_text=...)
+        patches the client and returns the same capture dict, whose keys are
+        "calls", "client_kwargs", "urls" and "tool_calls".
+    """
+    capture = {"calls": [], "client_kwargs": None, "urls": [], "tool_calls": []}
+    monkeypatch.setattr("chia.trace.profiler.get_profiler",
+                        lambda *a, **k: _DisabledProfiler())
+
+    def install(responses, tool_result_text: str = "42"):
+        from types import SimpleNamespace
+
+        import mcp
+        import mcp.client.streamable_http as streamable_mod
+        from google import genai
+
+        pending = list(responses)
+
+        class _FakeModels:
+            def generate_content(self, *, model, contents, config):
+                capture["calls"].append({"model": model,
+                                         "contents": list(contents),
+                                         "config": config})
+                return pending.pop(0)
+
+        class _FakeClient:
+            def __init__(self, **kwargs):
+                capture["client_kwargs"] = kwargs
+                self.models = _FakeModels()
+
+        monkeypatch.setattr(genai, "Client", lambda **kwargs: _FakeClient(**kwargs))
+
+        class _FakeStreamCM:
+            async def __aenter__(self):
+                return (object(), object(), None)
+
+            async def __aexit__(self, *exc):
+                return False
+
+        def _fake_streamable(url):
+            capture["urls"].append(url)
+            return _FakeStreamCM()
+
+        class _FakeSession:
+            def __init__(self, read, write):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def initialize(self):
+                pass
+
+            async def list_tools(self):
+                return SimpleNamespace(tools=[SimpleNamespace(
+                    name="read_file", description="read a file",
+                    inputSchema={
+                        "type": "object", "properties": {},
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "additionalProperties": False, "title": "x"})])
+
+            async def call_tool(self, name, args):
+                capture["tool_calls"].append((name, args))
+                return SimpleNamespace(
+                    content=[SimpleNamespace(type="text", text=tool_result_text)],
+                    isError=False)
+
+        monkeypatch.setattr(streamable_mod, "streamable_http_client", _fake_streamable)
+        monkeypatch.setattr(mcp, "ClientSession", _FakeSession)
+        return capture
+
+    yield install, capture

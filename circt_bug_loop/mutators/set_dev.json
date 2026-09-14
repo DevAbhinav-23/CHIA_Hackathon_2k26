@@ -1,0 +1,96 @@
+{
+  "format_version": 1,
+  "frozen": false,
+  "mutators": [
+    {
+      "derived_from": [],
+      "description": "repeat one option of the seed's own argument vector",
+      "id": "any.argv.option.duplicate",
+      "kind": "argv",
+      "language": "any",
+      "mutates_argv": true,
+      "pattern": "^--?[A-Za-z]",
+      "replacement": "duplicate"
+    },
+    {
+      "derived_from": [],
+      "description": "delete one non-blank line of the test",
+      "id": "any.line.delete",
+      "kind": "line",
+      "language": "any",
+      "mutates_argv": false,
+      "pattern": "\\S",
+      "replacement": "delete"
+    },
+    {
+      "derived_from": [],
+      "description": "repeat one non-blank line of the test",
+      "id": "any.line.duplicate",
+      "kind": "line",
+      "language": "any",
+      "mutates_argv": false,
+      "pattern": "\\S",
+      "replacement": "duplicate"
+    },
+    {
+      "derived_from": [],
+      "description": "make one UInt width zero",
+      "id": "fir.width.uint.zero",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "UInt<(\\d+)>",
+      "replacement": "zero"
+    },
+    {
+      "derived_from": [],
+      "description": "negate one integer attribute literal",
+      "id": "mlir.attr.int.flip_sign",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<![\\w.])(-?)(\\d+)\\s*:\\s*i(\\d+)",
+      "replacement": "flip"
+    },
+    {
+      "derived_from": [],
+      "description": "shift one integer attribute literal by one",
+      "id": "mlir.attr.int.off_by_one",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<![\\w.])(\\d+)\\s*:\\s*i(\\d+)",
+      "replacement": "off_by_one"
+    },
+    {
+      "derived_from": [],
+      "description": "widen one integer type to the 32-bit signed boundary",
+      "id": "mlir.type.int.max",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<![\\w.])i(\\d+)",
+      "replacement": "max"
+    },
+    {
+      "derived_from": [],
+      "description": "make one packed range's most significant bit zero",
+      "id": "sv.range.msb.zero",
+      "kind": "text",
+      "language": "sv",
+      "mutates_argv": false,
+      "pattern": "\\[(\\d+)\\s*:\\s*0\\]",
+      "replacement": "zero"
+    }
+  ],
+  "set_version": "dev",
+  "synthesis_input": {
+    "issue_numbers_sha256": "",
+    "issues_used": 0,
+    "mirror_refreshed_utc": "",
+    "query": "none: this set is hand-written for development and is not a synthesis",
+    "repo": "llvm/circt"
+  },
+  "synthesis_model": "",
+  "synthesised_utc": ""
+}
