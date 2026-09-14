@@ -5267,7 +5267,7 @@ that produced nothing reaches no other table in this section, because nothing do
 runs for it: there is no probe, so no `probe_result`, no `candidate` and no verdict row, and the only
 trace is an artefact directory nobody counts. `turn_failure` is that row.
 
-```sql
+```text
 CREATE TABLE IF NOT EXISTS turn_failure (
     run_manifest_id     TEXT NOT NULL REFERENCES run(run_manifest_id),
     seed_sha            TEXT NOT NULL,
