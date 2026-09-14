@@ -1,0 +1,368 @@
+[
+  {
+    "sha": "23abfba6006b9581a537632ab31f162f0213d3dd",
+    "entry_tool": "circt-opt",
+    "subject": "[DCToHW] Fix invalid ESI connections from Unpack(pack()) (#10649)",
+    "test_path": "test/Conversion/DCToHW/basic.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt --lower-dc-to-hw /tmp/a19-lift-7n8wiqpy/23abfba6006b9581a537632ab31f162f0213d3dd/basic.mlir -o /tmp/a19-lift-7n8wiqpy/23abfba6006b9581a537632ab31f162f0213d3dd/lifted.mlir",
+    "lift_returncode": 0,
+    "lift_stderr": "",
+    "lift_seconds": 0.04,
+    "lifted_bytes": 7447,
+    "outcome": "harness_error:no_top",
+    "detail": "14 public hw.module operations",
+    "chunks": 1,
+    "chunk_outcomes": {
+      "harness_error:no_top": 1
+    }
+  },
+  {
+    "sha": "73e28e09a3b5ba17ab4eba999d5bbff7031b11ee",
+    "entry_tool": "circt-opt",
+    "subject": "[CalyxToHW] Fix missing i1-to-clock conversion in convertPipelineOp (#9715)",
+    "test_path": "test/Conversion/CalyxToHW/pipeline-clock.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt -lower-calyx-to-hw /tmp/a19-lift-7n8wiqpy/73e28e09a3b5ba17ab4eba999d5bbff7031b11ee/pipeline-clock.mlir -o /tmp/a19-lift-7n8wiqpy/73e28e09a3b5ba17ab4eba999d5bbff7031b11ee/lifted.mlir",
+    "lift_returncode": 0,
+    "lift_stderr": "",
+    "lift_seconds": 0.03,
+    "lifted_bytes": 1733,
+    "outcome": "port_list",
+    "top": "main",
+    "ports": [
+      {
+        "index": 0,
+        "name": "in0",
+        "direction": "input",
+        "width": 32,
+        "type": "i32",
+        "clock": false,
+        "reset": false
+      },
+      {
+        "index": 1,
+        "name": "in1",
+        "direction": "input",
+        "width": 32,
+        "type": "i32",
+        "clock": false,
+        "reset": false
+      },
+      {
+        "index": 2,
+        "name": "clk",
+        "direction": "input",
+        "width": 1,
+        "type": "i1",
+        "clock": true,
+        "reset": false
+      },
+      {
+        "index": 3,
+        "name": "reset",
+        "direction": "input",
+        "width": 1,
+        "type": "i1",
+        "clock": false,
+        "reset": true
+      },
+      {
+        "index": 4,
+        "name": "go",
+        "direction": "input",
+        "width": 1,
+        "type": "i1",
+        "clock": false,
+        "reset": false
+      },
+      {
+        "index": 5,
+        "name": "out0",
+        "direction": "output",
+        "width": 32,
+        "type": "i32",
+        "clock": false,
+        "reset": false
+      },
+      {
+        "index": 6,
+        "name": "done",
+        "direction": "output",
+        "width": 1,
+        "type": "i1",
+        "clock": false,
+        "reset": false
+      }
+    ],
+    "chunks": 1,
+    "chunk_outcomes": {
+      "port_list": 1
+    },
+    "first_chunk_port_list": {
+      "chunk": 0,
+      "top": "main",
+      "ports": [
+        {
+          "index": 0,
+          "name": "in0",
+          "direction": "input",
+          "width": 32,
+          "type": "i32",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 1,
+          "name": "in1",
+          "direction": "input",
+          "width": 32,
+          "type": "i32",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 2,
+          "name": "clk",
+          "direction": "input",
+          "width": 1,
+          "type": "i1",
+          "clock": true,
+          "reset": false
+        },
+        {
+          "index": 3,
+          "name": "reset",
+          "direction": "input",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": true
+        },
+        {
+          "index": 4,
+          "name": "go",
+          "direction": "input",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 5,
+          "name": "out0",
+          "direction": "output",
+          "width": 32,
+          "type": "i32",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 6,
+          "name": "done",
+          "direction": "output",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": false
+        }
+      ]
+    }
+  },
+  {
+    "sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
+    "entry_tool": "circt-opt",
+    "subject": "[HandshakeToHW] Fix crashes when multiple `sync`s with different numbers of `none` inputs are used (#9587)",
+    "test_path": "test/Conversion/HandshakeToHW/test_buffer.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt -lower-handshake-to-hw /tmp/a19-lift-7n8wiqpy/3b30c823b82916627d62f59d4e6e8e520f8b530d/test_buffer.mlir -o /tmp/a19-lift-7n8wiqpy/3b30c823b82916627d62f59d4e6e8e520f8b530d/lifted.mlir",
+    "lift_returncode": 1,
+    "lift_stderr": "/tmp/a19-lift-7n8wiqpy/3b30c823b82916627d62f59d4e6e8e520f8b530d/test_buffer.mlir:0:0: error: 'builtin.module' op multiple candidate top-level modules detected (test_buffer_data, test_buffer_none, test_buffer_tuple_seq). Please remove one of these from the source program.\n/tmp/a19-lift-7n8wiqpy/3b30c823b82916627d62f59d4e6e8e520f8b530d/test_buffer.mlir:0:0: note: see current operation: \n\"builtin.module\"() ({\n  \"handshake.func\"() <{function_type = (none, none) -> (none, none)}> ({\n  ^bb0(%arg4: none, %arg5: none):\n    %2 = \"handshake.buffer\"(%arg4) <{bufferType = #handshake<buffer_type_enum seq>,",
+    "lift_seconds": 0.03,
+    "outcome": "lift_failed",
+    "chunks": 3,
+    "chunk_outcomes": {
+      "harness_error:no_top": 3
+    }
+  },
+  {
+    "sha": "91872b228b74931e77419e7b6c36a4bbf8cc0431",
+    "entry_tool": "circt-opt",
+    "subject": "Fix inout port lowering for sv.verbatim.module (#9209)",
+    "test_path": "test/Conversion/FIRRTLToHW/lower-to-hw-verbatim-blackbox.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt -lower-firrtl-to-hw /tmp/a19-lift-7n8wiqpy/91872b228b74931e77419e7b6c36a4bbf8cc0431/lower-to-hw-verbatim-blackbox.mlir -o /tmp/a19-lift-7n8wiqpy/91872b228b74931e77419e7b6c36a4bbf8cc0431/lifted.mlir",
+    "lift_returncode": 0,
+    "lift_stderr": "",
+    "lift_seconds": 0.02,
+    "lifted_bytes": 2631,
+    "outcome": "port_list",
+    "top": "VerbatimBlackBoxTest",
+    "ports": [
+      {
+        "index": 0,
+        "name": "clk",
+        "direction": "input",
+        "width": 1,
+        "type": "!seq.clock",
+        "clock": true,
+        "reset": false
+      },
+      {
+        "index": 1,
+        "name": "rst",
+        "direction": "input",
+        "width": 1,
+        "type": "i1",
+        "clock": false,
+        "reset": true
+      },
+      {
+        "index": 2,
+        "name": "data",
+        "direction": "input",
+        "width": 8,
+        "type": "i8",
+        "clock": false,
+        "reset": false
+      },
+      {
+        "index": 3,
+        "name": "result",
+        "direction": "output",
+        "width": 1,
+        "type": "i1",
+        "clock": false,
+        "reset": false
+      }
+    ],
+    "chunks": 1,
+    "chunk_outcomes": {
+      "port_list": 1
+    },
+    "first_chunk_port_list": {
+      "chunk": 0,
+      "top": "VerbatimBlackBoxTest",
+      "ports": [
+        {
+          "index": 0,
+          "name": "clk",
+          "direction": "input",
+          "width": 1,
+          "type": "!seq.clock",
+          "clock": true,
+          "reset": false
+        },
+        {
+          "index": 1,
+          "name": "rst",
+          "direction": "input",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": true
+        },
+        {
+          "index": 2,
+          "name": "data",
+          "direction": "input",
+          "width": 8,
+          "type": "i8",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 3,
+          "name": "result",
+          "direction": "output",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": false
+        }
+      ]
+    }
+  },
+  {
+    "sha": "3f0aa622f0ca59877dececf8631bf7028b59b051",
+    "entry_tool": "circt-opt",
+    "subject": "[ESI] Fix assert on lower unwrap value from block arg",
+    "test_path": "test/Dialect/ESI/passes/lower_to_hw_errors.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt --lower-esi-to-hw /tmp/a19-lift-7n8wiqpy/3f0aa622f0ca59877dececf8631bf7028b59b051/lower_to_hw_errors.mlir -o /tmp/a19-lift-7n8wiqpy/3f0aa622f0ca59877dececf8631bf7028b59b051/lifted.mlir",
+    "lift_returncode": 1,
+    "lift_stderr": "/tmp/a19-lift-7n8wiqpy/3f0aa622f0ca59877dececf8631bf7028b59b051/lower_to_hw_errors.mlir:6:24: error: lower-esi-to-hw left behind a channel operation\n  %rawOutput, %valid = esi.unwrap.vr %b_out_result, %ready : i16\n                       ^\n/tmp/a19-lift-7n8wiqpy/3f0aa622f0ca59877dececf8631bf7028b59b051/lower_to_hw_errors.mlir:6:24: note: see current operation: %0:2 = \"esi.unwrap.vr\"(%arg0, %2#1) : (!esi.channel<i16>, i1) -> (i16, i1)\n/tmp/a19-lift-7n8wiqpy/3f0aa622f0ca59877dececf8631bf7028b59b051/lower_to_hw_errors.mlir:8:25: error: lower-esi-to-hw left behind a channel operation\n  %chanOutput,",
+    "lift_seconds": 0.02,
+    "outcome": "lift_failed",
+    "chunks": 1,
+    "chunk_outcomes": {
+      "lift_failed": 1
+    }
+  },
+  {
+    "sha": "99826b849987b38b8590ad70cc45efd02dce2c35",
+    "entry_tool": "circt-opt",
+    "subject": "[HWArith] Fix lowering to HW with type aliases",
+    "test_path": "test/Conversion/HWArithToHW/test_basic.mlir",
+    "lift_argv": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt -lower-hwarith-to-hw /tmp/a19-lift-7n8wiqpy/99826b849987b38b8590ad70cc45efd02dce2c35/test_basic.mlir -o /tmp/a19-lift-7n8wiqpy/99826b849987b38b8590ad70cc45efd02dce2c35/lifted.mlir",
+    "lift_returncode": 0,
+    "lift_stderr": "",
+    "lift_seconds": 0.02,
+    "lifted_bytes": 7980,
+    "outcome": "harness_error:no_top",
+    "detail": "12 public hw.module operations",
+    "chunks": 13,
+    "chunk_outcomes": {
+      "harness_error:no_clock": 9,
+      "port_list": 1,
+      "harness_error:bad_port_type": 2,
+      "harness_error:no_top": 1
+    },
+    "first_chunk_port_list": {
+      "chunk": 7,
+      "top": "sigAndOps",
+      "ports": [
+        {
+          "index": 0,
+          "name": "a",
+          "direction": "input",
+          "width": 8,
+          "type": "i8",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 1,
+          "name": "b",
+          "direction": "input",
+          "width": 8,
+          "type": "i8",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 2,
+          "name": "cond",
+          "direction": "input",
+          "width": 1,
+          "type": "i1",
+          "clock": false,
+          "reset": false
+        },
+        {
+          "index": 3,
+          "name": "clk",
+          "direction": "input",
+          "width": 1,
+          "type": "!seq.clock",
+          "clock": true,
+          "reset": false
+        },
+        {
+          "index": 4,
+          "name": "out",
+          "direction": "output",
+          "width": 8,
+          "type": "i8",
+          "clock": false,
+          "reset": false
+        }
+      ]
+    }
+  }
+]

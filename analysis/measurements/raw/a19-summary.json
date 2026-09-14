@@ -1,0 +1,83 @@
+{
+  "seeds": 187,
+  "exact_pin": 171,
+  "applicable": 6,
+  "applicable_exact_pin": 6,
+  "applicable_eligible": 6,
+  "reason": {
+    "pipeline_not_hw_terminal": 123,
+    "entry_tool_not_hw_capable": 55,
+    "no_run_line": 2,
+    "applicable": 6,
+    "firtool_output_mode_not_hw": 1
+  },
+  "by_entry_tool": {
+    "circt-opt": 129,
+    "circt-verilog": 3,
+    "circt-translate": 35,
+    "other": 18,
+    "arcilator": 1,
+    "firtool": 1
+  },
+  "by_language": {
+    "mlir": 148,
+    "sv": 35,
+    "fir": 4
+  },
+  "applicable_by_entry_tool": {
+    "circt-opt": 6
+  },
+  "applicable_by_language": {
+    "mlir": 6
+  },
+  "any_run_line_applicable": 6,
+  "any_run_line_only": [],
+  "mine_seconds": 5.8,
+  "missing_blobs": 0,
+  "git_calls": 358,
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "clone": "/home/adi/.cache/chia-pin-smoke/w05/corpus-head",
+  "entry_tool_seeds": {
+    "circt-opt": 136,
+    "circt-verilog": 31,
+    "circt-translate": 39,
+    "circt-lec": 1,
+    "circt-synth": 3,
+    "firtool": 5,
+    "circt-reduce": 6,
+    "arcilator": 1,
+    "circt-capi-firrtl-test 2>&1 ": 1
+  },
+  "rule": {
+    "firtool_hw_modes": [
+      "ir-hw",
+      "verilog",
+      "split-verilog"
+    ],
+    "hw_terminal_passes": [
+      "lower-firrtl-to-hw",
+      "lower-hwarith-to-hw",
+      "lower-calyx-to-hw",
+      "lower-dc-to-hw",
+      "lower-esi-to-hw",
+      "lower-handshake-to-hw",
+      "lower-pipeline-to-hw"
+    ],
+    "not_a_pass": [
+      "o",
+      "verify-diagnostics",
+      "split-input-file",
+      "split-file",
+      "mlir-print-op-generic",
+      "allow-unregistered-dialect"
+    ]
+  },
+  "lift_seconds": 1.4,
+  "lift_bin_dir": "/home/adi/.cache/chia-pin-smoke/bassert_g/bin",
+  "lift_outcomes": {
+    "harness_error:no_top": 2,
+    "port_list": 2,
+    "lift_failed": 2
+  },
+  "wall_seconds": 7.3
+}

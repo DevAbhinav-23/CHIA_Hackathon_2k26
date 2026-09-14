@@ -343,7 +343,7 @@ zero, so R-09 does not fire and F-08's harness generators and `T-U-probe-50` are
 writing. Going one step further, the six seeds' own recorded test inputs were lifted with
 their own pipelines against the measured build and handed to `probe_task.extract_port_list`:
 **3 of 6** yield a port list. No model call, no docker, no cluster, and neither simulator was
-run. Whole measurement 6.4 s. Full record in
+run. Whole measurement 7.3 s. Full record in
 `analysis/measurements/2026-09-15-a19-differential-applicability.md`; script
 `analysis/measurements/a19_applicability.py`; raw `analysis/measurements/raw/a19-*`.
 
