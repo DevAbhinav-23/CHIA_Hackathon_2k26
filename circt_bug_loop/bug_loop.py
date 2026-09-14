@@ -387,7 +387,7 @@ def stage_shipped(*, upstream: Optional[str] = None,
             "py_modules": [str(root / name) for name in SHIPPED_MODULES]}
 
 
-def runtime_env() -> dict:
+def runtime_env(shipped: Optional[dict] = None) -> dict:
     """Return the `runtime_env` the driver's own `ray.init` ships (13.1).
 
     The STAGED package and nothing else (W6). 13.1's `py_modules` named the
@@ -399,17 +399,25 @@ def runtime_env() -> dict:
     6.1's path, `loop.db` with the mirrored issue corpus in it; and the
     installed `chia` is a namespace package and an unpatched one.
 
+    IT STAGES EVERY TIME unless the caller has already staged and hands the
+    result in. Reusing whatever `_shipped/` happened to be on disk is the same
+    defect in another place, and it was MEASURED on the cluster, 2026-09-15: a
+    directory staged earlier in the session made every dispatched node fail
+    with `AttributeError: Can't get attribute 'SpendGuard' on <module
+    'circt_bug_loop.llm' from .../_ray_pkg_*/circt_bug_loop/llm.py>` - the
+    workers were running an earlier commit's code - and the only symptom at the
+    driver was an arm that wrote no probe at all. Staging is a 3.7 MB copy and
+    two `git apply`s, once per `ray.init`.
+
     Returns:
         {"py_modules": list[str], "excludes": list[str]}.
     Worker:
-        the driver's; it reads the filesystem and dispatches nothing.
+        the driver's; it copies about 4 MB and dispatches nothing.
     Raises:
-        PreflightFailed("shipped_package", detail) from `stage_shipped` when the
-        staged directory is not there and cannot be built.
+        PreflightFailed("shipped_package", detail) from `stage_shipped`.
     """
-    if not SHIPPED_DIR.is_dir():
-        stage_shipped()
-    return {"py_modules": [str(SHIPPED_DIR / name) for name in SHIPPED_MODULES],
+    staged = shipped or stage_shipped()
+    return {"py_modules": list(staged["py_modules"]),
             "excludes": list(_RUNTIME_ENV_EXCLUDES)}
 
 
@@ -3593,7 +3601,8 @@ def run_campaign(args, out) -> int:
     config = load_config(args.cluster_yaml)
     resources = {name: dict(node_type.resources)
                  for name, node_type in config.node_types.items()}
-    ray.init(address="auto", runtime_env=runtime_env(), ignore_reinit_error=True)
+    ray.init(address="auto", runtime_env=runtime_env(shipped),
+             ignore_reinit_error=True)
     # The driver IS the head (13.1's B12 row), so its own node id is what pins
     # every `HEAD_NODES` member and every head-side tool server (K4, K5).
     dispatch = Dispatch(remote=True, head_node_id=_head_node_id())
