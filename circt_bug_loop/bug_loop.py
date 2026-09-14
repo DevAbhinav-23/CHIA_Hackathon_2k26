@@ -119,6 +119,12 @@ IMAGE_TARGETS = ("circt-opt", "firtool", "circt-translate", "arcilator",
                  "circt-reduce", "circt-verilog")
 IMAGE_FLAG_STRING = "-O3 -UNDEBUG -gline-tables-only"
 
+#: Step 3's evidence that the pin equality check RAN, which is distinct from
+#: its passing: the Dockerfile prints this on the `then` branch and
+#: `PIN CHECK FAILED` and `exit 1` on the other, so a build whose log carries
+#: neither has lost the layer (FR-03.2).
+PIN_CHECK_LINE = "PIN CHECK PASSED"
+
 #: The statuses at which a probe carries on to stage 4 (FR-06.9, 3.6).
 _FIRING_STATUSES = ("assertion", "fatal_error", "crash")
 
@@ -436,7 +442,7 @@ def build_image(circt_sha: str, sdk_tag: str, targets: tuple, flag_string: str,
         log = build["stdout"] + build["stderr"]
         if build["rc"] != 0:
             raise ImageBuildError("build", log[-4000:])
-        if "llvm pin matches" not in log.lower():
+        if PIN_CHECK_LINE.lower() not in log.lower():
             raise ImageBuildError("pin", "the pin equality check did not run")
         spec = _image_spec(tag, manifest, targets,
                            timeout=int(deadline - time.monotonic()),
@@ -507,17 +513,46 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         assertion_nonreferencing=nonreferencing, tool_hashes=hashes)
 
 
+#: W-04's own object scan (`analysis/measurements/w04_verify_in_image.sh:38-45`),
+#: which measured 555 `obj.CIRCT` objects, 536 referencing and 19 not. One
+#: container and one `nm` per object; the paths are printed relative to the
+#: build directory, which is the shape `image/baseline_objects.txt` records.
+_OBJECT_SCAN = r'''
+find /workspace/circt/build -path "*obj.CIRCT*.dir*" -name "*.o" | sort |
+while read -r o; do
+  nm --undefined-only "$o" 2>/dev/null | grep -q __assert_fail ||
+    echo "${o#/workspace/circt/build/}"
+done'''
+
+
 def _assertion_objects(tag: str, targets, *, timeout: int) -> list:
-    """FR-03.5's list: the obj.CIRCT objects that do not reference __assert_fail."""
-    out = _in_container(
+    """FR-03.5's two halves: every target binary, then the objects behind them.
+
+    Step 7 is `nm -u` over each target binary for `__assert_fail`, which must be
+    present in all of them, and the list of `obj.CIRCT` objects that do not
+    reference it, which is what the committed baseline is compared against as a
+    set. A binary without the symbol is an assertions-off build and stops the
+    publication here rather than at the first probe that does not fire.
+    """
+    binaries = _in_container(
         tag, ["sh", "-c",
               "for t in " + " ".join(targets) + "; do "
               "nm -u /workspace/circt/build/bin/$t | grep -c __assert_fail || true; "
               "done"], timeout=timeout)
-    if out["rc"] != 0:
-        raise ImageBuildError("assertion_objects", out["stderr"][-4000:])
-    return [t for t, line in zip(targets, out["stdout"].split())
-            if line.strip() in ("0", "")]
+    if binaries["rc"] != 0:
+        raise ImageBuildError("assertion_objects", binaries["stderr"][-4000:])
+    missing = [target for target, line in zip(targets, binaries["stdout"].split())
+               if line.strip() in ("0", "")]
+    if missing:
+        raise ImageBuildError(
+            "assertion_objects",
+            f"{missing} do not reference __assert_fail: the image was built "
+            f"with assertions compiled out (FR-03.5)")
+
+    objects = _in_container(tag, ["sh", "-c", _OBJECT_SCAN], timeout=timeout)
+    if objects["rc"] != 0:
+        raise ImageBuildError("assertion_objects", objects["stderr"][-4000:])
+    return sorted(objects["stdout"].split())
 
 
 # ---------------------------------------------------------------------------

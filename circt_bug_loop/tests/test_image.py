@@ -368,3 +368,44 @@ def test_T_U_image_01_in_image():
     assert head.stdout.strip() == recorded["circt_sha"]
     pin = in_image("git", "-C", "/workspace/circt", "ls-tree", "HEAD", "llvm")
     assert recorded["llvm_pin"] in pin.stdout
+
+
+@pytest.mark.t0
+def test_T_U_image_02_pin_line():
+    """T-U-image-02 (FR-03.2): the phrase step 3 looks for is the phrase the file prints.
+
+    `build_image` fails the build when the pin check did not RUN, which is
+    distinct from the check failing, and it decides that by reading one line out
+    of the build log. The line is the Dockerfile's own, so the two are asserted
+    against each other here rather than being kept in step with by hand.
+    Fixture: the Dockerfile. Tier 0.
+    """
+    text = dockerfile()
+    assert bug_loop.PIN_CHECK_LINE in text
+    assert "PIN CHECK FAILED" in text and "exit 1" in text
+    passed = text.index(bug_loop.PIN_CHECK_LINE)
+    assert text.index("ls-tree ${CIRCT_SHA} llvm") < passed
+
+
+@pytest.mark.t2
+@pytest.mark.needs_image
+@needs_image
+def test_T_U_image_05_objects():
+    """T-U-image-05 (FR-03.5): the object scan, and the nineteen W-04 measured.
+
+    `_assertion_objects`' own command, run against the published image: 555
+    `obj.CIRCT` objects, 19 of which do not reference `__assert_fail`, which is
+    the set `ImageSpec.assertion_nonreferencing` carries and the baseline a
+    later build is compared against. Tier 2.
+    """
+    scan = in_image("sh", "-c", bug_loop._OBJECT_SCAN, timeout=900)
+    assert scan.returncode == 0, scan.stderr[-400:]
+    nonreferencing = sorted(scan.stdout.split())
+    assert len(nonreferencing) == 19, nonreferencing
+    assert all(name.endswith(".o") and "obj.CIRCT" in name
+               for name in nonreferencing), nonreferencing
+    assert not [name for name in nonreferencing if name.startswith("/")]
+
+    total = in_image("sh", "-c", 'find /workspace/circt/build -path '
+                                 '"*obj.CIRCT*.dir*" -name "*.o" | wc -l')
+    assert total.stdout.strip() == "555"
