@@ -1895,3 +1895,43 @@ def test_T_U_driver_44_the_pilots_seed_subset_is_named_ordered_and_refusable():
     assert parsed.seed_sha == ["a" * 40, "b" * 40]
     assert bug_loop.build_parser().parse_args(["--mode", "discovery"]).seed_sha is None
     assert bug_loop.resolved_config(parsed)["seed_sha"] == ["a" * 40, "b" * 40]
+
+
+@pytest.mark.t0
+def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_path):
+    """T-U-driver-45 (FR-01.1, FR-01.11): `since` is the head's date, two years back.
+
+    New id, W-18. The driver passed `budget.campaign_start_utc[:10]`, a date in
+    the FUTURE of every commit the corpus head reaches - 2026-09-20 against a
+    head dated 2026-09-11 - and `build_corpus` drops every commit older than it,
+    so the mined corpus was EMPTY on every campaign and both arms would have run
+    their windows over no seed at all. `test_corpus.py` passes its own
+    `SINCE = "2024-09-11"` and the tier-3 tests mine nothing, so nothing met it.
+    The window is now derived from the one date `corpus_head_sha` fixes, which
+    keeps it reproducible from the registered file plus the clone. Fixture: a
+    throwaway repository with one dated commit. Tier 0.
+    """
+    repo = tmp_path / "clone"
+    repo.mkdir()
+    git = ("git", "-C", str(repo))
+    subprocess.run(git + ("init", "-q", "-b", "main"), check=True)
+    (repo / "a.txt").write_text("x", encoding="utf-8")
+    subprocess.run(git + ("add", "-A"), check=True)
+    subprocess.run(git + ("-c", "user.name=t", "-c", "user.email=t@t",
+                          "commit", "-q", "-m", "one"), check=True,
+                   env={**os.environ, "GIT_AUTHOR_DATE": "2026-09-11T10:36:10+02:00",
+                        "GIT_COMMITTER_DATE": "2026-09-11T10:36:10+02:00"})
+    head = subprocess.run(git + ("rev-parse", "HEAD"), check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+    # The committed corpus head's own window, which is `test_corpus.py`'s SINCE.
+    assert bug_loop.corpus_since(str(repo), head) == "2024-09-11"
+    assert bug_loop.CORPUS_WINDOW_MONTHS == 24
+
+    # And it is NOT the campaign start, which is what the driver used to pass.
+    budget = budget_module.load_budget._chia_original(
+        budget_module.BUDGET_YAML, str(bug_loop.FLOW_DIR.parent))["budget"]
+    assert budget.campaign_start_utc[:10] > "2024-09-11"
+    source = inspect.getsource(bug_loop.run_campaign)
+    assert "corpus_since(args.clone, budget.corpus_head_sha)" in source
+    assert "budget.campaign_start_utc[:10]" not in source

@@ -985,6 +985,41 @@ def check_02_mutator_set_earlier(*, repo_root: str,
         raise PreflightFailed("mutator_set_earlier", str(error)) from error
 
 
+#: FR-01.1's mining window: twenty-four months of `main`, ending at the corpus
+#: head. Two years back FROM THE HEAD'S OWN COMMIT DATE, which is the only date
+#: `corpus_head_sha` fixes and is therefore reproducible from the registered
+#: file plus the clone.
+CORPUS_WINDOW_MONTHS = 24
+
+
+def corpus_since(clone_path: str, corpus_head_sha: str) -> str:
+    """The date FR-01.1's window opens on, as `build_corpus` wants it (W-18).
+
+    The driver passed `budget.campaign_start_utc[:10]` here, which is a date in
+    the FUTURE of every commit the corpus head reaches - `2026-09-20` against a
+    head dated `2026-09-11` - so `build_corpus`'s `commit["date"] < since_dt`
+    excluded every commit and **the mined corpus was empty on every campaign**.
+    Nothing met it: `test_corpus.py` passes `SINCE = "2024-09-11"` explicitly
+    and the tier-3 tests drive `campaign_drive` over fixture seeds without
+    mining at all.
+
+    Returns:
+        str, an ISO 8601 date, `2024-09-11` for the registered corpus head.
+    Worker:
+        head; one `git log -1` against the blobless clone.
+    Raises:
+        PreflightFailed("git", stderr) when git itself fails.
+    """
+    when = _git(clone_path, "log", "-1", "--format=%cI", corpus_head_sha)
+    head = datetime.fromisoformat(when[:-1] + "+00:00" if when.endswith("Z") else when)
+    years = CORPUS_WINDOW_MONTHS // 12
+    try:
+        opened = head.replace(year=head.year - years)
+    except ValueError:                      # 29 February, in a year that has one
+        opened = head.replace(year=head.year - years, day=28)
+    return opened.date().isoformat()
+
+
 def check_03_clone_head(*, clone_path: str, corpus_head_sha: str,
                         head_sha: Optional[str] = None) -> None:
     """Check 3: the clone's HEAD equals `corpus_head_sha`, naming both (FR-01.11).
@@ -3793,7 +3828,7 @@ def run_campaign(args, out) -> int:
           file=out)
 
     mined = dispatch.call(corpus.build_corpus, args.clone, budget.corpus_head_sha,
-                          budget.campaign_start_utc[:10],
+                          corpus_since(args.clone, budget.corpus_head_sha),
                           budget.artefact_inline_cap_bytes)
     seeds = list(mined["seeds"])
     # W-18: a PILOT drives a named subset of the corpus, so a small run reaches
@@ -3971,7 +4006,8 @@ def main(argv: Optional[list] = None, out=None) -> int:
         budget = budget_module.load_budget._chia_original(
             args.budget, str(FLOW_DIR.parent))["budget"]
         mined = corpus.build_corpus._chia_original(
-            args.clone, budget.corpus_head_sha, budget.campaign_start_utc[:10],
+            args.clone, budget.corpus_head_sha,
+            corpus_since(args.clone, budget.corpus_head_sha),
             budget.artefact_inline_cap_bytes)
         # The draw is from the ELIGIBLE seeds since W-20b (W-19b #6): a sample
         # drawn from seeds no deployment can probe at their own parent commit
