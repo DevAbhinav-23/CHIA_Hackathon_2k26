@@ -56,10 +56,13 @@ SOURCE_MODULES = {
 NO_TEST_MODULES = ("contract/__init__.py", "__init__.py")
 
 #: §1.3's two structural test modules, which have no source counterpart, plus
-#: the THIRD the join added: `test_integration.py` holds §2's seventeen `T-I-*`
-#: tests, whose slugs name a CROSSING and not a module (`04-Test-Plan.md` §0.1),
-#: so it can no more have a source counterpart than `test_layout.py` can.
-STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py", "test_integration.py")
+#: the THIRD the join added and the FOURTH W-19b added. `test_integration.py`
+#: holds §2's seventeen `T-I-*` tests and `test_system.py` holds §3's `T-S-*`
+#: tests; both sets' slugs name a CROSSING or a whole TIER and not a module
+#: (`04-Test-Plan.md` §0.1), so neither can have a source counterpart any more
+#: than `test_layout.py` can (errata row W-19b-8).
+STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py", "test_integration.py",
+                    "test_system.py")
 
 #: §1.3's exemption list, compared for EQUALITY so neither document can grow
 #: one the other does not: the five artefact test modules, with
@@ -195,10 +198,11 @@ def test_T_U_layout_01_exemptions():
 def test_T_U_layout_01_twenty_five():
     """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
 
-    Nineteen for the source modules that hold logic, `llm.py` included, THREE
+    Nineteen for the source modules that hold logic, `llm.py` included, FOUR
     structural (`test_integration.py` is the join's, holding §2's seventeen
-    `T-I-*` tests), six on the exemption list and one the implementation added
-    (errata row 16). Fixture: none. Tier 0.
+    `T-I-*` tests, and `test_system.py` is W-19b's, holding §3's), six on the
+    exemption list and one the implementation added (errata row 16). Fixture:
+    none. Tier 0.
     """
     present = {path.name for path in TESTS.glob("test_*.py")}
     expected = (set(SOURCE_MODULES.values()) | set(STRUCTURAL_TESTS)
