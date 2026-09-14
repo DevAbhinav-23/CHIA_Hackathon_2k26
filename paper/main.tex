@@ -35,16 +35,22 @@
 
 \begin{abstract}
 CIRCT is an open-source compiler that turns hardware descriptions into Verilog,
-the text chip design tools consume, so a defect inside it can corrupt a design
-unnoticed. Agents that repair CIRCT take their work from its public issue
-tracker, a queue users fill and maintainers,
-whose attention is scarce, must drain. We describe a loop that makes its own supply: an agent
-reads a past bug fix, states the class of mistake it corrected, and writes fresh
-inputs probing for the same mistake elsewhere in the compiler. A fixed harness builds, judges, minimises, deduplicates and repairs, and a gate ending in
-human approval decides what, if anything, is filed. We evaluate the seeded agent
-against a mutation fuzzer at equal, pre-registered budget under identical tools.
-The loop is built and its oracle measured on real CIRCT failures; we release it
-as nodes and tools for the CHIA agent framework.
+so a defect in it can corrupt a chip unnoticed. Agents that repair CIRCT feed on
+its issue tracker, which only scarce maintainer attention drains. We built a
+loop that makes its own supply: an agent reads one of 187 CIRCT fix commits
+mined from 24 months, % 187 fix-shaped commits over 24 months: analysis/pin-window-analysis.md, headline table and lines 112-113
+171 rebuildable from a prebuilt SDK, % 171 of 187 have an exactly matching prebuilt-LLVM SDK: analysis/pin-window-analysis.md line 14
+names the class of mistake it corrected, and writes inputs probing for it
+elsewhere. Fixed tools, not the model, build, judge, minimise, deduplicate and
+repair; a named person approves every filing. CHIA's CIRCT image compiles
+out the compiler's own consistency checks, so nothing can fire; % CHIA's published chia-circt image: 606 of 606 compile commands carry -DNDEBUG, circt-opt has 0 undefined __assert_fail: analysis/measurements/2026-09-13-frd-followups.md lines 469-470, A-10
+restored, they reach 536 of 555 compiler objects % 536 of 555 obj.CIRCT objects reference the assertion handler: analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
+and leave CHIA's test gate at 1,119 passes and 0 failures, identical with them
+off. % 1,119 passed / 0 failed of 1,127 considered, identical in both images: analysis/measurements/2026-09-14-image-build.md 5 run 2 and W-04b 3
+Replaying six real CIRCT failures exposed two defects that would have misrouted
+three of four bugs. % 6 confirmed fixtures of 7 attempts: analysis/measurements/2026-09-14-crash-fixtures.md 1; the two frame defects and "three of the four real bugs are out of scope": same file 3.2 and 3.4
+We release the loop as CHIA nodes and tools; the pre-registered campaign against a
+mutation fuzzer is running, and will report its maintainer-confirmed bug count.
 \end{abstract}
 
 % =====================================================================
