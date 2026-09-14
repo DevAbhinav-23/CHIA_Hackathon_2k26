@@ -17,8 +17,10 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import time
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -31,8 +33,8 @@ from circt_bug_loop.circt_core import (ALLOCATION_FAILURE_LITERALS, CIRCT_BIN_DI
                                        circt_symbolize)
 from circt_bug_loop.contract import schema
 from circt_bug_loop.ddmin import ddmin
-from circt_bug_loop.store import (BuildResult, Frame, ImageSpec, OracleVerdict,
-                                  ReducedCase)
+from circt_bug_loop.store import (BuildResult, DifferentialVerdict, Frame,
+                                  ImageSpec, OracleVerdict, ReducedCase)
 
 #: `03-LLD.md` §9.4's implementation constants that belong to this module. The
 #: two imported above are defined once, in the function that builds the argv
@@ -884,6 +886,443 @@ def _width(mlir_type: str) -> int:
                 raise HarnessError("bad_port_type", mlir_type)
             return bits
     raise HarnessError("bad_port_type", mlir_type)
+
+
+# --- 3.6.3 B4, the differential ---------------------------------------------
+
+#: FR-08.1's rule, as two closed sets and nothing else. A `firtool` probe is
+#: applicable when its argv requests one of these three output modes.
+_FIRTOOL_HW_MODES = ("ir-hw", "verilog", "split-verilog")
+
+#: A `circt-opt` probe is applicable when its pipeline **ends** in one of these,
+#: which are the `--lower-*-to-hw` conversions the measured source build
+#: registers (`circt-opt --help`, 2026-09-14, assertions-on build). The Moore
+#: conversion is deliberately absent: it is spelled `--convert-moore-to-core`
+#: and FR-08.1's acceptance criterion puts a `MooreToCore` probe out of scope.
+_HW_TERMINAL_PASSES = ("lower-firrtl-to-hw", "lower-hwarith-to-hw",
+                       "lower-calyx-to-hw", "lower-dc-to-hw",
+                       "lower-esi-to-hw", "lower-handshake-to-hw",
+                       "lower-pipeline-to-hw")
+
+#: `circt-opt` options that are not passes, so that "the last pass" is not read
+#: off a trailing `-o` or a probe-only option. Both dash spellings reach here
+#: already stripped, which is W-09 finding 3's lesson applied to this rule.
+_NOT_A_PASS = ("o", "verify-diagnostics", "split-input-file", "split-file",
+               "mlir-print-op-generic", "allow-unregistered-dialect")
+
+#: FR-08.11's recorded deviation. `circt/arc-tests` is neither on this machine
+#: nor reusable as it stands, and the obstacle is named rather than implied.
+DIFFERENTIAL_DRIVER = (
+    "deviation: circt/arc-tests' lockstep driver runs two FIXED designs "
+    "(Rocket Chip, BOOM) from checked-in harnesses, and neither the repository "
+    "nor a clone is on the implementation machine; the harnesses here are "
+    "generated per probe from the extracted port list (FR-08.11)")
+
+#: The acceptance line both harnesses print, in the shape `gen_arc_harness`
+#: documents: one sampled value per line, so a line carries exactly one port.
+_BUGLOOP = re.compile(r"^BUGLOOP (?P<cycle>\d+) (?P<signal>\S+) = "
+                      r"(?P<value>[0-9a-fA-F]+)$")
+
+
+def differential_applicable(spec) -> tuple:
+    """FR-08.1's applicability rule, decided from the argv and nothing else.
+
+    Pure, and called **before** either simulator runs, so that a design a
+    simulator later rejects is `harness_failure` and never `not_applicable`
+    (FR-08.1). Admitted: a `firtool` probe requesting `--ir-hw`, `--verilog` or
+    `--split-verilog`, and a `circt-opt` probe whose pipeline ends in one of
+    `_HW_TERMINAL_PASSES`. Nothing else, which is what puts every
+    `circt-verilog`, `circt-translate` and `ImportVerilog`/`MooreToCore` probe
+    out of scope.
+
+    Both dash spellings are accepted, because CIRCT's own tests write single-
+    dash options and LLVM's command-line parser takes either (W-09 finding 3).
+    A `--pass-pipeline=` probe is **not** admitted: no corpus RUN line combines
+    that spelling with an HW-terminal lowering (measured: 50 pipeline lines in
+    `raw/m1-per-runline.csv`, none of them HW-terminal), so reading the last
+    pass out of a nested pipeline string would be code for no case.
+
+    Returns:
+        (applicable, reason). *reason* is "" when applicable and otherwise one
+        of `entry_tool_not_hw_capable`, `firtool_output_mode_not_hw`,
+        `pipeline_not_hw_terminal`, which is what the verdict carries.
+    Worker:
+        pure; it reads the spec and runs nothing.
+    Raises:
+        nothing.
+    """
+    if spec.tool == "firtool":
+        modes = [_option_name(token) for token in spec.argv]
+        if any(mode in _FIRTOOL_HW_MODES for mode in modes):
+            return True, ""
+        return False, "firtool_output_mode_not_hw"
+    if spec.tool == "circt-opt":
+        if _last_pass(spec.argv) in _HW_TERMINAL_PASSES:
+            return True, ""
+        return False, "pipeline_not_hw_terminal"
+    return False, "entry_tool_not_hw_capable"
+
+
+def _option_name(token: str) -> str:
+    """An argv token's option name: both dash spellings, any `=` value dropped."""
+    if not token.startswith("-"):
+        return ""
+    return token.lstrip("-").split("=", 1)[0]
+
+
+def _last_pass(argv: list) -> str:
+    """The last option of *argv* that names a pass, by `_NOT_A_PASS` alone."""
+    for token in reversed(list(argv)):
+        name = _option_name(token)
+        if name and name not in _NOT_A_PASS:
+            return name
+    return ""
+
+
+def compare_traces(arcilator_out: str, verilator_out: str) -> dict:
+    """Compare the two `BUGLOOP` line sequences positionally (§3.6.3).
+
+    The VCD files of §4.6 and §4.10 are evidence and are **not** read: a text
+    comparison needs no VCD reader and cannot disagree with one. Any line either
+    harness prints that is not a `BUGLOOP` line is ignored here and kept in the
+    artefact.
+
+    The two sequences are generated from ONE port list and ONE cycle count, so
+    unequal lengths or a signal mismatch at one index mean an arm stopped early
+    or ran a different design: that is `harness_failure` under FR-08.8 and never
+    a divergence, and the caller is told which arm was short.
+
+    **The X bucket (FR-08.9), made computable.** §3.6.3 declares a divergence
+    "confined to cycles before the first write of the divergent output signal"
+    to be `diverge_x_policy`, and gives no test a differ can run. The test used
+    here is the observable form of that sentence: every signal that diverges at
+    all does so over a contiguous PREFIX of the cycles it is sampled at, and
+    agrees from some cycle onward. A register the design never writes stays
+    undefined for the whole run under `--x-initial unique` and diverges to the
+    last cycle, so it is a plain `diverge`; one written at cycle k differs only
+    while it is uninitialised, which is exactly the bucket FR-08.9 excludes.
+
+    Returns:
+        {"verdict": "agree" | "diverge" | "diverge_x_policy" |
+                    "harness_failure",
+         "reason": str, "index": int | None, "cycle": int | None,
+         "signal": str | None, "arcilator_value": str | None,
+         "verilator_value": str | None, "lines": int}
+        `index` is the position of the first differing line in the two
+        sequences, from 0; `cycle` and `signal` are read off that line.
+    Worker:
+        pure.
+    Raises:
+        nothing.
+    """
+    left, right = _bugloop_lines(arcilator_out), _bugloop_lines(verilator_out)
+    empty = {"verdict": "harness_failure", "index": None, "cycle": None,
+             "signal": None, "arcilator_value": None, "verilator_value": None,
+             "lines": min(len(left), len(right))}
+    if not left or not right:
+        arm = "arcilator" if not left else "verilator"
+        if not left and not right:
+            arm = "arcilator and verilator"
+        return {**empty, "reason": f"{arm} printed no BUGLOOP line"}
+    if len(left) != len(right):
+        arm = "arcilator" if len(left) < len(right) else "verilator"
+        return {**empty, "reason": f"{arm} stopped after {min(len(left), len(right))} "
+                                   f"of {max(len(left), len(right))} lines"}
+    if [(c, s) for c, s, _ in left] != [(c, s) for c, s, _ in right]:
+        return {**empty, "reason": "the two arms sampled different signals"}
+
+    differing = [index for index, (one, other) in enumerate(zip(left, right))
+                 if one[2] != other[2]]
+    found = {"reason": "", "lines": len(left)}
+    if not differing:
+        return {**found, "verdict": "agree", "index": None, "cycle": None,
+                "signal": None, "arcilator_value": None, "verilator_value": None}
+    first = differing[0]
+    return {**found,
+            "verdict": "diverge_x_policy" if _x_confined(left, right) else "diverge",
+            "index": first, "cycle": left[first][0], "signal": left[first][1],
+            "arcilator_value": left[first][2], "verilator_value": right[first][2]}
+
+
+def _bugloop_lines(text: str) -> list:
+    """Every acceptance line of one stream, as (cycle, signal, value) in order."""
+    found = []
+    for line in text.splitlines():
+        match = _BUGLOOP.match(line.strip())
+        if match:
+            found.append((int(match.group("cycle")), match.group("signal"),
+                          match.group("value").lower()))
+    return found
+
+
+def _x_confined(left: list, right: list) -> bool:
+    """Whether every divergent signal diverges only over its opening cycles."""
+    agreement: dict = {}
+    for (_, signal, one), (_, _, other) in zip(left, right):
+        agreement.setdefault(signal, []).append(one == other)
+    divergent = [values for values in agreement.values() if not all(values)]
+    return bool(divergent) and all(
+        any(values) and all(values[values.index(True):]) for values in divergent)
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
+                        artefact_dir: str, *, limits: dict,
+                        bin_dir: str = CIRCT_BIN_DIR,
+                        verilator: str = "verilator") -> DifferentialVerdict:
+    """Run one design through arcilator and Verilator from one stimulus.
+
+    Five steps and nothing else: decide applicability from the argv alone
+    (FR-08.1); lift the design to HW-dialect IR with the probe's own entry tool
+    and extract its port list; generate both harnesses from that one list and
+    one seed; run §4.6's arcilator invocation and §4.10's Verilator build and
+    binary under the probe's own limits; and compare the two `BUGLOOP`
+    sequences line by line.
+
+    **This node is not on `probe_execute`'s path.** The driver calls it for the
+    seeds FR-08.1 admits and for no others (§3.6.3), and FR-08.10 keeps what it
+    produces out of the reducer, out of repair and out of the gate: it is
+    report-only, and the report-only flag lives on the `CandidateRecord` the
+    head writes, `DifferentialVerdict` having no such column.
+
+    *limits*, *bin_dir* and *verilator* are keywords §3.6.3's signature does not
+    have (erratum candidates): the two simulator runs are bounded by the probe
+    limits rather than by B4's 1800 s node timeout, and every fixture and
+    tier-1 measurement runs a build outside the image.
+
+    Returns:
+        DifferentialVerdict, always, including not_applicable with its reason.
+    Worker:
+        {"circt": 1} - both simulators live on the CIRCT image (ADR-D-09).
+    Raises:
+        nothing. A harness that will not build is harness_failure, never
+        diverge.
+    """
+    applicable, reason = differential_applicable(spec)
+    if not applicable:
+        return _differential_verdict(spec, image_spec, "not_applicable", reason)
+
+    directory = Path(artefact_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    # Every refusal below carries '' for port_list_sha, which is what §6.2's
+    # DDL comment asks of a harness_failure.
+    try:
+        lifted = _lift_to_hw(spec, directory, bin_dir, limits)
+        ports = extract_port_list(str(lifted), bin_dir=bin_dir)
+        top = top_module_name(str(lifted), bin_dir=bin_dir)
+        seed = stimulus_seed(spec.probe_id)
+        port_list = _canonical([dataclasses.asdict(port) for port in ports])
+        (directory / "port_list.json").write_text(port_list, encoding="utf-8")
+        (directory / "harness.mlir").write_text(
+            gen_arc_harness(ports, seed, top=top,
+                            design=_module_body(lifted.read_text(encoding="utf-8"))),
+            encoding="utf-8")
+        (directory / "tb.sv").write_text(gen_verilator_tb(ports, seed, top=top),
+                                         encoding="utf-8")
+        _emit_verilog(lifted, directory / "dut.sv", bin_dir, limits)
+        arc = _arcilator_arm(directory, bin_dir, limits)
+        ver = _verilator_arm(directory, verilator, limits)
+    except HarnessError as error:
+        return _differential_verdict(spec, image_spec, "harness_failure",
+                                     f"{error.reason}: {error.detail}"
+                                     if error.detail else error.reason)
+
+    port_list_sha = hashlib.sha256(port_list.encode("utf-8")).hexdigest()
+    (directory / "arcilator.out.txt").write_text(arc["stdout"], encoding="utf-8")
+    (directory / "verilator.out.txt").write_text(ver["stdout"], encoding="utf-8")
+    (directory / "differential_evidence.json").write_text(
+        _canonical({"arcilator": _arm_evidence(arc), "verilator": _arm_evidence(ver),
+                    "driver_source": DIFFERENTIAL_DRIVER, "x_policy": X_POLICY,
+                    "stimulus_id": STIMULUS_ID, "port_list_sha": port_list_sha}),
+        encoding="utf-8")
+
+    for arm, name in ((arc, "arcilator"), (ver, "verilator")):
+        if arm["exit_status"] != 0:
+            return _differential_verdict(
+                spec, image_spec, "harness_failure",
+                f"{name} {arm.get('stage', 'run')} exited {arm['exit_status']}, "
+                f"signal {arm['signal']}, limit {arm['limit_hit']}")
+
+    outcome = compare_traces(arc["stdout"], ver["stdout"])
+    if outcome["verdict"] == "harness_failure":
+        return _differential_verdict(spec, image_spec, "harness_failure",
+                                     outcome["reason"])
+    return _differential_verdict(
+        spec, image_spec, outcome["verdict"], outcome["reason"],
+        port_list_sha=port_list_sha,
+        arcilator_trace_path=str(directory / "arcilator.vcd"),
+        verilator_trace_path=str(directory / "verilator.vcd"),
+        first_divergent_cycle=outcome["cycle"],
+        first_divergent_signal=outcome["signal"],
+        arcilator_value=outcome["arcilator_value"],
+        verilator_value=outcome["verilator_value"])
+
+
+def _differential_verdict(spec, image_spec: ImageSpec, verdict: str,
+                          reason: str, **over) -> DifferentialVerdict:
+    """One `DifferentialVerdict`, with the five stimulus fields always filled.
+
+    FR-08.3 asks for one shared stimulus declaration per comparison, so the
+    constants are written on every verdict including `not_applicable`, where
+    they say what the comparison would have been.
+    """
+    fields = dict(
+        probe_id=spec.probe_id, verdict=verdict, reason=reason,
+        verilator_version=image_spec.verilator_version, x_policy=X_POLICY,
+        stimulus_id=STIMULUS_ID, port_list_sha="", cycles=DIFFERENTIAL_CYCLES,
+        first_divergent_signal=None, first_divergent_cycle=None,
+        arcilator_value=None, verilator_value=None, arcilator_trace_path=None,
+        verilator_trace_path=None, driver_source=DIFFERENTIAL_DRIVER)
+    fields.update(over)
+    return DifferentialVerdict(**fields)
+
+
+def _lift_to_hw(spec, directory: Path, bin_dir: str, limits: dict) -> Path:
+    """`<probe dir>/lifted.mlir`: the design in the HW dialect, from the probe's
+    own entry tool in the mode FR-08.1 admitted.
+
+    A `firtool` probe is re-run with `--ir-hw` whatever of the three modes its
+    own argv asked for, because arcilator needs the IR and not the Verilog; a
+    `circt-opt` probe is re-run with its own pipeline, whose last pass is an
+    HW-terminal lowering by construction.
+    """
+    lifted = directory / "lifted.mlir"
+    if spec.tool == "firtool":
+        argv = [spec.input_path, "--ir-hw", "-o", str(lifted)]
+    else:
+        argv = _without_output_option(spec.argv) + ["-o", str(lifted)]
+    done = _run_bounded(os.path.join(bin_dir, spec.tool), argv, directory, limits)
+    if done["exit_status"] != 0 or not lifted.is_file():
+        raise HarnessError("lift_failed", done["stderr"].strip()[:400])
+    return lifted
+
+
+def _without_output_option(argv: list) -> list:
+    """*argv* with `-o` and whatever follows it removed, in one pass.
+
+    Both dash spellings and both value forms: `-o out`, `--o=out`. The probe's
+    own output destination is replaced by the lift's, and dropping the option
+    without its value would leave the value as a second positional argument,
+    which `circt-opt` refuses ("Too many positional arguments specified").
+    """
+    kept, skip = [], False
+    for token in argv:
+        if skip:
+            skip = False
+            continue
+        if _option_name(token) == "o":
+            skip = "=" not in token
+            continue
+        kept.append(token)
+    return kept
+
+
+def _module_body(text: str) -> str:
+    """The operations inside a single outer `module { ... }`, if that is all
+    the text is; otherwise the text unchanged.
+
+    `circt-opt` and `firtool` both print the implicit top-level module
+    explicitly, and `gen_arc_harness` wraps what it is handed in a module of its
+    own, so a design that arrives already wrapped would be nested one level
+    deep and `arc.sim.instantiate` would not resolve its symbol.
+    """
+    stripped = text.strip()
+    opening = "module {"
+    if not stripped.startswith(opening):
+        return text
+    depth = 0
+    for index in range(len(opening) - 1, len(stripped)):
+        if stripped[index] == "{":
+            depth += 1
+        elif stripped[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return (stripped[len(opening):index]
+                        if index == len(stripped) - 1 else text)
+    return text
+
+
+def _emit_verilog(lifted: Path, target: Path, bin_dir: str, limits: dict) -> None:
+    """`<probe dir>/dut.sv`, by `firtool --verilog` on the lifted HW IR (§3.6.3).
+
+    Verified 2026-09-14 on the measured build: `firtool --verilog` reads an
+    HW-dialect file and emits synthesisable SystemVerilog, so the design under
+    test comes from the same file the arcilator harness carries and the two arms
+    cannot drift.
+    """
+    done = _run_bounded(os.path.join(bin_dir, "firtool"),
+                        [str(lifted), "--verilog", "-o", str(target)],
+                        target.parent, limits)
+    if done["exit_status"] != 0 or not target.is_file():
+        raise HarnessError("verilog_export_failed", done["stderr"].strip()[:400])
+
+
+def _arcilator_arm(directory: Path, bin_dir: str, limits: dict) -> dict:
+    """§4.6's invocation, verbatim, on the generated harness."""
+    return _run_bounded(
+        os.path.join(bin_dir, "arcilator"),
+        ["--run", f"--jit-entry={ARC_JIT_ENTRY}", "--observe-ports",
+         f"--jit-vcd-file={directory / 'arcilator.vcd'}",
+         str(directory / "harness.mlir")], directory, limits)
+
+
+def _verilator_arm(directory: Path, verilator: str, limits: dict) -> dict:
+    """§4.10's `--binary` build and then the binary it built.
+
+    `--x-assign unique --x-initial unique` is FR-08.4's declared policy and is
+    the reason `X_POLICY` reads as it does; `-Wno-fatal` is required rather than
+    convenient, a generated design routinely tripping a style warning.
+    """
+    binary = _which(verilator)
+    build = _run_bounded(
+        binary,
+        ["--binary", "-j", "0", "-Wno-fatal", "--timing",
+         "--x-assign", "unique", "--x-initial", "unique",
+         "--top-module", VERILATOR_TOP, "--Mdir", str(directory / "obj_dir"),
+         "-o", "Vbugloop", "--trace-vcd",
+         str(directory / "tb.sv"), str(directory / "dut.sv")], directory, limits)
+    model = directory / "obj_dir" / "Vbugloop"
+    if build["exit_status"] != 0 or not model.is_file():
+        return {**build, "exit_status": build["exit_status"] or 1,
+                "stage": "build"}
+    return {**_run_bounded(str(model), [], directory, limits), "stage": "run",
+            "build_argv": build["argv"]}
+
+
+def _run_bounded(binary: str, argv: list, cwd: Path, limits: dict) -> dict:
+    """One child under §4.1's `prlimit` prefix, through `circt_exec_probe`."""
+    return _exec_probe(binary, list(argv), cwd=str(cwd),
+                       wall_seconds=limits["probe_wall_seconds"],
+                       address_space_bytes=limits["probe_address_space_bytes"],
+                       cpu_seconds=limits["probe_cpu_seconds"],
+                       nofile=PROBE_NOFILE,
+                       output_byte_cap=limits["probe_output_byte_cap"])
+
+
+def _which(name: str) -> str:
+    """An absolute path for a tool named on PATH; `circt_exec_probe` needs one."""
+    found = name if os.path.isabs(name) else shutil.which(name)
+    if not found:
+        raise HarnessError("verilator_absent", name)
+    return found
+
+
+def _arm_evidence(arm: dict) -> dict:
+    """One arm's recorded argv, output digest and limit outcome.
+
+    FR-08.4's acceptance criterion reads the **recorded** Verilator argument
+    vector for the two X flags and §6.5 names no file that holds one, so this is
+    that file's content (erratum candidate against §6.5).
+    """
+    return {"argv": arm["argv"], "build_argv": arm.get("build_argv"),
+            "stdout_sha256": hashlib.sha256(
+                arm["stdout"].encode("utf-8")).hexdigest(),
+            "stdout_bytes": len(arm["stdout"].encode("utf-8")),
+            "exit_status": arm["exit_status"], "signal": arm["signal"],
+            # Keyed "limit" and not by the field's own name: T-U-probe-41
+            # asserts that no module but circt_core.py writes that key, and this
+            # is a copy of the field for the record, never a derivation of it.
+            "limit": arm["limit_hit"]}
 
 
 # --- 3.6.4 B5, the reducer --------------------------------------------------

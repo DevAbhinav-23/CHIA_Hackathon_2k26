@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -1119,7 +1120,19 @@ def test_u_probe_35_reducer_aborted_routes_to_the_textual_reducer(
     verdict = _oracle(build, probe, circt_roots=HOST_ROOTS,
                       symbolizer=str(SYMBOLIZER))
     assert verdict.fired is True and verdict.oracle_class == "crash"
-    assert verdict.prologue_dropped == 4
+    # The RULE is asserted and not a count: a stack overflow sometimes hits its
+    # guard page inside libc's own realloc, and the leading unresolved libc
+    # frames §3.7.1 strips are then two or three rather than one. Measured over
+    # eight runs of this input on this host: 4, 4, 4, 4, 6, 4, 5, 4. The three
+    # named handler frames are always the first three dropped. (Pre-existing
+    # flake, found by W-09's follow-up and unrelated to its two frame fixes.)
+    assert verdict.prologue_dropped >= 4
+    dropped = verdict.frames[:verdict.prologue_dropped]
+    assert [probe_task._normalise_function(f.function) for f in dropped[:3]] == \
+        ["llvm::sys::PrintStackTrace", "llvm::sys::RunSignalHandlers", "SignalHandler"]
+    assert all(probe_task._normalise_function(f.function) in probe_task._PROLOGUE
+               or (not f.function and probe_task._is_libc(f.module))
+               for f in dropped)
     assert len(verdict.frames) > 100
     assert verdict.frames_with_location > 0
     name, _space, basename = verdict.fingerprint_frame.rpartition(" ")
@@ -1320,3 +1333,328 @@ def test_u_probe_50_both_harnesses_build_and_run_and_agree(tmp_path, sdk_env) ->
 
     assert len(_lines(arc.stdout)) == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2
     assert _lines(arc.stdout) == _lines(run.stdout)
+
+# --- 3.6.3 B4, `oracle_differential` ----------------------------------------
+
+DIFFERENTIAL = FIXTURES / "differential"
+CONTRACT_FIXTURES = Path(schema.__file__).resolve().parent / "fixtures"
+
+#: The applicable `circt-opt` argv for a design that is already HW: the pipeline
+#: is one pass and it ends in the HW dialect, which is FR-08.1's criterion.
+HW_PASS = "--lower-hwarith-to-hw"
+
+
+def _differential_spec(tmp_path: Path, design: str, name: str = "input.mlir"):
+    """A `ProbeSpec` FR-08.1 admits, over a design written beside it."""
+    source = tmp_path / name
+    source.write_text(design)
+    return _spec("circt-opt", [str(source), HW_PASS, "-o", os.devnull], tmp_path,
+                 input_filename=name, input_path=str(source), input_text=design)
+
+
+def _run_differential(spec, tmp_path: Path, directory: str, **over):
+    kwargs = {"limits": LIMITS, "bin_dir": str(BASSERT_G), **over}
+    return call_node(probe_task.oracle_differential, spec,
+                     _build("clean_exit", "clean.txt", tmp_path, signal=None,
+                            exit_status=0),
+                     _image_spec(), directory, **kwargs)
+
+
+@pytest.mark.t0
+def test_u_probe_27_applicability_is_decided_before_either_simulator(tmp_path) -> None:
+    """T-U-probe-27 (FR-08.1): the rule, as a pure function over the argv.
+
+    Pass criterion: `firtool` with `--ir-hw`, `--verilog` or `--split-verilog`
+    and `circt-opt` whose pipeline ends in an HW-terminal lowering are
+    applicable; everything else is refused with a reason. The function runs no
+    process, which is what "decided **before** either simulator runs" means, and
+    it accepts both dash spellings, CIRCT's own tests writing single-dash
+    options (W-09 finding 3).
+    """
+    def _verdict(tool: str, argv: list) -> tuple:
+        return probe_task.differential_applicable(_spec(tool, argv, tmp_path))
+
+    for mode in ("--ir-hw", "--verilog", "--split-verilog", "-ir-hw", "-verilog"):
+        assert _verdict("firtool", ["in.fir", mode]) == (True, ""), mode
+    for mode in ("--parse-only", "--ir-fir", "--ir-sv", "--ir-verilog", "--btor2"):
+        assert _verdict("firtool", ["in.fir", mode]) == \
+            (False, "firtool_output_mode_not_hw"), mode
+    # firtool with no output mode at all emits Verilog by default; FR-08.1 asks
+    # for a REQUESTED mode and this rule is literal about it (erratum candidate).
+    assert _verdict("firtool", ["in.fir"]) == (False, "firtool_output_mode_not_hw")
+
+    for pipeline in probe_task._HW_TERMINAL_PASSES:
+        assert _verdict("circt-opt", ["in.mlir", f"--{pipeline}"]) == (True, ""), pipeline
+        assert _verdict("circt-opt", ["in.mlir", f"-{pipeline}", "-o", "/dev/null"]) \
+            == (True, ""), pipeline
+    # The last pass decides, and a probe-only option or `-o` is not a pass.
+    assert _verdict("circt-opt", ["in.mlir", "--lower-firrtl-to-hw",
+                                  "--verify-diagnostics"]) == (True, "")
+    assert _verdict("circt-opt", ["in.mlir", "--lower-firrtl-to-hw",
+                                  "--export-verilog"]) == \
+        (False, "pipeline_not_hw_terminal")
+    # FR-08.1's own acceptance criterion: MooreToCore and ImportVerilog are out.
+    assert _verdict("circt-opt", ["in.mlir", "--convert-moore-to-core"]) == \
+        (False, "pipeline_not_hw_terminal")
+    assert _verdict("circt-translate", ["in.sv", "--import-verilog"]) == \
+        (False, "entry_tool_not_hw_capable")
+    assert _verdict("circt-verilog", ["in.sv", "--ir-hw"]) == \
+        (False, "entry_tool_not_hw_capable")
+    # A nested `--pass-pipeline=` is refused rather than parsed: no corpus RUN
+    # line combines that spelling with an HW-terminal lowering.
+    assert _verdict("circt-opt", ["in.mlir",
+                                  "--pass-pipeline=builtin.module(lower-firrtl-to-hw)"]) \
+        == (False, "pipeline_not_hw_terminal")
+
+    # The committed contract fixture is a real, and inapplicable, ProbeSpec.
+    committed = schema.from_json(
+        (CONTRACT_FIXTURES / "probe_spec" / "seeded_01.json").read_text(),
+        schema.ProbeSpec)
+    assert probe_task.differential_applicable(committed) == \
+        (False, "pipeline_not_hw_terminal")
+
+
+@pytest.mark.t0
+def test_u_probe_30_the_five_stimulus_keys_and_the_two_ends_of_the_digest(
+        tmp_path) -> None:
+    """T-U-probe-30 (FR-08.1, FR-08.3, FR-08.4, FR-08.11): what every verdict carries.
+
+    Pass criterion: a `not_applicable` verdict still declares the whole shared
+    stimulus, because FR-08.3 asks for one declaration per comparison and a
+    refusal must say what the comparison would have been; `port_list_sha` is the
+    one key of the five the **generator** cannot know, so it is the empty string
+    here and a 64-character digest only once B4 has lowered the design
+    (`T-U-probe-30b`); the X policy is the literal pair §4.10 passes; and
+    `driver_source` is FR-08.11's recorded deviation, naming its obstacle rather
+    than citing the driver.
+
+    No process runs: an inapplicable probe is refused before either simulator.
+    """
+    # §3.2's B4 row: the worker slot and no retry, asserted statically because
+    # calling the wrapper would start a local Ray (`conftest.call_node`).
+    assert probe_task.oracle_differential._chia_options == \
+        {"resources": {"circt": 1}, "max_retries": 0}
+
+    spec = _spec("circt-verilog", ["in.sv", "--ir-hw"], tmp_path)
+    verdict = _run_differential(spec, tmp_path, str(tmp_path / "absent"),
+                                bin_dir=str(tmp_path / "no-such-bin"))
+    assert verdict.verdict == "not_applicable"
+    assert verdict.reason == "entry_tool_not_hw_capable"
+    assert not (tmp_path / "absent").exists(), "a refusal writes nothing"
+
+    assert verdict.stimulus_id == probe_task.STIMULUS_ID == "lfsr32-v1"
+    assert verdict.cycles == probe_task.DIFFERENTIAL_CYCLES == 64
+    assert verdict.x_policy == "x-assign=unique,x-initial=unique"
+    assert verdict.port_list_sha == ""
+    assert verdict.verilator_version == _image_spec().verilator_version
+    assert "circt/arc-tests" in verdict.driver_source
+    assert "deviation" in verdict.driver_source
+    assert verdict.first_divergent_cycle is None
+    assert verdict.first_divergent_signal is None
+
+    # The generator's half of `port_list_sha`'s two-sided life: A3 and A4 run
+    # before any tool does and cannot know the digest, which is why the
+    # committed ProbeSpec fixture carries no `differential` block at all.
+    committed = schema.from_json(
+        (CONTRACT_FIXTURES / "probe_spec" / "seeded_01.json").read_text(),
+        schema.ProbeSpec)
+    assert committed.differential is None and spec.differential is None
+
+
+@pytest.mark.t0
+def test_u_probe_29_the_x_policy_bucket_and_the_plain_divergence() -> None:
+    """T-U-probe-29 (FR-08.9): a divergence confined to the undefined prefix.
+
+    Driven by `differential/x_only/`, two recorded-shape streams whose only
+    divergence is on `o` at the first two sampled cycles, after which both arms
+    agree: a register written at cycle 10 differs only while it is
+    uninitialised, which is FR-08.9's bucket, and `--x-initial unique` is what
+    makes the two arms differ there at all.
+
+    Pass criterion: that pair is `diverge_x_policy`; the same pair with the
+    divergence carried to the last cycle is a plain `diverge`, because a
+    register the design never writes stays undefined for the whole run; and the
+    first divergence is reported by its line index, its cycle and its signal in
+    both cases, the bucket changing the class and not the evidence.
+    """
+    arcilator = (DIFFERENTIAL / "x_only" / "arcilator.out.txt").read_text()
+    verilator = (DIFFERENTIAL / "x_only" / "verilator.out.txt").read_text()
+
+    confined = probe_task.compare_traces(arcilator, verilator)
+    assert confined["verdict"] == "diverge_x_policy"
+    assert confined["index"] == 0 and confined["cycle"] == 8
+    assert confined["signal"] == "o"
+    assert (confined["arcilator_value"], confined["verilator_value"]) == ("00", "5c")
+    assert confined["lines"] == 8
+
+    # The same two streams, with `o` still differing on the last sampled cycle.
+    persistent = probe_task.compare_traces(
+        arcilator, verilator.replace("BUGLOOP 11 o = 7f", "BUGLOOP 11 o = 01"))
+    assert persistent["verdict"] == "diverge"
+    assert persistent["index"] == 0 and persistent["cycle"] == 8
+    assert persistent["signal"] == "o"
+
+    assert probe_task.compare_traces(arcilator, arcilator)["verdict"] == "agree"
+    assert probe_task.compare_traces(arcilator, arcilator)["index"] is None
+
+    # Lines neither harness meant as evidence are ignored, not compared.
+    noisy = "%Warning-WIDTH: tb.sv:3\n" + verilator + "- V e r i l a t i o n\n"
+    assert probe_task.compare_traces(arcilator, noisy) == confined
+
+    # FR-08.8: an arm that printed nothing, stopped early, or sampled other
+    # signals is a harness failure and never a divergence.
+    for other, fragment in ((" ", "printed no BUGLOOP line"),
+                            ("\n".join(verilator.splitlines()[:4]), "stopped after"),
+                            (verilator.replace(" o = ", " q = "),
+                             "sampled different signals")):
+        outcome = probe_task.compare_traces(arcilator, other)
+        assert outcome["verdict"] == "harness_failure", other
+        assert fragment in outcome["reason"]
+        assert outcome["index"] is None
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_28_a_harness_that_will_not_build_is_never_a_divergence(
+        tmp_path, sdk_env) -> None:
+    """T-U-probe-28 (FR-08.8): `harness_failure`, with the failing arm named.
+
+    Two halves, both with a real tool. First, `differential/broken_tb/`: a
+    testbench with one missing semicolon, which the host's Verilator 5.052
+    refuses, exiting non-zero and writing no `obj_dir/Vbugloop`. Second, the
+    whole node driven with a Verilator that cannot build anything: the verdict
+    is `harness_failure` naming the arm and its exit status, it is never
+    `diverge`, and `port_list_sha` is the empty string §6.2's DDL asks for on a
+    harness failure even though the port list was extracted successfully.
+    """
+    _needs_sdk()
+    if not shutil.which("verilator"):
+        pytest.skip("verilator absent")
+    broken = tmp_path / "broken"
+    shutil.copytree(DIFFERENTIAL / "broken_tb", broken)
+    arm = probe_task._verilator_arm(broken, "verilator", LIMITS)
+    assert arm["exit_status"] != 0 and arm["stage"] == "build"
+    assert not (broken / "obj_dir" / "Vbugloop").exists()
+    assert probe_task.compare_traces("", arm["stdout"])["verdict"] == "harness_failure"
+
+    stub = tmp_path / "verilator"
+    stub.write_text("#!/bin/sh\nexit 3\n")
+    stub.chmod(0o755)
+    directory = tmp_path / "probe"
+    verdict = _run_differential(_differential_spec(tmp_path, DUT), tmp_path,
+                                str(directory), verilator=str(stub))
+    assert verdict.verdict == "harness_failure"
+    assert verdict.verdict != "diverge"
+    assert "verilator build exited 3" in verdict.reason
+    assert verdict.port_list_sha == ""
+    assert verdict.first_divergent_cycle is None
+    # The arcilator arm ran and its evidence is kept whatever the other arm did.
+    assert (directory / "harness.mlir").is_file()
+    assert (directory / "arcilator.out.txt").read_text().startswith("BUGLOOP ")
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_30b_the_digest_and_the_recorded_verilator_argv(
+        tmp_path, sdk_env) -> None:
+    """T-U-probe-30b (FR-08.3, FR-08.4, FR-08.11): B4's half of `port_list_sha`.
+
+    Pass criterion: on a real lowering the verdict carries a 64-character hex
+    digest, which is `hashlib.sha256` over the canonical JSON of the `Port` list
+    both harnesses were generated from; the recorded Verilator argument vector
+    carries `--x-initial` and `--x-assign` with the policy's values, which is
+    FR-08.4's acceptance criterion and which §6.5 names no file for; and the
+    digest on disk equals the digest on the verdict, so the harnesses are
+    evidenced as generated from one list rather than compared as two halves.
+    """
+    _needs_sdk()
+    if not shutil.which("verilator"):
+        pytest.skip("verilator absent")
+    directory = tmp_path / "probe"
+    verdict = _run_differential(_differential_spec(tmp_path, DUT), tmp_path,
+                                str(directory))
+    assert verdict.verdict == "agree", verdict.reason
+    assert re.fullmatch(r"[0-9a-f]{64}", verdict.port_list_sha)
+    assert verdict.port_list_sha == hashlib.sha256(
+        (directory / "port_list.json").read_bytes()).hexdigest()
+
+    evidence = json.loads((directory / "differential_evidence.json").read_text())
+    assert evidence["port_list_sha"] == verdict.port_list_sha
+    build_argv = evidence["verilator"]["build_argv"]
+    assert build_argv[build_argv.index("--x-assign") + 1] == "unique"
+    assert build_argv[build_argv.index("--x-initial") + 1] == "unique"
+    assert "--top-module" in build_argv
+    assert build_argv[build_argv.index("--top-module") + 1] == probe_task.VERILATOR_TOP
+    arc_argv = evidence["arcilator"]["argv"]
+    assert f"--jit-entry={probe_task.ARC_JIT_ENTRY}" in arc_argv
+    assert "--observe-ports" in arc_argv
+    # Both streams are persisted and digested; §6.5 names the two .txt files.
+    for arm in ("arcilator", "verilator"):
+        stream = (directory / f"{arm}.out.txt").read_text()
+        assert evidence[arm]["stdout_sha256"] == hashlib.sha256(
+            stream.encode("utf-8")).hexdigest()
+    assert evidence["x_policy"] == probe_task.X_POLICY
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_56_the_node_end_to_end_and_a_constructed_divergent_pair(
+        tmp_path, sdk_env) -> None:
+    """FR-08's feature acceptance, both halves, through `oracle_differential`.
+
+    First half: the clocked accumulator W-08 ran by hand agrees when the node
+    runs it, the two `BUGLOOP` sequences being identical line for line over the
+    56 sampled cycles, and the artefact tree of §6.5 is written.
+
+    Second half: the same design with **one constant changed**, `p`'s driver
+    going from 1 to 0, agrees with itself as well; feeding the first design's
+    arcilator stream against the second design's Verilator stream through the
+    node's own differ reports the FIRST divergence, by line index, cycle and
+    signal, with both hexadecimal values. That is FR-08's "on a deliberately
+    injected difference, the oracle reports `diverge` with the first divergent
+    signal named", built from two real tool outputs rather than from a fixture.
+    """
+    _needs_sdk()
+    if not shutil.which("verilator"):
+        pytest.skip("verilator absent")
+
+    def _probe(design: str, name: str):
+        directory = tmp_path / name
+        verdict = _run_differential(_differential_spec(tmp_path, design, f"{name}.mlir"),
+                                    tmp_path, str(directory))
+        return verdict, directory
+
+    agree, directory = _probe(DUT, "same")
+    assert agree.verdict == "agree", agree.reason
+    assert agree.reason == ""
+    assert agree.first_divergent_cycle is None and agree.first_divergent_signal is None
+    assert agree.arcilator_value is None and agree.verilator_value is None
+    for name in ("lifted.mlir", "harness.mlir", "tb.sv", "dut.sv", "port_list.json",
+                 "arcilator.out.txt", "verilator.out.txt", "arcilator.vcd",
+                 "differential_evidence.json"):
+        assert (directory / name).is_file(), name
+    left = (directory / "arcilator.out.txt").read_text()
+    right = (directory / "verilator.out.txt").read_text()
+    assert left.count("BUGLOOP ") == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2
+    # Identical acceptance lines; the Verilator binary's own simulation report
+    # trails its stream and the differ ignores it, which is why the raw streams
+    # are not equal and the compared sequences are.
+    assert probe_task._bugloop_lines(left) == probe_task._bugloop_lines(right)
+    assert "S i m u l a t i o n   R e p o r t" in right
+
+    # One constant, and nothing else: `p` is driven 0 rather than 1.
+    other = DUT.replace("%c = hw.constant 1 : i1", "%c = hw.constant 0 : i1")
+    assert other != DUT
+    flipped, other_dir = _probe(other, "flipped")
+    assert flipped.verdict == "agree", flipped.reason
+
+    crossed = probe_task.compare_traces(
+        left, (other_dir / "verilator.out.txt").read_text())
+    assert crossed["verdict"] == "diverge"
+    # `p` is sampled second on every cycle and differs from the first sample on,
+    # so the first divergent LINE is index 1, cycle 8.
+    assert crossed["index"] == 1
+    assert crossed["cycle"] == 8
+    assert crossed["signal"] == "p"
+    assert (crossed["arcilator_value"], crossed["verilator_value"]) == ("1", "0")
+    assert crossed["lines"] == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2

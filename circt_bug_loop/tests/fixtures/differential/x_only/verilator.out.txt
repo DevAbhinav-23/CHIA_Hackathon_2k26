@@ -1,0 +1,8 @@
+BUGLOOP 8 o = 5c
+BUGLOOP 8 p = 1
+BUGLOOP 9 o = e3
+BUGLOOP 9 p = 1
+BUGLOOP 10 o = 2a
+BUGLOOP 10 p = 1
+BUGLOOP 11 o = 7f
+BUGLOOP 11 p = 1
