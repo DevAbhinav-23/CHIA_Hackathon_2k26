@@ -62,7 +62,7 @@ _ENTRY_TOOLS = ("circt-opt", "firtool", "circt-verilog", "circt-translate",
 _TOOLS = ("circt-opt", "firtool", "circt-verilog", "circt-translate", "arcilator",
           "circt-reduce", "circt-lec", "circt-bmc", "circt-test", "circt-synth",
           "circt-as", "circt-dis", "circt-lsp-server", "hlstool", "kanagawatool",
-          "esi-tester", "om-linker", "firld", "circt-capi-.*", "handshake-runner",
+          "esi-tester", "om-linker", "firld", r"circt-capi-[\w-]*", "handshake-runner",
           "ibistool", "circt-cocotb-driver.py", "circt-rtl-sim.py")
 _TOOL_RE = re.compile(r"(?<![\w./-])(" + "|".join(_TOOLS) + r")(?![\w-])")
 

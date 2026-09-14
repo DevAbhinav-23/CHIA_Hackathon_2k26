@@ -30,10 +30,24 @@ campaign_spend_cap_usd: 200.0
 # The two prices the ledger turns tokens into money with. The backend reports
 # usage_metadata token counts and no price, so the arithmetic is the ledger's:
 #   cost_usd = tokens_in/1e6 * input_price + tokens_out/1e6 * output_price
-# Introductory Vertex pricing for gemini-3.8-flash through 2026-12-31,
-# AGGREGATOR-SOURCED 2026-09-14 and [UNVERIFIED] against Google's own pricing
-# page, which ADR-D-03 requires to be re-read and these two figures rewritten
-# BEFORE the commit that lands this file. budget.py check 6 requires both.
+# VERIFIED 2026-09-15 on Google's own pricing page,
+# ai.google.dev/gemini-api/docs/pricing: gemini-3.8-flash at USD 0.75 and 3.75
+# per million tokens through 2026-12-31, DOUBLING on 2027-01-01, and THINKING
+# TOKENS ARE BILLED AS OUTPUT. ADR-D-03's superseding section is the record and
+# commit ecf4497 is where it was written down; this header said
+# AGGREGATOR-SOURCED and [UNVERIFIED] until W-20b, so the registration artefact
+# and the ADR disagreed about the provenance of the two numbers the whole money
+# cap is computed from (W8). budget.py check 6 requires both.
+#
+# The output rate is what `llm.turn_usage` prices a turn's thinking tokens at,
+# which is K11's fix: `thoughts_token_count` is a separate scalar from
+# `candidates_token_count` and nothing summed it, so every priced turn and this
+# cap were understated by whatever the model thought.
+#
+# A CAMPAIGN THAT RUNS PAST 2026-12-31 IS BILLED AT DOUBLE THESE RATES and this
+# file may not be edited after its registration commit (FR-14.7), so a run that
+# crosses the year end reports a spend that is half of what was charged. The
+# campaign window ends 2026-09-24 (campaign_end_utc below), so it does not.
 price_usd_per_m_input_tokens: 0.75
 price_usd_per_m_output_tokens: 3.75
 

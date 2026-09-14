@@ -26,6 +26,6 @@
     "tokens_in": 0,
     "tokens_out": 0,
     "turn": "probe_write",
-    "wall_seconds": 8.989099296741188e-05
+    "wall_seconds": 0.00013578901416622102
   }
 }

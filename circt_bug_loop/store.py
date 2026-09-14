@@ -13,6 +13,7 @@ the real statements with no cluster (chia:chia/database/sqlite_node.py:105-143).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -21,6 +22,7 @@ import sys
 import time
 import typing
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -28,6 +30,39 @@ from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract import schema
 from circt_bug_loop.contract.schema import ContractError, CounterBlock
+
+def sha256_file(path: str) -> str:
+    """The SHA-256 of one file's bytes, hex, streamed a megabyte at a time.
+
+    One implementation and not three (N3): `probe_task` hashes the tool binary
+    it is about to run (FR-06.1) and `repair_adapter` hashes `repro.sh` before
+    and after the chain and every tool binary after the restore (FR-12.11), and
+    each had spelled the same seven lines.
+
+    Returns:
+        str, 64 hex characters.
+    Worker:
+        the caller's; it reads one file and runs no process.
+    Raises:
+        OSError when the file cannot be read. A caller for whom an absent file
+        is an ANSWER catches it and says so, which is `probe_task`'s case.
+    """
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def utc_now() -> str:
+    """This moment, as the ISO 8601 string every `*_utc` column carries.
+
+    One implementation and not three (N3): the driver and the approval CLI both
+    stamp rows of this store, and a second spelling is a second answer to "what
+    is the format" waiting to diverge.
+    """
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
 
 #: 03-LLD.md 6.2, the tables, verbatim.
 _DDL_TABLES = """\
@@ -1165,8 +1200,13 @@ def write_artefact(artefact_dir: str, relative_path: str, data,
     root = Path(artefact_dir)
     if not root.is_absolute():
         raise ValueError(f"artefact_dir must be absolute; got {artefact_dir!r}")
-    target = Path(os.path.normpath(str(root / relative_path)))
-    if root not in target.parents:
+    # `realpath` and not `normpath` (N6): `normpath` is textual, so a symlink
+    # ALREADY INSIDE the artefact directory - one a stage or a reducer put
+    # there - is followed on the write and the bytes land wherever it points.
+    # The root is resolved too, so a symlinked artefact root still compares.
+    resolved_root = Path(os.path.realpath(str(root)))
+    target = Path(os.path.realpath(str(root / relative_path)))
+    if resolved_root not in target.parents:
         raise ValueError(f"{relative_path!r} escapes {artefact_dir!r}")
     marker = root / PARTIAL
 

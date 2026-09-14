@@ -52,7 +52,8 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
-                                  Report, validate_candidate, write_artefact)
+                                  Report, utc_now, validate_candidate,
+                                  write_artefact)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -148,7 +149,14 @@ _STAGE_OF = {"generate_seeded": "stage_2", "generate_mutation": "stage_2",
              "probe_execute": "stage_3", "oracle_primary": "stage_4",
              "oracle_differential": "stage_4", "reduce_case": "stage_5",
              "dedup_and_screen": "stage_6", "triage_report": "stage_6",
-             "repair_adapt": "stage_7", "gate_decide": "gate"}
+             "repair_adapt": "stage_7", "gate_decide": "gate",
+             # The gate's own two `{"circt": 1}` nodes (N8). They are dispatched
+             # by `gate_decide`, which holds NO circt resource, so without a row
+             # here their occupancy of a worker was folded into the head node's
+             # wall clock and charged as though the gate had run on the head.
+             # Both are the gate's stage; what changes is that they are
+             # charged, and `gate_decide`'s own entry no longer carries them.
+             "gate_rerun": "gate", "gate_validate": "gate"}
 
 #: Which stage id each of A3's two agent turns occupies, which is
 #: `generate_task._TURN_STAGE` read from the other side: the generator is one
@@ -1870,9 +1878,9 @@ def _row(store: LoopStore, table: str, record=None, **extra) -> dict:
     return row
 
 
-def _utc() -> str:
-    """This moment, as the ISO 8601 string every `_utc` column carries."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+#: Now, UTC, ISO-8601. `store.utc_now` and not a second spelling of it: the
+#: driver and the approval CLI both stamp rows of the same store (N3).
+_utc = utc_now
 
 
 def write_run_rows(store: LoopStore, manifest: RunManifest, *,

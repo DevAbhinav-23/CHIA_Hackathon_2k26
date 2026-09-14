@@ -230,7 +230,11 @@ class ProbeWriteTool(ChiaTool):
         try:
             with open(dest, "w", encoding="utf-8") as handle:
                 handle.write(content)
-        except OSError as error:
+        # ValueError as well as OSError (N3/N5): a filename carrying a NUL
+        # raises `ValueError: embedded null byte` from `open`, not `OSError`,
+        # and it would leave the MCP handler as a traceback rather than as the
+        # error string every other refusal here returns.
+        except (OSError, ValueError) as error:
             return f"Error: {error}"
         return dest
 

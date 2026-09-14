@@ -30,7 +30,7 @@ from typing import Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop import llm, mutators
-from circt_bug_loop.contract.schema import CounterBlock
+from circt_bug_loop.contract.schema import CounterBlock, canonical_json
 
 #: 8.3's prompt, beside this module (1.1). `cfg["mutator_synth"]` overrides it.
 PROMPTS = Path(__file__).resolve().parent / "prompts"
@@ -194,10 +194,9 @@ def parse_mutators(answer: dict) -> tuple:
     return kept, dropped
 
 
-def _canonical(document: dict) -> str:
-    """Canonical JSON by 2.3's rule: sorted keys, two-space indent, one newline."""
-    return json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False,
-                      separators=(",", ": ")) + "\n"
+#: 2.3's canonical JSON, from the module that defines it: a frozen mutator set
+#: is a plain dict and not a contract record, so `to_json` cannot take it (N3).
+_canonical = canonical_json
 
 
 @ChiaFunction(max_retries=0)

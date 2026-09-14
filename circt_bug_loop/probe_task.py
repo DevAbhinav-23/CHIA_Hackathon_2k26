@@ -34,13 +34,18 @@ from circt_bug_loop.circt_core import (ALLOCATION_FAILURE_LITERALS, CIRCT_BIN_DI
 from circt_bug_loop.contract import schema
 from circt_bug_loop.ddmin import ddmin
 from circt_bug_loop.store import (BuildResult, DifferentialVerdict, Frame,
-                                  ImageSpec, OracleVerdict, ReducedCase)
+                                  ImageSpec, OracleVerdict, ReducedCase,
+                                  sha256_file)
 
-#: `03-LLD.md` §9.4's implementation constants that belong to this module. The
+#: `03-LLD.md` §9.4's implementation constant that belongs to this module. The
 #: two imported above are defined once, in the function that builds the argv
 #: they parameterise, and re-exported here because §9.4 names this module.
+#: `PROBE_WALL_MARGIN_SECONDS` was a third and is gone: it was exported in
+#: `__all__` and read by nothing, and a margin nothing applies is a claim about
+#: the apparatus that is not true of it (N2). What bounds a probe is
+#: `budget.yaml`'s `probe_wall_seconds`, enforced by `circt_exec_probe`'s own
+#: wall-clock killer, and the reduction's separate `reduction_wall_seconds`.
 PROBE_NOFILE = 1024
-PROBE_WALL_MARGIN_SECONDS = 60
 
 #: §3.6's three allocation-failure literals, under the name §3.6 gives them.
 #: Their RECOGNITION is `circt_core.allocation_evidence`, which since W-20b
@@ -1895,14 +1900,11 @@ def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
     return text
 
 
-def _canonical(obj) -> str:
-    """`contract.to_json`'s canonical shape, for the lists that are not records.
-
-    `to_json` takes a dataclass; `argv.json` and `frames.json` are a list of
-    strings and a list of dicts, so the same four options are spelled here.
-    """
-    return json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=False,
-                      separators=(",", ": ")) + "\n"
+#: `contract.to_json`'s canonical shape for the values that are not records:
+#: `to_json` takes a dataclass and `argv.json` and `frames.json` are a list of
+#: strings and a list of dicts. ONE implementation, in the module that defines
+#: the shape (N3).
+_canonical = schema.canonical_json
 
 
 def _read(path: str) -> str:
@@ -1932,13 +1934,15 @@ def _first_match(pattern, stderr: str):
 
 
 def _sha256(path: str) -> str:
-    """The SHA-256 of one file, hex, or "" when it is not there (FR-06.1)."""
+    """The SHA-256 of one file, hex, or "" when it is not there (FR-06.1).
+
+    The empty string is a POLICY and not an implementation (N3): a missing tool
+    binary is an answer here - it is what `BinaryMismatch` reports - and the
+    hashing itself is `store.sha256_file`, which every other caller uses and
+    which raises.
+    """
     try:
-        with open(path, "rb") as handle:
-            digest = hashlib.sha256()
-            for block in iter(lambda: handle.read(1 << 20), b""):
-                digest.update(block)
-        return digest.hexdigest()
+        return sha256_file(path)
     except OSError:
         return ""
 
@@ -1948,6 +1952,6 @@ __all__ = ["BinaryMismatch", "probe_execute", "classify_build", "oracle_primary"
            "write_interestingness", "HarnessError", "Port", "extract_port_list",
            "top_module_name", "gen_arc_harness", "gen_verilator_tb",
            "stimulus_seed", "lfsr_value", "PROBE_NOFILE",
-           "PROBE_WALL_MARGIN_SECONDS", "CPU_HARD_MARGIN_SECONDS", "X_POLICY",
+           "CPU_HARD_MARGIN_SECONDS", "X_POLICY",
            "ARC_JIT_ENTRY", "STIMULUS_ID", "RESET_PROTOCOL", "SAMPLE_POINT",
            "DIFFERENTIAL_CYCLES", "PORT_LIST_TIMEOUT_SECONDS"]

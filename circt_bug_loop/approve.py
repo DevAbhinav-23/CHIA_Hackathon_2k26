@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from circt_bug_loop.store import LoopStore
+from circt_bug_loop.store import LoopStore, utc_now
 from circt_bug_loop.triage_task import GOOD_FIRST_ISSUE
 
 #: §9.4, FR-13.17, fixed by ADR-D-02. An FR-11.3-compliant body carries the
@@ -74,9 +74,9 @@ LLVM exceptions, and the confirmation is recorded against this report and never
 defaulted. The patch is on screen above. Confirm? [yes/no] """
 
 
-def _utc() -> str:
-    """Now, UTC, ISO-8601, as every recorded timestamp in this module is."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+#: Now, UTC, ISO-8601. `store.utc_now` and not a second spelling of it: the
+#: driver and the approval CLI both stamp rows of the same store (N3).
+_utc = utc_now
 
 
 def load_budget_caps(path: str) -> dict:

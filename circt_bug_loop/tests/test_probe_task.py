@@ -760,7 +760,9 @@ def test_u_probe_49_the_imports_probe_task_is_allowed(tmp_path) -> None:
 
     Pass criterion: an import walk shows the record names imported from `store`
     and `LoopStore` imported nowhere; the module opens no `sqlite3` connection
-    and names no `loop.db`.
+    and names no `loop.db`. `sha256_file` joined the list at W-20b: it is the
+    one implementation of a content digest three modules had copied (N3), and
+    it touches no database at all, which is what this rule is about.
     """
     tree = ast.parse(Path(probe_task.__file__).read_text())
     from_store = {alias.name for node in ast.walk(tree)
@@ -768,7 +770,8 @@ def test_u_probe_49_the_imports_probe_task_is_allowed(tmp_path) -> None:
                   and node.module.endswith("store")
                   for alias in node.names}
     assert from_store <= {"BuildResult", "OracleVerdict", "Frame",
-                          "DifferentialVerdict", "ReducedCase", "ImageSpec"}
+                          "DifferentialVerdict", "ReducedCase", "ImageSpec",
+                          "sha256_file"}
     assert "LoopStore" not in from_store
     source = Path(probe_task.__file__).read_text()
     assert "sqlite3" not in source and "loop.db" not in source

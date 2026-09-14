@@ -46,7 +46,7 @@ from chia.base.ChiaFunction import ChiaFunction
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.llm import MODEL_BACKEND, require_live_model
 from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
-                                  RepairResult, Report)
+                                  RepairResult, Report, sha256_file)
 
 #: §9.4, FR-12.2. `RunManifest.local_id_range` is exactly this pair. The floor is
 #: four orders of magnitude beyond `llvm/circt`'s own issue numbers, which are
@@ -349,15 +349,6 @@ def stage7_observed(elapsed: float) -> dict:
             "cost_usd": None}
 
 
-def _sha256(path: str) -> str:
-    """SHA-256 of one file, hex, streamed."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for block in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 @ChiaFunction(resources={"repair": 1}, max_retries=0)
 def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCase,
                  verdict: OracleVerdict, manifest: RunManifest, cfg: dict, *,
@@ -446,7 +437,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     # Measured rather than assumed (FR-12.3, W3): the reproduce turn's prompt
     # tells the agent to write <repro_path> itself and the prompt may not be
     # edited, so whether our script survived is reported per attempt.
-    before = _sha256(chain_cfg["repro_path"])
+    before = sha256_file(chain_cfg["repro_path"])
     Path(repro_dir, "repro.sh.sha256.before").write_text(before + "\n", encoding="utf-8")
 
     issue = as_github_issue(report, candidate, local_id,
@@ -458,7 +449,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     try:
         result = run_issue_remote(issue_md, local_id, chain_cfg)
     finally:
-        after = _sha256(chain_cfg["repro_path"]) if os.path.isfile(
+        after = sha256_file(chain_cfg["repro_path"]) if os.path.isfile(
             chain_cfg["repro_path"]) else ""
         Path(repro_dir, "repro.sh.sha256.after").write_text(after + "\n",
                                                             encoding="utf-8")
@@ -490,7 +481,7 @@ def _restore(candidate: CandidateRecord, manifest: RunManifest, chain_cfg: dict,
     after, unreadable = {}, []
     for tool in targets:
         try:
-            after[tool] = _sha256(os.path.join(bin_dir, tool))
+            after[tool] = sha256_file(os.path.join(bin_dir, tool))
         except OSError as error:
             unreadable.append(f"{tool}: {error}")
     expected = {tool: manifest.image_spec["tool_hashes"].get(tool) for tool in targets}

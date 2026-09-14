@@ -8,7 +8,7 @@
   "artefact_root": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts",
   "assertion_baseline_count": 0,
   "backend": "vertex",
-  "budget_file_sha": "8ddfd409624f36e24f0ff6d079313d72627f064d",
+  "budget_file_sha": "f99fa8b8cd1b3e81494f42d7523a9a3117e97158",
   "budget_unit": "wall_clock_seconds",
   "calibration_sample": null,
   "cluster_yaml_sha": "317cafae045b2eca4fe19136f75c3728645744f39e46e282e57d54a4fe3d76f0",
@@ -45,7 +45,7 @@
     "comments_mirrored": false,
     "issue_cap": 600,
     "issues_mirrored": 50,
-    "refreshed_utc": "2026-09-14T09:58:08+00:00",
+    "refreshed_utc": "2026-09-14T10:28:32+00:00",
     "state": "all"
   },
   "lag_commits": 8,

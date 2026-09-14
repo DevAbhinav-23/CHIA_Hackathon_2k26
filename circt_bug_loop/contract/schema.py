@@ -76,15 +76,29 @@ def check_version(instance_version: str) -> None:
             f"with package CONTRACT_VERSION {CONTRACT_VERSION!r}")
 
 
-def to_json(obj: Any) -> str:
-    """Serialise a contract instance to canonical JSON text.
+def canonical_json(document: Any) -> str:
+    """Serialise ANY json-able value in the canonical shape, and nothing else.
 
     Canonical means: keys sorted, two-space indent, no ASCII escaping (so a
     UTF-8 identifier survives as itself), one trailing newline. Two equal
-    objects therefore produce identical bytes.
+    documents therefore produce identical bytes.
+
+    It is here, in the module that DEFINES the shape, because three other
+    modules had spelled the same four options out for the values `to_json`
+    cannot take - `to_json` takes a dataclass, and `argv.json`, `frames.json`
+    and a frozen mutator set are a list and two plain dicts (N3).
     """
-    return json.dumps(dataclasses.asdict(obj), sort_keys=True, indent=2,
-                      ensure_ascii=False, separators=(",", ": ")) + "\n"
+    return json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False,
+                      separators=(",", ": ")) + "\n"
+
+
+def to_json(obj: Any) -> str:
+    """Serialise a contract instance to canonical JSON text.
+
+    Returns:
+        str, `canonical_json` of the instance's fields.
+    """
+    return canonical_json(dataclasses.asdict(obj))
 
 
 def from_json(text: str, cls: type) -> Any:
@@ -653,7 +667,7 @@ def bound_text(text: Optional[str], path: Optional[str], cap: int) -> Optional[s
 
 
 __all__ = [
-    "CONTRACT_VERSION", "ERROR_CODES", "ContractError",
+    "CONTRACT_VERSION", "ERROR_CODES", "ContractError", "canonical_json",
     "Arm", "LedgerArm", "Polarity", "Shape", "BuildStatus", "OracleClass",
     "LimitHit", "Scope", "Mode", "SeedSet", "Deployment", "Unit",
     "SeedRecord", "BudgetFile", "ProbeSpec", "ProbeResult", "FeedbackEntry",
