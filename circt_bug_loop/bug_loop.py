@@ -51,7 +51,8 @@ from circt_bug_loop.contract import schema
 from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBundle,
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
-from circt_bug_loop.store import CandidateRecord, ImageSpec, LoopStore
+from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
+                                  validate_candidate, write_artefact)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -135,9 +136,15 @@ _FIRING_STATUSES = ("assertion", "fatal_error", "crash")
 #: Which stage id each dispatched callable's counters belong to (3.11).
 _STAGE_OF = {"generate_seeded": "stage_2", "generate_mutation": "stage_2",
              "probe_execute": "stage_3", "oracle_primary": "stage_4",
-             "reduce_case": "stage_5", "dedup_and_screen": "stage_6",
-             "triage_report": "stage_6", "repair_adapt": "stage_7",
-             "gate_decide": "gate"}
+             "oracle_differential": "stage_4", "reduce_case": "stage_5",
+             "dedup_and_screen": "stage_6", "triage_report": "stage_6",
+             "repair_adapt": "stage_7", "gate_decide": "gate"}
+
+#: Which stage id each of A3's two agent turns occupies, which is
+#: `generate_task._TURN_STAGE` read from the other side: the generator is one
+#: node and two stages, so its occupancy is charged as two ledger entries and
+#: not as one (3.11, FR-14.8).
+_TURN_OF = {"seed_read": "stage_1", "probe_write": "stage_2"}
 
 
 class PreflightFailed(Exception):
@@ -1275,13 +1282,319 @@ def _snake(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The rows the driver writes (6.2, 6.4)
+# ---------------------------------------------------------------------------
+
+#: Each table's column list, read once per process from the schema `loop.db`
+#: was created with. Repeating §6.2's DDL here as tuples would be a second
+#: spelling of it, and two spellings of one DDL is how a value gets written
+#: into the column beside the one it belongs in.
+_TABLE_COLUMNS: dict = {}
+
+#: What `_row` treats as "the record does not carry this column", so that a
+#: column whose value is legitimately None is still written as NULL.
+_ABSENT = object()
+
+
+def table_columns(store: LoopStore, table: str) -> tuple:
+    """Return *table*'s columns, in the order §6.2's DDL declares them.
+
+    Read through the store's own read path, so the names are the ones the file
+    actually carries; `pragma_table_info` is a table-valued function and the
+    query goes through `LoopStore.query` like every other read, which is what
+    keeps the driver's whole database contact on one path (§6.1).
+
+    Returns:
+        tuple[str], one name per column.
+    Worker:
+        {"num_cpus": 0.1} for the one query, once per table per process.
+    Raises:
+        KeyError when the schema holds no such table, which is a caller defect
+        and never a state of the database.
+    """
+    if table not in _TABLE_COLUMNS:
+        rows = store.query("SELECT name FROM pragma_table_info(?)", (table,))
+        if not rows:
+            raise KeyError(f"loop.db holds no table {table!r}")
+        _TABLE_COLUMNS[table] = tuple(row["name"] for row in rows)
+    return _TABLE_COLUMNS[table]
+
+
+def _cell(value):
+    """One SQLite cell from one Python value: a bool is an INTEGER (§6.2)."""
+    return int(value) if isinstance(value, bool) else value
+
+
+def _json_cell(value) -> str:
+    """A `_json` column's text: JSON with sorted keys, dataclasses expanded.
+
+    `OracleVerdict.frames` is a list of `Frame`s and `frames_json` is one
+    column, so the expansion belongs here rather than at each of the callers
+    that happen to hold a list of records.
+    """
+    if isinstance(value, list):
+        value = [dataclasses.asdict(item) if dataclasses.is_dataclass(item) else item
+                 for item in value]
+    return json.dumps(value, sort_keys=True)
+
+
+def _row(store: LoopStore, table: str, record=None, **extra) -> dict:
+    """Build one row of *table* from *record*, column by declared column.
+
+    Every column takes the field of its own name off the record, a `_json`
+    column taking the field without that suffix; *extra* overrides any column
+    and supplies the ones no record carries, which are the run id on a seed,
+    the timestamps, and the canonical-JSON documents of whole members. A column
+    neither the record nor *extra* carries is left out of the INSERT, so one
+    builder serves a table whose record is partial and the DDL's own defaults
+    and NULLs still apply.
+
+    Returns:
+        dict, column name to value, in the DDL's order.
+    Worker:
+        head; it reads the schema through the store and writes nothing.
+    Raises:
+        KeyError from `table_columns` on a table outside the schema.
+    """
+    row = {}
+    for column in table_columns(store, table):
+        if column in extra:
+            row[column] = _cell(extra[column])
+            continue
+        name = column[:-5] if column.endswith("_json") else column
+        value = (record.get(name, _ABSENT) if isinstance(record, dict)
+                 else getattr(record, name, _ABSENT))
+        if value is _ABSENT:
+            continue
+        row[column] = _json_cell(value) if column.endswith("_json") else _cell(value)
+    return row
+
+
+def _utc() -> str:
+    """This moment, as the ISO 8601 string every `_utc` column carries."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def write_run_rows(store: LoopStore, manifest: RunManifest, *,
+                   image_spec: ImageSpec, mined: Optional[dict] = None,
+                   mirror: Optional[dict] = None) -> None:
+    """Write everything §6.4 puts in the store before the first probe is dispatched.
+
+    In the order the foreign keys fix: the `run` row first, because every other
+    table's `run_manifest_id` references it; then the `image`, because
+    `build_result.image_digest` references its digest; then A1's `seed` rows and
+    its `sdk_map`; then B6a's `issue_mirror_meta`, which is keyed by the run.
+    Each is written once, so a `--resume` run finds its own rows and adds none,
+    and an image built for an earlier run is not inserted twice.
+
+    Returns:
+        None.
+    Worker:
+        {"num_cpus": 0.1} per statement, on the head where loop.db lives.
+    Raises:
+        sqlite3.IntegrityError from any row the schema refuses.
+    """
+    run_id = manifest.run_manifest_id
+    if store.query_one("SELECT 1 FROM run WHERE run_manifest_id = ?",
+                       (run_id,)) is None:
+        store.insert("run", _row(store, "run", manifest,
+                                 manifest_json=schema.to_json(manifest)))
+    if store.query_one("SELECT 1 FROM image WHERE image_digest = ?",
+                       (image_spec.image_digest,)) is None:
+        store.insert("image", _row(store, "image", image_spec, built_utc=_utc()))
+
+    seeds = list((mined or {}).get("seeds") or ())
+    if seeds:
+        exclusions = dict((mined or {}).get("exclusions") or {})
+        # ADR-D-13 branch (b) only: under branch (a) the slang entry points are
+        # built and those seeds run like any other (§5.3).
+        excluded_sv = (set() if image_spec.slang_enabled
+                       else set((mined or {}).get("sv_seeds") or ()))
+        rows = []
+        for seed in seeds:
+            reason = exclusions.get(seed.seed_sha) or (
+                "sv_frontend_unavailable" if seed.seed_sha in excluded_sv else None)
+            rows.append(_row(store, "seed", seed, run_manifest_id=run_id,
+                             record_json=schema.to_json(seed),
+                             exclusion_reason=reason,
+                             eligible_seeded=reason is None,
+                             eligible_mutation=reason is None))
+        store.insert_many("seed", rows)
+    sdk_map = dict((mined or {}).get("sdk_map") or {})
+    if sdk_map:
+        store.insert_many("sdk_map", [
+            {"run_manifest_id": run_id, "sdk_tag": tag,
+             "seed_shas_json": json.dumps(list(shas), sort_keys=True)}
+            for tag, shas in sorted(sdk_map.items())])
+
+    if mirror is not None and store.query_one(
+            "SELECT 1 FROM issue_mirror_meta WHERE run_manifest_id = ?",
+            (run_id,)) is None:
+        store.insert("issue_mirror_meta",
+                     _row(store, "issue_mirror_meta", mirror, run_manifest_id=run_id))
+
+
+def finish_run(store: LoopStore, manifest: RunManifest, ended_utc: str) -> None:
+    """Stamp the run's end on its own row, which is the last write of a campaign."""
+    store.update("run", {"run_manifest_id": manifest.run_manifest_id},
+                 {"ended_utc": ended_utc})
+
+
+def write_probe(store: LoopStore, spec: ProbeSpec, artefact_dir: str) -> None:
+    """Write the `probe` row, before the probe that fills the rest of its tables."""
+    store.insert("probe", _row(store, "probe", spec,
+                               spec_json=schema.to_json(spec),
+                               artefact_dir=artefact_dir))
+
+
+def write_build_result(store: LoopStore, build) -> None:
+    """Write stage 3's `build_result` row, the evidence, as soon as B2 returns."""
+    store.insert("build_result", _row(store, "build_result", build))
+
+
+def write_probe_result(store: LoopStore, result, artefact_dir: str) -> None:
+    """Write the `probe_result` row, once, when the probe has stopped.
+
+    `ProbeResult` is "produced by B2 and completed by the stage the probe
+    stopped at" (§2.4), so the row is written at the end and carries the
+    stopping stage the probe actually reached. It is also the completion record
+    that lets the directory's PARTIAL marker be cleared (§6.5), which is why it
+    is the last row of a probe rather than the first.
+    """
+    store.insert("probe_result", _row(store, "probe_result", result,
+                                      result_json=schema.to_json(result),
+                                      artefact_dir=artefact_dir))
+
+
+def write_oracle_verdict(store: LoopStore, verdict) -> None:
+    """Write stage 4's `oracle_verdict` row, frames and all."""
+    store.insert("oracle_verdict", _row(store, "oracle_verdict", verdict))
+
+
+def write_differential_verdict(store: LoopStore, verdict) -> None:
+    """Write B4's `differential_verdict` row, whatever the verdict is (FR-08.9)."""
+    store.insert("differential_verdict",
+                 _row(store, "differential_verdict", verdict))
+
+
+def write_reduced_case(store: LoopStore, reduced) -> None:
+    """Write stage 5's `reduced_case` row, an unreduced case included (FR-09.12)."""
+    store.insert("reduced_case", _row(store, "reduced_case", reduced))
+
+
+def write_candidate(store: LoopStore, candidate: CandidateRecord) -> None:
+    """Write one `candidate` row the screen never sees: a differential one.
+
+    B6b writes the row of every candidate it screens, in one transaction with
+    its `fingerprint` and its `dedup_verdict` (§6.4 rule 4), and FR-08.10 keeps
+    a `differential` candidate out of that stage entirely, so this is the head's
+    own write and the one place the report-only candidate is persisted (§3.6.3).
+    `validate_candidate` runs first, as it does on B6b's path.
+
+    Returns:
+        None.
+    Worker:
+        {"num_cpus": 0.1}, on the head.
+    Raises:
+        ContractError from `validate_candidate`; sqlite3.IntegrityError on a
+        second candidate for one probe, `probe_id` being UNIQUE.
+    """
+    validate_candidate(candidate)
+    store.insert("candidate", _row(store, "candidate", candidate,
+                                   created_utc=_utc()))
+
+
+def write_report(store: LoopStore, report) -> None:
+    """Write stage 6's `report` row, an unrendered report included (FR-11.8)."""
+    store.insert("report", _row(store, "report", report))
+
+
+def write_repair_dispatch(store: LoopStore, candidate_id: str, local_id: int, *,
+                          repro_dir: str, backend: str) -> None:
+    """FR-12.10: the loop's row and the candidate's local id, before CHIA's.
+
+    §6.4 rule 1 puts this write **before** `run_issue_remote`, and B8 runs on a
+    `repair` worker holding no `loop.db` handle (§3.8), so the head writes the
+    row it can know at dispatch time and `write_repair_result` completes it from
+    what came back. The two statements are one transaction because a local id on
+    a candidate with no repair row, or the reverse, is a state the
+    reconciliation cannot read.
+
+    Returns:
+        None.
+    Worker:
+        {"num_cpus": 0.1}, on the head.
+    Raises:
+        sqlite3.Error from either statement, the batch rolled back.
+    """
+    store.transaction([
+        ("UPDATE candidate SET local_id = ? WHERE candidate_id = ?",
+         (local_id, candidate_id)),
+        ("INSERT INTO repair (candidate_id, local_id, status, lit_unusable, "
+         "lit_failures_json, chia_row_seen, repro_dir, repro_overwritten, "
+         "restore_ok, restore_hashes_match, restore_log, backend, token_capture) "
+         "VALUES (?, ?, 'dispatched', 0, '[]', 0, ?, 0, 0, 0, '', ?, "
+         "'unavailable_remote_dispatch')",
+         (candidate_id, local_id, repro_dir, backend)),
+    ])
+
+
+def write_repair_result(store: LoopStore, result) -> None:
+    """Complete the `repair` row from what B8 returned, leaving `chia_row_seen`.
+
+    An UPDATE and not an INSERT: the row was written before the chain ran
+    (§6.4 rule 1), and `chia_row_seen` is the reconciliation's column and is not
+    this write's to reset.
+    """
+    fields = _row(store, "repair", result)
+    for column in ("candidate_id", "chia_row_seen"):
+        fields.pop(column, None)
+    store.update("repair", {"candidate_id": result.candidate_id}, fields)
+
+
+def write_gate_decision(store: LoopStore, decision) -> None:
+    """§6.4 rule 4's second batch: the decision row and the candidate's bucket.
+
+    One transaction, because a `gate_decision` row whose candidate carries a
+    different bucket is the disagreement the results artefact would then have to
+    resolve. `held_reason` travels with the bucket for the same reason: it is
+    the gate's own answer about a candidate it refused to pass.
+    """
+    from circt_bug_loop.gate import answers
+
+    store.transaction([
+        ("INSERT INTO gate_decision (candidate_id, answers_json, "
+         "stopped_at_question, decision, taxonomy_bucket, decided_utc) "
+         "VALUES (?, ?, ?, ?, ?, ?)",
+         (decision.candidate_id, json.dumps(answers(decision), sort_keys=True),
+          decision.stopped_at_question, decision.decision,
+          decision.taxonomy_bucket, _utc())),
+        ("UPDATE candidate SET taxonomy_bucket = ?, held_reason = ? "
+         "WHERE candidate_id = ?",
+         (decision.taxonomy_bucket, decision.held_reason, decision.candidate_id)),
+    ])
+
+
+def write_feedback(store: LoopStore, bundle: FeedbackBundle, path: str) -> None:
+    """Write the iteration's `feedback` row and A5's bundle beside it (§6.5).
+
+    The bundle is on disk as `feedback.json` in the iteration directory and the
+    row carries the path, which is §6.5's cap rule applied to the one artefact
+    the seeded arm reads back.
+    """
+    write_artefact(str(Path(path).parent), Path(path).name,
+                   schema.to_json(bundle))
+    store.insert("feedback", _row(store, "feedback", bundle, path=path))
+
+
+# ---------------------------------------------------------------------------
 # The stage table, and the run loop
 # ---------------------------------------------------------------------------
 
 
 @dataclasses.dataclass(kw_only=True)
 class Stages:
-    """The nine stage callables `campaign_drive` dispatches, as one record.
+    """The ten stage callables `campaign_drive` dispatches, as one record.
 
     They are a parameter and not an import list so that a test can substitute
     the ones that need a CIRCT binary, a clone or a model, and drive the
@@ -1292,6 +1605,7 @@ class Stages:
     generate_mutation: Any
     probe_execute: Any
     oracle_primary: Any
+    oracle_differential: Any
     reduce_case: Any
     dedup_and_screen: Any
     triage_report: Any
@@ -1304,7 +1618,7 @@ class Stages:
 
 
 def default_stages() -> Stages:
-    """Return the nine real nodes, imported here so a T0 test need not import them.
+    """Return the ten real nodes, imported here so a T0 test need not import them.
 
     Returns:
         Stages, one field per node of 3.2 the driver dispatches.
@@ -1319,6 +1633,7 @@ def default_stages() -> Stages:
                   generate_mutation=generate_task.generate_mutation,
                   probe_execute=probe_task.probe_execute,
                   oracle_primary=probe_task.oracle_primary,
+                  oracle_differential=probe_task.oracle_differential,
                   reduce_case=probe_task.reduce_case,
                   dedup_and_screen=triage_task.dedup_and_screen,
                   triage_report=triage_task.triage_report,
@@ -1390,6 +1705,20 @@ def empty_feedback(manifest: RunManifest, seed: SeedRecord, arm: str,
                           entries=[], abandoned=False)
 
 
+def iteration_dir(manifest: RunManifest, seed_sha: str, iteration: int) -> str:
+    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>`, one seed's one iteration.
+
+    Returns:
+        str, the absolute directory; it is not created here.
+    Worker:
+        pure; no resource, no process, no database handle.
+    Raises:
+        nothing.
+    """
+    return str(Path(manifest.artefact_root) / manifest.run_manifest_id
+               / f"seed_{seed_sha}" / f"iter_{iteration}")
+
+
 def probe_dir(manifest: RunManifest, seed_sha: str, iteration: int,
               probe_id: str) -> str:
     """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>/probe_<id>` for one probe.
@@ -1402,8 +1731,8 @@ def probe_dir(manifest: RunManifest, seed_sha: str, iteration: int,
     Raises:
         nothing.
     """
-    return str(Path(manifest.artefact_root) / manifest.run_manifest_id
-               / f"seed_{seed_sha}" / f"iter_{iteration}" / f"probe_{probe_id}")
+    return str(Path(iteration_dir(manifest, seed_sha, iteration))
+               / f"probe_{probe_id}")
 
 
 def _candidate(spec: ProbeSpec, build, verdict, reduced, manifest: RunManifest,
@@ -1444,6 +1773,44 @@ def _candidate(spec: ProbeSpec, build, verdict, reduced, manifest: RunManifest,
         size_after_ops=reduced.size_after_ops)
 
 
+def _occupancies(stage: str, block: CounterBlock, out) -> list:
+    """The (stage, seconds, usage) occupancies one dispatched call produced.
+
+    One per call, at the node's own stage, except where the return carries a
+    per-turn usage map: A3 is one node running stages 1 and 2 and its two turns
+    are two occupancies, the turn's own wall clock against the turn's stage and
+    the rest of the call against the node's. The seconds of one call's entries
+    therefore always sum to the block's own.
+
+    Returns:
+        list[tuple[str, float, dict]], never empty.
+    Worker:
+        pure; it reads two dicts.
+    Raises:
+        nothing.
+    """
+    logs = out.get("logs") if isinstance(out, dict) else None
+    usage = (logs or {}).get("usage") if isinstance(logs, dict) else None
+    if not isinstance(usage, dict) or not usage:
+        return [(stage, block.seconds, {})]
+    if "tokens_in" in usage:                      # one turn, reported flat (B7)
+        return [(stage, block.seconds, usage)]
+    walls = logs.get("wall_seconds") or {}
+    turns = [(turn, u) for turn, u in sorted(usage.items()) if turn in _TURN_OF]
+    if not turns:
+        return [(stage, block.seconds, {})]
+    charged, spent = [], 0.0
+    for turn, turn_usage in turns:
+        if _TURN_OF[turn] == stage:
+            continue                              # the node's own stage takes the rest
+        seconds = float(walls.get(turn) or 0.0)
+        spent += seconds
+        charged.append((_TURN_OF[turn], seconds, turn_usage or {}))
+    own = next((u for turn, u in turns if _TURN_OF[turn] == stage), {})
+    charged.append((stage, block.seconds - spent, own or {}))
+    return charged
+
+
 class Campaign:
     """One run's state: the manifest, the budget, the stores and the dispatch.
 
@@ -1474,11 +1841,13 @@ class Campaign:
         self.bin_dir = bin_dir
 
     def call(self, name: str, fn: Callable, *args, **kwargs):
-        """Dispatch one stage, fold its counters in, and return its result.
+        """Dispatch one stage, fold its counters in, charge it, and return its result.
 
         A node that returns a mapping carrying `counters` has that block
         recorded; one that does not has a block synthesised from this call's own
-        timing and the synthesis recorded as a violation (3.11).
+        timing and the synthesis recorded as a violation (3.11). Either way the
+        occupancy is charged to the ledger, a stage that failed having occupied
+        the apparatus exactly as one that returned.
 
         Returns:
             whatever the stage returned.
@@ -1489,20 +1858,58 @@ class Campaign:
         """
         started = self.now()
         arm = kwargs.pop("_arm", "shared")
+        key = kwargs.pop("_key", "")
         stage = _STAGE_OF[name]
         try:
             out = self.dispatch.call(fn, *args, **kwargs)
         except Exception:
-            self.counters.record(arm, _counter_block(stage, 1, 0, 1, started),
-                                 synthesised=True)
+            block = _counter_block(stage, 1, 0, 1, started)
+            self.counters.record(arm, block, synthesised=True)
+            self.charge(arm, name, block, None, key)
             raise
         block = out.get("counters") if isinstance(out, dict) else None
         if isinstance(block, CounterBlock):
             self.counters.record(arm, block)
         else:
-            self.counters.record(arm, _counter_block(stage, 1, 1, 0, started),
-                                 synthesised=True)
+            block = _counter_block(stage, 1, 1, 0, started)
+            self.counters.record(arm, block, synthesised=True)
+        self.charge(arm, name, block, out, key)
         return out
+
+    def charge(self, arm: str, name: str, block: CounterBlock, out, key: str) -> None:
+        """Append this call's stage occupancy to the ledger, one entry per stage.
+
+        The occupancy is the block's own seconds and the observation is whatever
+        usage the node reported, which A6b prices (§3.11's "a counter is never a
+        budget": these are different numbers with different owners and both are
+        recorded). A3 is one node and two stages, so a return carrying a
+        per-turn usage map is charged as two entries and `_TURN_OF` says which.
+
+        Returns:
+            None.
+        Worker:
+            {"num_cpus": 0.1} per entry, through `ledger.accrue` on the head.
+        Raises:
+            ContractError or sqlite3.IntegrityError from `accrue`, a repeated
+            entry id being a double charge and not a duplicate (§6.4 rule 3).
+        """
+        run_id = self.manifest.run_manifest_id
+        for stage, seconds, usage in _occupancies(_STAGE_OF[name], block, out):
+            entry = LedgerEntry(
+                entry_id=uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    f"{run_id}/{arm}/stage/{stage}/{name}/{key}").hex,
+                run_manifest_id=run_id, arm=arm, scope="stage", stage=stage,
+                unit="wall_clock_seconds", amount=max(0.0, round(seconds, 6)),
+                metered=bool(self.manifest.stages_metered.get(stage, True)),
+                observed={"cpu_seconds": None,
+                          "tokens_in": usage.get("tokens_in"),
+                          "tokens_out": usage.get("tokens_out"),
+                          "cost_usd": None},
+                timestamp_utc=_utc(), stop_reason=None)
+            self.recorder.record(entry)
+            self.dispatch.call(ledger_module.accrue, entry, self.store.db_path,
+                               self.budget)
 
 
 def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
@@ -1512,6 +1919,11 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     at all: a probe that exits cleanly stops at stage 3, one whose oracle does
     not fire stops at stage 4, and a `differential` candidate never reaches the
     dedup or the gate at all (FR-08.10, FR-13.14).
+
+    Every stage's record lands in its own table as the stage returns it, in
+    §6.4's order, and the probe's own directory carries the PARTIAL marker of
+    §6.5 from before the first stage runs until the `probe_result` row that
+    completes it exists.
 
     Returns:
         {"probe_id", "arm", "seed_sha", "iteration", "stages": list[str],
@@ -1530,7 +1942,31 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
            "probe_result": None, "candidate_id": None}
     artefact_dir = probe_dir(campaign.manifest, spec.seed_sha, spec.iteration,
                              spec.probe_id)
+    write_artefact(artefact_dir, PARTIAL, b"")
+    write_probe(campaign.store, spec, artefact_dir)
+    try:
+        return _drive_probe(campaign, spec, seed, out, artefact_dir)
+    finally:
+        _close_probe(campaign, out, artefact_dir)
 
+
+def _close_probe(campaign: Campaign, out: dict, artefact_dir: str) -> None:
+    """Write the probe's own row and clear its PARTIAL marker (§6.5, FR-17.8).
+
+    A probe whose stage 3 never returned has no `ProbeResult` to write and its
+    marker therefore stays, which is the marker doing its job: the directory
+    holds whatever the dead stage had written and nothing is deleted.
+    """
+    result = out["probe_result"]
+    if result is None:
+        return
+    write_probe_result(campaign.store, result, artefact_dir)
+    write_artefact(artefact_dir, PARTIAL, None, store=campaign.store)
+
+
+def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dict,
+                 artefact_dir: str) -> dict:
+    """`drive_probe`'s body, under the marker its caller wrote (§6.5)."""
     def stop(stage: str, reason: str) -> dict:
         out["stopping_stage"] = stage
         out["stopping_reason"] = reason
@@ -1539,7 +1975,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     try:
         executed = campaign.call("probe_execute", campaign.stages.probe_execute,
                                  spec, campaign.image_spec, campaign.limits,
-                                 artefact_dir, _arm=spec.arm)
+                                 artefact_dir, _arm=spec.arm, _key=spec.probe_id)
     except Exception as error:
         out["stages"].append("stage_3")
         return stop("stage_3", f"stage_3_error:{type(error).__name__}")
@@ -1548,18 +1984,21 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     out["verdicts"]["stage_3"] = build.status
     out["probe_result"] = result
     campaign.recorder.record(result)
+    write_build_result(campaign.store, build)
     if build.status not in _FIRING_STATUSES:
-        return stop("stage_3", result.stopping_reason)
+        return _drive_differential(campaign, spec, build, result, out,
+                                   artefact_dir, stop)
 
     try:
         verdict = campaign.call("oracle_primary", campaign.stages.oracle_primary,
                                 build, campaign.image_spec, artefact_dir,
-                                _arm=spec.arm)["verdict"]
+                                _arm=spec.arm, _key=spec.probe_id)["verdict"]
     except Exception as error:
         out["stages"].append("stage_4")
         return stop("stage_4", f"stage_4_error:{type(error).__name__}")
     out["stages"].append("stage_4")
     out["verdicts"]["stage_4"] = verdict.oracle_class or "not_fired"
+    write_oracle_verdict(campaign.store, verdict)
     if not verdict.fired:
         return stop("stage_4", "oracle_did_not_fire")
     result.oracle_fired = True
@@ -1571,7 +2010,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     try:
         reduced = campaign.call("reduce_case", campaign.stages.reduce_case, spec,
                                 verdict, campaign.limits, artefact_dir,
-                                _arm=spec.arm)["reduced"]
+                                _arm=spec.arm, _key=spec.probe_id)["reduced"]
     except Exception as error:
         out["stages"].append("stage_5")
         return stop("stage_5", f"stage_5_error:{type(error).__name__}")
@@ -1579,6 +2018,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     out["verdicts"]["stage_5"] = reduced.reducer if reduced.reduced else "unreduced"
     result.reduced_path = reduced.path
     result.stopping_stage = "stage_5"
+    write_reduced_case(campaign.store, reduced)
 
     candidate = _candidate(spec, build, verdict, reduced, campaign.manifest,
                            artefact_dir, campaign.budget.fingerprint_top_n)
@@ -1587,7 +2027,8 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
         screen = campaign.call("dedup_and_screen", campaign.stages.dedup_and_screen,
                                candidate, seed, verdict, campaign.clone_path,
                                campaign.store.db_path,
-                               campaign.budget.fingerprint_top_n, _arm=spec.arm)
+                               campaign.budget.fingerprint_top_n, _arm=spec.arm,
+                               _key=spec.probe_id)
     except Exception as error:
         out["stages"].append("stage_6")
         return stop("stage_6", f"stage_6_error:{type(error).__name__}")
@@ -1611,30 +2052,14 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
             verdict, dedup, campaign.manifest,
             generator_cfg(campaign.manifest, campaign.budget,
                           clone_path=campaign.clone_path, iteration=spec.iteration),
-            artefact_dir, _arm=spec.arm)
+            artefact_dir, _arm=spec.arm, _key=spec.probe_id)
     except Exception as error:
         return stop("stage_6", f"stage_6_error:{type(error).__name__}")
     out["verdicts"]["report"] = report.get("failure") or "rendered"
+    write_report(campaign.store, report["report"])
 
-    repair = None
-    if campaign.repair_enabled:
-        try:
-            from circt_bug_loop.repair_adapter import mint_local_id
-
-            repair = campaign.call(
-                "repair_adapt", campaign.stages.repair_adapt, report["report"],
-                candidate, reduced, verdict, campaign.manifest,
-                generator_cfg(campaign.manifest, campaign.budget,
-                              clone_path=campaign.clone_path,
-                              iteration=spec.iteration),
-                local_id=mint_local_id(campaign.store, candidate.candidate_id),
-                input_path=reduced.path or spec.input_path,
-                _arm=spec.arm)["result"]
-            out["verdicts"]["stage_7"] = repair.status
-        except Exception as error:
-            out["verdicts"]["stage_7"] = f"refused:{type(error).__name__}"
-        out["stages"].append("stage_7")
-        result.stopping_stage = "stage_7"
+    repair = _drive_repair(campaign, spec, candidate, reduced, verdict, report, out,
+                           result)
 
     try:
         decision = campaign.call("gate_decide", campaign.stages.gate_decide,
@@ -1643,14 +2068,132 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
                                  limits=campaign.limits,
                                  top_n=campaign.budget.fingerprint_top_n,
                                  bin_dir=campaign.bin_dir,
-                                 _arm=spec.arm)["decision"]
+                                 _arm=spec.arm, _key=spec.probe_id)["decision"]
     except Exception as error:
         out["stages"].append("gate")
         return stop("gate", f"gate_error:{type(error).__name__}")
     out["stages"].append("gate")
     out["verdicts"]["gate"] = decision.decision
     result.stopping_stage = "gate"
+    write_gate_decision(campaign.store, decision)
     return stop("gate", decision.taxonomy_bucket or decision.decision)
+
+
+def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecord,
+                  reduced, verdict, report: dict, out: dict, result):
+    """Stage 7 for one candidate, the loop's own row written before CHIA's.
+
+    FR-12.10 and §6.4 rule 1: the head mints the identifier, writes it onto the
+    candidate and opens the `repair` row, and only then dispatches B8, whose
+    worker holds no `loop.db` handle (§3.8). The row is completed from the
+    `RepairResult` that comes back; an attempt that never came back leaves the
+    row at `dispatched`, which is what the reconciliation then reads.
+
+    Returns:
+        RepairResult, or None when repair is disabled or the attempt refused.
+    Worker:
+        head, dispatching one `{"repair": 1}` node.
+    Raises:
+        nothing; a refusal is `out["verdicts"]["stage_7"]`.
+    """
+    if not campaign.repair_enabled:
+        return None
+    from circt_bug_loop.repair_adapter import mint_local_id
+
+    repair = None
+    try:
+        local_id = mint_local_id(campaign.store, candidate.candidate_id)
+        write_repair_dispatch(
+            campaign.store, candidate.candidate_id, local_id,
+            # §6.5's repair directory and §3.8's own backend, both derived
+            # here because B8 computes them on a worker that cannot write.
+            repro_dir=str(Path(campaign.manifest.artefact_root)
+                          / campaign.manifest.run_manifest_id / "repair"
+                          / str(local_id)),
+            backend=campaign.manifest.model_ids["repair_adapt"].partition(":")[0])
+        repair = campaign.call(
+            "repair_adapt", campaign.stages.repair_adapt, report["report"],
+            candidate, reduced, verdict, campaign.manifest,
+            generator_cfg(campaign.manifest, campaign.budget,
+                          clone_path=campaign.clone_path,
+                          iteration=spec.iteration),
+            local_id=local_id, input_path=reduced.path or spec.input_path,
+            _arm=spec.arm, _key=spec.probe_id)["result"]
+        out["verdicts"]["stage_7"] = repair.status
+        write_repair_result(campaign.store, repair)
+    except Exception as error:
+        out["verdicts"]["stage_7"] = f"refused:{type(error).__name__}"
+    out["stages"].append("stage_7")
+    result.stopping_stage = "stage_7"
+    return repair
+
+
+def _drive_differential(campaign: Campaign, spec: ProbeSpec, build, result,
+                        out: dict, artefact_dir: str, stop) -> dict:
+    """B4, for the probes FR-08.1 admits, and the report-only candidate it can make.
+
+    B4 is not on `probe_execute`'s path and the driver is its only caller
+    (§3.6.3), so this is where the applicability rule is asked. It is asked of
+    the probes whose primary oracle did not fire: a tool that died has no design
+    to simulate, and the crash it died of is stage 4's answer, not stage 4b's.
+    A divergence is report-only (FR-08.10) - no reducer, no dedup, no repair and
+    no gate - so the driver writes the candidate itself, `dedup_and_screen`
+    refusing a `differential` one by design.
+
+    Returns:
+        the probe's `out` dict, stopped where the differential left it.
+    Worker:
+        head, dispatching one `{"circt": 1}` node.
+    Raises:
+        nothing.
+    """
+    from circt_bug_loop.probe_task import differential_applicable
+
+    applicable, _reason = differential_applicable(spec)
+    if not applicable:
+        return stop("stage_3", result.stopping_reason)
+    try:
+        verdict = campaign.call(
+            "oracle_differential", campaign.stages.oracle_differential, spec,
+            build, campaign.image_spec, artefact_dir, limits=campaign.limits,
+            bin_dir=campaign.bin_dir, _arm=spec.arm, _key=spec.probe_id)["verdict"]
+    except Exception as error:
+        out["stages"].append("stage_4")
+        return stop("stage_4", f"stage_4_error:{type(error).__name__}")
+    out["stages"].append("stage_4")
+    out["verdicts"]["differential"] = verdict.verdict
+    write_differential_verdict(campaign.store, verdict)
+    result.stopping_stage = "stage_4"
+    if verdict.verdict not in ("diverge", "diverge_x_policy"):
+        return stop("stage_4", f"differential:{verdict.verdict}")
+
+    candidate = CandidateRecord(
+        candidate_id=f"c-{spec.probe_id}", probe_id=spec.probe_id,
+        run_manifest_id=campaign.manifest.run_manifest_id, arm=spec.arm,
+        run_commit=campaign.manifest.run_commit[0].commit,
+        image_digest=campaign.manifest.image_spec["image_digest"],
+        oracle_class="differential", frame_tuple=[], frames_resolved=0,
+        frames_with_location=0, out_of_scope_root=False,
+        contaminated_symbol=False, contaminated_file=False,
+        contamination_lower_bound="seed_commit" if spec.arm == "seeded"
+                                  else "run_commit",
+        triage_class="untriaged", artefact_dir=artefact_dir)
+    write_candidate(campaign.store, candidate)
+    out["candidate_id"] = candidate.candidate_id
+    try:
+        report = campaign.call(
+            "triage_report", campaign.stages.triage_report, candidate, None, None,
+            None, campaign.manifest,
+            generator_cfg(campaign.manifest, campaign.budget,
+                          clone_path=campaign.clone_path, iteration=spec.iteration),
+            artefact_dir, differential=verdict, _arm=spec.arm, _key=spec.probe_id)
+    except Exception as error:
+        return stop("stage_6", f"stage_6_error:{type(error).__name__}")
+    out["stages"].append("stage_6")
+    out["verdicts"]["report"] = report.get("failure") or "rendered"
+    write_report(campaign.store, report["report"])
+    result.stopping_stage = "stage_6"
+    return stop("stage_6", f"differential:{verdict.verdict}")
 
 
 def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
@@ -1686,7 +2229,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
         try:
             generated = campaign.call(
                 f"generate_{arm}", campaign.stages.generator(arm), seed, bundle,
-                snapshot, cfg, _arm=arm)
+                snapshot, cfg, _arm=arm, _key=f"{seed.seed_sha}:{iteration}")
         except Exception as error:
             out["terminating_condition"] = f"generator_failed:{type(error).__name__}"
             return out
@@ -1707,6 +2250,9 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                                 [s.probe_id for s in specs], snapshot,
                                 len(out["probes"]))
         campaign.recorder.record(bundle)
+        write_feedback(campaign.store, bundle,
+                       str(Path(iteration_dir(campaign.manifest, seed.seed_sha,
+                                              bundle.iteration)) / "feedback.json"))
         if bundle.abandoned:
             out["terminating_condition"] = "abandoned"
             return out
@@ -1790,6 +2336,64 @@ def _arm_stop(campaign: Campaign, arm: str, deadline: float) -> Optional[str]:
     if reason is not None:
         return reason
     return "arm_window" if campaign.now() >= deadline else None
+
+
+def accrue_offline(store: LoopStore, manifest: RunManifest, budget: BudgetFile, *,
+                   dispatch: Dispatch, recorder: Optional[FixtureRecorder] = None,
+                   image_seconds: float = 0.0) -> None:
+    """Charge the run's two `shared` occupancies: B1's build and A7's synthesis.
+
+    Neither belongs to an arm and neither runs inside a window, and one of them
+    does not run inside the campaign at all. The offline mutator synthesis
+    precedes the registration commit (§8.3), so A7 cannot write its own entry -
+    `ledger_entry.run_manifest_id` has a foreign key to `run` and no run existed
+    when it ran - and it records the date in the frozen set instead. FR-05.8's
+    declaration is rendered off this entry's timestamp (§14.4), so the run
+    stamps what the set says, and the amount is zero because the frozen set
+    records the synthesis date and not its duration.
+
+    Returns:
+        None. A run that already carries the two entries adds neither, which is
+        what makes `--resume` re-enter here safely.
+    Worker:
+        {"num_cpus": 0.1} per entry, through `ledger.accrue` on the head.
+    Raises:
+        sqlite3.IntegrityError on a repeated entry id (§6.4 rule 3).
+    """
+    from circt_bug_loop import mutators
+
+    synthesised = (mutators.load_set().get("synthesised_utc")
+                   or manifest.started_utc)
+    for stage, amount, when in (("image", float(image_seconds or 0.0), _utc()),
+                                (results_stage(), 0.0, synthesised)):
+        entry = LedgerEntry(
+            entry_id=uuid.uuid5(uuid.NAMESPACE_URL,
+                                f"{manifest.run_manifest_id}/shared/stage/"
+                                f"{stage}").hex,
+            run_manifest_id=manifest.run_manifest_id, arm="shared", scope="stage",
+            stage=stage, unit="wall_clock_seconds", amount=amount, metered=False,
+            observed={"cpu_seconds": None, "tokens_in": None, "tokens_out": None,
+                      "cost_usd": None},
+            timestamp_utc=when, stop_reason=None)
+        if store.query_one("SELECT 1 FROM ledger_entry WHERE entry_id = ?",
+                           (entry.entry_id,)) is not None:
+            continue
+        if recorder is not None:
+            recorder.record(entry)
+        dispatch.call(ledger_module.accrue, entry, store.db_path, budget)
+
+
+def results_stage() -> str:
+    """The stage name the offline synthesis is charged under (`results.py`'s own).
+
+    One constant, read from the renderer rather than spelled again here: §9
+    names the stage nowhere and `results.SYNTHESIS_STAGE` is what the
+    declaration looks the entry up by, so a second spelling here would be the
+    one way the two could disagree.
+    """
+    from circt_bug_loop.results import SYNTHESIS_STAGE
+
+    return SYNTHESIS_STAGE
 
 
 def _accrue_arm_window(campaign: Campaign, arm: str, seconds: float,
@@ -2087,7 +2691,9 @@ def run_campaign(args, out) -> int:
         cluster=cluster, mutator_set_sha=mutators.set_sha256(),
         run_manifest_id=args.resume or uuid.uuid4().hex, started_utc=started_utc,
         calibration_seeds=[s for s in seeds
-                           if s.seed_sha in (budget.calibration_sample_shas or [])])
+                           if s.seed_sha in (budget.calibration_sample_shas or [])],
+        sv_seeds_excluded=(None if image_spec.slang_enabled
+                           else list(mined["sv_seeds"])))
     run_root = Path(args.artefact_root) / manifest.run_manifest_id
     run_root.mkdir(parents=True, exist_ok=True)
     (run_root / "manifest.json").write_text(schema.to_json(manifest), encoding="utf-8")
@@ -2096,6 +2702,13 @@ def run_campaign(args, out) -> int:
     recorder = FixtureRecorder(args.record_fixtures)
     recorder.record(manifest)
     recorder.record(budget)
+    # 6.4's first four tables, before a stage can reference one of them, and
+    # before --dry-run returns: a dry run's loop.db is what an operator reads to
+    # see what the run would have been taken against.
+    write_run_rows(store, manifest, image_spec=image_spec, mined=mined,
+                   mirror=mirror)
+    accrue_offline(store, manifest, budget, dispatch=dispatch, recorder=recorder,
+                   image_seconds=getattr(built.get("counters"), "seconds", 0.0))
     print(f"manifest {manifest.run_manifest_id} at {run_root}", file=out)
     if args.dry_run:
         print("--dry-run: every pre-flight check ran and nothing was dispatched",
@@ -2116,6 +2729,7 @@ def run_campaign(args, out) -> int:
     arms = None if args.arm == "both" else [args.arm]
     outcome = campaign_drive(campaign, seeds, arms=arms)
     outcome["reconciliation"] = reconcile(store, ISSUES_DB_PATH)
+    finish_run(store, manifest, _utc())
 
     from circt_bug_loop import results as results_module
 

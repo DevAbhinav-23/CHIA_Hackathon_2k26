@@ -25,8 +25,10 @@ import yaml
 from circt_bug_loop import budget as budget_module
 from circt_bug_loop import bug_loop
 from circt_bug_loop.contract import schema
-from circt_bug_loop.store import (BuildResult, DedupVerdict, Fingerprint, Frame,
-                                  ImageSpec, OracleVerdict, ReducedCase)
+from circt_bug_loop.store import (BuildResult, DedupVerdict, DifferentialVerdict,
+                                  Fingerprint, Frame, ImageSpec, OracleVerdict,
+                                  ReducedCase)
+from circt_bug_loop.tests.conftest import call_node
 from circt_bug_loop.tests.test_store import open_store
 
 # `-W error` turns FastMCP's own IncompleteFieldDefinitionWarning into an error
@@ -713,6 +715,14 @@ def test_T_U_driver_18(tmp_path: Path):
 
 # ---------------------------------------------------------------------------
 # The dry-run iteration: one whole seed through every stage, with no Ray
+#
+# The fixtures below are a MINI-CAMPAIGN and not nine stubs. Each fake stage
+# returns the record its real node returns AND writes what its real node
+# writes: the screen writes the candidate row and its two verdict rows through
+# `triage_task._write_rows`, which is B6b's own writer, and stage 3 classifies a
+# recorded tool stderr through the real `classify_build`. That is what makes
+# `T-U-driver-32` a test of the driver's write path rather than of its own
+# fixtures: everything else in `loop.db` afterwards is the driver's.
 # ---------------------------------------------------------------------------
 
 
@@ -750,12 +760,13 @@ def frame(index: int, function: str, file: str) -> Frame:
                  file=file, line=412 + index, in_circt_object=True)
 
 
-def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
-    """Nine stand-in stages: the sequencing is real and the tools are not.
+def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages:
+    """Ten stand-in stages: the sequencing is real and the tools are not.
 
-    Every one returns the record shape its real node returns, so the driver's
-    own handling of each return is what is under test. None of them needs a
-    CIRCT binary, a clone, a container or a model, which is what makes the whole
+    Every one returns the record shape its real node returns and writes what its
+    real node writes, so the driver's own handling of each return, and its own
+    write path around them, is what is under test. None of them needs a CIRCT
+    binary, a clone, a container or a model, which is what makes the whole
     iteration tier 0.
     """
     seen = []
@@ -765,31 +776,62 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
         prefix = "p-0" if remaining.arm == "seeded" else "p-1"
         return {"specs": [probe_spec(f"{prefix}00000000001", remaining.arm),
                           probe_spec(f"{prefix}00000000002", remaining.arm)],
-                "logs": {}, "counters": schema.CounterBlock(
+                "logs": {"usage": {"seed_read": {"tokens_in": 100, "tokens_out": 20},
+                                   "probe_write": {"tokens_in": 200,
+                                                   "tokens_out": 40}},
+                         "wall_seconds": {"seed_read": 0.04, "probe_write": 0.05}},
+                "counters": schema.CounterBlock(
                     stage="stage_2", started=1, completed=1, failed=0, seconds=0.1)}
 
     def execute(spec, image, limits, artefact_dir, **kwargs):
-        status = "assertion" if fires and spec.probe_id.endswith("1") else "clean_exit"
+        # The recorded stderr of a real firing and a real clean exit, classified
+        # by the real `classify_build`: FR-18.11's regeneration re-reads the file
+        # this copies and re-runs that function over it, so a fixture that made
+        # up either would make up the regeneration too.
+        from circt_bug_loop.probe_task import classify_build
+
+        firing = fires and spec.probe_id.endswith("1")
+        capture = FIXTURES / "stderr" / ("assert_glibc.txt" if firing else "clean.txt")
+        stderr = Path(bug_loop.write_artefact(
+            artefact_dir, "stderr.txt", capture.read_bytes()))
+        signal = "SIGABRT" if firing else None
+        status, reason = classify_build(None if firing else 0, signal,
+                                        stderr.read_text(encoding="utf-8"), None)
         build = BuildResult(
             probe_id=spec.probe_id, run_manifest_id=_RUN, run_commit="e" * 40,
-            image_digest="sha256:aa", status=status,
+            image_digest=image.image_digest, status=status,
             binary_path="/workspace/circt/build/bin/circt-opt",
-            binary_sha256="0" * 64, argv=["circt-opt"], exit_status=None,
-            signal="SIGABRT" if status == "assertion" else None, limit_hit=None,
+            binary_sha256="0" * 64, argv=["circt-opt"],
+            exit_status=None if firing else 0,
+            signal=signal, limit_hit=None,
             cpu_seconds=0.1, wall_seconds=0.2, peak_rss_bytes=1024,
             worker_hostname="host", worker_node_id="node", child_pid=1,
-            stdout_path="/dev/null", stderr_path="/dev/null", stdout_bytes=0,
-            stderr_bytes=0, truncated=False)
+            stdout_path="/dev/null", stderr_path=str(stderr), stdout_bytes=0,
+            stderr_bytes=capture.stat().st_size, truncated=False)
         result = schema.ProbeResult(
             probe_id=spec.probe_id, run_manifest_id=_RUN, seed_sha=spec.seed_sha,
             arm=spec.arm, iteration=spec.iteration, build_status=status,
             oracle_fired=False, stopping_stage="stage_3",
-            stopping_reason="assertion fired" if status == "assertion" else "rc 0",
-            artefact_dir=artefact_dir)
+            stopping_reason=reason, artefact_dir=artefact_dir)
         return {"build_result": build, "probe_result": result,
                 "counters": schema.CounterBlock(
                     stage="stage_3", started=1, completed=1, failed=0,
                     seconds=0.1)}
+
+    def differential(spec, build, image, artefact_dir, **kwargs):
+        return {"counters": schema.CounterBlock(
+            stage="stage_4", started=1, completed=1, failed=0, seconds=0.1),
+            "verdict": DifferentialVerdict(
+            probe_id=spec.probe_id, verdict="diverge",
+            reason="the two simulators disagree on one output at cycle 37",
+            verilator_version="5.028",
+            x_policy="x-assign=unique,x-initial=unique", stimulus_id="stim-01",
+            port_list_sha="c" * 64, cycles=128, first_divergent_signal="out_sum",
+            first_divergent_cycle=37, arcilator_value="32'h10",
+            verilator_value="32'h11",
+            arcilator_trace_path=f"{artefact_dir}/arcilator.vcd",
+            verilator_trace_path=f"{artefact_dir}/verilator.vcd",
+            driver_source="circt/arc-tests")}
 
     def oracle(build, image, artefact_dir, **kwargs):
         return {"counters": schema.CounterBlock(
@@ -820,17 +862,26 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
             recheck_matches=True)}
 
     def screen(candidate, seed, verdict, clone_path, db_path, top_n, **kwargs):
-        return {"fingerprint": Fingerprint(
-                    probe_id=candidate.probe_id, basis="assertion",
-                    value="fp-01", fingerprint_stable=None,
-                    frame_tuple=list(candidate.frame_tuple),
-                    structural_hash="sh-01"),
-                "dedup": DedupVerdict(
-                    probe_id=candidate.probe_id, verdict="new",
-                    evidence=dict.fromkeys(
-                        ("matched_key", "matched_token", "issue_number",
-                         "issue_url", "issue_state", "issue_labels",
-                         "duplicate_of_candidate_id", "fixing_commit"))),
+        # B6b's own three rows, through B6b's own writer: §6.4 rule 4 makes them
+        # one transaction and the driver must not write them a second time.
+        from circt_bug_loop.store import LoopStore
+        from circt_bug_loop.triage_task import _screened, _write_rows
+
+        fingerprint = Fingerprint(
+            probe_id=candidate.probe_id, basis="assertion",
+            value=f"fp-{candidate.arm}", fingerprint_stable=None,
+            frame_tuple=list(candidate.frame_tuple), structural_hash="s" * 64)
+        dedup = DedupVerdict(
+            probe_id=candidate.probe_id, verdict="new",
+            evidence=dict.fromkeys(
+                ("matched_key", "matched_token", "issue_number", "issue_url",
+                 "issue_state", "issue_labels", "duplicate_of_candidate_id",
+                 "fixing_commit")))
+        _write_rows(LoopStore(db_path),
+                    _screened(candidate, fingerprint, dedup, False, False,
+                              "seed_commit"),
+                    fingerprint, dedup)
+        return {"fingerprint": fingerprint, "dedup": dedup,
                 "contaminated_symbol": False, "contaminated_file": False,
                 "contamination_lower_bound": "seed_commit", "fixing_commits": [],
                 "counters": schema.CounterBlock(
@@ -839,13 +890,44 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
 
     def report(candidate, reduced, verdict, dedup, manifest_, cfg, artefact_dir,
                **kwargs):
-        return {"report": object(), "logs": {}, "failure": None,
+        from circt_bug_loop.store import Report
+
+        rendered = Report(
+            candidate_id=candidate.candidate_id, path=f"{artefact_dir}/report.md",
+            template=("differential" if candidate.oracle_class == "differential"
+                      else "primary"),
+            title=f"circt-opt: {candidate.oracle_class} on a reduced input",
+            classification="bug",
+            classification_reason="An oracle fired on a reduced input.",
+            rendered_sha256="d" * 64,
+            assisted_by="circt_bug_loop:vertex:gemini-3.8-flash",
+            fields_present=["repro_command"])
+        return {"report": rendered, "logs": {"usage": {"tokens_in": 30,
+                                                       "tokens_out": 9}},
+                "failure": None,
                 "counters": schema.CounterBlock(
                     stage="stage_6", started=1, completed=1, failed=0,
                     seconds=0.1)}
 
-    def repair(*args, **kwargs):
-        raise RuntimeError("repair is disabled in the dry-run iteration")
+    def repair(report_, candidate, reduced, verdict, manifest_, cfg, *,
+               local_id, input_path, **kwargs):
+        from circt_bug_loop.store import RepairResult
+
+        if not repairs:
+            raise RuntimeError("repair is disabled in this dry-run iteration")
+        return {"counters": schema.CounterBlock(
+            stage="stage_7", started=1, completed=1, failed=0, seconds=0.1),
+            "result": RepairResult(
+            candidate_id=candidate.candidate_id, local_id=local_id,
+            status="fixed", failing_phase=None, reproduced=True, build_ok=True,
+            fixed=True, lit_ok=True, lit_unusable=False, lit_passed=1119,
+            lit_failed=0, lit_failures=[], diff_path=f"{input_path}.diff",
+            diff_added=3, diff_removed=1, chia_artifact_dir=None,
+            repro_dir=f"{manifest_.artefact_root}/{manifest_.run_manifest_id}"
+                      f"/repair/{local_id}",
+            repro_overwritten=True, restore_ok=True, restore_hashes_match=True,
+            restore_log="reset, rebuilt and re-hashed", backend="vertex",
+            token_capture="unavailable_remote_dispatch")}
 
     def gate(candidate, reduced, dedup, repair_result, manifest_, db_path,
              *, limits, top_n, bin_dir):
@@ -865,8 +947,64 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
 
     return bug_loop.Stages(
         generate_seeded=generate, generate_mutation=generate, probe_execute=execute,
-        oracle_primary=oracle, reduce_case=reduce, dedup_and_screen=screen,
-        triage_report=report, repair_adapt=repair, gate_decide=gate)
+        oracle_primary=oracle, oracle_differential=differential,
+        reduce_case=reduce, dedup_and_screen=screen, triage_report=report,
+        repair_adapt=repair, gate_decide=gate)
+
+
+def seed_record(seed_sha: str = "a" * 40) -> schema.SeedRecord:
+    """One mined seed, as A1 returns it, for a campaign of one seed per arm."""
+    return schema.SeedRecord(
+        seed_sha=seed_sha, parent_sha="b" * 40, subject="fix a crash",
+        committed_date_utc="2026-01-01T00:00:00+00:00", source_paths=["lib/A.cpp"],
+        test_paths=["test/a.mlir"], llvm_pin="1" * 40, sdk_tag="firtool-1.159.0",
+        sdk_exact=True, bumps_away=None, entry_tool="circt-opt",
+        dialect_bucket="HW", dialect_bucket_unmerged="HW", run_lines=["RUN: x"],
+        argv_template=[["a"]], polarity=["expect_zero"], shape=["plain"],
+        diff="", test_files={"test/a.mlir": ""}, corpus_head_sha="d" * 40)
+
+
+def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
+                  **overrides) -> dict:
+    """Drive one whole campaign into a throwaway `loop.db`, with no Ray.
+
+    The store is the DRIVER's: `write_run_rows` writes the four tables §6.4 puts
+    down before the first probe and `campaign_drive` writes the rest as the
+    stages return them. Nothing here inserts a row of its own.
+
+    Returns:
+        {"store", "manifest", "outcome", "counters", "seed", "labelled_pairs"}.
+    """
+    loop = open_store(tmp_path)
+    built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
+    spec = image_spec("ok")
+    seed = seed_record()
+    bug_loop.write_run_rows(
+        loop, built, image_spec=spec,
+        mined={"seeds": [seed], "sdk_map": {seed.sdk_tag: [seed.seed_sha]},
+               "exclusions": {}, "sv_seeds": []},
+        mirror=dict(_MIRROR))
+    budget = budget_file(per_seed_iteration_cap=1, arm_window_seconds=600.0,
+                         **overrides.pop("budget", {}))
+    bug_loop.accrue_offline(loop, built, budget,
+                            dispatch=bug_loop.Dispatch(remote=False),
+                            image_seconds=3600.0)
+    counters = bug_loop.CounterLog(_RUN, str(tmp_path / "results"))
+    campaign = bug_loop.Campaign(
+        manifest=built, budget=budget, store=loop,
+        stages=overrides.pop("stages", None) or fake_stages(),
+        dispatch=bug_loop.Dispatch(remote=False), counters=counters,
+        recorder=bug_loop.FixtureRecorder(str(tmp_path / "rec")),
+        clone_path=str(tmp_path), image_spec=spec, repair_enabled=repair_enabled,
+        **overrides)
+    outcome = bug_loop.campaign_drive(campaign, [seed])
+    bug_loop.finish_run(loop, built, "2026-09-19T09:00:00+00:00")
+    return {"store": loop, "manifest": built, "outcome": outcome, "seed": seed,
+            "counters": counters,
+            # FR-10.2's labelled set is a human judgement over this campaign's
+            # own candidates: the two primary ones are different bugs.
+            "labelled_pairs": [{"label": "distinct", "a": "c-p-000000000001",
+                                "b": "c-p-100000000001"}]}
 
 
 def test_T_U_driver_30(tmp_path: Path, capsys):
@@ -878,33 +1016,8 @@ def test_T_U_driver_30(tmp_path: Path, capsys):
     `CounterBlock`; and the arm's one `arm_window` ledger entry is written with
     its stop reason. Fixture: a throwaway `loop.db`. Tier 0.
     """
-    loop = open_store(tmp_path)
-    built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
-    loop.insert("run", {
-        "run_manifest_id": _RUN, "mode": built.mode, "seed_set": built.seed_set,
-        "manifest_json": schema.to_json(built),
-        "budget_file_sha": built.budget_file_sha,
-        "cluster_yaml_sha": built.cluster_yaml_sha,
-        "artefact_root": built.artefact_root, "started_utc": built.started_utc,
-        "ended_utc": None})
-    budget = budget_file(per_seed_iteration_cap=1, arm_window_seconds=600.0)
-    counters = bug_loop.CounterLog(_RUN, str(tmp_path / "results"))
-    campaign = bug_loop.Campaign(
-        manifest=built, budget=budget, store=loop, stages=fake_stages(),
-        dispatch=bug_loop.Dispatch(remote=False), counters=counters,
-        recorder=bug_loop.FixtureRecorder(str(tmp_path / "rec")),
-        clone_path=str(tmp_path), image_spec=image_spec("ok"), repair_enabled=False)
-
-    seed = schema.SeedRecord(
-        seed_sha="a" * 40, parent_sha="b" * 40, subject="fix a crash",
-        committed_date_utc="2026-01-01T00:00:00+00:00", source_paths=["lib/A.cpp"],
-        test_paths=["test/a.mlir"], llvm_pin="1" * 40, sdk_tag="firtool-1.159.0",
-        sdk_exact=True, bumps_away=None, entry_tool="circt-opt",
-        dialect_bucket="HW", dialect_bucket_unmerged="HW", run_lines=["RUN: x"],
-        argv_template=[["a"]], polarity=["expect_zero"], shape=["plain"],
-        diff="", test_files={"test/a.mlir": ""}, corpus_head_sha="d" * 40)
-
-    outcome = bug_loop.campaign_drive(campaign, [seed])
+    run = mini_campaign(tmp_path)
+    loop, outcome, counters = run["store"], run["outcome"], run["counters"]
 
     # Both arms ran, in budget.yaml's order, one after the other.
     assert list(outcome["arms"]) == ["seeded", "mutation"]
@@ -912,18 +1025,21 @@ def test_T_U_driver_30(tmp_path: Path, capsys):
     assert all(a["stop_reason"] == "seed_set_exhausted"
                for a in outcome["arms"].values())
 
-    # One seed record per arm; two probes each; the firing one reached the gate.
+    # One seed record per arm; two probes each; the firing one reached the gate
+    # and the clean one went on to the differential, its argv being HW-terminal.
     assert len(outcome["seeds"]) == 2
     seeded = outcome["seeds"][0]
     assert seeded["arm"] == "seeded" and seeded["iterations"] == 1
-    assert [p["stopping_stage"] for p in seeded["probes"]] == ["gate", "stage_3"]
+    assert [p["stopping_stage"] for p in seeded["probes"]] == ["gate", "stage_6"]
     fired, clean = seeded["probes"]
     assert fired["stages"] == ["stage_3", "stage_4", "stage_5", "stage_6", "gate"]
     assert fired["verdicts"] == {"stage_3": "assertion", "stage_4": "assertion",
                                  "stage_5": "circt-reduce", "stage_6": "new",
                                  "report": "rendered", "gate": "report"}
     assert fired["candidate_id"] == "c-p-000000000001"
-    assert clean["stages"] == ["stage_3"] and clean["verdicts"]["stage_3"] == "clean_exit"
+    assert clean["stages"] == ["stage_3", "stage_4", "stage_6"]
+    assert clean["verdicts"]["stage_3"] == "clean_exit"
+    assert clean["verdicts"]["differential"] == "diverge"
 
     # FR-17.4: every stage contributed a block, and counters.json is on disk.
     stages = {key.split("/", 1)[1] for key in counters.totals}
@@ -965,3 +1081,209 @@ def test_T_U_driver_31(tmp_path: Path):
     outcome = bug_loop.campaign_drive(campaign, [], arms=["seeded"])
     assert outcome["arms"]["seeded"]["stop_reason"] == "arm_window"
     assert outcome["arms"]["seeded"]["seeds"] == 0
+
+
+# ---------------------------------------------------------------------------
+# T-U-driver-32 to -34: the write path of 6.4
+# ---------------------------------------------------------------------------
+
+
+def test_T_U_driver_32(tmp_path: Path):
+    """T-U-driver-32 (FR-17.2, FR-17.6, FR-18.1): the driver's own store renders.
+
+    The store this reads is the one `T-U-driver-30` drove and nothing else: no
+    row of it was written by a test helper. `render_results` refuses an artefact
+    that is missing any element `03-LLD.md` §14.4 makes mandatory, so a single
+    table the driver forgot to write is a refusal here, which is what makes this
+    the end-to-end check on §6.4's write path rather than fourteen assertions
+    about tables. Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    from circt_bug_loop.results import render_results
+
+    run = mini_campaign(tmp_path)
+    rendered = call_node(render_results, run["store"], run["manifest"],
+                         labelled_pairs=run["labelled_pairs"])["rendered"]
+    assert "REFUSED" not in rendered
+    assert rendered.endswith("\n") and not rendered.endswith("\n\n")
+    # The four elements a store with no filings still has to carry.
+    for element in ("Distinct confirmed bugs per arm", "Both arm windows",
+                    "Divergences observed",
+                    "regenerated from its recorded artefacts"):
+        assert element in rendered
+    # FR-18.11: nothing is MARKED. The recorded stderr reclassifies to the row
+    # the driver wrote and the gate's answers decide to the decision it wrote.
+    assert "**MARKED**" not in rendered
+
+
+def test_T_U_driver_33(tmp_path: Path):
+    """T-U-driver-33 (FR-17.2, FR-17.8, FR-12.10): every table of §6.4, in its order.
+
+    One row per probe in `probe`, `build_result` and `probe_result`; one
+    `oracle_verdict` per firing and one `differential_verdict` per admitted
+    clean exit; the candidate rows B6b wrote and the differential ones the head
+    wrote; a `report` and a `gate_decision` where the probe reached them; the
+    per-stage ledger occupancy of every dispatched stage; and no PARTIAL marker
+    left behind, every probe directory having its completion row.
+    Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    run = mini_campaign(tmp_path)
+    loop = run["store"]
+
+    def count(table: str) -> int:
+        return loop.query_one(f"SELECT COUNT(*) AS n FROM {table}")["n"]
+
+    assert count("run") == 1 and count("image") == 1
+    assert count("seed") == 1 and count("sdk_map") == 1
+    assert count("issue_mirror_meta") == 1
+    assert count("probe") == count("build_result") == count("probe_result") == 4
+    assert count("oracle_verdict") == 2 and count("differential_verdict") == 2
+    assert count("reduced_case") == 2
+    assert count("candidate") == 4 and count("fingerprint") == 2
+    assert count("dedup_verdict") == 2 and count("report") == 4
+    assert count("gate_decision") == 2 and count("feedback") == 2
+    assert count("repair") == 0 and count("filing") == 0
+
+    # FR-17.6: every row traces to this run, and the run row carries its end.
+    assert loop.query_one("SELECT ended_utc FROM run")["ended_utc"] is not None
+    for table in ("probe", "probe_result", "candidate", "seed", "sdk_map",
+                  "ledger_entry", "issue_mirror_meta"):
+        assert loop.query_one(
+            f"SELECT COUNT(*) AS n FROM {table} "
+            "WHERE run_manifest_id <> ?", (_RUN,))["n"] == 0
+
+    # The differential candidates are report-only: FR-08.10 keeps them out of
+    # the reducer, the dedup and the gate, and their report is the other
+    # template.
+    differential = loop.query(
+        "SELECT c.candidate_id, r.template FROM candidate c "
+        "JOIN report r USING (candidate_id) WHERE c.oracle_class = 'differential'")
+    assert len(differential) == 2
+    assert {row["template"] for row in differential} == {"differential"}
+    assert loop.query_one(
+        "SELECT COUNT(*) AS n FROM gate_decision g JOIN candidate c "
+        "USING (candidate_id) WHERE c.oracle_class = 'differential'")["n"] == 0
+
+    # §6.4 rule 4: the gate's decision and the candidate's bucket agree, having
+    # been written in one transaction.
+    for row in loop.query("SELECT g.taxonomy_bucket AS gated, c.taxonomy_bucket "
+                          "AS carried FROM gate_decision g "
+                          "JOIN candidate c USING (candidate_id)"):
+        assert row["gated"] == row["carried"] == "new_bug"
+
+    # FR-17.8: the marker is gone from every probe directory that completed, and
+    # 3.11's stage occupancy is one ledger entry per dispatched stage per probe.
+    for row in loop.query("SELECT artefact_dir FROM probe_result"):
+        assert Path(row["artefact_dir"]).is_dir()
+        assert not (Path(row["artefact_dir"]) / "PARTIAL").exists()
+    stage_3 = loop.query("SELECT arm, amount FROM ledger_entry "
+                         "WHERE scope = 'stage' AND stage = 'stage_3'")
+    assert len(stage_3) == 4 and {row["arm"] for row in stage_3} == {"seeded",
+                                                                     "mutation"}
+    # A3 is one node and two stages, so its turns are charged apart, and the
+    # offline synthesis carries the date FR-05.8's declaration reads.
+    assert loop.query_one("SELECT COUNT(*) AS n FROM ledger_entry "
+                          "WHERE scope = 'stage' AND stage = 'stage_1'")["n"] == 2
+    assert loop.query_one("SELECT stage FROM ledger_entry WHERE arm = 'shared' "
+                          "AND stage = 'synthesis'")["stage"] == "synthesis"
+
+
+def test_T_U_driver_34(tmp_path: Path, monkeypatch):
+    """T-U-driver-34 (FR-17.3, §6.1): under Ray every write goes through the node.
+
+    `LoopStore` dispatches its members as Ray tasks when a session is running
+    and opens one direct connection when it is not (§6.1), and the driver takes
+    whichever it is given: every other test here takes the direct path, and this
+    one takes the SQLiteNode path against a stub, as `T-U-store-02` does. The
+    stub runs the same statements against the same file, so what is asserted is
+    that the driver reached the database through the node and nowhere else.
+    Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    import sys
+    import types
+
+    from circt_bug_loop import store as store_module
+
+    seen = []
+
+    class _Member:
+        def __init__(self, name, run):
+            self.name, self.run = name, run
+
+        def chia_remote(self, *args):
+            seen.append(self.name)
+            return self.run(*args)
+
+    class _SQLiteNode:
+        """Every statement, recorded and then run against the same file."""
+
+        def __init__(self, db_path, **kwargs):
+            self.db_path = db_path
+            self.init_schema = _Member(
+                "init_schema", lambda script: _script(db_path, script))
+            for member, local in store_module._LOCAL_MEMBERS.items():
+                setattr(self, member,
+                        _Member(member, lambda *a, _l=local: _l(db_path, *a)))
+
+    def _script(db_path, script):
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.executescript(script)
+        finally:
+            conn.close()
+
+    monkeypatch.setitem(sys.modules, "chia.database.sqlite_node",
+                        types.SimpleNamespace(SQLiteNode=_SQLiteNode))
+    monkeypatch.setitem(sys.modules, "chia.base.ChiaFunction",
+                        types.SimpleNamespace(get=lambda value: value))
+    monkeypatch.setattr(store_module, "_ray_initialised", lambda: True)
+    # The column cache is per process and the schema is fixed, so a later store
+    # reuses an earlier one's read; emptied here, the pragma read takes the same
+    # path as the writes and is asserted with them.
+    monkeypatch.setattr(bug_loop, "_TABLE_COLUMNS", {})
+
+    loop = store_module.LoopStore(str(tmp_path / "loop.db"))
+    assert loop.node is not None
+    built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
+    seed = seed_record()
+    bug_loop.write_run_rows(loop, built, image_spec=image_spec("ok"),
+                            mined={"seeds": [seed], "sdk_map": {}, "exclusions": {},
+                                   "sv_seeds": []},
+                            mirror=dict(_MIRROR))
+    bug_loop.write_probe(loop, probe_spec("p-000000000001"),
+                         str(tmp_path / "probe"))
+    assert {"init_schema", "execute", "executemany", "query", "query_one"} <= set(seen)
+    assert loop.query_one("SELECT COUNT(*) AS n FROM probe")["n"] == 1
+
+
+def test_T_U_driver_35(tmp_path: Path):
+    """T-U-driver-35 (FR-12.10, §6.4 rule 1): the loop's repair row before CHIA's.
+
+    The head mints the identifier, stamps it on the candidate and opens the
+    `repair` row at `dispatched` BEFORE B8 runs, and completes that same row
+    from the `RepairResult`; `chia_row_seen` stays 0 until the reconciliation
+    sets it, which is what `T-U-driver-18` then reads.
+    Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    run = mini_campaign(tmp_path, repair_enabled=True,
+                        stages=fake_stages(repairs=True))
+    loop = run["store"]
+    rows = loop.query("SELECT r.*, c.local_id AS candidate_local_id FROM repair r "
+                      "JOIN candidate c USING (candidate_id) ORDER BY r.candidate_id")
+    assert len(rows) == 2
+    for row in rows:
+        assert row["local_id"] == row["candidate_local_id"] >= 900_000_000
+        assert row["status"] == "fixed" and row["chia_row_seen"] == 0
+        assert row["repro_dir"].endswith(f"/repair/{row['local_id']}")
+        assert row["backend"] == "vertex" and row["repro_overwritten"] == 1
+    assert [p["verdicts"]["stage_7"] for p in run["outcome"]["seeds"][0]["probes"]
+            if "stage_7" in p["verdicts"]] == ["fixed"]
+
+    # A repair that never came back leaves the row it opened, which is the whole
+    # point of writing it first (FR-12.10).
+    refused_root = tmp_path / "refused"
+    refused_root.mkdir()
+    other = mini_campaign(refused_root, repair_enabled=True)
+    refused = other["store"].query_one("SELECT status, chia_row_seen FROM repair")
+    assert refused["status"] == "dispatched" and refused["chia_row_seen"] == 0
