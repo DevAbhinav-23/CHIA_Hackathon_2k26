@@ -1,0 +1,181 @@
+{
+  "format_version": 1,
+  "frozen": true,
+  "mutators": [
+    {
+      "derived_from": [
+        316,
+        319,
+        328,
+        429,
+        436,
+        446,
+        847,
+        1350
+      ],
+      "description": "collapse integer bitwidth to zero",
+      "id": "fir.type.zero_width",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(?<=\\b(?:UInt|SInt)<)[1-9]\\d*(?=>)",
+      "replacement": "0"
+    },
+    {
+      "derived_from": [
+        311,
+        418,
+        446,
+        1639
+      ],
+      "description": "duplicate first argument into second operand slot of binary primop",
+      "id": "fir.primop.duplicate_arg",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(\\b(?:add|sub|mul|div|rem|and|or|xor|eq|neq|lt|leq|gt|geq)\\s*\\(\\s*([a-zA-Z_]\\w*)\\s*,\\s*)[a-zA-Z_]\\w*",
+      "replacement": "$1$2"
+    },
+    {
+      "derived_from": [
+        363,
+        1465,
+        2546,
+        4780,
+        7266
+      ],
+      "description": "turn connection RHS into self-referential loop with LHS",
+      "id": "fir.connect.self",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(\\b([a-zA-Z_]\\w*)\\s*<=\\s*)[^\\n;]+",
+      "replacement": "$1$2"
+    },
+    {
+      "derived_from": [
+        419,
+        423,
+        1485,
+        2763
+      ],
+      "description": "swap strict and partial connect operators",
+      "id": "fir.connect.op_swap",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "<=(?!>)",
+      "replacement": "<-"
+    },
+    {
+      "derived_from": [
+        181,
+        779,
+        841,
+        1302,
+        1303
+      ],
+      "description": "substitute AsyncReset for Reset or 1-bit UInt",
+      "id": "fir.reset.type_swap",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "\\bUInt<1>\\b(?=\\s*(?:\\)|$))",
+      "replacement": "AsyncReset"
+    },
+    {
+      "derived_from": [
+        316,
+        429,
+        2269,
+        3417,
+        6652
+      ],
+      "description": "replace integer bitwidth with zero-width type",
+      "id": "mlir.type.i0_width",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<=: )i[1-9]\\d*(?=[\\s,\\)>])",
+      "replacement": "i0"
+    },
+    {
+      "derived_from": [
+        314,
+        354,
+        955
+      ],
+      "description": "promote 64-bit integer type to boundary 65-bit type",
+      "id": "mlir.type.i65_width",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "\\bi64\\b",
+      "replacement": "i65"
+    },
+    {
+      "derived_from": [
+        854,
+        2546,
+        9066
+      ],
+      "description": "duplicate first operand of comb.xor into second operand",
+      "id": "mlir.comb.xor_duplicate",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(comb\\.xor\\s+(?:bin\\s+)?(%[\\w\\d]+)),\\s*%[\\w\\d]+",
+      "replacement": "$1, $2"
+    },
+    {
+      "derived_from": [
+        2327,
+        5483
+      ],
+      "description": "empty all fields from struct type definition",
+      "id": "mlir.hw.struct_empty",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "!hw\\.struct<[^>]+>",
+      "replacement": "!hw.struct<>"
+    },
+    {
+      "derived_from": [
+        1187,
+        2203,
+        5650
+      ],
+      "description": "replace constant operand in strictconnect with undefined invalid value",
+      "id": "mlir.firrtl.rwprobe_force",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(firrtl\\.strictconnect\\s+%[\\w\\d]+,\\s*)%c\\d+_[\\w\\d]+",
+      "replacement": "$1%invalid_val"
+    },
+    {
+      "derived_from": [
+        709,
+        7399
+      ],
+      "description": "convert standard case statement to wildcard casez",
+      "id": "sv.case.wildcard_swap",
+      "kind": "text",
+      "language": "sv",
+      "mutates_argv": false,
+      "pattern": "\\bcase\\s*\\(",
+      "replacement": "casez ("
+    }
+  ],
+  "set_version": "v1",
+  "synthesis_input": {
+    "issue_numbers_sha256": "5c78adcea2166c7b768452413409e453502607305e879da2a8e0acba371fa5ae",
+    "issues_used": 487,
+    "mirror_refreshed_utc": "2026-09-14T10:55:15+00:00",
+    "query": "closed issues labelled bug, the full history",
+    "repo": "llvm/circt"
+  },
+  "synthesis_model": "gemini-3.8-flash",
+  "synthesised_utc": "2026-09-14T11:44:25+00:00"
+}
