@@ -345,6 +345,14 @@ def test_T_U_driver_11():
     source = inspect.getsource(bug_loop.run_campaign)
     assert "filings_total=budget.filings_total" in source
 
+    # The contract is frozen at 2.1 and makes both manifest fields non-null, so
+    # an exempt run records WHY there is no post rather than a URL nobody
+    # posted; an operator's own values still win.
+    assert "filings_total is 0" in bug_loop.NO_FORUM_POST
+    manifest = inspect.getsource(bug_loop.build_manifest)
+    assert "forum_post_url=args.forum_post_url or NO_FORUM_POST" in manifest
+    assert "forum_post_date=args.forum_post_date or NO_FORUM_POST" in manifest
+
 
 def test_T_U_driver_27():
     """T-U-driver-27 (NFR-06, NFR-08): check 12, the interlock and the key.

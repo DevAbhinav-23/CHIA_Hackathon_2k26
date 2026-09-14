@@ -985,6 +985,14 @@ def check_02_mutator_set_earlier(*, repo_root: str,
         raise PreflightFailed("mutator_set_earlier", str(error)) from error
 
 
+#: What `RunManifest.forum_post_url` and `forum_post_date` record for a run that
+#: CANNOT FILE (W-18). Check 11 exempts a run whose registered `filings_total`
+#: is zero, and the contract - frozen at `contract-2.1`, so this cannot be an
+#: Optional - still requires both fields to be non-null. A sentinel that reads
+#: as a sentence is what the manifest carries, so a reader of the artefact meets
+#: the reason and never a URL that was never posted.
+NO_FORUM_POST = "none: this run's registered filings_total is 0 (FR-20.1)"
+
 #: FR-01.1's mining window: twenty-four months of `main`, ending at the corpus
 #: head. Two years back FROM THE HEAD'S OWN COMMIT DATE, which is the only date
 #: `corpus_head_sha` fixes and is therefore reproducible from the registered
@@ -1727,7 +1735,13 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         issue_mirror={k: mirror[k]
                       for k in schema._DICT_KEYS[("RunManifest", "issue_mirror")]},
         local_id_range=[repair_adapter.LOCAL_ID_BASE, repair_adapter.LOCAL_ID_MAX],
-        forum_post_url=args.forum_post_url, forum_post_date=args.forum_post_date,
+        # FR-20.1's two fields. A run whose registered filing cap is zero has no
+        # forum post to name and cannot be given one honestly, and the contract
+        # (frozen at `contract-2.1`) makes both fields non-null, so the manifest
+        # records WHY there is none rather than a URL nobody posted (W-18). The
+        # operator's own values win wherever they are supplied.
+        forum_post_url=args.forum_post_url or NO_FORUM_POST,
+        forum_post_date=args.forum_post_date or NO_FORUM_POST,
         confirmation_cutoff_date=budget.campaign_end_utc[:10],
         differential_driver=differential_driver(),
         started_utc=started_utc,
