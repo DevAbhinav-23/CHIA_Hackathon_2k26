@@ -28,6 +28,13 @@ settle it.
 
 ## 0. Conventions
 
+**Erratum 2026-09-15** (§16.2): the standard-library list below is **five short**. `collections`,
+`fnmatch`, `logging`, `select` and `types` are imported too, as is `__future__`. No third-party
+dependency is added, which is what FR-19.8 requires; the list was the error. `T-U-layout-05`
+therefore asserts the **rule**, every import being in `sys.stdlib_module_names` or one of `yaml`,
+`ray`, `chia`, the flow's own package and CHIA's two shipped example modules, rather than comparing
+against a hand-kept enumeration that a new standard-library import silently falsifies.
+
 **Citations.** `chia:<path>:<lines>` is a path under `~/.cache/chia-src` at commit `16c35e92`.
 `circt:<path>:<lines>` is a path under `~/.cache/chia-pin-smoke/circt` at `b792c772`. A tool flag
 marked **verified** was obtained by running `--help` on 2026-09-13 against the SDK at
@@ -81,12 +88,15 @@ with its one-line purpose and the components of `02-HLD.md` §1 it holds.
 | `contract/fixtures/` | Committed recorded instances, `<schema>/<id>.json`, one document per file, the enforcement point for the compatibility rule (`02-HLD.md` §2.13). | seam |
 | `corpus.py` | Mines the clone by PIN §2's rule, normalises every `RUN:` line, emits `SeedRecord[]` and the `SdkMap`. | A1 |
 | `pin_select.py` | Walks `main` first-parent to the newest commit whose LLVM pin has a `firtool-*` release; reports the lag. | A2 |
-| `generate_task.py` | Both generators and the two agent-facing tools: the seeded arm's two turns, the mutation arm's deterministic runner, `ProbeWriteTool`, `SourceReadTool`. | A3, A4, `ProbeWriteTool`, `SourceReadTool` |
+| `generate_task.py` | Both generators and the two agent-facing tools: the seeded arm's two turns, the mutation arm's deterministic runner, `ProbeWriteTool`, `SourceReadTool`. ~~It also holds the backend, the interlock, the turn node and the JSON-footer parser.~~ **Corrected 2026-09-15** (§16.2): those four moved to `llm.py`. | A3, A4, `ProbeWriteTool`, `SourceReadTool` |
+| `llm.py` | **Added 2026-09-15** (§16.2, architect decision 3). The one neutral module both halves import: `MODEL_BACKEND`, `LiveModelRefused`, `require_live_model`, `build_llm`, the `llm_turn` node, `PromptContractError` and `parse_json_footer`. It is neither the supply half nor the apparatus half, which is why it can be imported by both without crossing the seam of `02-HLD.md` §2. | the backend glue, shared |
 | `mutator_synth.py` | The offline, once, pre-registration mutator synthesis and the freeze. Not imported by the campaign. | A7 |
 | `mutators/__init__.py` | Loads the frozen set, checks its digest, exposes `apply(mutator_id, text, seed_int)`. | A4's set |
-| `mutators/set_v1.json` | The frozen set itself: one JSON document, versioned, digest recorded in the `RunManifest`. | A4's set |
+| `mutators/set_v1.json` | The frozen set itself: one JSON document, versioned, digest recorded in the `RunManifest`. **Erratum 2026-09-15** (§16.2): A7 has not been run, so the committed set is `mutators/set_dev.json` at `set_version: "dev"` carrying `"frozen": false`; `SET_PATH` prefers the frozen name wherever it exists and `load_set` refuses an unfrozen set whenever a run names a digest, so no campaign can run on the development set. | A4's set |
 | `probe_task.py` | The four apparatus nodes that touch a probe: execute, judge, differential, reduce. Worker-side; imports no head module. | B2, B3, B4, B5 |
 | `ddmin.py` | The textual reducer of FR-09.10: ddmin over lines, standard library only, no CIRCT knowledge. | B5's second reducer |
+| `circt_core.py` | **Added 2026-09-15** (§16.2). §3.10's three generic functions, `circt_exec_probe`, `circt_reduce_run` and `circt_symbolize`, carried here until CHIA takes them, because `chia/chipyard/` is a **published** path this tree does not hold (§1.4). `probe_task.py` imports them from here and `upstream/chia-chipyard-circt-additions.py` is the block appended to CHIA's file; `tests/test_circt_core.py` asserts the two texts are identical below their headers. | §3.10 |
+| `__init__.py` | **Added 2026-09-15** (§16.2). The package marker the two-tree layout of §1.4 needs, `tests/` importing the flow as `circt_bug_loop.<module>`. No logic, so no test module of its own. | none |
 | `triage_task.py` | The issue mirror, the fingerprint and dedup and contamination screen, the triage turn and the report render. | B6a, B6b, B7 |
 | `repair_adapter.py` | The shim that presents a local report to CHIA's unmodified chain, then restores the worker. | B8 |
 | `gate.py` | The four mechanical questions, the re-run dispatch, the `GateDecision`. | B9a, B9b |
@@ -105,7 +115,7 @@ with its one-line purpose and the components of `02-HLD.md` §1 it holds.
 | `env.yml` | The head's conda environment, in CHIA's shape. | none |
 | `bug_loop_submit.sh` | The `chia job submit` wrapper, carrying no token in `--runtime-env-json`. | §13.3 |
 | `budget.yaml` | The pre-registered budget (F-14). Committed before the campaign; its commit is the registration. | §9 |
-| `pyproject.toml` | The example's own packaging: one `[project.scripts]` entry, `bugloop-approve = "approve:main"`, which is how §13.2's CLI is installed. Nothing else; the flow is not a library. | §13.2 |
+| `pyproject.toml` | The example's own packaging: one `[project.scripts]` entry, `bugloop-approve = "approve:main"`, which is how §13.2's CLI is installed. Nothing else; the flow is not a library. **Erratum 2026-09-15** (§16.2, architect decision 7): this file does not exist and the team repository packages nothing, so the entry that exists today is `python -m circt_bug_loop.approve`; the console script is W-26's packaging work. | §13.2 |
 | `.gitignore` | Two lines, `loop.db` and `loop.db-*`, so an 8-hour campaign's database and its WAL companions cannot be committed by accident. | §6.1 |
 | `tests/` | Unit tests for the flow-specific code (FR-19.5); layout mirrors the modules, §1.3. | none |
 
@@ -146,13 +156,21 @@ patch, and the fifth is the only one that touches a file CHIA already has under 
 table has a mechanical target. The mapping is stated exactly, because the earlier "one-to-one"
 wording was false and would have been asserted by a test that fails on itself (W6):
 
-- **Eighteen source modules hold logic and each has its test module** below: `bug_loop.py`,
-  `contract/schema.py`, `corpus.py`, `pin_select.py`, `generate_task.py`, `mutator_synth.py`,
+- ~~**Eighteen source modules hold logic and each has its test module**~~ **Twenty since
+  2026-09-15** (§16.2), `llm.py` and `circt_core.py` being the two added: `circt_core.py`,
+  `bug_loop.py`,
+  `contract/schema.py`, `corpus.py`, `pin_select.py`, `generate_task.py`, `llm.py`,
+  `mutator_synth.py`,
   `mutators/__init__.py`, `probe_task.py`, `ddmin.py`, `triage_task.py`, `repair_adapter.py`,
   `gate.py`, `approve.py`, `budget.py`, `ledger.py`, `feedback.py`, `store.py`, `results.py`.
-- **One source module holds no logic and has no test module of its own**: `contract/__init__.py` is a
+  The two `ChiaTool`s of `generate_task.py` are tested in a module of their own,
+  `tests/test_tools.py`, added 2026-09-15 (§16.2): they are not a source module, so they are an
+  exemption of the same kind as the five artefacts below rather than a twentieth source module.
+- ~~**One source module holds no logic and has no test module of its own**~~ **Two, since
+  2026-09-15** (§16.2): `contract/__init__.py` is a
   re-export list, and `tests/test_schema.py` imports every public name through it, which is the only
-  behaviour it has.
+  behaviour it has; and `circt_bug_loop/__init__.py` is the package marker §1.4's two-tree layout
+  needs.
 - **Two test modules are structural and have no source counterpart**: `test_layout.py`, which asserts
   the three properties below, and `test_fixtures.py`, which validates the committed fixture set.
 - **Five artefacts of §1.1 and §1.2 are not Python modules, each has a named test module, and each is
@@ -164,7 +182,7 @@ wording was false and would have been asserted by a test that fails on itself (W
 
 | Artefact | Test module | What it asserts |
 |---|---|---|
-| `dockerfiles/ChiaCirctAssertDockerfile` and the `ImageSpec` it emits (§1.2, §4.11) | `tests/test_image_spec.py` | the built image and the recorded `ImageSpec`; F-03's requirements, which need a Docker build and have no in-process substitute |
+| `dockerfiles/ChiaCirctAssertDockerfile` and the `ImageSpec` it emits (§1.2, §4.11) | ~~`tests/test_image_spec.py`~~ **`tests/test_image.py`** (renamed 2026-09-15, §16.2) | the built image and the recorded `ImageSpec`; F-03's requirements, which need a Docker build and have no in-process substitute |
 | `prompts/` and the shared JSON-footer parser (§7) | `tests/test_prompts.py` | every substitution variable of §7.2, §7.3, §7.4 and §8.3 is declared in its file and supplied by its caller; the footer parser's four failure reasons |
 | `cluster_single.yaml` and `cluster_gcp.yaml` (§12) | `tests/test_cluster_yaml.py` | both files load through `chia.cluster.config.load_config`; the three worker types, the three resource names, `--user` on every type, no credential anywhere |
 | `bug_loop_submit.sh` (§13.3) | `tests/test_submit.py` | no token anywhere in it; `--runtime-env-json` carrying exactly the three non-secret variables; the `exec` line |
@@ -172,13 +190,26 @@ wording was false and would have been asserted by a test that fails on itself (W
 
 `tests/test_layout.py` has exactly three jobs and the earlier "and nothing else" is withdrawn:
 (1) the mapping above, as the four sets just named rather than as an equality of directory listings,
-with the five artefact test modules named in an exemption list the test compares for equality;
+with the five artefact test modules **and `test_tools.py`** named in an exemption list the test
+compares for equality;
 (2) the check that no `store.py` name is imported by any supply-half module (§2.9, FR-16.1); and
 (3) the `ast` walk of §14.5 for FR-18.1. All three are layout properties of the repository, which is
 why they share one module.
 
-**Twenty-five test modules under `tests/`**: eighteen for the source modules that hold logic, two
-structural, and five for the artefacts above.
+**Rule (2) carries two exemptions, added 2026-09-15** (§16.2). `ledger.py` is A6b, which
+`02-HLD.md` §1.2 puts in the supply half, and it imports `BudgetLedger` and `LoopStore` from
+`store.py` because §2.9 is where those two are declared; they are records the ledger owns the
+arithmetic of and no apparatus behaviour crosses with them. The rule as written was false of the
+design it describes. Separately, `pin_select.py` **imports** `corpus._Git`, `corpus._read_tags` and
+`corpus._walk_pins` rather than copying them, which is what §4.11.1's listing of §3.3's and §3.4's
+commands **once** means; any rule about private names crossing a module boundary must exempt those
+three by name.
+
+~~**Twenty-five test modules under `tests/`**: eighteen for the source modules that hold logic, two
+structural, and five for the artefacts above.~~ **Twenty-eight since 2026-09-15** (§16.2):
+**twenty** for the source modules that hold logic, `llm.py` and `circt_core.py` included, two
+structural, five for the
+artefacts above, and `test_tools.py` for the two `ChiaTool`s.
 
 ```
 tests/
@@ -188,6 +219,8 @@ tests/
   test_corpus.py          corpus.py, including one RUN: line of every shape of FR-01.10
   test_pin_select.py      pin_select.py, including the no-match and multi-tag paths
   test_generate_task.py   generate_task.py: the emitter, the cap, the tool list, the mutation runner
+  test_llm.py             llm.py: the interlock, the backend, the turn, the footer parser
+  test_tools.py           ProbeWriteTool and SourceReadTool          (tools, exempt)
   test_mutators.py        mutators/: determinism, no-ops, a raising mutator, the digest check
   test_mutator_synth.py   mutator_synth.py: the parse, the freeze, the post-registration refusal
   test_probe_task.py      probe_task.py: the seven statuses, the three oracle classes, the limits
@@ -196,13 +229,14 @@ tests/
   test_repair_adapter.py  repair_adapter.py: the identifier, the repro polarity, the restore
   test_gate.py            gate.py: all four questions, every stopping value, the default to nothing
   test_approve.py         approve.py: the cap, the licence downgrade, the walk-away, the URL
-  test_budget.py          budget.py: the schema, the pre-registration rule, the five checks
+  test_budget.py          budget.py: the schema, the pre-registration rule, the six checks (9.2)
   test_ledger.py          ledger.py: the three arms, the two scopes, the stop rule
   test_feedback.py        feedback.py: one entry per probe, the abandonment rule, the deny-list
   test_store.py           store.py: the DDL, the write order, the PARTIAL marker, the cap rule
   test_results.py         results.py: every render refusal, and the zero-bug render
   test_bug_loop.py        bug_loop.py: argv, the pre-flight refusals, the reconciliation
-  test_image_spec.py      the Dockerfile and the ImageSpec          (artefact, exempt)
+  test_image.py           the Dockerfile and the ImageSpec          (artefact, exempt)
+  test_circt_core.py      circt_core.py: the three generic functions (3.10)
   test_prompts.py         prompts/ and the shared footer parser     (artefact, exempt)
   test_cluster_yaml.py    both cluster YAMLs                        (artefact, exempt)
   test_submit.py          bug_loop_submit.sh                        (artefact, exempt)
@@ -1592,6 +1626,14 @@ never started and never one that ran (`chia:chia/base/chia_wait.py:48-88`).
 
 ### 3.1 Docstring obligations (FR-19.4)
 
+**Narrowed 2026-09-15** (§16.2, the architect's instruction). The three paragraphs below are required
+of the `@ChiaFunction` **nodes** and the two `ChiaTool`s' **methods**, and of nothing else. As this
+section was written it covered every public callable, and **Worker**, "the resource the node needs,
+spelled as the dict it declares", can only be false or empty for a private helper that declares none:
+measured 2026-09-15, **45 of the flow's 184 public module-level functions** carry fewer than three,
+while **all** the nodes and **all four** tool methods carry them. `contract/` was already exempt for
+the same reason (§16.1).
+
 Every added node, tool method and prompt carries a docstring whose first line is one sentence in the
 imperative, followed by three named paragraphs in this order and no others.
 
@@ -1632,11 +1674,13 @@ tuple under which a re-run is a no-op or a safe repeat.
 | B8 | `repair_adapter.py:repair_adapt` | `@ChiaFunction(resources={"repair": 1}, max_retries=0)` | CHIA's five phase timeouts, unchanged, `turn` | none; each call is a new attempt, and the loop row is written first |
 | B9a | `gate.py:gate_decide` | `@ChiaFunction(max_retries=0)`, head | 900 s `[DEFAULT]`, `driver`; the FR-13.16 poll on `turn` | `(candidate_id, run_manifest_id)` |
 | B9b | `gate.py:gate_rerun` | `@ChiaFunction(resources={"circt": 1}, max_retries=0)` | `probe_wall_seconds` plus 60 s `[DEFAULT]`, `subprocess` | deliberately none: a fresh process in a new directory is the point |
+| B9d | `gate.py:gate_validate` | `@ChiaFunction(resources={"circt": 1}, max_retries=0)` | `probe_wall_seconds` plus 60 s `[DEFAULT]`, `subprocess` | `(candidate_id, case_sha256, tool)`; a pure parse-and-verify of a fixed file. **Added 2026-09-15** (§16.2, §3.9); the id is the next free one and B9c is not renumbered |
 | B9c | `approve.py:main` | head program, not a node | none; a human's own pace | `candidate_id`; a second approval is refused with the first's timestamp |
 | B10a | `store.py:LoopStore` | `SQLiteNode(path, pin_to_current_node=True)` | `SQLiteNode`'s own 30 s busy timeout | primary key per table |
 | B10b | `store.py:artefact_write` | `@ChiaFunction(max_retries=0)`, head | 300 s `[DEFAULT]`, `driver` | `(artefact_dir, relative_path)`; append-only, `PARTIAL` never deleted |
 | B11 | `results.py:render_results` | `@ChiaFunction(max_retries=0)`, head | 600 s `[DEFAULT]`, `driver` | `(run_manifest_id, store_sha)`; a pure function of the store |
 | B12 | `bug_loop.py:main` | head driver, not a node | the two arm windows, which it meters | `run_manifest_id`; a restart resumes and never re-charges |
+| turn | `llm.py:llm_turn` | `@ChiaFunction(resources={"llm": 1.0}, max_retries=0)` | the calling stage's own turn timeout, `turn` | none; a model turn is replayed through bypass, never re-run. **Added 2026-09-15** (§16.2): §3.5.1 created this node and this table had no row for it, which is why `T-U-layout-06`'s "three placements and no fourth" was a count of the table rather than of the code. `{"llm": 1.0}` is declared by §12.1 and is the fourth placement |
 | tool | `generate_task.py:ProbeWriteTool` | `ChiaTool`, `task_options` pinning it to A3's worker | none; one file write per call | `(probe_id, relative_path)`; a rewrite is byte-identical |
 | tool | `generate_task.py:SourceReadTool` | `ChiaTool`, `task_options` pinning it to the **head** | 60 s `[DEFAULT]` per `git` call, `subprocess` | `(run_commit, method, args)`; a pure query against a fixed commit |
 
@@ -1671,6 +1715,9 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
          "counts": {"filtered": int, "exact_pin": int, "no_run_line": int,
                     "unsupported_shape": int, "seed_text_over_cap": int,
                     "polarity": dict, "shape": dict},
+         # amended 2026-09-15 (16.2): four keys the block did not list.
+         "counters": CounterBlock, "exclusions": dict, "nearest_tag": dict,
+         "sv_seeds": list[str],
          "inputs": {"clone_head_sha": str, "since": str, "git_version": str}}
     Worker:
         head - it runs git against the head's blobless clone, which is the only
@@ -1698,6 +1745,16 @@ def resolve_sites(clone_path: str, run_commit: str, sites: list[dict],
         the git stderr recorded, which rejects rather than accepts.
     """
 ```
+
+**Three errata, 2026-09-15** (§16.2). **Exclusion precedence is fixed**, because three exclusions can
+hold of one seed at once and counting them independently makes the counts fail to sum:
+`seed_text_over_cap` outranks `no_run_line`, which outranks `unsupported_shape`.
+**`strip_probe_only_options` knows four spellings, not two**: `--verify-diagnostics` and
+`--split-input-file` in the double-dash and the single-dash form, bare and `=`-valued, because
+CIRCT's own tests write the single-dash forms and 46 of M1's 331 corpus `RUN:` lines do
+(`raw/m1-per-runline.csv`, measured 2026-09-14). And **`_Git`, `_read_tags` and `_walk_pins` are
+imported by `pin_select.py`** rather than copied, `_walk_pins` taking a keyword `ref: str = "HEAD"`
+for the reason §3.4 gives; that is what §4.11.1's listing of these commands once already meant.
 
 `resolve_sites` is the one query FR-04.1's acceptance criterion needs and the one thing A3 still asks
 of the tree; it exists because A3 runs on a `circt` worker and the clone is on the head. Its two
@@ -1810,7 +1867,8 @@ and 28.3% of seeds respectively (M1), so it is not an edge case.
 
 ```python
 @ChiaFunction(max_retries=0)
-def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600) -> dict:
+def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600,
+                               *, ref: str = "HEAD") -> dict:
     """Return the newest first-parent main commit whose LLVM pin has a release.
 
     Returns:
@@ -1821,17 +1879,43 @@ def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600) -> d
         head - it walks 24 months of main in the head's blobless clone, which no
         worker container mounts (K5).
     Raises:
-        PinSelectError("no_match") when no first-parent commit inside 24 months
+        PinSelectError("no_tags") when for-each-ref returns no firtool-* tag at
+            all, naming the refspec, BEFORE the walk starts (FR-01.8);
+        PinSelectError("no_match") when no first-parent commit inside the window
             has a matching release, naming the last window examined (FR-02.5).
     """
 ```
+
+**Four errata, 2026-09-15** (§16.2), and the first of them changes the callable's contract.
+
+**`ref` is a parameter and the acceptance run passes `origin/main`.** The signature as written
+cannot reach `main`. A1 holds the head's blobless clone detached at `corpus_head_sha` (FR-01.11), so
+`HEAD` is the corpus head and not `main`, and every pin-walk command §4.11.1 spells would have walked
+the wrong ref. `corpus._walk_pins` gained the same parameter, with the same default.
+
+**Two refusals, not one.** `no_tags` is separated from `no_match` because the operator's next action
+differs: a clone fetched without `--tags` is not a `main` that has drifted, and `corpus._read_tags`
+already tells the two apart.
+
+**The window is `WINDOW_DAYS = 730`, measured from the head commit's own date.** FR-02.5's "24
+months" carries no number anywhere in this set. Measuring from the head commit rather than from now
+makes the window a property of the clone, so a run re-run a week later examines the same window,
+which is what FR-01.6's offline re-runnability needs.
+
+**`lag_days` is returned unrounded.** W-04's 4.807 is `round(lag_days, 3)`; the raw figure and the
+rounded one are two numbers and the record keeps the raw one.
 
 Equality is of full 40-character SHAs and nothing else: no tolerance, no nearest match, no version
 string (FR-02.3). "Newest" is first-parent position, not commit date (FR-02.1). Where several
 releases share the chosen pin, the newest by tag date wins and all are recorded (FR-02.6). The lag
 is `git -C <clone> rev-list --first-parent --count <chosen>..<head>` for commits and the difference
-of the two commit dates for days (FR-02.2). The caller, B12, writes all eight fields into the
+of the two commit dates for days (FR-02.2). The caller, B12, writes ~~all eight fields~~ **seven of
+the eight fields** into the
 `RunManifest` once and never recomputes them, because A2 is idempotent only against a fixed clone.
+**Corrected 2026-09-15** (§16.2): `RunManifest.run_commit` is `list[RunCommit]` (FR-02.7), so the
+returned `run_commit` string is **wrapped** rather than assigned, and `resolved_utc` has **no**
+manifest field at all. It stays on the node's return and in the artefact copy's provenance block; a
+schema field for a timestamp would be a contract MAJOR bump.
 
 ### 3.5 `generate_task.py` (A3, A4, `ProbeWriteTool`, F-04 and F-05)
 
@@ -1864,9 +1948,26 @@ subsection now gives.
 
 #### 3.5.1 The backend, the interlock and the turn (2026-09-14)
 
-`02-HLD.md` §0.2 records the decision and its three measured facts; this is the code. Everything
-below lives in `generate_task.py` and is imported by `triage_task.py` (B7) and `mutator_synth.py`
-(A7), so there is exactly one backend constructor and exactly one turn node in the flow.
+`02-HLD.md` §0.2 records the decision and its three measured facts; this is the code.
+~~Everything below lives in `generate_task.py` and is imported by `triage_task.py` (B7) and
+`mutator_synth.py` (A7)~~, so there is exactly one backend constructor and exactly one turn node in
+the flow.
+
+**Corrected 2026-09-15** (§16.2, architect decision 3): everything below lives in **`llm.py`**, a
+module that is neither half, and is imported by `generate_task.py` (A3, A4),
+`mutator_synth.py` (A7), `triage_task.py` (B7) and `repair_adapter.py` (B8). `generate_task.py` is
+the **supply** half, and the apparatus half may not import it (FR-16.1, `05-Work-Plan.md` §2.3);
+holding the backend there forced the two apparatus modules into function-local imports and gave
+§7.1's "one function, shared by all four" parser a second copy. A neutral module is the only shape in
+which the parser is one function and the seam rule holds. §7.1 is the parser's home section and it
+now names `llm.py` as its module.
+
+**One signature changes with the move.** `require_live_model` takes a keyword-only
+`env: Mapping[str, str] | None = None`, defaulting to `os.environ`, so a caller can hand it an
+explicit mapping. `04-Test-Plan.md` `T-U-layout-08` (1) forbids any test outside `tests/system/` to
+set `BUGLOOP_ALLOW_LIVE_MODEL` in the process environment, and the allow path still has to be
+exercised against the real refusal, the real key check and the real express construction; an
+injected mapping is the only shape that does both (architect decision 2).
 
 ```python
 MODEL_BACKEND = "vertex"                  # RunManifest.backend (C-20: one per run)
@@ -2602,6 +2703,12 @@ fully idempotent. Four steps.
 ```python
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def oracle_differential(spec: ProbeSpec, build: BuildResult, image_spec: ImageSpec,
+                        # three keyword-only additions, 2026-09-15 (16.2):
+                        # limits, because the two simulator runs are bounded by
+                        # the PROBE limits through circt_exec_probe and not by
+                        # this node's 1800 s timeout (4.8); bin_dir and
+                        # verilator, because every fixture and tier-1
+                        # measurement runs a build outside the image.
                         artefact_dir: str) -> DifferentialVerdict:
     """Run one design through arcilator and Verilator from one stimulus.
 
@@ -2913,13 +3020,34 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
         clone, and the issue mirror is a table in loop.db, which is head-pinned
         (K5, K7).
     Raises:
-        nothing. An undecidable dedup is dedup_unavailable, which fails gate
-        question 4 rather than passing it (FR-10.7).
+        nothing for an undecidable dedup, which is dedup_unavailable and fails
+        gate question 4 rather than passing it (FR-10.7). Amended 2026-09-15
+        (16.2): ValueError for a candidate of class differential, which
+        FR-08.10 keeps out of this stage entirely, so one arriving is a caller
+        defect and dedup_unavailable would hide it behind an ordinary verdict.
     """
 ```
 
 The run's commit is **not** a parameter: it is `candidate.run_commit`, which `CandidateRecord`
 carries and which is the only value that is right in both modes (K14, §3.7.2).
+
+**The signal name has a source, added 2026-09-15** (§16.2). §3.7.1's crash and fatal-error
+fingerprint begins with the signal name, and this signature carries no `BuildResult` while neither
+`CandidateRecord` nor `OracleVerdict` has a `signal` field, so the first half of the fingerprint was
+unreachable from the signature. It is read from `build_result.signal` by `probe_id`, through the
+store the node already opens for the mirror screen.
+
+**Verdict precedence is fixed, and it was fixed nowhere.** More than one of the six `DedupVerdict`
+values can hold of one candidate. The order, stated here and in the node's own docstring: an empty
+mirror is `dedup_unavailable` for **every** candidate; then a mirror hit, open before closed; then a
+candidate-to-candidate duplicate; then a post-pin fix; then `new`. The mirror hit outranks the
+candidate duplicate because its evidence is the only carrier of FR-13.9's label.
+
+**"Once per run" is not B6a's to enforce.** The signature carries neither a run id nor a refresh
+flag, and `issue_mirror_meta` is keyed by `run_manifest_id` with a foreign key to `run` (§6.2). B6a
+writes `issue_mirror` rows only; **B12** calls it once unless `--refresh-mirror` and writes the meta
+row from the return. §3.2's idempotency key `(repo, issue_cap, run_manifest_id)` is where the rule
+lives.
 
 #### 3.7.1 The primary fingerprint, and the normalisation that makes it stable
 
@@ -3116,7 +3244,12 @@ SELECT issue_number, state, url, labels_json
 run once per token, with **any token matching any issue** producing a hit. The verdict is
 `known_open_issue` when the matched issue's `state` is `open` and `known_closed_issue` when it is
 `closed`; where tokens match issues in both states the open one wins, because an open issue is the
-one a maintainer would be told about twice. `DedupVerdict.evidence` carries `matched_token`,
+one a maintainer would be told about twice. **Amended 2026-09-15** (§16.2): a match on an issue
+carrying the `good first issue` label is **promoted ahead of the state rule**, so a labelled match is
+never masked by an unlabelled one. FR-13.9 refuses a filing that matched **any** such issue, and
+`DedupVerdict.evidence`'s eight keys hold the labels of exactly **one**, so under the state rule
+alone the refusal could silently fail to fire. Promotion is the safe direction; the alternative, a
+ninth evidence key, is a MINOR contract bump this revision declines. `DedupVerdict.evidence` carries `matched_token`,
 `issue_number`, `issue_url`, `issue_state` and `issue_labels`, which is what FR-13.9's refusal reads
 and what the rendered report shows.
 
@@ -3128,7 +3261,21 @@ a wrong filing, and the human at the gate sees the matched token and the issue n
 and can overrule by declining. `04-Test-Plan.md` owns F-10's acceptance, which is that at least one
 candidate seeded from a known closed CIRCT issue comes back `known_closed_issue` with that number.
 
-**Cost and index.** `issue_mirror_issue_cap` is 20,000, so the table is at most 20,000 rows and a
+**The walk that fills the table is two-directional, added 2026-09-15** (§16.2, architect decision 1,
+C-22). GitHub's issues-listing endpoint refuses page 100, that is item 10,001, with a **422**;
+measured 2026-09-14 with `GITHUB_TOKEN` set, `T-U-triage-35` made 100 requests in 99.3 s, the first
+99 returning 200 and the hundredth 422, `issue_mirror_refresh` caught it as `GithubRequestError`, set
+`incomplete_reason`, and wrote **zero** rows. At the committed cap the mirror therefore did not
+truncate, it produced nothing. `issue_mirror_refresh` now walks `direction=desc` and then, on the
+ceiling, `direction=asc`, and unions the two deduplicated by issue number. Two directions of 10,000
+items each is more numbered items than `llvm/circt` has issued, the newest issue or pull-request
+number on 2026-09-14 being **11,113**, so the union is the whole history. The same measurement's
+bounded control run at a cap of 600 succeeded: 600 rows, 249 open and 351 closed, 35 requests,
+33.9 s wall, `X-RateLimit-Remaining` 4865 of 5000, the 35 listing pages for 600 issues being what it
+costs to drop pull requests, which are the majority of the numbering.
+
+**Cost and index.** `issue_mirror_issue_cap` is 20,000 and is a **row** bound rather than a request
+bound, so the table is at most 20,000 rows and a
 scan of it is a few milliseconds; `instr` cannot use an index, so §6.3 adds none for this query and
 says why. The screen makes **no** GitHub request, which is FR-10.3's network-trace criterion: B6a is
 the only writer of the table and it runs once per run, before the first candidate is screened.
@@ -3139,7 +3286,9 @@ the only writer of the table and it runs once per run, before the first candidat
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def triage_report(candidate: CandidateRecord, reduced: ReducedCase,
                   verdict: OracleVerdict, dedup: DedupVerdict,
-                  manifest: RunManifest, cfg: dict, artefact_dir: str) -> dict:
+                  manifest: RunManifest, cfg: dict, artefact_dir: str,
+                  *,   # added 2026-09-15 (16.2): 7.4.1's differential template
+                  differential: Optional[DifferentialVerdict] = None) -> dict:
     """Classify one candidate advisorily and render the report a maintainer reads.
 
     Returns:
@@ -3189,21 +3338,31 @@ The classification reason is capped at **4 sentences** `[DEFAULT]`, an implement
 here (FR-11.1), counted by splitting on `.`, `!` and `?` followed by whitespace or end of string, and
 truncated rather than rejected, with the truncation recorded.
 
-**B7's turn is §3.5.1's turn** (2026-09-14). It calls `generate_task.build_llm` with stage 6's
-timeout and `cfg["model_id"]`, dispatches through `generate_task.llm_turn`, gets exactly one tool,
+**B7's turn is §3.5.1's turn** (2026-09-14). It calls ~~`generate_task.build_llm`~~ **`llm.build_llm`**
+(corrected 2026-09-15, §16.2) with stage 6's
+timeout and `cfg["model_id"]`, dispatches through ~~`generate_task.llm_turn`~~ **`llm.llm_turn`**,
+gets exactly one tool,
 `SourceReadTool`, and stops it in a `finally` as A3 does. It therefore inherits the interlock, the
 express-mode construction and the usage capture with no code of its own, which is why
 `build_llm` and `llm_turn` live in one module and are imported rather than repeated.
 `Report.assisted_by` reads `manifest.model_ids["triage_report"]`, which is already spelled
 `"<backend>:<model id>"` (§2.7), so §7.4's `Assisted-by:` trailer is that value verbatim rather than
-two fields joined at render time.
+two fields joined at render time. **B7 also carries its own one-line system message,
+`TRIAGE_SYSTEM_MESSAGE`, added 2026-09-15** (§16.2): `build_llm` takes one and §1.1 gives stage 6 no
+equivalent of CHIA's `prompts/system.md`. Until the join, `triage_report` imports `llm.py`
+**inside the function**, because the apparatus half may not carry a module-scope edge into the supply
+half before W-17 and `generate_task.py` is where those callables were.
 
 ### 3.8 `repair_adapter.py` (B8, F-12)
 
 ```python
 @ChiaFunction(resources={"repair": 1}, max_retries=0)
 def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCase,
-                 verdict: OracleVerdict, manifest: RunManifest, cfg: dict) -> RepairResult:
+                 verdict: OracleVerdict, manifest: RunManifest, cfg: dict, *,
+                 # three keyword-only additions, 2026-09-15 (16.2).
+                 local_id: int,          # minted on the head by mint_local_id
+                 input_path: str,        # the probe's own input path
+                 created_utc: Optional[str] = None) -> RepairResult:
     """Present one local report to CHIA's unmodified chain, then restore the worker.
 
     Returns:
@@ -3222,9 +3381,20 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     """
 ```
 
+**The three keyword-only values, and why they are not computed here** (2026-09-15, §16.2).
+`local_id` is `LOCAL_ID_BASE + <the candidate's rowid>`, which is a query against the head's
+`loop.db` that a `repair` worker cannot run; `mint_local_id(store, candidate_id)` is the head's half
+and the node takes the minted value. `input_path` is the probe's own input path, because `repro.sh`
+runs the tool with the **reduced case** in the input's place, which is `probe_task._test_args`' rule,
+and `OracleVerdict.repro_command` names the original input without saying which token it is.
+`created_utc` is this section's own free variable `candidate_created_at_utc`, which the `candidate`
+**table** has a column for and `CandidateRecord` has no field for (§2.9).
+
 **The refusals come first**, and none of them invokes the chain: `oracle_class` of `differential`
-(FR-08.10) or `fatal_error` (FR-12.4), or `out_of_scope_root` true (FR-12.5). Only `crash` and
-`assertion` proceed.
+(FR-08.10) or `fatal_error` (FR-12.4), or `out_of_scope_root` true (FR-12.5), **and, added
+2026-09-15, `--no-repair`, which is `RepairRefused("repair_disabled")` and is checked before the
+interlock so that a disabled run asks for no credential at all** (consequence 4, §13.1). Only `crash`
+and `assertion` proceed.
 
 **Then the interlock, added 2026-09-14 with the `vertex` branch** (§3.5.1). CHIA's `_turn` builds its
 own backend inside CHIA's file, which cannot carry the loop's refusal, so the adapter carries it:
@@ -3539,7 +3709,13 @@ because `SQLiteNode` opens a fresh connection per `chia_remote` call
 @ChiaFunction(max_retries=0)
 def gate_decide(candidate: CandidateRecord, reduced: ReducedCase, dedup: DedupVerdict,
                 repair: RepairResult | None, manifest: RunManifest,
-                db_path: str) -> GateDecision:
+                db_path: str, *,
+                # three keyword-only additions, 2026-09-15 (16.2): limits,
+                # because 4.8 bounds the re-run and the validity check by the
+                # PROBE limits; top_n, compute_fingerprint's frame depth, which
+                # is budget.yaml's fingerprint_top_n; bin_dir, because every
+                # fixture and tier-1 measurement runs a build outside the image.
+                limits: dict, top_n: int, bin_dir: str) -> GateDecision:
     """Ask the four mechanical questions in order and stop at the first no.
 
     Returns:
@@ -3606,8 +3782,13 @@ it alone changes no answer and no decision (FR-13.4).
 
 ```python
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
-def gate_rerun(repro_command: str, image_spec: ImageSpec, limits: dict,
-               artefact_root: str) -> dict:
+def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
+               artefact_root: str, *,
+               # image_spec is a DICT, not the dataclass: RunManifest.image_spec
+               # is 2.7's eight-key dict and the four keys read here are all in
+               # it. run_manifest_id and candidate_id added 2026-09-15 (16.2),
+               # without which the mkdtemp below has no path.
+               run_manifest_id: str, candidate_id: str, top_n: int) -> dict:
     """Re-run one reproducing command in a fresh process and a new directory.
 
     Returns:
@@ -3621,13 +3802,55 @@ def gate_rerun(repro_command: str, image_spec: ImageSpec, limits: dict,
     """
 ```
 
-The working directory is `tempfile.mkdtemp(dir=<artefact_root>/<run>/gate/)`, created per call and
+The working directory is `tempfile.mkdtemp(prefix="<candidate_id>-", dir=<artefact_root>/<run>/gate/)`,
+created per call and
 never reused, which with a fresh process and a different worker is what the framework can deliver and
 what the question needs: no state carried over from the run that produced the verdict (C-19,
-FR-13.2's own rationale).
+FR-13.2's own rationale). The prefix is the 2026-09-15 erratum (§16.2): §3.9 asked for a `mkdtemp`
+and §6.5 for `gate/<candidate_id>/`, and neither spelling alone is both unique per call and readable.
+
+**Question 3 has a node of its own, B9d, added 2026-09-15** (§16.2, architect decision 6). §4.8 gives
+question 3 three tool invocations "under the same `prlimit` prefix as a probe" against "the
+source-tree binaries", and `gate_decide` runs on the head and holds no `circt` resource, so it can
+run none of them; `gate_decide` **stays** resource-free, which is FR-13.2's own reason for existing.
+
+```python
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def gate_validate(case_path: str, image_spec: dict, limits: dict,
+                  artefact_root: str, *, run_manifest_id: str,
+                  candidate_id: str, bin_dir: str) -> dict:
+    """Parse and verify one reduced case at the run's commit (FR-13.15).
+
+    Returns:
+        {"exit_status": int | None, "signal": str | None, "stdout": str,
+         "stderr": str, "tool": str, "argv": list[str], "fired": bool}
+        where "fired" is True when the check itself fired the primary oracle,
+        which is 3.9 question 3's validity_basis=checker_failed case.
+    Worker:
+        {"circt": 1}, and it is dispatched by gate_decide exactly as gate_rerun
+        is, through the same soft-affinity path.
+    Raises:
+        BinaryMismatch, exactly as probe_execute does and for the same reason.
+    """
+```
+
+**Two more values, and the six stay total** (2026-09-15, §16.2, architect decision 6). Question 2
+gains a fourth stopping value, **`not_fixpoint`**, for a reducer that ran and did not reach one,
+which FR-13.3's pass requires and FR-18.6's three failing rows did not name; it buckets `not_minimal`
+with the other three, and a free-text `ReducedCase.reason` (FR-09.12) buckets the same way. A **null**
+answer, which FR-13.10 defaults to `nothing` and FR-18.6's table had no row for, is recorded as
+**`undecided`**. The mapping lives in a pure `decide(fields, repair)` so that `T-U-gate-17` can
+produce a null answer at all: the four questions as implemented cannot be made to return one on
+demand.
 
 **`approve.py`** is a program, not a node: `input()` and `print()`, no framework (ADR-D-12). §13.2
-gives its commands. It enforces, in this order and before anything is shown to the human: the per-UTC-day
+gives its commands, ~~and its entry point is the `bugloop-approve` console script~~ **corrected
+2026-09-15** (§16.2, architect decision 7): the entry that exists is
+`python -m circt_bug_loop.approve`, the console script being W-26's packaging work. It reads
+`budget.yaml` with `yaml.safe_load` and **not** through `budget.load_budget`, because a human
+approving a report is not starting a run and `load_budget` also runs the campaign's git
+pre-registration checks; the two caps of FR-13.8 are what the program needs. A human refusal is
+recorded as the candidate's `held_reason`, §13.2 and §6.2 giving it no table of its own. It enforces, in this order and before anything is shown to the human: the per-UTC-day
 filing cap (FR-13.8); the `good first issue` refusal, read from the `issue_labels` key of the
 candidate's `dedup_evidence` (FR-13.9); and FR-11.8's hold. It then shows the full rendered report,
 the four answers, the repair diff if any, and the reduced case, in one view (FR-13.12), takes a typed
@@ -3829,11 +4052,11 @@ called once.
 
 | Module | Public callables | Notes |
 |---|---|---|
-| `budget.py` | `load_budget(path: str, repo_root: str) -> BudgetFile`, `snapshot(ledger: BudgetLedger, arm: Arm) -> LedgerSnapshot` | `load_budget` runs `git -C <repo_root> log -1 --format=%H -- budget.yaml` and `git -C <repo_root> log -1 --format=%cI -- budget.yaml`, refuses an uncommitted or later-committed file (FR-14.2), refuses unequal per-arm values (FR-14.5), and refuses any key outside §9's list. |
-| `ledger.py` | `accrue(entry: LedgerEntry, db_path: str) -> None`, `aggregate(run_manifest_id: str, db_path: str) -> BudgetLedger`, `stop_reason(ledger: BudgetLedger, arm: Arm, budget: BudgetFile) -> str \| None`, `price(tokens_in: int, tokens_out: int, budget: BudgetFile) -> float` | `accrue` appends and calls `price` to fill `observed.cost_usd` before it writes, so no row is ever stored with tokens and no money; `aggregate` is a view over `ledger_entry` and sums `observed.cost_usd` across **both** arms and `shared` into `BudgetLedger.spend_usd`; `stop_reason` returns the window, the binding safety cap, **or `campaign_spend_cap` when `aggregate`'s campaign-wide `spend_usd` has reached `budget.campaign_spend_cap_usd`**, else `None`. `price` is `tokens_in / 1e6 * budget.price_usd_per_m_input_tokens + tokens_out / 1e6 * budget.price_usd_per_m_output_tokens`, rounded to six decimal places, and returns `None` when either count is `None`. |
+| `budget.py` | `load_budget(path: str, repo_root: str, *, run_start_utc=None, manifest_budget_file_sha: str = None, exact_pin_shas=None) -> BudgetFile`, `snapshot(ledger: BudgetLedger, arm: Arm, budget: BudgetFile) -> LedgerSnapshot`. **Amended 2026-09-15** (§16.2): checks 1, 4 and 5 of §9.2 need the run's start, the manifest's SHA and the exact-pin set, and none of the three was a parameter; `BudgetLedger` carries no cap field, so `snapshot` needs the `BudgetFile` to fill one | `load_budget` runs `git -C <repo_root> log -1 --format=%H -- budget.yaml` and `git -C <repo_root> log -1 --format=%cI -- budget.yaml`, refuses an uncommitted or later-committed file (FR-14.2), refuses unequal per-arm values (FR-14.5), and refuses any key outside §9's list. |
+| `ledger.py` | `accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None`, `aggregate(run_manifest_id: str, db_path: str, *, today: str = None) -> BudgetLedger`, `stop_reason(ledger: BudgetLedger, arm: Arm, budget: BudgetFile) -> str \| None`, `price(tokens_in: int, tokens_out: int, budget: BudgetFile) -> float` | `accrue` appends and calls `price` to fill `observed.cost_usd` before it writes, so no row is ever stored with tokens and no money; `aggregate` is a view over `ledger_entry` and sums `observed.cost_usd` across **both** arms and `shared` into `BudgetLedger.spend_usd`; `stop_reason` returns the window, the binding safety cap, **or `campaign_spend_cap` when `aggregate`'s campaign-wide `spend_usd` has reached `budget.campaign_spend_cap_usd`**, else `None`. `price` is `tokens_in / 1e6 * budget.price_usd_per_m_input_tokens + tokens_out / 1e6 * budget.price_usd_per_m_output_tokens`, rounded to six decimal places, and returns `None` when either count is `None`. **Five errata, 2026-09-15** (§16.2): `accrue` takes the `BudgetFile` because it calls `price`; `aggregate` takes a keyword-only `today` because `inputs_today` is stage-3 occupancy per UTC day per arm and a test must be able to fix the day; `STOP_REASONS` fixes the order `campaign_spend_cap`, `arm_window`, `generated_inputs_per_day`, `filings_total`, `filings_per_day`, because more than one stop can hold at once; `accrue` enforces FR-14.4's one `arm_window` entry per arm per run, raising `E005`, the ledger being the only place that sees every entry; and `accrue` never sets `metered`, which is FR-14.8's manifest fact and the caller's to supply. |
 | `feedback.py` | `build_feedback(results: list[ProbeResult], previous: FeedbackBundle \| None, seed_sha: str, iteration: int, dispatched_probe_ids: list[str]) -> FeedbackBundle` | One entry per **dispatched** probe id, so a probe with no `ProbeResult` appears with `reason=result_missing` rather than being absent, which is what keeps A5's set difference honest and is why the dispatched list is a parameter. |
 | `store.py` | `LoopStore`, `init_schema`, `artefact_write`, `validate_candidate`, `load_candidate`, every record dataclass | §2.9, §6. |
-| `results.py` | `render_results(store: LoopStore, manifest: RunManifest) -> str`, and the **fourteen** private refusal checks listed immediately below | Refuses to render without any element `02-HLD.md` §1.3 lists; §14.4 gives each check its element and its FR, and §14.2 maps each FR to it. |
+| `results.py` | `render_results(store: LoopStore, manifest: RunManifest, *, labelled_pairs: Optional[list] = None) -> str`, and the **fourteen** private refusal checks listed immediately below. **Amended 2026-09-15** (§16.2): FR-10.2's hand-labelled pair set is a committed measurement of the project and not a row of the campaign, so it cannot come out of the store; its absence is `_require_dedup_rates`' refusal rather than a silent omission | Refuses to render without any element `02-HLD.md` §1.3 lists; §14.4 gives each check its element and its FR, and §14.2 maps each FR to it. |
 | `bug_loop.py` | `main() -> int`, `build_image(...) -> ImageSpec` (§4.11.1), `_head_node_id()`, `_head_options()` | §13.1, §4.11.1. `build_image` is B1 and was named in §3.2 and §14.1 without a signature (W4); §4.11.1 now carries it in full, beside the Dockerfile lines it runs. |
 
 **The fourteen refusal checks of `results.py`, named once and here** (W5). The count was "nine" in
@@ -3852,7 +4075,24 @@ _REFUSALS = (_require_headline, _require_secondaries, _require_validation_table,
 `render_results` calls each in that order and collects every failure before raising, so one render
 reports every missing element rather than the first. §14.4 gives each one the element it demands and
 the requirement it discharges and adds nothing to this list; `len(_REFUSALS) == 14` is asserted by
-`tests/test_results.py`, and `grep -c '^| ' ` over §14.4's table body is the check that the two agree.
+`tests/test_results.py`, and counting the lines of §14.4's table body that begin with a pipe is the
+check that the two agree. **Corrected 2026-09-15** (§16.2): that count is a **repository-wide**
+check and not a unit test, because §1.4 puts this package at two depths in two trees and no test
+module in it may walk to `design/`; `T-U-results-21` hard-codes the fourteen names instead.
+
+**Four further errata on `results.py`, 2026-09-15** (§16.2). `_facts` raises `ResultsIncomplete`
+directly where `loop.db` holds no `run` row for the manifest, which is a fifteenth **failure mode**
+and not a fifteenth **check**: there is no artefact to refuse parts of, so `len(_REFUSALS)` stays 14.
+`_require_regeneration_marks` re-runs the two deterministic **head-side** stages only,
+`probe_task.classify_build` over the recorded stderr and `gate.decide` over the recorded answers,
+and reads `image_unavailable` off the store's `image` table and `reduction_budget_truncated` off
+`reduced_case.budget_truncated`; re-executing a tool stage inside an image of the recorded digest is
+`04-Test-Plan.md` §11's system half. `_require_qualifiers` finds a table **textually**, as a line
+beginning with a pipe whose predecessor does not, taking the nearest non-blank line above as the
+caption, which is why `_table` writes the caption immediately above every table and why no table in
+the artefact may be introduced any other way. And the offline mutator synthesis is charged to a
+`shared` ledger entry at stage **`synthesis`**, a spelling §9 does not name anywhere and which
+`results.SYNTHESIS_STAGE` fixes in one constant so that the renderer and the ledger cannot disagree.
 
 **Two rules `feedback.py` owns and neither was defined** (W16).
 
@@ -5297,14 +5537,23 @@ bind-mounted into every worker container at the identical path (§12.1).
         case.<ext>                    the reduced case the script runs
         repro.sh.sha256.before        the hash B8 takes before the chain starts
         repro.sh.sha256.after         the hash B8 takes after the reproduce turn
+        fix.diff                      added 2026-09-15 (16.2): the chain returns
+                                      the diff as a STRING and
+                                      RepairResult.diff_path is a path, so the
+                                      file has to exist somewhere
     seed_<seed_sha>/
       iter_<n>/
         feedback.json                 canonical JSON, the FeedbackBundle A5 built for this iteration
+        llm_seed_read.prompt.md       added 2026-09-15 (16.2): the rendered
+                                      prompt. FR-04.6 requires FIVE files per
+                                      turn and this tree listed four; the prompt
+                                      is the fifth
         llm_seed_read.md              the stage-1 turn's streamed transcript
         llm_seed_read.stderr
         llm_seed_read.jsonl           the raw session transcript (.db on the antigravity backend)
         llm_seed_read.usage.json      the backend's reported usage, or {} where it reports none
-        llm_probe_write.md            the stage-2 turn, same five files
+        llm_probe_write.prompt.md     the stage-2 turn, the same five files
+        llm_probe_write.md
         llm_probe_write.stderr
         llm_probe_write.jsonl
         llm_probe_write.usage.json
@@ -5331,11 +5580,19 @@ bind-mounted into every worker container at the identical path (§12.1).
           port_list.json              canonical JSON, the Port list extract_port_list returned
           arcilator.out.txt           arcilator's stdout, the BUGLOOP lines the differ compared
           verilator.out.txt           the Verilator binary's stdout, the same shape
+          differential_evidence.json  added 2026-09-15 (16.2): both arms' argv,
+                                      the Verilator BUILD's included, both
+                                      stdout digests, both exit statuses, the
+                                      FR-08.11 driver deviation, the X policy
+                                      and the port-list digest. FR-08.4's
+                                      acceptance reads "the recorded Verilator
+                                      argument vector" and no file here held one
           arcilator.vcd               the arcilator trace, evidence, never parsed
           verilator.vcd               the Verilator trace, evidence, never parsed
           differential_verdict.json
           report.md                   the rendered report
-          llm_report_write.md         the stage-6 turn, with its four companions as above
+          llm_report_write.prompt.md  the stage-6 turn, with its four companions
+          llm_report_write.md         as above
           PARTIAL                     present iff the stage that owned this directory died
     results/
       counters.json                   FR-17.4's per-stage CounterBlocks, rewritten on every
@@ -5409,7 +5666,10 @@ substitution point and contain no other `$` anywhere, including inside their JSO
 ### 7.1 The output contract, and what happens when it is not met
 
 Every one of the four prompts ends by demanding a single fenced JSON block. The parser is one
-function, shared by all four:
+function, shared by all four, **and it lives in `llm.py`** (§1.1, §3.5.1, added 2026-09-15, §16.2).
+Its home had to be named: it is called by A3, A4 and A7 in the supply half and by B7 in the
+apparatus half, and the apparatus half may not import the supply half (FR-16.1), so as written the
+one function was necessarily two. `PromptContractError` moves with it.
 
 ```python
 _JSON_BLOCK = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL)
@@ -5801,6 +6061,7 @@ document, so a set can never be confused with another by path alone.
 {
   "format_version": 1,
   "set_version": "v1",
+  "frozen": true,
   "synthesised_utc": "",
   "synthesis_input": {
     "repo": "llvm/circt",
@@ -5828,6 +6089,7 @@ document, so a set can never be confused with another by path alone.
 | Field | Meaning |
 |---|---|
 | `format_version` | The **format**'s version, bumped when the fields change. |
+| `frozen` | **Added 2026-09-15** (§16.2). `true` only on a set A7 has frozen. `load_set` refuses an unfrozen set outright whenever a run names a digest, which is what stops the development set `mutators/set_dev.json` running a campaign; `SET_PATH` prefers `set_v1.json` wherever it exists. |
 | `set_version` | The **set**'s version, part of the file name, referenced by `RunManifest.mutator_set_sha`. |
 | `synthesised_utc`, `synthesis_model` | When, and by which model id (FR-05.8's declaration). |
 | `synthesis_input` | The exact input: the repo, the query, how many issues were used, when the mirror those issues came from was refreshed, and a SHA-256 over the sorted issue numbers so the input set is identifiable without shipping it. |
@@ -5858,12 +6120,17 @@ filled from the run rather than from the model.
 
 ```python
 def mutate_seed(seed: SeedRecord, iteration: int, cap: int,
-                mutator_set: dict) -> list[tuple[str, str, str, int]]:
+                mutator_set: dict,
+                argv: Optional[list] = None) -> tuple:
     """Produce up to *cap* mutants for one seed, deterministically.
 
     Returns:
-        a list of (mutator_id, source_test_path, mutant_text, seed_int), in a
-        fixed order, with no-ops already dropped.
+        Amended 2026-09-15 (16.2): (mutants, no_ops, failures), where each
+        mutant is the FIVE-tuple (mutator_id, source_test_path, mutant_text,
+        seed_int, argv_or_None), in a fixed order and with no-ops already
+        dropped; no_ops is FR-05.6's count and failures is FR-05.7's count per
+        mutator id. The bare list of four-tuples had nowhere to put either
+        count, nor FR-05.5's replacement argument vector.
     Worker:
         pure; no worker resource and no model (FR-05.1, FR-05.3). It reads
         seed.test_files and never the filesystem.
@@ -5876,7 +6143,11 @@ def mutate_seed(seed: SeedRecord, iteration: int, cap: int,
 and the one function it calls, which W4 found named and unsigned:
 
 ```python
-def apply(mutator_id: str, text: str, seed_int: int) -> tuple[str, list[str] | None]:
+def apply(mutator_id: str, text: str, seed_int: int, *,
+          # amended 2026-09-15 (16.2): the three-argument form can neither look
+          # an id up in a set it is not given nor mutate an argv it is not given.
+          mutator_set: Optional[dict] = None,
+          argv: Optional[list] = None) -> tuple[str, list[str] | None]:
     """Apply one frozen mutator to one input text, deterministically.
 
     Returns:
@@ -6156,7 +6427,16 @@ beside the headline with the price they were computed from.
 1. **Committed, and earlier.** `git -C <repo> log -1 --format=%H%x09%cI -- budget.yaml` must return a
    commit, and that commit's date must precede the run's start. A run against an uncommitted or
    later-committed file exits non-zero naming the offending commit (FR-14.2). The returned SHA is
-   `BudgetFile.budget_file_sha` and is the pre-registration (FR-14.3, G-32).
+   `BudgetFile.budget_file_sha` and is the pre-registration (FR-14.3, G-32). **FR-05.2's frozen-set
+   rule runs inside this check** (added 2026-09-15, §16.2): the mutator set must be committed no
+   later than `budget.yaml`, so a set frozen after the registration invalidates the campaign for the
+   same reason a later budget edit does. The set's path is derived from the **budget file's own
+   directory**, which is what makes it right in both of §1.4's trees, and a set that is not there is
+   skipped rather than refused, because A7 runs before the registration commit and not before every
+   run. `_CHECKS` therefore stays **six**; this is not a seventh.
+   Note that `git log --format=%cI` emits a trailing `Z`, which Python 3.10's
+   `datetime.fromisoformat` rejects; `budget._iso` normalises it, and without that this check
+   refused every committed budget file.
 2. **Complete and closed.** Every key of §9.1 present; no other top-level key; every type as declared.
 3. **Equal on the unit and on both safety caps.** `arm_window_seconds` is one value and applies to
    both arms by construction, and `arm_order` names each arm exactly once, so FR-14.5's equality is
@@ -6185,8 +6465,10 @@ beside the headline with the price they were computed from.
    ledger would under-report the spend it is meant to stop on, so `budget.py` refuses a file in
    which either price is absent, non-positive, or not a finite float, naming which. It refuses a
    non-positive `campaign_spend_cap_usd` for the same reason, and it refuses a `model_id` that is
-   empty. The heading above says five because five is what the LLD review left; the count is
-   **six** from 2026-09-14 and `tests/test_budget.py` asserts six.
+   empty. ~~The heading above says five because five is what the LLD review left;~~ the count is
+   **six** from 2026-09-14 and `tests/test_budget.py` asserts six. §1.3's `test_budget.py` line said
+   "the five checks" and was corrected on 2026-09-15 (§16.2); no heading in this section carries a
+   count.
 
 ### 9.3 The acceptance block, and why it exists
 
@@ -6356,6 +6638,15 @@ reduction_sigkill_grace_seconds: 10
 # --- the issue mirror (FR-10.9) ---------------------------------------------
 # An ISSUE cap, not a page cap: GithubIssuesNode.recent takes n and pages
 # internally. Comments are never mirrored.
+#
+# AMENDED 2026-09-15 (16.2, C-22). This is a ROW bound and not a request bound,
+# and it is only reachable because 3.7.3's walk is two-directional. GitHub
+# refuses page 100 of this endpoint, that is item 10,001, with a 422: measured
+# 2026-09-14, a single desc walk at this cap made 100 requests in 99.3 s, took
+# the 422 on the hundredth and wrote ZERO rows. desc then asc, unioned and
+# deduplicated by issue number, covers at most 20,000 numbered items, and
+# llvm/circt's newest number on 2026-09-14 was 11,113, so the union is the whole
+# history. Do not raise this above 20000 without re-reading C-22.
 issue_mirror_issue_cap: 20000
 
 # --- filing (FR-13.16) ------------------------------------------------------
@@ -7645,15 +7936,15 @@ a named private check in `results.py`, and a missing one is a render failure rat
 |---|---|---|
 | the headline, distinct confirmed bugs per arm, from `filing` rows carrying a URL | `_require_headline` | FR-18.3 |
 | the five secondaries per arm | `_require_secondaries` | FR-18.4 |
-| the separate seeded-bug validation table | `_require_validation_table` | FR-18.5 |
+| the separate seeded-bug validation table, whose `probes` column counts a seed's probes across **both** arms, seeds being shared within a mode (added 2026-09-15, §16.2) | `_require_validation_table` | FR-18.5, FR-18.2 |
 | the mode and the seed set on **every** table | `_require_qualifiers` | FR-18.2, ADR-D-07 |
 | the contamination column, and the headline both with and without contaminated candidates | `_require_contamination` | FR-15.2 |
 | the two disclosure sentences, incompleteness and the unscreened repair stage | `_require_disclosures` | FR-15.3, FR-15.4 |
 | the lag the campaign ran under, beside the headline | `_require_lag` | ADR-D-10 |
 | the confirmation cut-off date | `_require_cutoff` | FR-18.8 |
-| the collision and false-merge rates, beside the headline they qualify | `_require_dedup_rates` | FR-10.2 |
+| the collision and false-merge rates, beside the headline they qualify, each printed as **numerator and denominator as well as a rate** (added 2026-09-15, §16.2), because a small campaign gives the false-merge rate a zero denominator and `triage_task.rates` returns 0.0 for an empty class, so a bare `0.0` would read as "no false merges" where the truth is "unmeasured" | `_require_dedup_rates` | FR-10.2 |
 | the divergences-observed list | `_require_divergences` | FR-18.12 |
-| the mutator-synthesis declaration, naming its input, date and frozen-set SHA | `_require_mutator_declaration` | FR-05.8 |
+| the mutator-synthesis declaration, naming its input, date and frozen-set SHA, **and, added 2026-09-15 (§16.2), stating that the synthesis is Mut4All's design rather than a leak in the experiment** | `_require_mutator_declaration` | FR-05.8 |
 | tokens, cost and CPU time under a heading saying they are not the budget, and, added 2026-09-14, the sentence that the USD total is a **lower bound excluding stage 7**, whose per-turn tokens CHIA's chain does not return (§3.8, FR-14.6) | `_require_observed_heading` | FR-14.5, FR-14.6 |
 | both arm windows, with the binding cap and the unspent balance where one bit | `_require_both_windows` | FR-18.10 |
 | every row that could not be regenerated, marked rather than reported | `_require_regeneration_marks` | FR-18.11 |
@@ -7668,12 +7959,25 @@ does (§3.7.1); and `_require_secondaries` prints the count of repair attempts w
 `repro_overwritten` is true, because FR-12.3's "confirms rather than invents" is reported per attempt
 (§3.8).
 
+**The failure-taxonomy table prints a seventh row, added 2026-09-15** (§16.2). FR-18.6's six buckets
+are unchanged and the seventh row is **not** a bucket: it is `no gate decision`, the count of
+candidates the gate never reached, printed so that a candidate is counted rather than dropped and the
+sum check stays meaningful.
+
 Two further properties are asserted rather than rendered: the render succeeds from an empty
 confirmation set and states the zero (FR-18.7), and the rendered text contains no sentence comparing
 the loop's count to FLEX, ISSTA-2024, Nuwa or DESIL (FR-18.9), checked by a name search over the
 output.
 
 ### 14.5 Where `arm` may be branched on, and the check that keeps it there
+
+**Two refinements, 2026-09-15** (§16.2), both forced by a measured false positive and neither
+weakening the rule. The walk reads a branch's **operand** and not its body, that is an `If`'s test
+rather than its whole subtree, because otherwise every mention of a name inside a branch is reported
+as a branch on it; and it matches the name `arm` or a name ending `_arm` rather than any name ending
+in those three letters, because `warm` ends in them and `circt_warm_build` is a name this tree uses.
+The two positives it caught were both spurious: `probe_task.oracle_differential` named its two
+**simulator** sides `arm`, a local the code half of the same erratum renames `side`.
 
 FR-18.1 permits the apparatus to **carry** `arm` and forbids it to **branch** on it, except in the
 budget ledger and the results table. The check is a search of the apparatus modules for any `if`,
@@ -7843,7 +8147,9 @@ running the tool, measured, or marked `[DEFAULT]` with its home named.
 
 ---
 
-## 16. Errata from implementation, 2026-09-14
+## 16. Errata from implementation, 2026-09-14/15
+
+### 16.1 Errata from the contract package, 2026-09-14
 
 `W-02` typed §2 into `circt_bug_loop/contract/` and `W-03` froze it. Seven places where the code and
 this document differed are recorded here rather than left to be rediscovered. Six are the package's
@@ -7861,3 +8167,177 @@ each is at version **2.0** and none of them is a bump; the freeze is the annotat
 | `LedgerSnapshot` in §2.3's rebuild list | §2.3 | not rebuilt anywhere; no `__post_init__` mentions it | §2.3 names `FeedbackEntry`, `RunCommit` and `LedgerSnapshot` as the nested dataclasses the owning member's `__post_init__` rebuilds. `LedgerSnapshot` has no owning member: §2.5 makes it the generator's read-only argument view, it is a field of none of the seven, and `_MEMBERS` excludes it, so `from_json` refuses it by design. It serialises through `to_json` and stops there, and `T-U-schema-12` asserts exactly that |
 | `BudgetFile`'s four keys of 2026-09-14 | §2.4, §9.1 | `model_id: str`, `campaign_spend_cap_usd: float`, `price_usd_per_m_input_tokens: float` and `price_usd_per_m_output_tokens: float`, all four required; `model_id` non-blank, the three money figures positive and finite with an `int` accepted per §2.3 | §9.1 and §9.5 gained the four keys with the backend decision and §2.4's dataclass was not updated with them. The parsed `budget.yaml` therefore could not carry what FR-14.1 requires the file to declare, and NFR-08's campaign-wide USD cap had no home in the seam at all. `T-U-schema-24` to `T-U-schema-27` cover the four rules; the fixture carries §9.5's values |
 | §3.1's docstring rule | §3.1 | applied to `@ChiaFunction` nodes and `ChiaTool` methods; `contract/` is exempt | §3.1's three paragraphs are **Returns**, **Worker** and **Raises**, and **Worker** is "the resource the node needs, spelled as the dict it declares". A pure function in `contract/schema.py` runs in whichever process calls it, declares no resource and reaches no worker, so the paragraph could only be false or empty. `T-U-layout-03` therefore exempts `contract/` and covers the nodes and the tools the rule was written for |
+
+### 16.2 Errata from W-05 to W-16, 2026-09-14/15
+
+Dated **2026-09-15**. The driver is `reviews/implementation-errata-log.md`, the running log W-05 to
+W-16 kept while the modules were written, together with its **Architect decisions** section, which
+is binding and overrides any row it contradicts. §16.1 above stays as it was: it is the contract
+package's own list and none of it is reopened here.
+
+Every row below is a place where the committed code and this document differed. The convention is
+`01-FRD.md` §1.5's: the section named is **corrected in place**, with the withdrawn text struck
+through and the date given, and this table is the index rather than the correction. Nothing here is
+a contract change: the seam is at **2.0** and stays there, `contract-2.0` unmoved.
+
+**Three things this table does not cover, said here so their absence is not read as agreement.**
+The log carries no W-11 or W-12 section, so `circt_core.py`'s **three signature deviations** from
+§3.10, recorded in that module's own docstring, are owed a pass of their own; the module itself is
+added to §1.1 below, on W-16's row, rather than left unlisted. Rows the log owes to `05-Work-Plan.md` alone are outside this document. And rows that record a
+defect in the **code** rather than in this document are listed in `04-Test-Plan.md` §16.8 as open
+code items for W-17, not corrected here, because there is nothing here to correct.
+
+#### The layout, §1
+
+| Item | Section | What the code does, or must do | Why |
+|---|---|---|---|
+| `llm.py`, a neutral module | §1.1, §1.3, §3.5.1, §7.1 | `parse_json_footer`, `PromptContractError`, `require_live_model`, `LiveModelRefused`, `build_llm`, `llm_turn` and `MODEL_BACKEND` move out of `generate_task.py` into `circt_bug_loop/llm.py`; both halves import it; `generate_task.py` keeps the two generators and the two tools | Architect decision 3. §7.1 calls the footer parser "one function, shared by all four" and names no module for it, and §3.5.1 puts the backend and the turn in `generate_task.py`, which is the **supply** half. The apparatus half may not import the supply half (FR-16.1, `05-Work-Plan.md` §2.3), so `triage_task.py` and `repair_adapter.py` reached them by a function-local import and `generate_task.py` grew a second copy of the parser. A neutral module both halves import is the only shape in which the parser is one function and the seam rule holds. §1.3's mapping therefore reads **nineteen** source modules with logic, not eighteen |
+| `tests/test_tools.py` | §1.3 | a **twenty-sixth** test module, holding the two `ChiaTool`s' tests | §1.3's mapping names twenty-five and its exemption list is compared for equality by `T-U-layout-01`, so a twenty-sixth module fails the test unless the document names it. The two tools are not a source module of their own; their tests are separated from `test_generate_task.py` because they need a git repository and the generator tests do not |
+| `test_layout.py` rule (2) | §1.3 | exempts `BudgetLedger` and `LoopStore` | `ledger.py` is A6b, which `02-HLD.md` §1.2 puts in the **supply** half, and it imports `BudgetLedger` from `store.py` because that is where §2.9 declares it. The rule as written, "no `store.py` name is imported by any supply-half module", is therefore false of the design it describes. The two names are records the ledger owns the arithmetic of; no apparatus behaviour crosses with them |
+| `corpus._Git`, `_read_tags`, `_walk_pins` | §1.3, §3.3, §3.4 | imported by `pin_select.py` across the module boundary rather than copied | §4.11.1 lists §3.3's and §3.4's git commands **once**, which can only be true if one module runs them. Any `test_layout.py` rule about private names crossing modules must exempt these three by name |
+| `mutators/set_dev.json` | §1.1, §8.1 | the committed set is `set_dev.json`, `set_version: "dev"`, carrying `"frozen": false` | A7 has not been run, so `set_v1.json` does not exist. `mutators.SET_PATH` prefers the frozen name wherever it exists and `load_set` refuses an unfrozen set outright whenever a run names a digest, so the development set cannot run a campaign. §8.1's format gains the `frozen` boolean, which is what makes that refusal expressible |
+| no `pyproject.toml`, no console script | §1.1, §13.2 | the entry is `python -m circt_bug_loop.approve` | Architect decision 7. The team repository packages nothing, so §1.1's `pyproject.toml` row and §13.2's `bugloop-approve` are **W-26's packaging work** and not the entry that exists today. `T-U-appr-15` exercises the module entry as a program |
+
+#### The records, §2
+
+| Item | Section | What the code does | Why |
+|---|---|---|---|
+| `SeedRecord` and the nearest tag | §2.4, §3.3 | no schema field; `build_corpus` returns a top-level `nearest_tag` map | FR-01.7 asks for the nearest tag by date and the bumps away, and `SeedRecord` carries `sdk_tag` and `bumps_away` only, both null on the 16 inexact seeds. A field would have been a contract MAJOR bump for a reporting figure, so the map rides on the node's return and the record is unchanged |
+| "eleven reduction fields" | §2.9 | nine | A miscount of §2.9's own `ReducedCase` block |
+| `CandidateRecord`'s field count | §2.9 | **38** fields, not 41; the `candidate` table's 20 columns are right | The same kind of miscount, in the other direction; `T-U-store-01` counts both |
+| `artefact_write` | §2.9, §6.5 | `artefact_write(artefact_dir, relative_path, data, *, mode=0o644, store=None)`; `relative_path == "PARTIAL"` with `b""` writes the marker and with `None` removes it; any other write creates the marker when it is absent | §2.9 gives no `store` parameter and §6.5 describes the marker in prose. The completion-record check of §6.5 needs the store, and the protocol needs a spelling in the signature or two callers will invent two |
+| "completion record" | §6.5 | a `probe_result` or `candidate` row whose `artefact_dir` equals the directory; `probe` rows are excluded | §6.5 says `artefact_write` refuses to clear a marker whose completion record is absent, and names no table. `probe` is excluded because it is written before the stage that owns the directory finishes |
+| `load_candidate` on a `differential` | §2.9 | `frames_*` 0/0 and a null `repro_command` where no `oracle_verdict` row exists | FR-08.10 keeps such a candidate out of the primary path, so its verdict row is absent by construction rather than by loss |
+| `candidate_created_at_utc` | §2.9, §3.8 | the `candidate` **table** has the column and `CandidateRecord` has no field; §3.8's free variable is passed to `repair_adapt` as a keyword | Recorded so that a reader of §3.8 does not look for a field that is not there |
+| `RunManifest.run_commit` and `resolved_utc` | §2.4, §2.7, §3.4 | of A2's eight returned fields, seven map into the manifest, `run_commit` must be **wrapped** in a `RunCommit` because the field is a list (FR-02.7), and `resolved_utc` has **no** manifest field at all | §3.4 says B12 "writes all eight fields into the `RunManifest`", which is false of two of them. `resolved_utc` is kept on the node's return and in the artefact copy of the manifest's provenance block, not in the schema, which would be a MAJOR bump for a timestamp |
+| `RunManifest.issue_mirror` | §2.7, §3.7 | closed at six keys, and `validate` compares the key set exactly; `issue_mirror_refresh` returns the six **plus** a seventh, `incomplete_reason`, and B12 copies the six | FR-10.7's detection point had nowhere to be recorded. `incomplete_reason` is the caught exception's class name or `None`, and it is what makes an incomplete refresh visible without reopening the contract |
+| `image_spec` is a dict | §2.7, §3.9 | `gate_rerun` and `gate_validate` take `image_spec: dict`, not `ImageSpec` | `RunManifest.image_spec` is §2.7's eight-key dict and the four keys the two nodes read, `tool_hashes`, `flag_string`, `circt_sha` and `image_digest`, are all in it. `oracle_primary` reads exactly one field off its own `image_spec`, `flag_string`, so `gate_rerun` hands it a one-field stand-in rather than restating §3.6.2's rule |
+| `turn_cost.cost_usd` | §2.7, §3.11 | computed only where `cfg` carries the two prices, `None` otherwise; `metered` agrees with `tokens_in` | The generator may not read `spend_usd` (§2.5) and the ledger owns the arithmetic (§9.1), so a generator that priced its own turn would be doing the ledger's job with a copy of the ledger's input |
+| the differential's return shape | §2.9, §3.6.3 | the divergence index is `first_divergent_cycle` plus `first_divergent_signal`; `report_only` is a `CandidateRecord` field the head writes; the arcilator side's version is `ImageSpec.circt_sha` with `BuildResult.binary_sha256`, the Verilator side's is `DifferentialVerdict.verilator_version`; the two output digests have **no** column | `05-Work-Plan.md`'s W-08 brief asked for an `OracleVerdict` of class `differential` carrying all four, and `DifferentialVerdict` is what §3.6.3 returns. The four facts exist and are spread over three records; the digests live in `differential_evidence.json` below |
+| every node returns a `CounterBlock` | §2.10, §3.5, §8.3 | A3, A4 and A7 return `"counters"` too; A3 and A4 report `stage="stage_2"` and A7 `stage="synthesis"` | §2.10's `CounterBlock` docstring requires it of every node of §3.2 and §3.5's and §8.3's **Returns** blocks do not list it, which is the one place `T-U-layout-07` reads |
+
+#### The modules, §3
+
+| Item | Section | What the code does | Why |
+|---|---|---|---|
+| `build_corpus`'s **Returns** | §3.3 | the dict also carries `counters` (a `CounterBlock`), `exclusions`, `nearest_tag`, `sv_seeds`, and count keys beyond the seven named | The block as written is not the return a caller destructures. `05-Work-Plan.md`'s W-05 brief asked for a bare `list[SeedRecord]`; **§3.3's signature is the right one** and the brief was wrong |
+| exclusion precedence | §3.3 | `seed_text_over_cap` > `no_run_line` > `unsupported_shape` | Three exclusions can hold at once and §3.3 counted them without ordering them, so one seed could be counted three times and the counts would not sum to the corpus |
+| `strip_probe_only_options` | §3.3, §4.2 | `_PROBE_ONLY_OPTIONS` is **four** spellings: `--verify-diagnostics` and `--split-input-file` in both the double-dash and the single-dash form, bare and `=`-valued | CIRCT's own tests write the single-dash forms and they survived into the probe argv. The reach is measured rather than assumed: **46 of M1's 331 corpus `RUN:` lines** spell one of the two options with a single dash (`raw/m1-per-runline.csv`, 2026-09-14) |
+| `select_release_pinned_main` | §3.4, §4.11.1 | keyword-only `ref: str = "HEAD"`; the acceptance run passes `origin/main` | §3.4's signature **cannot reach `main`**. The head's blobless clone is detached at `corpus_head_sha` while A1 holds it (FR-01.11), so `HEAD` is the corpus head and not `main`, and the walk §4.11.1 spells for every pin-walk command would have walked the wrong ref |
+| `PinSelectError("no_tags")` | §3.4 | **two** refusals, not one: an empty tag map raises `no_tags` naming the refspec, before the walk starts; `no_match` is a walk that finished | The operator's next action differs: a clone fetched without `--tags` is not a `main` that drifted. `corpus._read_tags` already separates the two cases (FR-01.8) |
+| `WINDOW_DAYS = 730` | §3.4 | 24 months is 730 days, measured from the **head commit's own date** and not from now | FR-02.5's "24 months" has no number anywhere. Measuring from the head commit makes the window a property of the clone rather than of the day the run happens, which is what FR-01.6's re-runnability needs |
+| `lag_days` | §3.4 | returned unrounded; W-04's 4.807 is `round(lag_days, 3)` | Two numbers were being compared as one |
+| `SourceReadTool.grep` | §3.5 | strips the `<rev>:` prefix `git grep` puts on every line, returning `<path>:<line>:<text>` | The method's docstring is the text the model reads and it promises that shape, and it is also the shape whose path the model can hand straight back to `read_file`. §3.5's table gives the command and says nothing about the return |
+| probe ids | §3.5, §2.4 | derived: `p-<sha256(run_manifest_id, seed_sha, arm, iteration, key)[:12]>` | §3.5's emitter is handed no allocator. A derived id makes FR-16.5's replay and A4's idempotency key reproduce the **same** row rather than a second one. `contract/fixtures/probe_spec/seeded_01.json`'s `p-0000000001` is a counter and is constructed |
+| the staging directory | §3.5, §6.5 | `ProbeWriteTool` is bound to `<iter>/probes/`; the emitter then writes each accepted input to §6.5's `<iter>/probe_<probe_id>/input.<ext>`, and that path is `ProbeSpec.input_path` | No section said how one becomes the other. `input_filename` is therefore `input.<ext>` and the agent's own file name survives in the transcript and in the staging directory, which is the only place it is evidence |
+| the `cfg` keys A3 and A4 read | §3.5 | `model_id`, `per_seed_probe_cap`, `iteration`, `run_manifest_id`, `artefact_dir` or `artefact_root`, `artefact_inline_cap_bytes`, `clone_path`, `run_commit`, `head_options`, `here_options`, `timeout_seconds`, the two prices, `mutator_set_path`, `mutator_set_sha`, and the two prompt overrides. A3 defaults its iteration index to `feedback.iteration`; A4 reads `cfg["iteration"]` only | A4 may not read the bundle at all (FR-16.2), so the two nodes cannot share one rule for the index |
+| `require_live_model` | §3.5.1 | `require_live_model(purpose, *, need_key=True, env=None)`; a caller passes an explicit mapping and no test touches the process environment | Architect decision 2. `T-U-layout-08` (1) forbids any test outside `tests/system/` to set `BUGLOOP_ALLOW_LIVE_MODEL`, and the allow path has to be exercised somewhere. An `env=` mapping is the only shape in which the refusal, the key check and the express construction all run against the real code with the process environment untouched |
+| `_normalise_function` | §3.7.1 | strips a leading `(anonymous namespace)::` and every such segment **before** §3.7.1 step 2's depth-zero cut | Step 2 as written cuts at the first depth-zero `(`, so `(anonymous namespace)::X::f` normalised to `""` and was skipped, every trace lost a frame, and `fatal_error` fingerprints collapsed to `main`. Measured effect on the six recorded fixtures: two fingerprint frames stopped collapsing to `main circt-opt.cpp` and two evidence tuples lost a blank slot. `T-U-probe-52` is the guard |
+| `_address_groups` and `out_of_scope_root` | §3.6.2 step 4, §3.7.1 | frames sharing one address form a group; the ROOT group is in scope when **any** member resolves to a CIRCT source file; `_fingerprint_frame` takes the **last-listed** usable CIRCT member of the first group that has one | Step 4 read only the first `#n` line of an inlined chain, so 3 of 4 mined bugs were wrongly out of scope. Measured: `out_of_scope_root` flips true to false on **four** of the six fixtures, `fatal_error_01` staying out because its root group is one unresolved SDK `.so` frame. `T-U-probe-53` is the guard, and `expected.json` gains `out_of_scope_root` so the rule has a regression guard of its own |
+| `prologue_dropped` | §3.7.1 | the assertion is the **rule**, not the count | Measured 4, 4, 4, 4, 6, 4, 5, 4 over eight runs of one input on one host: a stack overflow sometimes hits its guard page inside libc's own `realloc` and the leading unresolved libc frames the strip removes are then two or three rather than one. Pre-existing, and identical before and after the two frame fixes above |
+| `signal_name` | §3.7, §3.7.1, §2.9 | read from `build_result.signal` by `probe_id`, through the store the node already opens for the mirror screen | §3.7.1's crash and fatal-error fingerprint begins with the signal name and `dedup_and_screen`'s signature carries no `BuildResult`, while neither `CandidateRecord` nor `OracleVerdict` has a `signal` field. The first half of the fingerprint was unreachable from the signature |
+| `dedup_and_screen` **Raises** | §3.7 | raises on a `differential` candidate, against "Raises: nothing" | FR-08.10 keeps such a candidate out of the stage entirely, so one arriving is a caller defect and not an undecidable dedup; `dedup_unavailable` would hide it behind a verdict the gate treats as ordinary |
+| verdict precedence | §3.7 | fixed and stated in the node's docstring: an empty mirror is `dedup_unavailable` for every candidate; then a mirror hit, open before closed; then a candidate-to-candidate duplicate; then a post-pin fix; then `new` | §3.7 names six `DedupVerdict` values and no order between them, and more than one can hold. The mirror hit outranks the candidate duplicate because its evidence is the only carrier of FR-13.9's label |
+| "once per run" | §3.2, §3.7, §6.2 | B6a writes `issue_mirror` rows only; B12 calls it once unless `--refresh-mirror` and writes the `issue_mirror_meta` row from the return | The node's signature carries neither a run id nor a refresh flag, and `issue_mirror_meta` is keyed by `run_manifest_id` with a foreign key to `run`, so the rule is the driver's and the idempotency key of §3.2 is what expresses it |
+| `_after` | §3.7.2 | both commit scans drop the bound commit's own SHA from the result | `git log --since <bound>` includes a commit stamped exactly at the bound, so without the drop every candidate is `fixed_post_pin` against its own run commit (FR-10.4, FR-15.1) |
+| `frame_paths` | §3.7.2, §3.7.1 | cuts each frame path at the first of `lib/ include/ tools/ test/ frontends/ integration_test/` and falls back to `:(glob)**/<basename>`; it reads the **raw** `assertion_site`, not the normalised one; only `in_circt_object` frames contribute | §3.7.2 says "the candidate's source paths" and §3.7.1's site normalisation keeps two components, which is a fingerprint and not a pathspec. One real trace in §3.7.1 is 466 frames long and a pathspec list that size is not a query |
+| the mirror walk | §3.7.3, §9.5 | the walk is **two-directional**: `direction=desc` first and then, on the ceiling, `direction=asc`, the two unioned and deduplicated by issue number; the cap stays the **row** bound | Architect decision 1, forced by measurement. With `GITHUB_TOKEN` set, `T-U-triage-35` made **100 requests in 99.3 s**, the first 99 returning 200 and the 100th returning **422**, which is GitHub's own pagination ceiling of 10,000 items on this endpoint. `issue_mirror_refresh` caught it as `GithubRequestError`, set `incomplete_reason`, and wrote **zero** rows: at the committed cap the mirror does not truncate, it produces nothing. A bounded second run at 600 succeeded: 600 rows, 249 open and 351 closed, 35 requests, 33.9 s wall, `X-RateLimit-Remaining` 4865 of 5000. 35 listing pages for 600 issues because the node drops pull requests, which are the majority of the numbering. The ceiling is recorded as **C-22** |
+| the labelled match | §3.7.3 | `mirror_screen` promotes a `good first issue` match **ahead** of the open-before-closed rule | FR-13.9 refuses a filing that matched **any** `good first issue` issue and `DedupVerdict.evidence`'s eight keys hold the labels of **one**, so under §3.7.3's selection order a labelled match could be masked by an unlabelled one and the refusal would silently not fire. Promotion is the safe direction; the alternative is a ninth evidence key, which is a MINOR contract bump this revision declines |
+| the cap paragraph | §3.7.3 | rewritten with the two-direction walk; the table is still at most `issue_mirror_issue_cap` rows and `instr` still cannot use an index, so §6.3 still adds none | The paragraph asserted that 20,000 rows is what the screen scans, which was true of the table and false of the walk that fills it |
+| `triage_report` | §3.7.4, §7.4.1 | keyword-only `differential: Optional[DifferentialVerdict] = None` | §7.4.1's differential template needs one and §3.7.4's signature takes no `ProbeSpec` and no `DifferentialVerdict`, so the template had no source for three of its five stimulus values |
+| `TRIAGE_SYSTEM_MESSAGE` | §3.7.4, §3.5.1, §1.1 | one line in the module | `build_llm` takes a system message and CHIA's chain has `prompts/system.md`, which §1.1 gives stage 6 no equivalent of |
+| the build-identity wording | §3.7.4, §7.4, §7.4.1 | "Built with `-UNDEBUG`, so the compiler's internal checks are on" | FR-07.10 forbids the words "crash" and "assertion" in a `fatal_error` report and the block previously read "Assertions: -UNDEBUG", which is the renderer breaking the rule the agent is held to. The literal `-UNDEBUG` stays, which is what FR-11.3 and C-08 ask for |
+| `render_report`'s removal cases | §7.4.1 | eleven of the thirteen substitution points can be absent; `contamination` and `assisted_by` cannot | Both are always derivable from the `CandidateRecord` and the `RunManifest`, so `ReportIncomplete` cannot fire for them and a test asserting thirteen would assert two impossibilities |
+| "six primary variables" | §7.4 | the variable list has **ten**, and a `differential` candidate cannot fill seven of them | Seven are bound to a literal for that class; `oracle_class` is bound to the class itself, because the prompt branches on it three times and binding it to "not applicable" would disable those branches |
+| §7.4.1's `stimulus` point | §7.4.1, §9.4 | three values come off the `DifferentialVerdict` (`stimulus_id`, `cycles`, `port_list_sha`) and two off §9.4's campaign constants (`RESET_PROTOCOL`, `SAMPLE_POINT`) | The point is written as "`ProbeSpec.differential`'s five keys" and `render_report` is given no `ProbeSpec`. It is the same data, by FR-08.3's rule that one stimulus definition serves the whole campaign |
+| `oracle_differential` | §3.6.3 | three keyword-only additions: `limits`, `bin_dir` and `verilator` | The two simulator runs are bounded by the **probe** limits through `circt_exec_probe`, not by B4's 1800 s node timeout, and every fixture and tier-1 measurement runs a build outside the image |
+| FR-08.1's applicability | §3.6.3 | `_HW_TERMINAL_PASSES`, the **seven** `--lower-*-to-hw` conversions the measured source build registers (`circt-opt --help`, 2026-09-14), applied to the **last** option of the argv that is not one of `_NOT_A_PASS`; both dash spellings accepted; a `--pass-pipeline=` probe is **refused** rather than parsed | "A pipeline that ends in the HW dialect" is not a testable rule without a list. `--convert-moore-to-core` is deliberately absent, which is FR-08.1's own acceptance criterion. 50 of M1's corpus `RUN:` lines use the `--pass-pipeline=` spelling and **none** of them is HW-terminal, so reading the last pass out of a nested pipeline string would be code for no case. `firtool` with **no** output mode also emits Verilog by default, and FR-08.1's own wording, "requesting" one of three, excludes it |
+| FR-08.9's bucket | §3.6.3 | its observable form: every signal that diverges does so over a contiguous **prefix** of the cycles it is sampled at, and agrees from some cycle onward | "A divergence confined to cycles before the first write of the divergent output signal" is not something a differ that sees two line sequences can evaluate. A register the design never writes stays undefined for the whole run under `--x-initial unique` and is a plain `diverge`; one written at cycle k differs only while uninitialised, which is the bucket |
+| `port_list_sha` | §3.6.3 | `hashlib.sha256` over `_canonical([dataclasses.asdict(port) ...])`, **not** over `contract.to_json` of the list | `to_json` takes one dataclass and raises on a list. The canonical shape is the same four `json.dumps` options |
+| `_module_body` | §3.6.3 | a lifted design is unwrapped from the implicit top-level module before `gen_arc_harness` wraps it | `circt-opt` and `firtool` print the implicit module **explicitly**, and `gen_arc_harness` wraps what it is handed, so `arc.sim.instantiate` cannot resolve a symbol one level down. Measured: the nested form makes arcilator exit 1 |
+| `dut.sv`'s provenance | §3.6.3, §4.13 | `firtool --verilog` on the lifted HW IR, as §3.6.3 says, and **verified** rather than assumed on 2026-09-14 against the measured build | The probe's own `--verilog` stdout is deliberately not reused, so both arms come from one file and cannot drift |
+| `repair_adapt` | §3.8, §2.9 | three keyword-only additions: `local_id`, `input_path` and `created_utc` | `local_id` is `LOCAL_ID_BASE + <the candidate's rowid>`, a query against the head's `loop.db` that a `repair` worker cannot run, so `mint_local_id(store, candidate_id)` is the head's half and the node takes the minted value. `input_path` is the probe's own input path, because `repro.sh` runs the tool with the **reduced case** in the input's place and `OracleVerdict.repro_command` names the original without saying which token it is. `created_utc` is §3.8's own free variable, which `CandidateRecord` has no field for |
+| `RepairRefused("repair_disabled")` | §3.8, §13.1 | `--no-repair` is a refusal **inside** B8, checked **before** the interlock | §3.8 consequence 4 states the outcome and names no mechanism. Checking before the interlock is what makes a disabled run ask for no credential at all |
+| `PROMPT_FILES` | §3.8 | a key-to-file map; the six prompt keys are **not** the six file names | §3.8's table renders them `f"{n}.md"`, and `cfg["repro_prompt"]` is read from `reproduce.md` (`chia:examples/circt_issue_solver/circt_issue_loop.py:88`) |
+| `cfg["backend"]` and `cfg["model"]` | §3.8, §2.7 | both come from **one** recorded pair: `build_cfg` splits `manifest.model_ids["repair_adapt"]`, which is already `"<backend>:<model id>"`, and raises `ValueError` where `cfg["repair_backend"]` disagrees | §3.8 sources the backend from the flag and the model from the manifest, which is two places for one fact. `stages_metered["stage_7"]` reads the manifest and the chain reads the flag (FR-14.8), so a disagreement is a mis-metered stage rather than a cosmetic one |
+| FR-12.8's stop | §3.8 | B8 **records** `lit_unusable` true with `lit_ok` null, so no patch can attach, and **B12** stops on the field | §3.8's **Raises** paragraph closes the exception set at `RepairRefused` and `LiveModelRefused`, so "stops the run" cannot be B8's act. `T-U-repair-12` asserts the mapping and that the mapper's docstring names FR-03.17 |
+| the three function-local imports | §3.8, §3.7.4, §13.1 | `generate_task` (after this revision, `llm.py`), CHIA's `issue_task` and `circt_util` are imported **inside** `repair_adapt`, and `llm.py` inside `triage_report` | Two reasons, and both are structural. The apparatus half may not carry a module-scope edge into the supply half before the join (`05-Work-Plan.md` §2.3), and `repair_adapter.py` is imported on the **head**, where CHIA's `issue_task` and `circt_util` are not on `sys.path` at all: §13.1's `_PY_MODULES` ships them to the repair worker only. `T-U-repair-17` asserts the call site is still the bare `run_issue_remote(issue_md, local_id, chain_cfg)` |
+| `fix.diff` | §6.5 | written beside `repro.sh`, `case.<ext>` and the two hashes in `repair/<local_id>/` | The chain returns the diff as a string and `RepairResult.diff_path` is a path, so the file has to exist and §6.5 did not list it |
+| `gate_validate` | §3.9, §4.8, §6.5 | a **third** gate node, `gate_validate(case_path, image_spec, limits, artefact_root, *, run_manifest_id, candidate_id, bin_dir)`, holding `{"circt": 1}` and dispatched exactly as `gate_rerun` is | §3.9 names two nodes and §4.8 gives question 3 three tool invocations "under the same `prlimit` prefix as a probe" against "the source-tree binaries". `gate_decide` runs on the head and holds no `circt` resource, so it can run neither, and it stays resource-free. Architect decision 6 accepts the node. `02-HLD.md` §0.4 gives it its component id |
+| `gate_decide` and `gate_rerun`'s arguments | §3.9, §6.5 | three §3.9 does not list, plus two on `gate_rerun`: `limits`, `top_n`, `bin_dir`, and `run_manifest_id` and `candidate_id` | The re-run and the validity check are bounded by the **probe** limits, as §4.8 requires; `top_n` is `compute_fingerprint`'s frame depth, `budget.yaml`'s `fingerprint_frame_depth`; `bin_dir` is what lets a fixture run a build outside the image, exactly as `probe_execute`'s own erratum records; and without the last two §3.9's `mkdtemp(dir=<artefact_root>/<run>/gate/)` has no path |
+| `not_fixpoint` | §3.9 | a **fourth** question-2 stopping value, bucketed `not_minimal` | Architect decision 6. FR-13.3's pass requires a fixpoint and FR-18.6's table has three failing rows, none of them "a reducer ran and did not reach a fixpoint", which §9.5's own `reduction_wall_seconds` comment says was the common case at 60 s. The taxonomy is unchanged and stays total. A free-text `ReducedCase.reason` (FR-09.12 permits one) buckets the same way |
+| `undecided` for a null answer | §3.9 | a null answer is recorded as `undecided`, and the rule lives in a pure `decide(fields, repair)` | FR-13.10 defaults the decision to `nothing` and FR-18.6's table has no row for an unanswered question, so the six values were not total. The rule is pure so that `T-U-gate-17` can produce a null answer at all: the four questions as implemented cannot be made to return one on demand |
+| `gate_rerun`'s directory | §3.9, §6.5 | `mkdtemp(prefix="<candidate_id>-", dir=<artefact_root>/<run>/gate/)` | §3.9 asks for a `mkdtemp` and §6.5 for `gate/<candidate_id>/`; neither spelling alone is both unique per call and readable, and the prefix form is both |
+| `q3_after_parse`'s input | §3.9, §3.7.1 | the frame's **full** path, read back out of the recorded `oracle_verdict.frames_json` and re-stripped by §3.7.1's rule; "the probe's argv carried a pass pipeline" is `probe_task._last_pass` over `probe.argv_json` | `OracleVerdict.fingerprint_frame` is `"<function> <basename>"`, which answers FR-13.15's `*Parser*.cpp` half and none of its three directory halves |
+| the head modules' signatures | §3.11 | `load_budget(path, repo_root, *, run_start_utc=None, manifest_budget_file_sha=None, exact_pin_shas=None)`; `snapshot(ledger, arm, budget)`; `accrue(entry, db_path, budget)`; `aggregate(run_manifest_id, db_path, *, today=None)` | Checks 1, 4 and 5 of §9.2 need the run's start, the manifest's SHA and the exact-pin set, and none was a parameter. `BudgetLedger` has no cap field, so `snapshot` needs the `BudgetFile`; `accrue` calls `price`, which needs it too; and `inputs_today` is stage-3 occupancy per UTC day per arm, so the day has to be injectable for a test to fix it |
+| `STOP_REASONS` | §3.11 | the order is fixed: `campaign_spend_cap`, `arm_window`, `generated_inputs_per_day`, `filings_total`, `filings_per_day` | More than one stop can hold at once and §3.11 named them without ordering them, so two implementations could report two different reasons for one stop |
+| `accrue` and FR-14.4 | §3.11 | enforces "one `arm_window` entry per arm per run", raising `E005` | The rule had no enforcement point, and the ledger is the only place that sees every entry |
+| `metered` | §3.11 | `accrue` never sets it; it is FR-14.8's flag and the caller owns it | The ledger prices what it is given; whether a stage is meterable is a manifest fact |
+| `budget._iso` | §3.11 | normalises the trailing `Z` | `git log --format=%cI` emits `Z` and Python 3.10's `datetime.fromisoformat` rejects it, so check 1 refused every committed budget file on this host |
+| `render_results` | §3.11 | `render_results(store, manifest, *, labelled_pairs=None)` | FR-10.2's hand-labelled duplicate-pair set is a committed measurement of the **project** and not a row of the campaign, so it cannot come out of the store. Its absence is `_require_dedup_rates`'s refusal rather than a silent omission |
+| `_facts`'s refusal | §3.11 | raises `ResultsIncomplete` directly when `loop.db` holds no `run` row for the manifest; `len(_REFUSALS)` stays **14** | A fifteenth **failure mode**, not a fifteenth **check**: there is no artefact to refuse parts of |
+| `_require_regeneration_marks` | §3.11, §14.4 | re-runs the two deterministic **head-side** stages only, `probe_task.classify_build` over the recorded stderr and `gate.decide` over the recorded answers; `image_unavailable` comes off the store's `image` table and `reduction_budget_truncated` off `reduced_case.budget_truncated` | Re-executing a tool stage inside an image of the recorded digest is `04-Test-Plan.md` §11's system half (`T-S-regen-01`), which a unit-level renderer cannot do and must not pretend to |
+| `_require_qualifiers`'s table rule | §3.11, §14.4 | finds a table textually: a line beginning with a pipe whose predecessor does not, then the nearest non-blank line above as the caption | That is why `_table` writes the caption immediately above every table, and why **no table in the artefact may be introduced any other way** |
+| `SYNTHESIS_STAGE` | §3.11, §9 | the offline mutator synthesis is charged to a `shared` ledger entry at stage `synthesis` | §9 names no such stage and `02-HLD.md` §1.2 says A7's cost is a `shared` entry against the pre-campaign window. The spelling is fixed in one constant so the results artefact and the ledger fixture cannot disagree |
+
+#### The invocations, the tree and the file formats, §4 to §9
+
+| Item | Section | What the code does | Why |
+|---|---|---|---|
+| two dangling section numbers | §4.11.1, §3.3 | the git-command table cited as "§4.12" lives **unnumbered inside §4.11.1**, and RUN-line normalisation is **§4.1 and §4.2**, not §4.4 | §4.12 does not exist as a heading and §4.4 is `circt-verilog`. Both citations are corrected at their sites |
+| `split-file` lines | §4.1 | carry a meaningless tool and argv; only `shape=split_file` is informative | The wrapper's own argument list is the file it splits, not a probe |
+| a quoted `;` | §4.1 | step 6 rejects a line carrying a `;` inside a quoted option value, conservatively | The step is a scan for shell constructs and it does not track quoting. Rejecting is the safe direction: an unsupported seed is excluded and counted, and a mis-parsed one runs the wrong command |
+| shell redirects | §4.1 | a `>` survives normalisation as an argv token; **10 lines across 4 seeds** | Step 4 drops from the first unquoted pipe onward and says nothing about redirects. Measured over the corpus, so the size of the leak is known rather than assumed |
+| the invocation shape | §4.1, §4.2 | `<binary> *spec.argv`; `corpus.normalise_run_line` returns an argv that **excludes** the tool | `contract/fixtures/probe_spec/seeded_01.json` repeated the tool in `argv` and was regenerated. `mutation_01.json` has the same defect and is an open code item |
+| the probe argv's source | §7.3, §4.1 | `argv_template[0]`, with lit's three substitutions bound and the two probe-only options stripped | §7.3 says only "substituting the written file's path". `SeedRecord` records no per-run-line tool, so no index other than the first is attributable to `entry_tool`, and `--split-input-file` and `--verify-diagnostics` mean nothing for one generated input (§4.2) |
+| `differential_evidence.json` | §6.5 | written beside `arcilator.out.txt` and `verilator.out.txt`, carrying both arms' argv including the Verilator build's, both stdout digests, both exit statuses, the driver deviation, the X policy and the port-list digest | §6.5 names no file holding a recorded argv, and FR-08.4's acceptance criterion reads "the recorded Verilator argument vector". One file, and §6.5 did not list it |
+| five per-turn files, not four | §6.5 | `llm_<stage>.prompt.md`, `.md`, `.stderr`, `.jsonl`, `.usage.json` | FR-04.6 requires five, prompt included, and §6.5 lists four. The prompt file takes the name `triage_task` already gave it |
+| `run_manifest_id` per table | §6.2 | **9** tables carry it, **10** join to it through a probe or candidate id, and `image` and `issue_mirror` carry neither | §6.2 implied every table carries it, which the two campaign-independent tables cannot: an image and an issue exist across runs |
+| the mirror's column name | §6.2, §8.3 | `issue_number`; §8.3 step 2 selects `number` | One name, spelled twice |
+| a human refusal | §6.2, §13.2 | recorded as the candidate's `held_reason` | §13.2 and §6.2 give it no table, and a refusal that is not recorded is a filing that quietly did not happen |
+| `--pass-pipeline` and `[UNVERIFIED]` | §4.13, §15 | §4.13's `[UNVERIFIED]` row for the differential harnesses and §15 item 1 are **closed** | A-08 is closed by measurement: the generated harnesses build and run against a generated design, the clocked accumulator agreeing over all 56 sampled cycles through `oracle_differential` end to end, and the same design with one constant changed diverging at line index 1, cycle 8, signal `p`, `1` against `0`. **A-19 is still open**: FR-08.1's rule now exists as a pure function and the count over the 187-seed corpus has not been run |
+| `mutate_seed` and `apply` | §8.2 | `mutate_seed(seed, iteration, cap, mutator_set, argv=None) -> (mutants, no_ops, failures)`, each mutant a **five**-tuple; `apply(mutator_id, text, seed_int, *, mutator_set=None, argv=None)` | §8.2's bare `list[tuple[str, str, str, int]]` has nowhere to put FR-05.6's no-op count, FR-05.7's per-id failure count or FR-05.5's replacement argument vector, and §8.2's three-argument `apply` cannot look an id up in a set it is not given, nor mutate an argv it is not given |
+| the frozen-set format | §8.1 | a `frozen` boolean, which §8.1's format does not have | `load_set` refuses an unfrozen set outright whenever a run names a digest, which is what stops the development set running a campaign |
+| §8.3 step 1's path | §8.3 | the registration check asks git for `budget.yaml` **and** `*/budget.yaml` | The bare path is right in only one of §1.4's two trees |
+| two unused substitution variables | §7.3, §8.3 | `$probe_dir` and `$issue_digest` are declared and no prompt text carries the name; both are supplied by the caller anyway, so `safe_substitute` leaves nothing unbound | `T-U-prompt-04`'s "declared in its file and supplied by its caller" fails on both as written, so the plan's rule is the half that changes |
+| §9.2's checks | §9.2, §8.1 | FR-05.2's mutator-set rule runs **inside check 1**; `_CHECKS` stays **six**; the set path is derived from the budget file's own directory | The rule is about the registration commit, which is check 1's subject, and deriving the path from the file's directory is what makes it right in both of §1.4's trees. §1.3's `test_budget.py` line still says "the five checks" and is corrected to six |
+| `issue_mirror_issue_cap` | §9.5, §3.7.3 | stays **20,000**, and is now reachable | Architect decision 1: the two-direction walk covers at most 20,000 numbered items, which is more than `llvm/circt` has issued, the newest number on 2026-09-14 being **11,113**. The cap is a row bound, not a request bound. `contract/fixtures/run_manifest/discovery_01.json` carries 600, which is a **fixture** bound and not a disagreement |
+| §13.2's commands | §13.2 | `list`, `show`, `approve`, `refuse`, `url <id>`, `filed <id> <url>` and `poll`; `status` is not written | §13.2's table names `reject` where the CLI names `refuse`, and splits the URL in two: `url` prints the pre-filled link or FR-13.17's hand-filing text, `filed` records the pasted one. `list` and `show` print what `status` would |
+| `approve.py`'s budget read | §13.2, §3.11 | `yaml.safe_load`, not `budget.load_budget` | A human approving a report is not starting a run, and `load_budget` also runs the campaign's git pre-registration checks. The two caps of FR-13.8 are what the program needs |
+| §14.4's mutator declaration | §14.4 | the element row gains the clause "and that the synthesis is **Mut4All's design**" | FR-05.8's acceptance requires the declaration to say so and §14.4's row named only "its input, date and frozen-set SHA", so a render that satisfied §14.4 could still fail FR-05.8 |
+| §14.4's taxonomy table | §14.4 | prints a **seventh** row, `no gate decision` | A candidate the gate never reached is counted rather than dropped, so the sum check stays meaningful. FR-18.6's six buckets are unchanged; the seventh row is not a bucket |
+| §14.4's validation table | §14.4 | the `probes` column counts a seed's probes across **both** arms | Seeds are shared within a mode (FR-18.2), so a per-arm count would be a different number under the same heading. None of this table reaches the headline, which is the table's own point (FR-18.5) |
+| §14.4's dedup rates | §14.4 | numerator and denominator are printed beside every rate | False-merge rate over a small campaign has a **zero denominator**, and `triage_task.rates` returns 0.0 for an empty class, so `0/0` would read as "no false merges". Printed as a fraction it reads as "unmeasured" |
+| §14.4 and §3.11's cross-check | §3.11, §14.4 | counting the lines of §14.4's table body that begin with a pipe is a **repository-wide** check and not a unit test; `T-U-results-21` hard-codes the fourteen names instead | §1.4 puts this package at two depths in two trees, so no test module in it may walk to `design/` |
+
+#### W-16, the driver and the structural tests, 2026-09-15
+
+W-16 was written against the sections above and its rows are folded in the same pass. Two of them,
+`build_image` steps 3 and 7, are **defects the tests found in the code and fixed**; they are recorded
+because in both cases this document under-specified the step enough for the two to disagree.
+
+| Item | Section | What the code does, or must do | Why |
+|---|---|---|---|
+| `circt_core.py` | §1.1, §1.3, §3.10 | a source module of the flow, holding §3.10's three generic functions until CHIA takes them, with `tests/test_circt_core.py` beside it | §1.1's table lists them only at their **published** path, `chia/chipyard/circt.py`, and `chia/chipyard/test/` is a CHIA path the team repository does not hold (§1.4). `probe_task.py` imports them from here. `upstream/chia-chipyard-circt-additions.py` is the block appended to CHIA's file and the test module asserts the two texts are identical below their headers, so the copy cannot drift from the one that runs |
+| `circt_bug_loop/__init__.py` | §1.1, §1.3 | the package marker the two-tree layout needs, `tests/` importing the flow as `circt_bug_loop.<module>`; it holds no logic and has no test module | It joins `contract/__init__.py` in §1.3's **second** set, which is therefore two modules and not one |
+| `tests/test_image.py` | §1.3 | that is the module's name; §1.3's exemption list said `test_image_spec.py` | One rename, recorded so the list can be compared for equality |
+| a **fourth** placement | §3.2 | `llm.py:llm_turn` is `@ChiaFunction(resources={"llm": 1.0}, max_retries=0)` and §3.2's table has no row for it | §3.5.1 added the node and §3.2's table predates it, so "three placements and no fourth" is a count of the table and not of the code. The placement itself is consistent with §12.1, which declares the `llm` resource; only the count was wrong |
+| §3.1's docstring rule | §3.1 | applies to the `@ChiaFunction` nodes and the two `ChiaTool`s' methods, and **not** to every public callable | Measured 2026-09-15: **45 of the flow's 184 public module-level functions**, across `approve.py`, `bug_loop.py`, `contract/schema.py`, `corpus.py`, `gate.py`, `generate_task.py` and others, carry fewer than the three paragraphs, while **all** the nodes and **all four** tool methods carry them. **Returns**, **Worker** and **Raises** are a node's paragraphs; a private helper has no worker and no resource, exactly as §16.1's last row already found for `contract/`. Narrowing is the architect's instruction and is what makes the rule true of the thing it was written for |
+| `ProbeWriteTool.write_probe`'s docstring | §3.5 | names `filename` and not `content` | An MCP method's docstring is the text the model reads, and the plan's tool rule is "one action, one argument, one failure"; the second argument is owed a mention |
+| §0's dependency paragraph | §0 | five standard-library modules short: `collections`, `fnmatch`, `logging`, `select` and `types`, plus `__future__` | **No third-party dependency is added**, which is what FR-19.8 requires and what the check asserts; the list is the erratum. The check reads `sys.stdlib_module_names` plus `yaml`, `ray`, `chia`, the flow's own package and CHIA's two shipped example modules, rather than a hand-kept list |
+| §14.5's `arm` walk | §14.5 | reads a branch's **operand** and not its body, that is an `If`'s test rather than its whole subtree, and matches `arm` or a name ending `_arm` rather than any name ending in the three letters | Two false positives, both measured. `oracle_differential` names its two **simulator** sides `arm` (`for arm, name in ((arc, "arcilator"), (ver, "verilator"))`), so a subtree walk reports `arm["exit_status"]` as a branch on the campaign arm; and "ending in arm" matches `warm`, which `circt_warm_build` is. The local is renamed `side` as well, which is the code half |
+| `bug_loop.differential_driver()` | §13.1, §3.6.3 | derives `RunManifest.differential_driver`'s four keys from the one constant `probe_task.DIFFERENTIAL_DRIVER`, splitting it at its single semicolon into `obstacle` and `deviation` and naming the two harness generators as `source` | §13.1's producer table says "from whether `circt/arc-tests` was reused or a deviation was recorded" and gives no mapping. B4 records the same constant verbatim on every `DifferentialVerdict.driver_source`, so the manifest and the verdict cannot state different reasons for one deviation (FR-08.11) |
+| `build_feedback` | §3.11 | four keyword-only arguments §3.11's signature does not name: `run_manifest_id`, `budget`, `remaining` and `probes_this_seed` | The arm comes from `remaining.arm` and FR-16.3's probe cap from the seed's running probe count, so the driver passes both. §3.11's five-positional form cannot build a `FeedbackBundle` at all |
+| `bug_loop._candidate` | §2.9, §3.7.1 | builds `CandidateRecord.frame_tuple` on the way in, with B6b's own two steps, `probe_task.strip_prologue` then `probe_task._normalise_function`, truncated at `budget.fingerprint_top_n` | `OracleVerdict` carries `frames` and no `frame_tuple`, and `validate_candidate` requires the field **before** B6b runs. No section said who fills it. The tuple B6b then computes from the same verdict is equal by construction |
+| `Stages` and `Dispatch` | §13.1 | the driver reaches the nine stage nodes through a record of callables and dispatches them through one indirection, which is `chia_remote` under Ray and the node's own undecorated body without it | The one structural deviation from §13.1, and it is what makes a whole iteration runnable at tier 0 against a fixture store and fake stages. `--dry-run` still dispatches nothing and still stops after the manifest |
+| the pre-flight checks | §13.1 | twelve **named functions** taking what they check rather than reading the world, so all twelve run at tier 0 from a fixture `ImageSpec`, a fixture store and an explicit environment mapping; `interlock_probe(env=None)` takes that mapping | Architect decision 2 applied to the driver's own interlock probe. A check that reads the world can only be tested by changing the world |
+| `--forum-post-url`, `--forum-post-date` | §13.1 | CLI arguments | §13.1's table does not list them and attributes the two values to "the operator, via pre-flight check 11", which names no mechanism; check 11 and two `RunManifest` fields need them |
+| the driver's keyword arguments | §13.1 | it mints the identifier on the head with `repair_adapter.mint_local_id(store, candidate_id)` before dispatching stage 7, and passes the reduced case's path as `input_path`; it passes `limits`, `top_n` and `bin_dir` to `gate_decide` | §3.8 and §3.9 name the parameters above and §13.1's run loop did not |
+| `--record-fixtures` | §13.1, `02-HLD.md` §2.13 | records the **`FeedbackBundle`** as well as the four §2.13 names, one JSON document per file at `<dir>/<snake_case schema>/<id>.json`, the id being the schema's own key and `LedgerEntry`'s being `entry_id`. Every instance passes `contract.validate` first | A recorder that could write a fixture the seam refuses would make §2.13's enforcement point circular |
+| `CIRCT_BIN_DIR` | §5.1 | `bug_loop.py` imports it from `circt_core.py` for `gate_decide`'s `bin_dir` | §5.1's table gives the path twice, once there and once as `repair_adapter.CIRCT_BUILD_BIN`; the two are the same string and one of them is the constant |
+| `cluster_summary` | §12.1 | reads `min_workers` and `max_workers` from the **raw YAML** and not from `load_config` | CHIA's `NodeTypeConfig` exposes `num_workers` only, filling it from `num_workers`, then `max_workers`, then `min_workers` (`chia:chia/cluster/config.py:789`), so the two spellings §12.1 uses are invisible after loading and the fixed-size property has to be asserted on the file |
+| `cluster_gcp.yaml`'s node types | §12.2 | there is **no `available_node_types` key**: the three worker types appear under `gcp_nodes` and the images live in §12.2's own comment | §12.2 leaves the section as a comment saying "identical to `cluster_single.yaml` except the artefact mount", so the file it describes and the file it ships are not the same shape. The deferral is unchanged (ADR-D-14) and is now recorded as what it is |
+| `cluster_single.yaml`'s conda environment | §12.1 | left exactly as this document writes it, activating a conda environment named `circtbugloop` | That environment **does not exist on the implementation machine**, whose head environment is the uv venv at `~/.cache/chia-venv`. W-19 either creates it or edits the two command lists at deployment; editing the design's own file to match one host would be the wrong repair |
+| `build_image` step 3 | §4.11.1 | looks for the constant `PIN_CHECK_LINE`, which is the string the Dockerfile prints, `PIN CHECK PASSED` | The code read `"llvm pin matches"`, so **every real build would have raised** `ImageBuildError("pin", "the pin equality check did not run")` on a build whose pin check ran and passed. §4.11.1 specifies the step and names no line, which is how the two could disagree; the tier-0 half of `T-U-image-02` now asserts that the Dockerfile prints the string the code looks for |
+| `build_image` step 7 | §4.11.1, §2.9 | does **both** halves: a target binary lacking `__assert_fail` raises, which is an assertions-off build, and `assertion_nonreferencing` is the `obj.CIRCT` **object** scan of W-04 (`analysis/measurements/w04_verify_in_image.sh:38-45`), paths relative to the build directory | The step counted the symbol in the six target **binaries** and returned the targets that lacked it, while FR-03.5 and §2.9 define the field as the objects that do not reference it. Run against the published image on 2026-09-15: **19 of 555**, the baseline W-04 recorded, reproduced exactly |
+| `upstream/chia-circt-assert.yml` | §1.2 | does not exist | §1.2 lists the workflow beside the Dockerfile and CHIA requires one for every new Dockerfile (`chia:AGENTS.md:124`). `sync-to-chia.sh` copies whatever `upstream/.github/workflows/` holds and tolerates the directory being empty, so the script is complete and the artefact is owed; it is `04-Test-Plan.md` §16.8's thirteenth open item |

@@ -133,3 +133,9 @@ any filing, the GCP hand-over) are listed with the date by which the user must a
 ## Sign-off record
 
 **Approved 2026-09-14 by the architect, on the user's delegation of 2026-09-13 ("no need to split work u finish the entire work start to end").** Basis: each of 01, 02 and 03 was attacked by a fresh-context red team (13, 7 and 16 kills respectively; `reviews/`), every finding dispositioned and the fixes verified by execution where executable; 04 was written against the final 03 and realigned twice; 05 was written against 04's tiers. Mechanical checks at sign-off: zero em-dashes in all six documents; 198 FRs, all traced in 04 §12.1; 477 test ids, all unique; all 66 Python blocks in 03 parse; 03's DDL (21 tables, 9 indexes) and mirror query execute; both cluster YAMLs load through CHIA's config loader; no superseded model id survives as a default. Open assumptions are listed in 01 §7 with owners and dates in 05 §6; nothing Must is deferred. Code may start.
+
+**Implementation errata folded 2026-09-15; the design remains Approved with these errata.** They are
+indexed in `01-FRD.md` §1.10, `02-HLD.md` §0.4, `03-LLD.md` §16.2 and `04-Test-Plan.md` §16.7, with
+the code defects they surfaced listed as open items for W-17 in `04-Test-Plan.md` §16.8. The contract
+package is unchanged at **2.0** and `contract-2.0` is not retagged, so the seven schemas above stand
+exactly as this document lists them.

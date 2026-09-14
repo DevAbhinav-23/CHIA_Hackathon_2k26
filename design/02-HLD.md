@@ -206,12 +206,46 @@ objects referencing `__assert_fail`, and **zero** failures over CHIA's own lit g
 changes because of it; `01-FRD.md` §1.9 carries the requirement-level errata and `03-LLD.md` §4.11
 carries the seven Dockerfile deviations.
 
+### 0.4 Errata from implementation, 2026-09-14/15
+
+Dated **2026-09-15**. The driver is `reviews/implementation-errata-log.md`, the running log kept
+while W-05 to W-15 wrote the modules, together with its **Architect decisions** section, which is
+binding. `03-LLD.md` §16.2 is the full list and names every section it corrects; `01-FRD.md` §1.10
+names every requirement; `04-Test-Plan.md` §16.7 names every test and §16.8 lists the open code
+items. **This section is only what changes here**, which is placement: what the parts are, which
+half each belongs to, and how many there are.
+
+**Nothing about the seam changes.** The contract is at **2.0**, the seven members and the one
+interface are unmoved, and `contract-2.0` is not retagged. Every erratum below is either a component
+that was missing or a module boundary that was in the wrong place; none of them is a schema.
+
+| Where | Change |
+|---|---|
+| §1, §1.3, §3, §6 | **A twenty-seventh component, `B9d`.** Question 3's mechanical check needs a node holding `{"circt": 1}`: `04-Test-Plan.md` and `03-LLD.md` §4.8 give it three tool invocations under the same `prlimit` prefix as a probe, against the source-tree binaries, and B9a `gate_decide` runs on the head and holds no `circt` resource so that it can never occupy a slot while waiting for one (FR-13.2). B9a stays resource-free and dispatches B9d exactly as it dispatches B9b. The id is the next free one and **B9c is not renumbered**, ids being permanent |
+| §1.2, §1.3 | **`llm.py` is a module of neither half**, and the halves are unchanged by it. The backend constructor, the interlock, the turn node and the JSON-footer parser were in `generate_task.py`, which is the supply half, and the apparatus half may not import the supply half (FR-16.1), so B7 and B8 reached them through function-local imports and the parser `03-LLD.md` §7.1 calls "one function, shared by all four" had grown a second copy. Moving the four to a neutral module both halves import restores one function without weakening the rule: `llm.py` proposes no work and measures nothing, so it is in neither table of §1.2 and §1.3 and no component owns it. `03-LLD.md` §1.1 and §3.5.1 carry the detail |
+| §3, B6a's row | **The mirror walk is two-directional** (architect decision 1). GitHub's issues-listing endpoint refuses page 100, item 10,001, with a 422; measured 2026-09-14, one `desc` walk at the committed cap made 100 requests, took the 422 on the hundredth, and wrote **zero** rows. B6a now walks `desc` and then, on the ceiling, `asc`, and unions the two deduplicated by issue number. The idempotency key and the once-per-run rule are unchanged; the ceiling is recorded as **C-22** |
+| §3, B6a's row | **"Once per run" is B12's, not B6a's.** B6a's signature carries neither a run id nor a refresh flag and `issue_mirror_meta` is keyed by `run_manifest_id`, so B6a writes `issue_mirror` rows and B12 calls it once unless `--refresh-mirror` and writes the meta row from the return |
+| §2.10, §3, B6a's row | **`RunManifest.issue_mirror` stays at six keys** and `validate` still compares the key set exactly. B6a returns the six **plus** a seventh, `incomplete_reason`, the caught exception's class name or `None`, and B12 copies the six. FR-10.7's detection point had nowhere to be recorded and a seventh manifest key would have been a contract change |
+| §5.3 | **`CandidateRecord` has 38 fields**, not the 41 that section's own prose claimed; the `candidate` table's 20 columns are right. A miscount, corrected where it is counted |
+| §3, B8's row | **B8 does not stop the run.** `03-LLD.md` §3.8 closes B8's exception set at `RepairRefused` and `LiveModelRefused`, so FR-12.8's "stops the run" is **B12's** act on a recorded `lit_unusable` field. B8 also refuses `--no-repair` **before** the interlock, so a disabled run asks for no credential at all |
+| §3's opening | **The `llm` tag is a fourth placement, and the count of three was a count of a table.** §3.5.1 of `03-LLD.md` gave the loop its own `llm_turn` node, `@ChiaFunction(resources={"llm": 1.0})`, and `03-LLD.md` §3.2's placement table had no row for it. Three **worker types** is still right and §4.1's cluster is unchanged; what was wrong is "three placements and no fourth" as a claim about the code |
+| §1.3, §8.2 | **`circt_core.py` is a module of the flow.** `03-LLD.md` §3.10's three generic functions are proposed for `chia/chipyard/circt.py`, which is a **published** path the team repository does not hold, so they are developed at `circt_bug_loop/circt_core.py` and shipped upstream as a patch. They are not a component: they belong to B2, B3 and B5, which is what §9's reuse row already says |
+| §8.2, §9 | **No `pyproject.toml` and no `bugloop-approve` console script** (architect decision 7). The team repository packages nothing, so B9c's entry is `python -m circt_bug_loop.approve` and the console script is W-26's packaging work. Nothing about B9c's behaviour changes |
+
+**One count, restated so the two tables and the prose agree.** §1 reads **twenty-seven** components
+from 2026-09-15: **twenty-two** nodes that do work, nineteen of them on a worker and three, A1, A2
+and B6b, on the head; one `SQLiteNode` service; two `ChiaTool`s; two head-side programs.
+`llm.py:llm_turn` is **not** a twenty-eighth: it is the turn A3, A7 and B7 dispatch, counted inside
+each of them, exactly as §3's own "where the `llm` tag is applied" paragraph describes it.
+
 ---
 
 ## 1. Components
 
-**Twenty-six components**, twenty-five until 2026-09-14 (§0.1). Twenty-one are nodes that do work,
-eighteen of them on a worker and three, A1, A2 and B6b, on the head; one is a `SQLiteNode` service;
+~~**Twenty-six components**, twenty-five until 2026-09-14 (§0.1). Twenty-one are nodes that do work,
+eighteen of them on a worker~~ **Twenty-seven components** from 2026-09-15 (§0.4), twenty-six until
+then and twenty-five until 2026-09-14 (§0.1). **Twenty-two** are nodes that do work,
+nineteen of them on a worker and three, A1, A2 and B6b, on the head; one is a `SQLiteNode` service;
 **two** are `ChiaTool`s, one exposing a file write to an agent and one exposing read-only source
 access; two are head-side programs, the campaign driver and the approval CLI. Nothing else exists,
 and no component is here that no functional requirement asks for (§9). The count is of rows in the two tables below, not of id
@@ -343,13 +377,14 @@ a `shared` ledger entry against the pre-campaign window. `[accepted 2026-09-13]`
 | B3 | `oracle_primary` node | Decide whether the probe crashed, fired a CIRCT assertion or hit `LLVM ERROR:`, symbolise the frames, and emit the reproducing command. | F-07 |
 | B4 | `oracle_differential` node, with the two harness generators | Run the same design through arcilator and Verilator from one stimulus and report agreement, divergence, non-applicability or harness failure. | F-08 |
 | B5 | `reduce_case` node | Choose a reducer by input language, shrink the firing input under a firing-specific interestingness test, and re-check the verdict. | F-09 |
-| B6a | `issue_mirror_refresh` node | Mirror `llvm/circt`'s open and closed issues into `loop.db` once per run, titles, bodies, labels and state only, **no comments**. | F-10 |
+| B6a | `issue_mirror_refresh` node | Mirror `llvm/circt`'s open and closed issues into `loop.db` once per run, titles, bodies, labels and state only, **no comments**. **Amended 2026-09-15 (§0.4)**: the walk is `desc` then, on GitHub's page-100 ceiling (C-22), `asc`, unioned and deduplicated by number; the node writes rows only and B12 owns "once per run"; the return carries a seventh key, `incomplete_reason`, that the manifest's six-key dict does not. | F-10 |
 | B6b | `dedup_and_contamination_screen` node, **head** | Fingerprint, partition, screen against the mirror, scan post-run-commit commits, and flag contamination at file and symbol level, including the 16 non-exact seeds of FR-15.5. | F-10, F-15 |
 | B7 | `triage_report` node | Classify each surviving candidate advisorily and render the issue-shaped report a maintainer would read. | F-11 |
 | B8 | `repair_adapt` node | Present a local report to CHIA's unmodified phase chain, record its result, then reset and rebuild the tree it mutated. | F-12 |
 | B9a | `gate_decide` node | Ask the four mechanical questions, dispatch question 1's re-run, and record the answers. | F-13 |
 | B9b | `gate_rerun` node | Re-run one reproducing command in a fresh process and a newly created directory, preferring a worker other than the one that produced the verdict. | F-13 |
-| B9c | `bugloop-approve` CLI | Present one report to a named human who approves it, confirms the patch licence, files, and records the URL. | F-13, F-20 |
+| B9c | `bugloop-approve` CLI | Present one report to a named human who approves it, confirms the patch licence, files, and records the URL. **Erratum 2026-09-15 (§0.4)**: the entry is `python -m circt_bug_loop.approve`; the console script is W-26's packaging work. | F-13, F-20 |
+| B9d | `gate_validate` node | Parse and verify one reduced case at the run's commit under the probe's own limits, and say whether the check itself fired the primary oracle. **Added 2026-09-15 (§0.4)**: question 3 needs a `circt` worker and B9a holds no resource by design. | F-13 |
 | B10a | `LoopStore`, a `SQLiteNode` | Hold every row the run produces, joined to CHIA's `issues.db` by one key. | F-17 |
 | B10b | `artefact_write` node | Write the head-authored artefacts (manifest, feedback bundle, results) into the shared artefact tree and mark partials. | F-17 |
 | B11 | `results_render` node | Render the results table, the seeded-bug validation table, the failure taxonomy, the divergences list, the contamination columns and every mandatory disclosure. | F-18 |
@@ -999,6 +1034,7 @@ parameters (FR-14.1).
 | B8 `repair_adapt` | `{"repair": 1}`; the chain dispatches its own turns at `{"llm": 1.0}` | assertions-on | CHIA's five phase timeouts, unchanged, `turn` | `max_retries=0` | **Not idempotent.** It mutates the CIRCT tree. It resets to the run's commit before starting (FR-12.6), **and resets and rebuilds the tool targets after finishing**, and the loop's row is written before CHIA's (FR-12.10). A re-run is safe and produces a new attempt, not the same one. |
 | B9a `gate_decide` | head | n/a | 900 s `[DEFAULT]`, `driver` for its own work, `turn` for the FR-13.16 poll | `max_retries=0` | **Idempotent in the four answers; question 1 re-runs by construction.** Holds **no** `circt` resource, so it can never hold a slot while waiting for one. |
 | B9b `gate_rerun` | `{"circt": 1}` | assertions-on | the per-probe wall-clock limit plus a margin `[DEFAULT]`, `subprocess` | `max_retries=0` | **Deliberately not idempotent in placement.** FR-13.2 requires a fresh process and a newly created working directory each time, so the re-run is the point rather than a side effect. |
+| B9d `gate_validate` | `{"circt": 1}` | assertions-on | the per-probe wall-clock limit plus a margin `[DEFAULT]`, `subprocess` | `max_retries=0` | **Idempotent.** A parse and verify of one fixed file at one commit; `(candidate_id, case_sha256, tool)` is the key. Added 2026-09-15 (§0.4). |
 | B9c `bugloop-approve` CLI | head, interactive | n/a | none; a human's own pace | none | **Idempotent by refusal.** Approval is per report and does not generalise (FR-13.13); a second approval of the same report is refused with the first approval's timestamp. |
 | B10a `LoopStore` | head, `pin_to_current_node=True` | n/a | `SQLiteNode`'s own 30 s busy timeout | `max_retries=0` on writes, CHIA's own default | **Idempotent by primary key on writes.** Never on network storage (FR-17.3, `chia:chia/database/sqlite_node.py:29-33`). |
 | B10b `artefact_write` | head | n/a | 300 s `[DEFAULT]`, `driver` | `max_retries=0` | **Append-only.** A partial directory keeps its `PARTIAL` marker rather than being deleted (FR-17.8). |
@@ -1388,7 +1424,8 @@ path, never inlined into a row or a task return value
 ### 5.3 `CandidateRecord`, apparatus-internal
 
 One row per **candidate**, which is a probing input for which an oracle fired (G-23, ADR-D-06), and
-nothing else. It does not cross the seam and no supply-half module imports it. It references its
+nothing else. **Thirty-eight fields**, corrected 2026-09-15 (§0.4); the twenty columns of the
+`candidate` table are what `03-LLD.md` §6.2 gives and are unchanged. It does not cross the seam and no supply-half module imports it. It references its
 probe by `probe_id` and carries the downstream verdicts; `ProbeResult` carries what the generator is
 allowed to see.
 
@@ -1508,6 +1545,7 @@ the driver rather than lost. Without it, A5's set difference would see a missing
 | B5 | A reduction step hangs | the interestingness script's own `timeout` and rlimits (FR-09.13) | the step is killed, SIGTERM then SIGKILL after the grace period; reduction continues | none | none; `circt-reduce` imposes no limits of its own (C-18) |
 | B5 | `--keep-best` output truncated by a kill | post-exit validation of the `-o` file (FR-09.13) | the previous good output is kept | none | none |
 | B6a | GitHub rate limit or server error | CHIA's typed `GithubRateLimitError` (`chia:chia/github/github_client.py:33-39`) | the mirror is marked incomplete with the issue count reached | screening proceeds against a partial mirror | flagged in the manifest and reported; candidates screened against it are `dedup_unavailable` only if the mirror is empty |
+| B6a | GitHub's pagination ceiling, a **422** at page 100 of the listing (C-22) | the response status, caught as `GithubRequestError` | the walk turns round: `direction=asc` from the other end, unioned with what `desc` returned and deduplicated by issue number (**added 2026-09-15, §0.4**) | none; the union is the whole history for a repository under 20,000 numbered items | `incomplete_reason` is set only if the second direction also fails, and measured 2026-09-14 the single-direction walk wrote **zero** rows, which is why this row exists |
 | B6a | The issue cap binds before the history is exhausted | issue count against the `budget.yaml` cap | `cap_bound=true` with `issues_mirrored` recorded (FR-10.9) | screening proceeds against a partial mirror | the flag is in the manifest and is reported |
 | B6a | A maintainer's words would reach a prompt | by construction: the mirror stores number, title, body, labels and state, and `comments_mirrored=false` | n/a | n/a | FR-20.4's boundary; B6a and B6b own it and `dedup_evidence` carries no issue text (§2.11) |
 | B6b | Dedup cannot be decided for a candidate | mirror empty or unreachable for that screen | `dedup_unavailable` (FR-10.7) | candidate **fails** gate question 4 rather than passing it | bucketed `undecided` |
@@ -1525,6 +1563,9 @@ the driver rather than lost. Without it, A5's set difference would see a missing
 | B9a | FR-13.16's poll finds no issue carrying the fingerprint | the poll window expiring | fallback to the human pasting the URL into the same CLI (FR-13.18) | the `FilingRecord` still completes | the fallback is recorded |
 | B9b | No `circt` node other than the original is available | the soft pin falls back, or only one node is live | the re-run happens anyway, on whichever node the scheduler grants, with `same_worker` recorded truthfully (FR-13.2 erratum) | none; question 1 is still answered | the count of same-worker re-runs is reported beside the gate numbers |
 | B9b | The re-run's verdict differs from the original's | class, text and `file:line` comparison | question 1 fails | candidate refused | bucketed `unreproducible` |
+| B9d | The validity check itself fires the primary oracle | the check's own exit and stderr | **pass**, with `validity_basis=checker_failed` (FR-13.15); the parser or verifier is then the failing component | candidate proceeds | counted |
+| B9d | The tool binaries do not match the `ImageSpec` hashes | `BinaryMismatch`, exactly as B2 raises it | **stops the run** | the candidate is not decided | the tree has been mutated and every verdict from that worker is suspect (§5.2 of `03-LLD.md`) |
+| B9a | Question 2's reducer ran and reached no fixpoint | `ReducedCase.fixpoint` false with no other reason | `not_fixpoint`, a fourth stopping value **added 2026-09-15 (§0.4)** | candidate refused | bucketed `not_minimal`, so FR-18.6's six are unchanged and still total |
 | B9c | Per-day filing cap reached | UTC-day count before the human is asked (FR-13.8) | candidate held | no filing today | recorded |
 | B9c | Pre-filled URL exceeds 6,000 characters `[DEFAULT]` | length measurement (FR-13.17, ADR-D-02) | fallback to the human filing by hand, with the reason recorded | filing still possible | recorded |
 | B9c | The human declines to confirm the patch licence | the CLI's own prompt (FR-20.5) | the decision is downgraded to `report`, the patch is not offered, and the decline is recorded | filing still possible without the patch | recorded |

@@ -264,7 +264,7 @@ One subsection per artefact of `03-LLD.md` §14.7. Columns are the same everywhe
 behaviour it pins, the fixture, the tier, and the requirements it traces to. Every test's pass
 criterion is the behaviour column read as an assertion.
 
-### 1.1 `contract/schema.py` (the seam), 23 tests
+### 1.1 `contract/schema.py` (the seam), ~~23~~ **27 tests** (§16.7)
 
 **Callables covered:** `validate`, `check_version`, `to_json`, `from_json`, `bound_text`,
 `_check_field` and the five `_*_conditionals`.
@@ -306,7 +306,14 @@ The validator's error codes are closed (`03-LLD.md` §2.1) and every one is exer
 | `T-U-fixt-02` | Each half's fixture set covers **all seven** members; a missing member fails, naming it | all | T0 | FR-16.1 |
 | `T-U-fixt-03` | A fixture whose MAJOR differs from `CONTRACT_VERSION` fails rather than being silently re-recorded: injected by writing a `3.0` copy into a temporary directory and running the same walk over it | `malformed/major_newer.json` | T0 | FR-04.3 |
 
-### 1.3 Repository-wide static checks, 9 tests
+### 1.3 Repository-wide static checks, ~~9~~ **10 tests** (§16.7)
+
+**Amended 2026-09-15 (§16.7).** `T-U-layout-01`'s exemption list gains `tests/test_tools.py` and the
+source-module set gains `llm.py`, so the counts it compares are **nineteen** source modules with
+logic and **twenty-seven** test modules (`03-LLD.md` §1.3). `T-U-layout-02`'s exempt list is
+unchanged at three. `T-U-layout-06` gains B9d, `gate.py:gate_validate`. `T-U-layout-08`'s clause (1)
+is restated below, because the committed tests violate it and the rule rather than the tests is what
+this plan changes.
 
 `tests/test_layout.py`. These are the four properties `03-LLD.md` §14.7 calls "properties of the
 design as a whole", plus the layout rule and the placement table.
@@ -320,10 +327,10 @@ design as a whole", plus the layout rule and the placement table.
 | `T-U-layout-05` | Every import in `examples/circt_bug_loop/` is in `03-LLD.md` §0's list: the standard-library set, `yaml`, `ray`, and `chia`. No added dependency | none | T0 | FR-19.8, NFR-11 |
 | `T-U-layout-06` | Every node's `_chia_options` equals `03-LLD.md` §3.2's row: the three placements and no fourth, `max_retries=0` everywhere, `{"repair": 1}` held by `repair_adapt` alone, `gate_decide` declaring no worker resource, and **A1, A1', A2 and B6b declaring none either**, which is the head move this revision made; `SourceReadTool`'s `task_options` carries the head's node id and `ProbeWriteTool`'s carries the constructing worker's | none | T0 | FR-12.11, FR-13.2, FR-19.1 |
 | `T-U-layout-07` | **Every node returns a `CounterBlock`.** For every row of `03-LLD.md` §3.2 that is a node, the documented **Returns** paragraph names the key `counters`, and a call through the §0.4 plain-call path returns a dict carrying one; `CounterBlock.stage` is drawn from `_COUNTER_STAGES` and from nothing else | none | T0 | FR-17.4, FR-19.4 |
-| `T-U-layout-08` | **Nothing below T3 can reach a model.** Three assertions over the repository itself. (1) `BUGLOOP_ALLOW_LIVE_MODEL` is assigned, `setenv`'d or `monkeypatch.setenv`'d in **no** test module outside `tests/system/`, asserted by an `ast` walk over every `tests/` file rather than by a grep, so a string in a docstring does not fail it and a computed name does not pass it. (2) The identifier `VertexGeminiLLM` appears in exactly one function of the **loop's own modules**, `generate_task.build_llm`, and in no other one of them. **Amended 2026-09-14**: there is exactly one further construction path, the `elif backend == "vertex":` arm of `upstream/issue_task-vertex-branch.patch` in CHIA's `issue_task.py`, which is CHIA's file and cannot carry the loop's interlock; the test asserts that it is **gated** instead, `repair_adapter.repair_adapt` calling `generate_task.require_live_model` before it invokes the chain, asserted on the source, and that no **third** occurrence of the identifier exists anywhere the loop ships. Two construction paths, both behind the same refusal. (3) `conftest.py` deletes the variable and sets the synthetic key for every non-T3 test, asserted by reading the fixture's own effect inside a test | `secrets/known_values.txt` | T0 | NFR-06, NFR-08 |
+| `T-U-layout-08` | **Nothing below T3 can reach a model.** Three assertions over the repository itself. (1) **Amended 2026-09-15 (§16.7, architect decision 2):** `BUGLOOP_ALLOW_LIVE_MODEL` is assigned, `setenv`'d or `monkeypatch.setenv`'d in **no** test module outside `tests/system/`, asserted by an `ast` walk over every `tests/` file rather than by a grep, so a string in a docstring does not fail it and a computed name does not pass it. ~~§1.6's header permits a test to set it inside `monkeypatch` to exercise the allow path.~~ That exception is **withdrawn** and replaced by a mechanism: `llm.require_live_model(purpose, *, need_key, env=None)` takes an explicit mapping, so a test exercises the allow path against the real refusal, the real key check and the real express construction while touching no process environment. `tests/test_repair_adapter.py` sets the real variable twice as committed and is `04-Test-Plan.md` §16.8's second open code item. (2) The identifier `VertexGeminiLLM` appears in exactly one function of the **loop's own modules**, `generate_task.build_llm`, and in no other one of them. **Amended 2026-09-14**: there is exactly one further construction path, the `elif backend == "vertex":` arm of `upstream/issue_task-vertex-branch.patch` in CHIA's `issue_task.py`, which is CHIA's file and cannot carry the loop's interlock; the test asserts that it is **gated** instead, `repair_adapter.repair_adapt` calling `generate_task.require_live_model` before it invokes the chain, asserted on the source, and that no **third** occurrence of the identifier exists anywhere the loop ships. Two construction paths, both behind the same refusal. (3) `conftest.py` deletes the variable and sets the synthetic key for every non-T3 test, asserted by reading the fixture's own effect inside a test | `secrets/known_values.txt` | T0 | NFR-06, NFR-08 |
 | `T-U-layout-09` | **The two-tree layout of `03-LLD.md` §1.4.** No module in the flow walks further than its own directory to find anything: an `ast` walk finds no `Path(__file__).parents[n]` with `n >= 2` and no `.parent.parent`, because `circt_bug_loop/` in the team repository and `examples/circt_bug_loop/` in a CHIA checkout have different ancestors; `_CHIA_PKG` is derived from `chia.__path__[0]` and **not** from `chia.__file__`, which is `None` for a namespace package and would raise. `upstream/sync-to-chia.sh` is run twice into a temporary copy of a stub CHIA checkout and the second run leaves it byte-identical, and it refuses a target holding no `chia/` | `repo/chia_stub/` | T0 | FR-19.2, FR-19.5 |
 
-### 1.4 `corpus.py` (A1, A1'), 24 tests
+### 1.4 `corpus.py` (A1, A1'), ~~24~~ **38 tests** (§16.7)
 
 **Callables covered:** `build_corpus`, `normalise_run_line`, `strip_probe_only_options`,
 `resolve_sites`.
@@ -358,7 +365,7 @@ is `01-FRD.md` §10.3's requirement that the normaliser meet the M1 shapes.
 | `T-U-corpus-23` | **The over-cap exclusion.** A seed whose `diff`, or whose `test_files` values in total, exceed `artefact_inline_cap_bytes` (262,144) is marked ineligible for **both** arms with `exclusion_reason="seed_text_over_cap"` and counted in `counts`; neither field is truncated and neither goes through `bound_text`, which returns `None` and would make a required field null | `corpus/clone` | T1 | FR-01.9, FR-17.7 |
 | `T-U-corpus-24` | **`resolve_sites`, A1's fourth callable.** Its two commands are `git -C <clone> ls-tree -- <run_commit>:<dir> <basename>` and `git -C <clone> grep -n -F -- <symbol> <run_commit> -- <file>`, both argument vectors with no shell; a site whose file and symbol both resolve stands, one whose symbol does not is rejected with `no_symbol`, one whose file does not with `no_such_file`, and a git failure rejects every site of that call rather than accepting it. It raises nothing | `corpus/clone` | T1 | FR-04.1 |
 
-### 1.5 `pin_select.py` (A2), 8 tests
+### 1.5 `pin_select.py` (A2), ~~8~~ **9 tests over eleven pytest items** (§16.7)
 
 **Callable covered:** `select_release_pinned_main`.
 
@@ -377,17 +384,30 @@ without a network.
 | `T-U-pin-07` | `current_window_has_release` is a boolean and is set on every run, including the run where it is false | `pin/pin_window_raw.json` | T0 | FR-02.4 |
 | `T-U-pin-08` | At clone head `b792c772` the selector refuses head, whose pin `e297b52ec9d8` has no release, and returns an older commit with a non-zero lag | `corpus/clone` | T1 | FR-02.1, FR-02.4 |
 
-### 1.6 `generate_task.py` (A3, A4, `ProbeWriteTool`, `SourceReadTool`, the backend glue), 25 tests
+### 1.6 `generate_task.py` and `llm.py` (A3, A4, `ProbeWriteTool`, `SourceReadTool`, the backend glue), ~~25~~ **26 tests over two test modules** (§16.7)
 
 **Callables covered:** `generate_seeded`, `generate_mutation`, `emit_specs`,
 `ProbeWriteTool.write_probe`, `SourceReadTool.read_file`, `.grep` and `.list_dir`, and, from
-2026-09-14, `build_llm` and `llm_turn`.
+2026-09-14, `build_llm` and `llm_turn`, which from 2026-09-15 live in `llm.py` (`03-LLD.md` §3.5.1)
+together with `require_live_model` and `parse_json_footer`.
+
+**Two test modules, and one new id** (2026-09-15, §16.7). `T-U-gen-11` to `T-U-gen-18`, the two
+`ChiaTool`s, live in `tests/test_tools.py`; the rest live in `tests/test_generate_task.py`. The tools
+need a git repository and the generator tests do not, and `03-LLD.md` §1.3's exemption list names the
+module. `T-U-gen-15b` is new: §3.5's **measured pair**, `lib/Dialect/HW/HWTypes.cpp` at `b792c772`
+and its two `parseHWArray` hits, is a **tier-1** test of its own against the real blobless clone, and
+it passes on this host. `T-U-gen-15` to `T-U-gen-18` themselves run at **T0** against a throwaway
+two-file git repository built in `tmp_path`, because what is under test is the argument vector, the
+error string and the cap, none of which needs CIRCT's history; `T-U-gen-05` likewise runs
+`corpus.resolve_sites` for real at T0 against that repository, where the tier column says T1.
 
 No model runs in any of these, and from 2026-09-14 that is enforced rather than intended: the five
 backend tests use the `fake_vertex` fixture of §0.3, which is CHIA's own
 `chia/models/tests/test_vertex.py` recipe, and `BUGLOOP_ALLOW_LIVE_MODEL` is deleted from the
-environment for all of them except where a test sets it itself, inside `monkeypatch`, to exercise the
-allow path against the fake. The seeded arm's two turns are driven by a recorded transcript replayed
+environment for all of them ~~except where a test sets it itself, inside `monkeypatch`, to exercise the
+allow path against the fake~~ **without exception (amended 2026-09-15, §16.7): the allow path is
+exercised by passing `require_live_model` an explicit `env=` mapping, so no test touches the process
+environment and `T-U-layout-08` (1) has no carve-out**. The seeded arm's two turns are driven by a recorded transcript replayed
 through a `_turn` substitute, which is what `02-HLD.md` §2.13 and NFR-01 mean by replaying an agent
 turn; the emitter, the cap and the validator are the code under test.
 
@@ -452,7 +472,7 @@ turn; the emitter, the cap and the validator are the code under test.
 | `T-U-msyn-08` | **The freeze is write-once.** A second call with the same `set_version` raises `MutatorSynthError("set_exists", path)` and leaves the existing file byte-identical, so the digest `RunManifest.mutator_set_sha` names can never change under a run | `mutators/set_v1.json` | T0 | FR-05.2 |
 | `T-U-msyn-09` | `MutatorSynthError("empty_mirror")` when step 2 returns no row: a set synthesised from nothing would freeze successfully and measure nothing | `mirror/empty/` | T0 | FR-05.2 |
 
-### 1.9 `probe_task.py` (B2, B3, B4, B5), 50 tests
+### 1.9 `probe_task.py` (B2, B3, B4, B5), ~~50~~ **54 tests** (§16.7)
 
 **Callables covered:** `probe_execute`, `classify_build`, `oracle_primary`, `strip_prologue`,
 `oracle_differential`, `extract_port_list`, `gen_arc_harness`, `gen_verilator_tb` and `reduce_case`.
@@ -532,7 +552,7 @@ Wholly tier 0, which is the reason `03-LLD.md` §1.1 gives for it being a file o
 | `T-U-ddmin-07` | Degenerate inputs: an empty list, a one-line list, and a list where every line is load-bearing, each terminate and return correctly | none | T0 | FR-09.10 |
 | `T-U-ddmin-08` | The module imports nothing outside the standard library and knows nothing about CIRCT, asserted by an import walk; this is what makes the module tier 0 | none | T0 | FR-09.10, FR-19.8 |
 
-### 1.11 `triage_task.py` (B6a, B6b, B7), 34 tests
+### 1.11 `triage_task.py` (B6a, B6b, B7), ~~34~~ **35 tests** (§16.7)
 
 **Callables covered:** `issue_mirror_refresh`, `dedup_and_screen`, `triage_report` and
 `render_report`.
@@ -611,9 +631,12 @@ ten, `T-U-triage-25` to `T-U-triage-34`.
 | `T-U-repair-14` | The loop's row is written **first**, carrying the local identifier; killing the chain between the two writes leaves the loop row present and the reconciliation marks it `repair_row_missing`, with no join key dangling unmarked | `repair/issues.db` | T0 | FR-12.10 |
 | `T-U-repair-15` | `PHASE_TIMEOUTS` is CHIA's own dict verbatim, and the chain is invoked with it unaltered | none | T0 | FR-12.1 |
 
-### 1.13 `gate.py` (B9a, B9b), 26 tests
+### 1.13 `gate.py` (B9a, B9b, **B9d**), 26 tests
 
-**Callables covered:** `gate_decide` and `gate_rerun`.
+**Callables covered:** `gate_decide`, `gate_rerun` and, from 2026-09-15 (§16.7), `gate_validate` and
+the pure `decide(fields, repair)`. The count is unchanged: `gate_validate` is exercised by the
+question-3 rows that already existed and by `T-U-gate-02`, which reads every gate node's
+`_chia_options`, and `decide` is what lets `T-U-gate-17` produce a null answer at all.
 
 `01-FRD.md` §10.3 items 16 and 17 both land here, plus the four questions and the default-refuse rule.
 
@@ -646,7 +669,7 @@ ten, `T-U-triage-25` to `T-U-triage-34`.
 | `T-U-gate-25` | **The two mirror verdicts are reachable and both fail question 4.** A candidate carrying `known_open_issue` and one carrying `known_closed_issue`, each produced by §3.7.3's screen rather than constructed, each fails question 4 with the issue number in the reason; both values were unreachable before the screen was defined, so this test could not have been written against the earlier LLD | `dedup/known_issue/` | T0 | FR-10.3, FR-13.5 |
 | `T-U-gate-26` | **Question 3 runs at `candidate.run_commit`.** Against a calibration manifest with two entries, the three check commands execute against the binaries of the candidate's **own** commit and never `manifest.run_commit[0]`'s, asserted on the recorded working tree and the recorded argv | `run_manifest/calibration_two.json` | T1 | FR-02.7, FR-13.15 |
 
-### 1.14 `approve.py` (B9c), 14 tests
+### 1.14 `approve.py` (B9c), ~~14~~ **17 tests** (§16.7)
 
 **Callable covered:** `approve.main`.
 
@@ -744,7 +767,7 @@ framework (ADR-D-12), so it is wholly tier 0.
 | `T-U-store-12` | **The three codes `store.py` adds.** `E011_BAD_EVIDENCE_KEYS` when `dedup_evidence`'s key set differs from `_DEDUP_EVIDENCE_KEYS`, with the symmetric difference listed so a missing key and an extra one are distinguishable; `E012_FINGERPRINT_BASIS` when `(fingerprint is None) != (dedup_basis == "insufficient")`; `E013_MISSING_EVIDENCE` when a key `_DEDUP_EVIDENCE_REQUIRED[dedup_verdict]` names is present and `None`, naming the verdict and every missing key. All three are `contract.ContractError`, so a caller catches one class across both validators, and none of `E001`, `E007`, `E008`, `E009` or `E010` is ever raised from here | `candidate/`, `dedup/verdicts/` | T0 | FR-10.5, FR-10.8 |
 | `T-U-store-13` | **The DDL enforces the fingerprint rule too.** `INSERT INTO fingerprint` with a non-null `value` and `basis = 'insufficient'`, and with a null `value` and `basis = 'frames'`, are both rejected by the table's `CHECK ((value IS NULL) = (basis = 'insufficient'))`, so FR-10.8 holds once in Python (`E012`) and once in SQL and a writer that bypasses either still meets the other | none | T0 | FR-10.8 |
 
-### 1.19 `results.py` (B11), 21 tests
+### 1.19 `results.py` (B11), ~~21~~ **22 tests** (§16.7)
 
 **Callables covered:** `render_results` and the fourteen `_require_*` checks.
 
@@ -776,7 +799,7 @@ of the store.
 | `T-U-results-20` | Both arms' seed SHA sets are identical within a mode: 187 in discovery, 171 in calibration | `results/store_full.db` | T0 | FR-18.2 |
 | `T-U-results-21` | **The count is fourteen, in both places.** `len(_REFUSALS) == 14`, the tuple's names are exactly the fourteen `_require_*` names `03-LLD.md` §14.4's table rows carry, in the same order, and `render_results` calls **every** one and collects every failure before raising, so a store missing three elements reports three rather than the first. A fifteenth name in either document, or a thirteenth, fails this test | `results/store_zero.db` | T0 | FR-18.2 |
 
-### 1.20 `bug_loop.py` (B12, and B1's driver), 28 tests
+### 1.20 `bug_loop.py` (B12, and B1's driver), ~~28~~ **31 tests** (§16.7)
 
 **Callables covered:** `main`, `build_image`, `_head_node_id` and `_head_options`.
 
@@ -840,7 +863,7 @@ tests: a test under the example directory does not discharge a contribution to `
 | `T-U-core-16` | `circt_exec_probe` returns `worker_hostname` from `socket.gethostname()`, `worker_node_id` from `ray.get_runtime_context().get_node_id()` and `child_pid` from the pid `os.fork` returned; all three are non-empty on every call and are what FR-13.2's recorded pair is built from | none | T1 | FR-13.2 |
 | `T-U-core-17` | **An attributed frame is not symbolised.** `circt_symbolize` returns a `shape="attributed"` frame unchanged, LLVM having resolved it at print time and there being no module to ask, and computes `in_circt_object` for **both** shapes: a `module_offset` frame is in a CIRCT object when its module is `/workspace/circt/build/bin/<tool>` or matches `/workspace/circt/build/lib/libCIRCT*.so*`, and an attributed frame when its file lies under `/workspace/circt/`, which covers the generated `.inc` files under `build/` as well as the source tree | `stderr/trace.txt` | T1 | FR-07.4, FR-07.5 |
 
-### 1.22 `dockerfiles/ChiaCirctAssertDockerfile` and the `ImageSpec`, 19 tests
+### 1.22 `dockerfiles/ChiaCirctAssertDockerfile` and the `ImageSpec`, ~~19~~ **15 tests** (§16.7)
 
 The unit under test is the **image**, so every test here is tier 2 except those driven from a recorded
 `ImageSpec`. There is no in-process substitute for an image, which is why §12.3 lists F-03's
@@ -981,12 +1004,12 @@ input can be in two rows.
 | Test | Class | Constructed input | Expected `ProbeResult` | Reducer path | Gate outcome |
 |---|---|---|---|---|---|
 | `T-E-input-01` | valid input that passes | a well-formed `hw.module` with two ports, run under `circt-opt --canonicalize` | `build_status=clean_exit`, `exit_status=0`, `signal=null`, `oracle_fired=false`, `stopping_stage=stage_4`, `stopping_reason=oracle_did_not_fire` | none; B5 is not dispatched | never reaches the gate; counted in the feedback bundle |
-| `T-E-input-02` | valid input that crashes | an MLIR module driving a null dereference in a CIRCT pass, reduced from the recorded crash of `fixtures/oracle/crash_01/` | `build_status=crash`, `exit_status=null`, `signal=SIGSEGV`, `oracle_fired=true`, `oracle_class=crash` | `circt-reduce`, no lift | passes questions 1 to 3; question 4 by the dedup verdict |
-| `T-E-input-03` | valid input that fires an assertion | an MLIR module violating a documented pass precondition, from `fixtures/oracle/assert_01/` | `build_status=assertion`, `signal=SIGABRT`, `exit_status=null`, `assertion_text` and `assertion_site` non-empty and verbatim, `oracle_class=assertion` | `circt-reduce`, no lift | the same; the fingerprint basis is `assertion` |
+| `T-E-input-02` | valid input that crashes | an MLIR module driving a null dereference in a CIRCT pass, reduced from the recorded crash of `fixtures/crashes/crash_01/` | `build_status=crash`, `exit_status=null`, `signal=SIGSEGV`, `oracle_fired=true`, `oracle_class=crash` | `circt-reduce`, no lift | passes questions 1 to 3; question 4 by the dedup verdict |
+| `T-E-input-03` | valid input that fires an assertion | an MLIR module violating a documented pass precondition, from `fixtures/crashes/assertion_01/` | `build_status=assertion`, `signal=SIGABRT`, `exit_status=null`, `assertion_text` and `assertion_site` non-empty and verbatim, `oracle_class=assertion` | `circt-reduce`, no lift | the same; the fingerprint basis is `assertion` |
 | `T-E-input-04` | input rejected by the parser | an `.mlir` file whose first token is `%%%` | `build_status=parse_error`, `exit_status` non-zero, `signal=null`, `oracle_fired=false` | none | never reaches the gate; PAPER §2's "does it build" bar; the reason returns in the bundle |
 | `T-E-input-05` | input that times out | a module whose canonicalisation does not terminate inside `probe_wall_seconds` (60) | `build_status=timeout`, `signal=null`, `limit_hit=wall`, `oracle_fired=false`. The sibling case, a module that exhausts `probe_cpu_seconds` (45) first, is `build_status=timeout` with `limit_hit=cpu` and `stopping_reason=cpu_limit`, and is run as a second parameter case of this class: `probe_cpu_seconds` sits **below** `probe_wall_seconds`, so for any compute-heavy probe the CPU limit binds first and this is the common path rather than an edge | none | never fires; counted separately in the taxonomy, never as a crash |
 | `T-E-input-06` | input that exhausts memory | a module allocating past `probe_address_space_bytes` (4 GiB) | `build_status=oom`, `limit_hit=address_space`, `signal=null` and `exit_status` non-zero, because `RLIMIT_AS` makes allocation fail rather than killing; `oracle_fired=false`, **and the worker survives** | none | never fires; the worker still answers a trivial node afterwards |
-| `T-E-input-07` | input whose crash roots in MLIR, not CIRCT | a module crashing inside MLIR's own verifier, from `fixtures/oracle/mlir_root/` | `build_status=crash`, `oracle_fired=true`, `oracle_class=crash`, `out_of_scope_root=true` | `circt-reduce` runs normally | report-only: never reaches repair; reaches the gate and is reported |
+| `T-E-input-07` | input whose crash roots in MLIR, not CIRCT | a module crashing inside MLIR's own verifier, from `fixtures/candidate/mlir_root.json` | `build_status=crash`, `oracle_fired=true`, `oracle_class=crash`, `out_of_scope_root=true` | `circt-reduce` runs normally | report-only: never reaches repair; reaches the gate and is reported |
 | `T-E-input-08` | input that reduces | the 4,000-op `comb` module of M2's probe-speed measurement, carrying one crashing operation | `oracle_fired=true`; `ReducedCase.reduced=true`, `fixpoint=true`, `size_after_bytes < size_before_bytes` | `circt-reduce` to a fixpoint | question 2 passes |
 | `T-E-input-09` | input that does not reduce | the already-minimal output of `T-E-input-08`, fed again | `ReducedCase.reduced=false`, `reason` recorded, `fixpoint=true` | `circt-reduce` making no progress | refused at question 2 as `not_minimal`, with the reason recorded, and still persisted and counted |
 | `T-E-input-10` | input that duplicates another | a byte-different module producing the same assertion expression at the same `file:line` as `T-E-input-03` | `oracle_fired=true`, `oracle_class=assertion`; the same primary fingerprint | `circt-reduce` | refused at question 4 as `duplicate_of_candidate`, naming the first candidate's id |
@@ -1046,7 +1069,9 @@ of the three classes".
 
 ### 5.2 The acceptance: what a fixture directory holds
 
-One directory per recorded failure, under `fixtures/oracle/<class>_<nn>/`, committed, each holding
+One directory per recorded failure, under ~~`fixtures/oracle/<class>_<nn>/`~~
+**`fixtures/crashes/<class>_<nn>/`** (corrected 2026-09-15, §16.7: `crashes/` is the root W-09 built
+and the architect kept, and the plan is what moves), committed, each holding
 exactly these files and no others:
 
 | File | Content |
@@ -1057,6 +1082,19 @@ exactly these files and no others:
 | `expected.json` | `{"class", "assertion_text", "assertion_site", "fingerprint_frame", "prologue_dropped", "top_frames", "exit_status", "signal"}` |
 | `stderr.txt` | the recorded stderr, verbatim, decoded with `errors="backslashreplace"` |
 | `README.md` | one paragraph: where it came from, why it is in the set, and which class it covers |
+
+**The six committed fixtures are `crash_01`, `assertion_01`, `assertion_02`, `assertion_03`,
+`assertion_04` and `fatal_error_01`**, across two SDK tags, 1.143.0 and 1.156.0; the "five" of §13 is
+corrected to six there. `_ASSERT_UNREACHABLE` is still unexercised on real output, which is recorded
+rather than fixed: no mined failure produced one.
+
+`expected.json` **gains a seventh key, `out_of_scope_root`** (added 2026-09-15, §16.7), which nothing
+pinned before and which is the regression guard for `03-LLD.md` §3.6.2 step 4's address-group rule;
+`w09_mkfixture.py` records it from now on. The six were re-derived by the independent transcription
+`analysis/measurements/w09_oracle.py`, which reproduced the previous recording byte for byte before
+the two frame decisions were applied to both and agrees with the loop's own classifier field for
+field after; `stderr.txt`, `input.*`, `argv.json`, `commit.json` and `README.md` are untouched in all
+six.
 
 `expected.json`'s `assertion_text` and `assertion_site` are present for the `assertion` class and null
 otherwise; `top_frames` holds the `fingerprint_top_n` (5) normalised frame function names **after the
@@ -1542,43 +1580,48 @@ Sizes marked `[DEFAULT]` are chosen here, which is the home FR-14.1 gives a fixt
 | `fixtures/corpus/clone_notags` | the same clone with the tag refs removed | the same script with `--no-tags` | shares the object store | no |
 | `fixtures/corpus/pin_window_raw.json` | `analysis/pin_window_raw.json`, verbatim: 63 windows, 1,103 shape candidates, 164 tags | copied from `analysis/`, never regenerated by a test | 687 kB | yes |
 | `fixtures/corpus/runlines/` | one `RUN:` line per shape of FR-01.10: `not_*.txt` (the corpus's 2 real ones), `env.txt`, `splitfile.txt` (the corpus's 1), `pipe_*.txt` (one plain, one quoted), `subst_*.txt`, `unsupported_*.txt` (`;`, `&&`, backtick, `$(`, and a constructed `%{`), `cont.txt` | extracted from the clone by `m1_runlines.py`'s method, except the `%{` case, which is constructed because M1 measured zero occurrences | 14 files, under 10 kB | yes |
-| `fixtures/pin/` | `pin_window_raw.json` (shared), plus `one_bump_off.json`, `no_tags.json`, `multi_tag.json` | derived from `pin_window_raw.json` by selecting rows; the derivation script is committed beside them | 4 files | yes |
-| `fixtures/run_manifest/` | one manifest per mode, including `calibration_two.json`, a **calibration** manifest carrying two `run_commit` entries whose index 0 is a different seed's commit from the candidate's, which is what `T-U-triage-32`, `T-U-repair-09` and `T-U-gate-26` need to catch a reader that uses `manifest.run_commit[0]` | recorded, `calibration_two.json` by a two-seed calibration run | 3 files | yes |
+| ~~`fixtures/pin/`~~ **`fixtures/pin_select/`** (corrected 2026-09-15, §16.7) | ~~`pin_window_raw.json` (shared), plus `one_bump_off.json`, `no_tags.json`, `multi_tag.json`, derived from that JSON~~ **`head_pin_released.json`, `head_pin_unreleased.json`, `all_windows_released.json`, `one_bump_off.json`, `no_tags.json`: each replays the six git commands of `03-LLD.md` §4.11.1 verbatim, as recorded git output rather than as rows of `pin_window_raw.json`.** The recorded form is what exercises `corpus._read_tags` and `corpus._walk_pins`; a parsed-window fixture would step over exactly the code §3.4 says A2 **shares** with A1, which is the property the tests exist to hold | `make_fixtures.py`, committed beside them, which is this table's own rule | 5 files plus the script | yes |
+| ~~`fixtures/run_manifest/`~~ **`fixtures/triage/run_manifest/`** (corrected 2026-09-15, §16.7): `T-U-repair-09` and `T-U-gate-26` read the shared manifests from where W-10 put them rather than from a second and third copy, one manifest not being allowed to become three | one manifest per mode, including `calibration_two.json`, a **calibration** manifest carrying two `run_commit` entries whose index 0 is a different seed's commit from the candidate's, which is what `T-U-triage-32`, `T-U-repair-09` and `T-U-gate-26` need to catch a reader that uses `manifest.run_commit[0]` | recorded, `calibration_two.json` by a two-seed calibration run | 3 files | yes |
 | `fixtures/seed_record/` | one `SeedRecord` per shape at contract **2.0**, including the 9-test-file seed, one `sdk_exact=false` seed, and one whose `diff` sits just under `artefact_inline_cap_bytes` and one just over, for `T-U-corpus-23` | recorded | 7 files, under 2 MB | yes |
-| `fixtures/turns/` | recorded agent transcripts: `seed_read_ok`, `probe_write_ok`, `probe_write_10`, `probe_write_wrongtool`, `probe_write_argv`, `probe_write_badfooter`, `backend_error`, `report_write_disagree`, `report_write_long`, `mutator_synth_bad`, `two_blocks.md`, `footer_*` | captured from real turns during the pilot, then **redacted** of nothing, because no turn ever sees a credential: the key lives in the LLM object's `client_kwargs` and in the container's environment, neither of which is in a transcript | 15 files, under 5 MB | yes |
+| ~~`fixtures/turns/`~~ **`fixtures/generate/turns/`, `fixtures/synth/turns/` and `fixtures/triage/turns/`** (corrected 2026-09-15, §16.7). They are **`.md`, not `.jsonl`**: a `.jsonl` in `03-LLD.md` §6.5 is the raw session transcript and what a replay needs is the turn's final text, which is what `parse_json_footer` reads. **All of them are constructed and their READMEs say so: no model has been run against this design.** The list that follows is the shapes they cover | recorded agent transcripts: `seed_read_ok`, `probe_write_ok`, `probe_write_10`, `probe_write_wrongtool`, `probe_write_argv`, `probe_write_badfooter`, `backend_error`, `report_write_disagree`, `report_write_long`, `mutator_synth_bad`, `two_blocks.md`, `footer_*` | captured from real turns during the pilot, then **redacted** of nothing, because no turn ever sees a credential: the key lives in the LLM object's `client_kwargs` and in the container's environment, neither of which is in a transcript | 15 files, under 5 MB | yes |
 | `fixtures/vertex/` | the fake responses the `fake_vertex` fixture replays, as **response builders** rather than as recorded bytes: one plain text turn with `prompt_token_count` and `candidates_token_count` set, one `function_call` turn followed by its text turn, one `MAX_TOKENS` turn, and one blocked turn. They are built from `google.genai.types` at test time, exactly as CHIA's own `_resp` does (`chia:chia/models/tests/test_vertex.py:64-75`), so a `google-genai` upgrade that renames a field fails the tests loudly instead of replaying stale JSON | a committed Python module, not data; no recorded HTTP anywhere | 1 file, under 10 kB | yes |
 | `fixtures/ledger/vertex/` | `LedgerEntry` rows whose `observed` is populated: tokens from a mocked turn and a `cost_usd` the ledger computed from `budget/complete.yaml`'s two prices | recorded through `accrue` in a test, then committed | 4 files, under 20 kB | yes |
 | `fixtures/mutators/` | `set_v1.json`, a `raising.json` set holding one deliberately raising mutator, and `noop_case/` | `mutator_synth.py` for the real set; hand-written for the two test sets | 3 files, under 200 kB | yes |
 | `fixtures/stderr/` | one recorded stderr per `classify_build` row: `clean`, `parse_error`, `parse_error_argv`, `assert_glibc`, `assert_cpp`, `unreachable_*`, `llvm_error`, `segv`, `bad_alloc`, `oom_*`, `both`, `trace` | captured from real tool runs; `assert_glibc.txt` is the measured three-line C programme's output and `assert_cpp.txt` the measured namespaced C++ member function's, which is the shape `_ASSERT_GLIBC`'s `.+?` exists for; `parse_error_argv.txt` carries the literal `does not refer to a registered pass or pass pipeline`; `trace.txt` is the recorded 466-frame `!hw.array` overflow and carries **both** `_FRAME` shapes | 15 files, under 150 kB | yes |
-| `fixtures/oracle/<class>_<nn>/` | **the five recorded real failures of §5**: `input.<ext>`, `argv.json`, `commit.json`, `expected.json`, `stderr.txt`, `README.md` | the procedure of §5.1, from the 187 seeds and from closed `label:bug` issues | 5 directories `[DEFAULT]`, 30 files, under 1 MB | yes |
-| `fixtures/reducer/` | `branch_mlir/`, `branch_fir/`, `branch_sv_verilog/`, `branch_sv_translate/`, `branch_textual/`, `minimal/`, `reducer_abort/`, `truncated/` | each derived from a `fixtures/oracle/` failure; the `.sv` branch splits in two because `circt-verilog` takes `--format=mlir` and `circt-translate` has no such option; `reducer_abort/` is the measured parser-overflow input on which `circt-reduce` itself died with rc 139, which must now route to `textual-ddmin`; `truncated/` is produced by killing a reduction mid-write | 8 directories, under 2 MB | yes |
+| ~~`fixtures/oracle/<class>_<nn>/`~~ **`fixtures/crashes/<class>_<nn>/`** (corrected 2026-09-15, §16.7) | **the ~~five~~ six recorded real failures of §5**: `input.<ext>`, `argv.json`, `commit.json`, `expected.json` (now with `out_of_scope_root`), `stderr.txt`, `README.md`. They are `crash_01`, `assertion_01` to `assertion_04` and `fatal_error_01` | the procedure of §5.1, from the 187 seeds and from closed `label:bug` issues | 6 directories, 36 files, under 1 MB | yes |
+| `fixtures/reducer/` | `branch_mlir/`, `branch_fir/`, `branch_sv_verilog/`, `branch_sv_translate/`, `branch_textual/`, `minimal/`, `reducer_abort/`, `truncated/` | each derived from a `fixtures/crashes/` failure; the `.sv` branch splits in two because `circt-verilog` takes `--format=mlir` and `circt-translate` has no such option; `reducer_abort/` is the measured parser-overflow input on which `circt-reduce` itself died with rc 139, which must now route to `textual-ddmin`; `truncated/` is produced by killing a reduction mid-write | 8 directories, under 2 MB | yes |
 | `fixtures/ddmin/200_3/` | a 200-line input `[DEFAULT]` whose interestingness depends on exactly 3 lines `[DEFAULT]`, plus the interestingness function as a Python callable | constructed: 197 filler lines and 3 load-bearing ones, with the expected answer committed beside it | 2 files, under 20 kB | yes |
 | `fixtures/ddmin/adversarial/` | an input whose interestingness function is true only for the full list | constructed | 2 files | yes |
-| `fixtures/dedup/pairs/` | **the 20 labelled pairs of §10**, `<nn>.json`, each with two candidate ids, the label, the one-sentence justification and the labelling date; at least four are R4 pairs | the four construction rules of §10, labelled before the fingerprint is computed | 20 files, under 500 kB | yes |
-| `fixtures/fingerprint/` | `assertion/`, `crash/`, `structural/`, `insufficient/` and `unstable/` | `unstable/` is the **ten recorded runs of one `!hw.array` stack overflow** whose top-5 stripped tuple takes nine distinct values and whose fingerprint frame takes three, which is what `T-U-triage-03`, `T-U-triage-26` and `T-N-nfr02-01` are written against; `structural/` holds the observed `hw.module @top` and `hw.module private @Foo` pair | 5 directories, under 500 kB | yes |
+| `fixtures/dedup/pairs/` | **the ~~20~~ 22 labelled pairs of §10** (corrected 2026-09-15, §16.7: eleven duplicate and eleven distinct, at least four per rule and five R4), `<nn>.json`, each with two candidate ids, the label, the one-sentence justification and the labelling date; at least four are R4 pairs | the four construction rules of §10, labelled before the fingerprint is computed | 20 files, under 500 kB | yes |
+| ~~`fixtures/fingerprint/`~~ **`fixtures/triage/fingerprint/`**, and likewise `triage/report/`, `triage/turns/` and `triage/run_manifest/` (corrected 2026-09-15, §16.7); **`contamination/clone` is not committed at all**, the two commit scans running against a three-commit repository built in `tmp_path`, which is why `T-U-triage-18`, `-19`, `-20` and `-32` keep the `t1` marker although they need only `git` | `assertion/`, `crash/`, `structural/`, `insufficient/` and `unstable/` | `unstable/` is the **ten recorded runs of one `!hw.array` stack overflow** whose top-5 stripped tuple takes nine distinct values and whose fingerprint frame takes three, which is what `T-U-triage-03`, `T-U-triage-26` and `T-N-nfr02-01` are written against; `structural/` holds the observed `hw.module @top` and `hw.module private @Foo` pair | 5 directories, under 500 kB | yes |
 | `fixtures/dedup/known_issue/`, `fixtures/dedup/verdicts/` | one candidate per `DedupVerdict` value, including **both** `known_open_issue` and `known_closed_issue`, which §3.7.3's screen makes reachable for the first time; plus one candidate per oracle class carrying the tokens §3.7.3 draws, one whose only token is under the 8-character floor, and one matching issues in both states | recorded, except the token cases, which are derived from a recorded candidate by one edit each | 14 files | yes |
-| `fixtures/mirror/` | recorded GitHub responses: `closed_bug.jsonl` (487 closed and 101 open `label:bug` issues, M9), `with_comments.jsonl`, `ratelimit/`, `empty/`, `filed_issue.jsonl` | one `GithubIssuesNode.recent` call captured through the recording adapter of §8, then committed; no test ever calls GitHub. `closed_bug.jsonl` is also `synthesise_mutators`' whole input, so `T-U-msyn-05` and `T-U-msyn-06` read the same file the campaign would | 5 files, about 30 MB | yes, and it is the largest committed fixture |
+| `fixtures/mirror/` | recorded GitHub responses: ~~`closed_bug.jsonl` (487 closed and 101 open `label:bug` issues, M9)~~, `with_comments.jsonl`, `ratelimit/`, `empty/`, **`sample.json`** | **Corrected 2026-09-15 (§16.7).** `fixtures/mirror/` is **B6a's**, and holds **fifty real issues** recorded unauthenticated, which is neither of M9's counts; a fixture of 487 fabricated issues presented as recordings would be worse than one whose README says what it is. A7's input is a different fixture, `fixtures/synth/`, whose mirror is a real `loop.db` built through `store.LoopStore` carrying **constructed** rows at M9's two counts, 487 closed and 101 open, and whose README says so. No test calls GitHub except `T-U-triage-35`, which is live and skips cleanly with no `GITHUB_TOKEN` | 4 files plus `synth/`, under 5 MB | yes |
 | `fixtures/contamination/clone` | the clone of `fixtures/corpus/clone`, reused | shared | shared | no |
 | `fixtures/image_spec/` | `ok.json`, `lit_broken.json` | recorded from a real image build; `lit_broken.json` is `ok.json` with `lit_discovery_ok` false | 2 files | yes |
 | `fixtures/image/fetch_upstream/` | a purpose-built upstream shaped like `llvm/circt`: an `llvm` gitlink and two `firtool-*` tags, plus the script that shallow-clones it at the older tag exactly as CHIA's base does | `tests/fixtures/make_fetch_upstream.sh` at test time; the real clone is `blob:none` and cannot serve a shallow clone offline, so the fetch semantics of `T-U-image-18` are exercised here and the two `ls-tree` commands of `T-U-image-02` against the real clone | 1 script | script yes, repository no |
 | `fixtures/image/` | `one_bump_off/`, `broken_target/`, `slang/`, `baseline_objects.txt` (FR-03.5's **19** named objects, re-based on the image at `eade0de6` on 2026-09-14; ~~18~~ was a different commit and a different target set), `lit_baseline/` | build-time fixtures: each is a Dockerfile argument set plus the expected failure, not an image | 5 items, under 100 kB | yes |
 | `fixtures/symbolize/` | `bassert_g_addrs.txt`, `bassert_addrs.txt` and `module_offsets.txt`, each one address or offset per line with its expected resolution | the first two from M2's measured probe; `module_offsets.txt` from the recorded 466-frame trace, one `(<module>, <offset>)` pair per line grouped by module, which is what `circt_symbolize` actually feeds `llvm-symbolizer` and what `T-U-core-10` asserts resolves where the runtime addresses do not | 3 files | yes |
 | `fixtures/repro_polarity/crashing/`, `.../diagnosing/` | **the two `repro.sh` polarity fixture binaries of FR-12.3**: a tiny C programme that aborts on its input, and the same programme patched to print a diagnostic and exit 1 | built from committed C source by `tests/fixtures/build_polarity.sh`; the **source** is committed and the binaries are built at test time, so no ELF is in the repository | 2 source files, under 5 kB | source yes, binaries no |
-| `fixtures/repair/` | `issues.db` (a real CHIA database with existing keys), `chia_baseline.json` (the `sha256` of the **six prompts** at `16c35e92`, plus, since 2026-09-14, `issue_task.py`'s `sha256` at `16c35e92` **and** the `sha256` of `upstream/issue_task-vertex-branch.patch`, which is what `T-U-repair-07` and `T-U-repair-21` compare against instead of a hash of the working file), `verdicts/`, `lit_red/`, `lit_zero/` | `issues.db` copied from a CHIA run; the baseline hashes computed once | 5 items, under 2 MB | yes |
+| `fixtures/repair/` | `issues.db` (a real CHIA database with existing keys, **force-added past the repository's `.gitignore`, which excludes `issues.db*` as runtime state; §13's own table requires a committed one and `T-U-repair-01` asserts disjointness against it. Its rows are real `llvm/circt` issue numbers taken from `fixtures/mirror/sample.json` and its schema is CHIA's own `db.py` `_SCHEMA`**), `chia_baseline.json` (the `sha256` of the **six prompts** at `16c35e92`, plus, since 2026-09-14, `issue_task.py`'s `sha256` at `16c35e92` **and** the `sha256` of `upstream/issue_task-vertex-branch.patch`, which is what `T-U-repair-07` and `T-U-repair-21` compare against instead of a hash of the working file), `verdicts/`, `lit_red/`, `lit_zero/` | `issues.db` copied from a CHIA run; the baseline hashes computed once | 5 items, under 2 MB | yes |
 | `fixtures/candidate/`, `fixtures/reduced_case/`, `fixtures/report/` | one record per branch each stage can take, including `differential.json`, `mlir_root.json`, `null_answer.json`, `taxonomy/` (one per stopping value), `short.md`, `long.md`, plus one `CandidateRecord` per row of `03-LLD.md` §2.9's class table in both columns and one per `E011`, `E012` and `E013` | recorded, the three malformed ones derived by one edit each | about 40 files, under 1 MB | yes |
 | `fixtures/approve/` | `store_one_filed.db`, `store_at_total.db`, `two_pending.db`, `gfi_candidate.json`, `untriaged.json`, `with_patch.json` | built by running the loop to the gate and stopping, then copying `loop.db` | 6 files, under 2 MB | yes |
-| `fixtures/results/` | `store_full.db`, `store_zero.db`, `store_capped.db`, `store_marked.db` | `store_full.db` is the pilot's own database; the other three are it with one property changed | 4 files, about 20 MB | yes |
+| `fixtures/results/` | ~~`store_full.db`, `store_zero.db`, `store_capped.db`, `store_marked.db`~~ **`make_store.py` and `example.md`** (replaced 2026-09-15, §16.7) | ~~`store_full.db` is the pilot's own database; the other three are it with one property changed~~ **The pilot's own database cannot exist before W-18, so the four stores are replaced by a committed generator, `tests/fixtures/results/make_store.py`, regenerated into `tmp_path` at test time; the three variants are one edit each inside the tests, exactly as this table described them. `example.md`, the render of that store, is committed instead and `T-U-results-22` compares it byte for byte, because the renderer and the generator are two files that drift apart quietly and the artefact is the thing a reader reads.** | 2 files, under 100 kB | yes |
 | `fixtures/budget/`, `fixtures/repo/` | `complete.yaml`, `missing/` (**27** one-key-short copies), `extra_key.yaml`, `bad_types/`, `empty_sample.yaml`, **`bad_prices/`** (one copy per refusal of check 6: each price absent, zero, negative, `nan`, `inf` and a string, plus a non-positive `campaign_spend_cap_usd` and an empty `model_id`); and **five** throwaway git repositories: `uncommitted/`, `later_commit/`, `mutator_after/`, `preregistered/`, **`chia_stub/`** (a directory holding an empty `chia/` and `examples/circt_issue_solver/`, which is all `sync-to-chia.sh` checks before it writes) | the YAMLs are derived from `03-LLD.md` §9.5 by one edit each, `empty_sample.yaml` being the file with `calibration_sample_shas` emptied, which is what §9.5 itself used to ship; the repositories are built by `tests/fixtures/make_repos.sh` at test time | 44 files, under 120 kB | YAMLs yes, repositories no |
-| `fixtures/equivalence/<class>/` | **the fourteen constructed inputs of §4**, one directory each, with the input, the argv and the expected `ProbeResult` fields | constructed by hand, except `T-E-input-02`, `T-E-input-03`, `T-E-input-07` and `T-E-input-08`, which are derived from `fixtures/oracle/` | 14 directories, under 2 MB | yes |
-| `fixtures/differential/` | `broken_tb/`, `x_only/`, `port_lists/` and `register_add/` | `port_lists/` holds one lifted HW-dialect file per `extract_port_list` outcome: a clean two-port clocked module, a two-module file whose submodule is `private`, a file with no public module and one with two, a file with an `!hw.array` port, and a purely combinational file. Those five are constructed and drive `T-U-probe-47` and `T-U-probe-48` at tiers 1 and 0, so the generator tests are **no longer blocked**. `register_add/` is the recorded 12-line FIRRTL register-add of FINAL Appendix A and drives `T-U-probe-50`, which stays **blocked on A-19** and is skipped with the skip recorded | 4 directories, under 100 kB | yes |
+| `fixtures/equivalence/<class>/` | **the fourteen constructed inputs of §4**, one directory each, with the input, the argv and the expected `ProbeResult` fields | constructed by hand, except `T-E-input-02`, `T-E-input-03`, `T-E-input-07` and `T-E-input-08`, which are derived from `fixtures/crashes/` | 14 directories, under 2 MB | yes |
+| `fixtures/differential/` | ~~`broken_tb/`, `x_only/`, `port_lists/` and `register_add/`~~ **`broken_tb/` and `x_only/` only** (corrected 2026-09-15, §16.7): `T-U-probe-47` and `T-U-probe-48` construct their five port-list cases **inline** and `T-U-probe-50` carries the accumulator it runs, so neither directory is committed and neither test is blocked. The previous description follows and is what those inline cases are | `port_lists/` holds one lifted HW-dialect file per `extract_port_list` outcome: a clean two-port clocked module, a two-module file whose submodule is `private`, a file with no public module and one with two, a file with an `!hw.array` port, and a purely combinational file. Those five are constructed and drive `T-U-probe-47` and `T-U-probe-48` at tiers 1 and 0, so the generator tests are **no longer blocked**. `register_add/` is the recorded 12-line FIRRTL register-add of FINAL Appendix A and drives `T-U-probe-50`, which stays **blocked on A-19** and is skipped with the skip recorded | 4 directories, under 100 kB | yes |
 | `fixtures/secrets/known_values.txt` | the literal strings the secret grep searches for: a synthetic token of the shape `ghp_` plus 36 characters, and **two** synthetic model keys, one of each Google shape, `AQ.` plus 32 characters and `AIza` plus 35, which are what `T-N-nfr06-02`'s regular expression is written against. It is also the value `conftest.py` puts in `GEMINI_API_KEY` for every test below T3, so a test that somehow reached the network would present a key that cannot authenticate | constructed; **no real credential is ever committed**, and no test reads `~/.config/bugloop/gemini.env` | 1 file | yes |
 | `tests/system/budget_tiny.yaml` | the system tests' budget file, complete by `03-LLD.md` §9.1 with `arm_window_seconds` 600 `[DEFAULT]` | derived from §9.5 by one edit | 1 file | yes, and it must be committed for FR-14.2 to pass on it |
 
-**Total committed fixture weight** is dominated by three items: the issue mirror at about 30 MB, the
-results stores at about 20 MB, and the transcripts at under 5 MB. Everything else is under 10 MB
-together. The clone, the polarity binaries and the throwaway git repositories are **not** committed
-and are produced by three committed scripts, which keeps the repository under 60 MB `[DEFAULT]` and
-keeps every binary out of it.
+~~**Total committed fixture weight** is dominated by three items: the issue mirror at about 30 MB, the
+results stores at about 20 MB, and the transcripts at under 5 MB.~~ **Restated 2026-09-15 (§16.7):**
+the two largest items are gone. The mirror is fifty recorded issues rather than 588, and the results
+stores are a generator plus one rendered artefact rather than four databases, so no committed fixture
+is above about 2 MB and the whole set is a few megabytes. Everything else is unchanged. The clone,
+the polarity binaries and the throwaway git repositories are **not** committed
+and are produced by ~~three~~ **four** committed scripts, `fetch_clone.sh`, `build_polarity.sh`,
+`make_repos.sh` and `make_fetch_upstream.sh`, which keeps the repository under 60 MB `[DEFAULT]` and
+keeps every binary out of it. **`fetch_clone.sh` does not exist yet** and is §16.8's ninth open code
+item; `filtered_187.json` is what the corpus tests read in the meantime.
 
 ---
 
@@ -1586,13 +1629,34 @@ keeps every binary out of it.
 
 | Tier | Tests | Which | Expected wall time |
 |---|---|---|---|
-| **T0**, no CIRCT | 337 | Every test of `schema`, `fixt`, `layout`, `mut`, `msyn`, `ddmin`, `budget`, `ledger`, `feed`, `store`, `results`, `appr`, `prompt`, `submit`, `byaml`, `cluster` (bar `cluster-01`); the pure-logic half of `corpus`, `pin`, `gen`, `probe`, `triage`, `repair`, `gate`, `driver`, `core`; `image-10` and `image-11`; 13 of the 17 integration tests; `T-N-nfr03-01`, `T-N-nfr03-02`, `T-N-nfr11-01`, `T-N-nfr12-01`. The LLD resync added 47 of them, the largest groups being the ten mirror-screen and fingerprint tests of `triage`, the five `build_image` and CLI tests of `driver`, and the five contract tests of `schema`; the backend fold-in added 15, of which the five `gen` tests run the whole Gemini agent loop against CHIA's own fake `genai.Client` and fake MCP transport and so still fork nothing | **under 130 s** `[DEFAULT]` for the whole tier, given that nothing forks a compiler and nothing opens a socket. It was 90 s for 275 tests and the added 62 are pure-logic |
-| **T1**, the SDK or a measured build | 72 | `corpus-01`, `corpus-15`, `corpus-16`, `corpus-19`, `corpus-21` to `corpus-24`; `pin-02`, `pin-08`; `gen-05`, `gen-15` to `gen-18`; `probe-01`, `probe-07` to `probe-09`, `probe-13` to `probe-15`, `probe-20`, `probe-23`, `probe-25`, `probe-26`, `probe-31` to `probe-36`, `probe-38`, `probe-41` to `probe-43`, `probe-45` to `probe-47`; `triage-18` to `triage-20`, `triage-32`; `repair-03`, `repair-04`, `repair-18`; `gate-10` to `gate-13`, `gate-21` to `gate-23`, `gate-26`; `driver-03`, `driver-26`; `core-02` to `core-05`, `core-08` to `core-17`; `T-I-app-tri-01`, `T-I-rep-gate-02` | **about 30 min** `[DEFAULT]`, still dominated by two measured git walks: the batched `cat-file` over 228 blobs at **125 s** (M1) and the contamination `log -p` over 109 paths at **488 s** (M4), the latter now run once after `driver-26`'s backfill rather than cold. The 23 tests the resync added are seconds each: four `git` reads for `SourceReadTool`, four `prlimit` and `os.wait4` probes, and one `circt-opt --mlir-print-op-generic` |
-| **T2**, the assertions-on image | 42 | Every `image` test bar `image-10` and `image-11`, `image-18` included; `probe-28` to `probe-30`, `probe-37`, `probe-50`; `repair-13`; `driver-07`, `driver-08`; the §5 and §6 parameterised runs; `T-I-gen-app-01`, `T-I-gen-app-02`; all 14 `T-E-input-*`; `T-N-nfr02-01`, `T-N-nfr02-02` | **about 45 min** `[DEFAULT]` **after** the image exists, unchanged: `image-18` runs against a synthetic upstream in seconds and `probe-50` is skipped until A-19 answers. The image build itself is separate and measured: **582 s** for the five targets under `-O3 -UNDEBUG -gline-tables-only` at `-j12` (M2), or **841 s** with the slang front end at `-j8` (M7), plus the two lit runs at **10.06 s** and **10.21 s** (M3) |
-| **T3**, the single-machine cluster | 22 | All 9 system tests; `cluster-01`; `driver-05`; `T-N-nfr01-01`, `T-N-nfr04-01` to `T-N-nfr10-02`, `T-N-nfr06-02` and `T-N-nfr08-02` among them; the §5 fixtures' five cached images are reused rather than rebuilt | **about 2 h 30 min** `[DEFAULT]`: `chia up` and image pulls, then `T-S-pilot-01`'s two 600 s `[DEFAULT]` arm windows, then the regeneration check over the pilot's rows, which re-executes every tool stage |
+| **T0**, no CIRCT | ~~337~~ **390** (§16.7) | Every test of `schema`, `fixt`, `layout`, `mut`, `msyn`, `ddmin`, `budget`, `ledger`, `feed`, `store`, `results`, `appr`, `prompt`, `submit`, `byaml`, `cluster` (bar `cluster-01`); the pure-logic half of `corpus`, `pin`, `gen`, `probe`, `triage`, `repair`, `gate`, `driver`, `core`; `image-10` and `image-11`; 13 of the 17 integration tests; `T-N-nfr03-01`, `T-N-nfr03-02`, `T-N-nfr11-01`, `T-N-nfr12-01`. The LLD resync added 47 of them, the largest groups being the ten mirror-screen and fingerprint tests of `triage`, the five `build_image` and CLI tests of `driver`, and the five contract tests of `schema`; the backend fold-in added 15, of which the five `gen` tests run the whole Gemini agent loop against CHIA's own fake `genai.Client` and fake MCP transport and so still fork nothing | **under 130 s** `[DEFAULT]` for the whole tier, given that nothing forks a compiler and nothing opens a socket. It was 90 s for 275 tests and the added 62 are pure-logic |
+| **T1**, the SDK or a measured build | ~~72~~ **61** (§16.7) | `corpus-01`, `corpus-15`, `corpus-16`, `corpus-19`, `corpus-21` to `corpus-24`; `pin-02`, `pin-08`; `gen-05`, `gen-15` to `gen-18`; `probe-01`, `probe-07` to `probe-09`, `probe-13` to `probe-15`, `probe-20`, `probe-23`, `probe-25`, `probe-26`, `probe-31` to `probe-36`, `probe-38`, `probe-41` to `probe-43`, `probe-45` to `probe-47`; `triage-18` to `triage-20`, `triage-32`; `repair-03`, `repair-04`, `repair-18`; `gate-10` to `gate-13`, `gate-21` to `gate-23`, `gate-26`; `driver-03`, `driver-26`; `core-02` to `core-05`, `core-08` to `core-17`; `T-I-app-tri-01`, `T-I-rep-gate-02` | **about 30 min** `[DEFAULT]`, still dominated by two measured git walks: the batched `cat-file` over 228 blobs at **125 s** (M1) and the contamination `log -p` over 109 paths at **488 s** (M4), the latter now run once after `driver-26`'s backfill rather than cold. The 23 tests the resync added are seconds each: four `git` reads for `SourceReadTool`, four `prlimit` and `os.wait4` probes, and one `circt-opt --mlir-print-op-generic` |
+| **T2**, the assertions-on image | ~~42~~ **30** (§16.7) | Every `image` test bar `image-10` and `image-11`, `image-18` included; `probe-28` to `probe-30`, `probe-37`, `probe-50`; `repair-13`; `driver-07`, `driver-08`; the §5 and §6 parameterised runs; `T-I-gen-app-01`, `T-I-gen-app-02`; all 14 `T-E-input-*`; `T-N-nfr02-01`, `T-N-nfr02-02` | **about 45 min** `[DEFAULT]` **after** the image exists, unchanged: `image-18` runs against a synthetic upstream in seconds and `probe-50` is skipped until A-19 answers. The image build itself is separate and measured: **582 s** for the five targets under `-O3 -UNDEBUG -gline-tables-only` at `-j12` (M2), or **841 s** with the slang front end at `-j8` (M7), plus the two lit runs at **10.06 s** and **10.21 s** (M3) |
+| **T3**, the single-machine cluster | ~~22~~ **21** (§16.7) | All 9 system tests; `cluster-01`; `driver-05`; `T-N-nfr01-01`, `T-N-nfr04-01` to `T-N-nfr10-02`, `T-N-nfr06-02` and `T-N-nfr08-02` among them; the §5 fixtures' five cached images are reused rather than rebuilt | **about 2 h 30 min** `[DEFAULT]`: `chia up` and image pulls, then `T-S-pilot-01`'s two 600 s `[DEFAULT]` arm windows, then the regeneration check over the pilot's rows, which re-executes every tool stage |
 
-The four counts sum to **473**, which is every test identifier in this document, each counted once at
-the **lowest** tier it can run at. The LLD resync added 72, 47 at T0, 23 at T1 and 2 at T2, and the
+~~The four counts sum to **473**~~ **They sum to 502 from 2026-09-15** (§16.7), which is every test
+identifier in this document, each counted once at
+the **lowest** tier it can run at. Three things move it and each is sourced from a committed
+`pytest.mark` read on 2026-09-15.
+
+**New identifiers, +34.** Twenty-nine at T0: fourteen `corpus`, two `pin`, two `probe`, three `appr`,
+one `results`, four `schema` and three `driver`. Five at T1: `gen-15b`, `probe-30b`, `probe-56`,
+`triage-35` and `layout-10`.
+
+**Withdrawn, -5.** `T-U-pin-02`, which was T1 and whose criterion moved inside `T-U-pin-08`, so the
+identifier survives and the test does not; and four image identifiers, `T-U-image-06`, `-09`, `-11`
+and `-18`, which fold into the tier-0 Dockerfile-text assertions of the fifteen that remain.
+`T-U-image-11` was T0 and the other three T2, so T0 loses one, T1 one and T2 three.
+
+**Relabels, twenty-six, which move identifiers between tiers and change no total.** Twenty-five into
+T0: `gen-05`, `gen-15` to `gen-18`, `repair-03`, `repair-04`, `gate-10` to `gate-13`, `gate-21` to
+`gate-23`, `gate-26` and `driver-03` from T1; `probe-29`, `driver-07`, `driver-08` and five of the
+remaining `T-U-image-*` from T2; `driver-05` from T3. One into T1: `probe-28`, from T2.
+
+**The arithmetic, in one line each.** T0 is 337 plus 29 new, minus 1 withdrawn, plus 25 relabelled in,
+which is **390**. T1 is 72 plus 5 new, minus 1 withdrawn, minus 16 relabelled out, plus 1 in, which
+is **61**. T2 is 42 minus 3 withdrawn, minus 9 relabelled out, which is **30**. T3 is 22 minus 1,
+which is **21**. They sum to 502, and 473 plus 34 minus 5 is 502. The LLD resync added 72, 47 at T0, 23 at T1 and 2 at T2, and the
 backend fold-in of 2026-09-14 added 17 more, **15 at T0** (`layout-08`, `layout-09`, `gen-21` to
 `gen-25`, `budget-12`, `budget-13`, `ledger-10`, `ledger-11`, `repair-20`, `driver-27`, `driver-28`,
 `cluster-08`) and **2 at T3** (`T-N-nfr06-02`, `T-N-nfr08-02`). Neither withdrew any.
@@ -1612,7 +1676,8 @@ Four gates, each of which must be green before the next begins. `05-Work-Plan.md
 section owns the order and the reason for it.
 
 1. **T0 first, and on every commit.** It needs nothing but the repository, runs in under 120 s, and
-   covers **339** of **477** tests, including the whole contract, the whole taxonomy mapping, the whole gate
+   covers ~~**339** of **477**~~ **390 of 502** tests (corrected 2026-09-15, §16.7, to agree with
+   §14, whose per-tier assignment is the only complete one in this document), including the whole contract, the whole taxonomy mapping, the whole gate
    logic, every render refusal and, since this resync, the whole issue-mirror screen and the two
    harness generators. It is the only tier cheap enough to be a pre-commit gate, and the
    contract fixtures' compatibility check lives in it, so a MAJOR bump is caught at the commit that
@@ -1834,7 +1899,9 @@ exactly four keys, `T-U-schema-08` asserts that an extra key fails as loudly as 
 committed fixture for a diagnostic string. The reason lives on `RepairResult.token_capture`, which is
 the loop's own object and not a member of the seven-schema seam, and the contract stays at **2.0**.
 
-### 16.7 Errata from implementation, 2026-09-14
+### 16.7 Errata from implementation, 2026-09-14/15
+
+#### The contract package, 2026-09-14
 
 `W-02` wrote §1.1's and §1.2's tests and `W-03` froze the package they test. Five places where this
 plan and the committed tests differ are recorded here. **Four tests were added and no identifier
@@ -1849,3 +1916,145 @@ moved**: §1.1 is its 23 plus `T-U-schema-24` to `T-U-schema-27`, the four rules
 | The module for `T-U-fixt-*` | `circt_bug_loop/tests/test_fixtures.py` | §1.2 heads its table `contract/fixtures/` and names no test module, while §1.3 names `tests/test_layout.py` for `T-U-layout-*`. The three fixture tests walk the committed set and belong beside the schema tests, not inside them: `test_schema.py` tests the validator and `test_fixtures.py` tests the set the validator is pointed at |
 | The tier markers | `pytest.ini` registers `t0`, `t1`, `t2` and `t3` **and** `needs_sdk`, `needs_image` and `needs_cluster`; a module states its tier with `pytestmark` | §0.5's table gives T1, T2 and T3 a `needs_*` marker and T0 none, and §14's matrix and §15's order select by tier. Both sets are therefore needed, the `t<N>` marker to select a tier and the `needs_*` marker to name the resource, and `--strict-markers` rejects an unregistered one, so all seven are registered with one line each |
 | The `conftest.py` interlock | a session-scoped autouse fixture **asserts** that `BUGLOOP_ALLOW_LIVE_MODEL` is absent from the environment and fails the run if it is set | §0.5 has `conftest.py` delete the variable and set `GEMINI_API_KEY` to the synthetic value in `fixtures/secrets/known_values.txt`, so that `generate_task.build_llm` raises `LiveModelRefused` on any unmocked path. Neither the fixture nor `build_llm` exists yet, so there is nothing to set a key for and no refusal to reach. Refusing to start is strictly stronger than deleting the variable, and it is replaced by §0.5's rule verbatim when the secrets fixture and `build_llm` land; `T-U-layout-08` is the test that will then assert the fixture's own effect |
+
+#### The rest of it: W-05 to W-16, 2026-09-15
+
+Dated **2026-09-15**. §16.7 above is the contract package's own list and stays as it is. This is the
+rest: the driver is `reviews/implementation-errata-log.md`, the running log kept while W-05 to W-16
+wrote the modules, plus its **Architect decisions** section, which is binding. `01-FRD.md` §1.10
+names every requirement that changed, `02-HLD.md` §0.4 the placement, and `03-LLD.md` §16.2 the
+design sections. **Everything here is a change to this plan.** Things that are defects in the
+**code** are in §16.8 and are not corrected here, because there is nothing here to correct.
+
+**Test counts, per module.** No identifier is renumbered and none is reused. The counts in §1's
+headings are counts of **rows**, that is of allocated ids, and not of pytest items; where the two
+differ this table says so.
+
+| Section | Was | Is | The ids |
+|---|---|---|---|
+| §1.4 `corpus.py` | 24 | **38** | `T-U-corpus-24` implemented with `resolve_sites`; `T-U-corpus-25` to `-36` new (W-05); `T-U-corpus-37`, three recorded single-dash `RUN:` lines, and `-38`, `crashes/assertion_02/argv.json` fed back through `strip_probe_only_options`, new (W-07) |
+| §1.5 `pin_select.py` | 8 | **9 tests over eleven pytest items** | `T-U-pin-02`'s criterion, the lag against `rev-list --first-parent --count`, is discharged **inside** the one tier-1 test `T-U-pin-08` rather than as a second live test; the id is retired in place and not reused. `T-U-pin-09` (every window released) and `T-U-pin-10` (the `_chia_options` row, the six argument vectors, §3.1's paragraphs) are new. `T-U-pin-07` is parameterised over three fixtures, which is why nine tests collect as eleven items |
+| §1.6 `generate_task.py` and `llm.py` | 25 | **26 over two modules** | `T-U-gen-15b`, §3.5's measured pair against the real clone, is new and is **tier 1**. `T-U-gen-11` to `-18` live in `tests/test_tools.py` |
+| §1.9 `probe_task.py` | 50 | **54** | `T-U-probe-30b` (the differential's `not_applicable` path on a real pair), `T-U-probe-52` (the `(anonymous namespace)::` strip), `T-U-probe-53` (the address-group scope rule) and `T-U-probe-56` (the node end to end, plus a constructed divergent pair) are new |
+| §1.11 `triage_task.py` | 34 | **35** | `T-U-triage-35`, the live mirror test FR-10.9's acceptance and W-10's brief both need and §1.11 allocated no id for. It is `t1`, skips cleanly with no `GITHUB_TOKEN`, and **has been run**: see FR-10.9's erratum for what it measured |
+| §1.14 `approve.py` | 14 | **17** | `T-U-appr-15`, `python -m circt_bug_loop.approve` exercised as a program, which is the entry that exists (architect decision 7); and `T-U-appr-16` (an unknown candidate id is a loud `LookupError` rather than a quiet no-op) and `T-U-appr-17` (FR-13.12's view renders for a candidate with no patch and no report, so a hold is visible rather than a blank screen), both of which the committed suite holds and this plan had allocated no id for |
+| §1.19 `results.py` | 21 | **22** | `T-U-results-22`, the byte-for-byte comparison of the committed `fixtures/results/example.md` against a fresh render of the generated store. The renderer and the generator are two files that drift apart quietly and the artefact is the thing a reader reads |
+| §1.1 `contract/schema.py` | 23 | **27** | unchanged from §16.7 above; recorded here so the module counts are in one table |
+| §1.3 repository-wide static checks | 9 | **10** | `T-U-layout-10`, the two-tree property `03-LLD.md` §1.4 needs asserted against a real CHIA checkout, which is why it is the one **tier-1** layout test |
+| §1.20 `bug_loop.py` | 28 | **31** | `T-U-driver-29`, `-30` and `-31` are new: the second is a **whole iteration** run at tier 0 against a fixture store and fake stages, which is what the driver's `Stages` and `Dispatch` indirection buys (`03-LLD.md` §16.2) |
+| §1.22 the Dockerfile and the `ImageSpec` | 19 | **15** | six at T0 and nine at T2, measured 2026-09-15. Two of the nine are new work rather than a re-count: `T-U-image-02`'s tier-0 half asserts that the Dockerfile prints the string `build_image` step 3 looks for, and step 7's object scan is asserted against W-04's own baseline, **19 of 555**, reproduced exactly against the published image |
+
+Every other module's count is unchanged: §1.2 is 3, §1.3 is 9, §1.7 is 10, §1.8 is 9, §1.10 is 8,
+§1.12 is 23, §1.13 is 26, §1.15 is 13, §1.16 is 11, §1.17 is 8, §1.18 is 13, §1.20 is 28, §1.21 is
+17, §1.22 is 19, §1.23 is 8, §1.24 is 8, §1.25 is 4 and §1.26 is 4.
+
+**The §1 tables therefore sum to 449 unit tests**, against 420 in the approved document: `+4` schema,
+`+1` layout, `+14` corpus, `+1` pin, `+1` gen, `+4` probe, `+1` triage, `+3` approve, `+1` results,
+`+3` driver and `-4` image. That is
+**+34 identifiers, `-4` withdrawn image identifiers and `-1` test**, `T-U-pin-02` being an identifier
+that survives as a criterion inside `T-U-pin-08` and no longer as a test of its own. The four image
+identifiers are withdrawn, not reused: `T-U-image-06`, `-09`, `-11` and `-18` fold into the tier-0
+Dockerfile-text assertions of the fifteen that remain.
+
+**A defect in this document, found by that arithmetic and recorded rather than papered over.** §14's
+four tier counts summed to **473** in the approved document and §15's first paragraph said **477**,
+and §14's T0 was 337 where §15's was 339. Neither figure was re-derived at sign-off and this pass does
+not re-derive them either: it carries **§14's own sum** forward by the delta above, because §14 is
+the only place in this document where every identifier is assigned to exactly one tier, and corrects
+§15 to agree with it. The four counts below are sourced test by test from the committed
+`pytest.mark` decorators, read 2026-09-15.
+
+**Tier relabels.** Every one is a test running at a **lower** tier than §1's column says, which is a
+correction to the column and not a weakening of the test: in each case the thing under test is a
+recorded string, an argument vector or a pure classification, and the binary that produced the
+string is a stand-in whose only job is to produce it.
+
+| Test | Column said | Runs at | Why |
+|---|---|---|---|
+| `T-U-gen-05` | T1 | **T0** | `corpus.resolve_sites` runs for real against a throwaway two-file git repository in `tmp_path`; CIRCT's history is not what the site resolver is about |
+| `T-U-gen-15` to `-18` | T1 | **T0** | the same repository. Under test are the argument vector, the `Error:` string and the cap. `T-U-gen-15b` is the tier-1 half and runs against the real blobless clone at `b792c772` |
+| `T-U-probe-28`, `T-U-probe-30b` | T2 | **T1**, `needs_sdk` | the host has both simulators; no test in the suite runs at T2 at all |
+| `T-U-probe-29` | T1 | **T0** | over `fixtures/differential/x_only/`. The X classification is pure, and the real X behaviour needs a design no corpus seed provides |
+| `T-U-repair-03`, `-04` | T1 | **T0** | FR-12.3's acceptance asks for a committed fixture binary that still crashes and one patched to emit a diagnostic. Shell scripts are those binaries, and `circt_exec_probe`'s `prlimit` prefix runs unmocked around them |
+| `T-U-gate-10` to `-13`, `-21` to `-26` | T1 or T2 | **T0** | the gate's questions are about a recorded class, text and site read off stderr, whatever produced the stderr. `circt_exec_probe`, `classify_build`, `oracle_primary`'s parse and `compute_fingerprint` all run unmocked; only the compiler is a stand-in |
+| `T-U-triage-18`, `-19`, `-20`, `-32` | T1 | **T1, kept** | recorded here because it looks like a relabel and is not: `contamination/clone` is not a committed fixture, the scans running against a three-commit repository in `tmp_path`, so these need only `git`. They keep `t1` because `git` is a tier-1 resource by §0.5's table |
+| `T-U-repair-07`, `-08`, `-21` | T1 | **T1, kept** | they need CHIA's own git checkout, which no stand-in replaces |
+| `T-U-driver-03`, `-05`, `-07`, `-08` | T1, T3, T2, T2 | **T0** | the twelve pre-flight checks are twelve named functions taking what they check, so each runs from a fixture `ImageSpec`, a fixture store and an explicit environment mapping. `interlock_probe(env=None)` is architect decision 2 applied to the driver's own probe. `T-U-driver-26`'s backfill stays **T1** and has not been run |
+| `T-U-image-*` | 2 at T0, 17 at T2 | **6 at T0, 9 at T2** | the Dockerfile is a text file and half of what the image tests assert is about its text: the pin-check line, the flag string, the target list. Only what needs a built image needs a daemon |
+| `T-U-layout-10` | new | **T1** | it runs `upstream/sync-to-chia.sh` into a temporary copy of a CHIA checkout twice and diffs, which needs a checkout |
+
+**No T2 test exists in the `probe_task` suite**, which §14's matrix and §15's order should read as a
+fact rather than as an omission: every candidate there either runs at T1 on this host's two
+toolchains or is a system test. The nine tier-2 tests that do exist are all `T-U-image-*`, and they
+were **run once each on 2026-09-15 and pass**, in 16 s.
+
+**Four assertions are `xfail`ed against a named erratum rather than weakened**, which is the rule
+this plan follows for a check that is right and a tree that is not yet. Each `xfail` reason names its
+row and each is an item of §16.8.
+
+| The assertion | Why it fails today | The item |
+|---|---|---|
+| `T-U-layout-01`'s module count | `tests/test_prompts.py` and `tests/test_budget_yaml.py` are not written; the prompts are W-13's and `budget.yaml` is W-06's | §16.8 item 14 |
+| `T-U-layout-02`'s `arm` walk | `probe_task.oracle_differential` names its two **simulator** sides `arm`, so `03-LLD.md` §14.5's walk fires on a name collision and not on a campaign arm. The design half is folded; the rename is the code half | §16.8 item 15 |
+| `T-U-layout-07`'s counter rule | only `corpus.py`, `generate_task.py`, `mutator_synth.py` and `bug_loop.py` return a `CounterBlock`; nine node modules return bare records or dicts | §16.8 item 16 |
+| `T-U-layout-08`'s first clause | `tests/test_repair_adapter.py` sets `BUGLOOP_ALLOW_LIVE_MODEL` twice with `monkeypatch.setenv` | §16.8 item 2 |
+
+**The measured suite, 2026-09-15**: the tier-0 run is **485 passed, 1 skipped, 4 xfailed**; the
+tier-2 image run is **9 passed in 16 s**; `T-U-layout-10` at tier 1 passes. Those are pytest **items**
+and not identifiers, which is why they do not equal §14's tier counts: `T-U-pin-07` alone is three
+items and the §5 and §6 sweeps are parameterised over every recorded failure.
+
+**Six more changes to this plan.**
+
+| The item | What this plan now says | Why |
+|---|---|---|
+| §0.3's model-layer recipe | `conftest.fake_vertex` also substitutes `chia.trace.profiler.get_profiler` | Measured 2026-09-14: `ray.get_actor` starts a **local Ray** when none is running, and both `ChiaFunction._wrapper` and `VertexGeminiLLM.prompt` call `get_profiler`, so a turn driven offline would start one and trip the session finaliser below. §0.3's recipe does not mention it and a reader following it exactly gets a Ray |
+| §0.4's plain-call path | a `conftest.call_node` helper calls `fn._chia_original`, and a session finaliser, `no_local_ray`, asserts `ray.is_initialized()` is false at session end, naming `call_node` in its message. It stands down when `BUGLOOP_CLUSTER` or `CHIA_LIVE_CLUSTER` is set | §0.4's recipe is a **plain call to the wrapper**, and the wrapper takes the profiler branch, which starts a local Ray and raises `FutureWarning` under `-W error`. The finaliser forbids exactly what §0.4 as written prescribes, so §0.4 is what changes: `call_node` is the path, and the check is what keeps it the path |
+| §0.3's warning policy | one module-level `pytest.mark.filterwarnings` in the tools' module for `pydantic_settings.IncompleteFieldDefinitionWarning` | `-W error` turns a third-party warning into an error on **every** `ChiaTool` construction: `FastMCP`'s settings model raises it about its own `lifespan` field. A module-level mark is the one filter that outranks a command-line `-W` |
+| §0.5's `conftest.py` rule | unchanged as the rule, and §16.8's third open code item is that the committed `conftest.py` does not yet meet it | §0.5 has `conftest.py` delete `BUGLOOP_ALLOW_LIVE_MODEL` and set a synthetic `GEMINI_API_KEY`. The committed file **asserts the variable is absent**, which is strictly stronger on the interlock half and silent on the key half, and each test sets its own synthetic key. Refusing to start is not the same as setting a key, so the rule stands and the code owes it |
+| §1.19's `T-U-results-18` | **behavioural**: relabel every row of the store with the other arm, re-render, and every arm-keyed table comes back exactly transposed | A syntactic `ast` walk says nothing about this module, which is the exemption `T-U-layout-02` is written around (`03-LLD.md` §14.5) |
+| §10's labelled set | **22 pairs**, and the two that carry the exercise are named: pair 16 is `assertion_01` against `assertion_04` as the latter would have been recorded under the former's SDK, where the generic `cast<>` check sits at the same `Casting.h` line, and pair 22 is the ten-run `!hw.array` measurement whose fingerprint frame moved between three adjacent frames of one recursion cycle. Measured by `T-U-triage-09`, which prints both rates | FR-10.2 asks for "at least 20"; twenty-two is what the four construction rules produced with at least four per rule and five R4. The measured rates are 1/11 and 1/11, and A-05 closes on them with the caveat that the set comes from six recorded failures and not from a pilot's own probes, which §10 asks for |
+| §11's regeneration check | the **unit** half re-runs the two deterministic head-side stages only, `probe_task.classify_build` over the recorded stderr and `gate.decide` over the recorded answers; `image_unavailable` comes off the store's `image` table and `reduction_budget_truncated` off `reduced_case.budget_truncated`. Re-executing a tool stage inside an image of the recorded digest is the **system** half, `T-S-regen-01` | A renderer cannot start a container, and a check that claimed to have re-executed a tool stage when it had not would be the one thing FR-18.11 exists to prevent |
+| §1.9's `T-U-probe-35` | the assertion is the **rule** and not the count: `prologue_dropped` is not a stable property | Measured 4, 4, 4, 4, 6, 4, 5, 4 over eight runs of the same input on one host. A stack overflow sometimes hits its guard page inside libc's own `realloc`, so the leading unresolved libc frames the strip removes are two or three rather than one. Pre-existing, and identical before and after W-09's two frame fixes |
+| §1.23's `T-U-prompt-04` | "declared in its file and supplied by its caller" holds for every substitution variable **except two, named here**: `$probe_dir` (§7.3) and `$issue_digest` (§8.3) are declared and no prompt text carries the name. Both are supplied by the caller anyway, so `safe_substitute` leaves nothing unbound | The rule as written fails on two variables the design itself declares, so the rule is what changes; removing the declarations is a `03-LLD.md` change this revision did not make, and the plan names the exception instead |
+| §1.16's ledger rows | `T-U-ledger-08` and `-10` are written to the reading that `accrue` never sets `metered` | FR-14.8's flag is a manifest fact and the caller's to supply; the ledger prices what it is given |
+| §13's `secrets/known_values.txt` | still required, and §16.8's sixth open code item is that it does not exist; `T-U-store-10`'s values are inline in the meantime | §0.5 and `T-U-layout-08` (3) both read it |
+
+### 16.8 Open code items for W-17
+
+Rows of `reviews/implementation-errata-log.md` that record a defect in the **code** rather than in
+the design. None of them is folded into 01, 02, 03 or the sections above, because in each case the
+design is already right and the code does not match it. They are listed here, in the plan, because
+the plan is what W-17's join and W-20's code review read, and because a defect with no home is a
+defect nobody owns.
+
+Each item names what is wrong, what right looks like, and the row it came from.
+
+| # | The defect | What right looks like | From |
+|---|---|---|---|
+| 1 | `triage_task._run_turn` calls `SourceReadTool(cfg["clone_path"], cfg["run_commit"])` with **two positional arguments** against a constructor whose signature is `(name, clone_path, run_commit, cap_bytes, task_options)`. It binds `name=clone_path` and `clone_path=run_commit` and then raises `TypeError` for the missing `run_commit`. Nothing catches it today because `test_triage_task.py` installs a stand-in `generate_task` module | The call site is fixed to `03-LLD.md` §3.5's signature, with `cap_bytes` and `task_options` defaulted, and a test constructs the tool **for real** rather than against a stand-in | W-13 #2, architect decision 4 |
+| 2 | `tests/test_repair_adapter.py` sets the real `BUGLOOP_ALLOW_LIVE_MODEL` **twice**, through `monkeypatch.setenv`, which `T-U-layout-08` (1) as amended forbids for every module outside `tests/system/` | Both call sites pass `require_live_model` an explicit `env=` mapping and touch no process environment | W-13 #16, architect decision 2 |
+| 3 | `parse_json_footer` and `PromptContractError` have **two copies**, one in `triage_task.py` and one in `generate_task.py`, because the supply half may not import the apparatus half and the import can only run the other way | Both copies are deleted and the one function lives in `llm.py`, which both halves import, together with `build_llm`, `require_live_model`, `llm_turn` and `MODEL_BACKEND`. `triage_task._run_turn` and `repair_adapt`, which already import lazily, import `llm.py` instead | W-13 #1, W-10 #2, architect decision 3 |
+| 4 | `contract/fixtures/probe_spec/mutation_01.json`'s `argv` **still repeats the tool**, which W-08's erratum corrected in `seeded_01.json` only. §4.1 builds the invocation as `<binary> *spec.argv`, so the fixture describes a command that runs the tool twice | Regenerated exactly as `seeded_01` was. It is a fixture and not a schema, so the contract stays at 2.0 | W-13 #23, architect decision 5 |
+| 5 | `contract/fixtures/probe_result/assertion_01.json`'s `assertion_site` is `LowerTypes.cpp:412`, which is neither stderr-verbatim nor normalised by `03-LLD.md` §3.7.1's rule. The fixture is constructed and its `assertion_text` was already corrected to §3.6.2 step 2's `expr` group, the line it previously held having carried no `func` field and therefore not matching `_ASSERT_GLIBC` at all | Replaced with a recorded one, from `tests/fixtures/crashes/assertion_01/` | W-08 #5 |
+| 6 | `tests/fixtures/secrets/known_values.txt` **does not exist**, so `conftest.py` has no synthetic key to set and `T-U-layout-08` (3) has no fixture effect to read. `T-U-store-10`'s values are inline | The file is created with the three synthetic values §13 describes, `conftest.py` sets `GEMINI_API_KEY` from it for every test below T3, and `T-U-store-10` reads it | W-06 #18 |
+| 7 | `conftest.py` **asserts** `BUGLOOP_ALLOW_LIVE_MODEL` is absent rather than deleting it and setting a synthetic key, which is §0.5's rule. Refusing to start is stronger on the interlock half and silent on the key half | §0.5's rule, verbatim, once item 6 lands | W-10 #22, W-13 #17 |
+| 8 | `mutators/set_v1.json` **does not exist**: the committed set is `set_dev.json` at `set_version: "dev"` with `"frozen": false`, and `budget.py`'s `MUTATOR_SET` names the frozen file and skips a set that is not there | A7 runs, freezes `set_v1.json`, and the freeze lands **before** the `budget.yaml` registration commit, which is what FR-14.3 and check 1 of `03-LLD.md` §9.2 require. Nothing breaks before A7 runs, and nothing may run a campaign until it has | W-13 #7 |
+| 9 | `tests/fixtures/fetch_clone.sh` and the committed raw-JSON copy of `analysis/pin_window_raw.json` **were not created**; `filtered_187.json` is used instead | Both created, §13's row being what a fresh checkout follows to get a clone | W-05 #16 |
+| 10 | `triage_task.issue_mirror_refresh` still walks **one** direction, so at the campaign's cap it writes zero rows | The two-direction walk of `03-LLD.md` §3.7.3, `desc` then `asc` on the 422, unioned and deduplicated by number, with the ceiling recorded as C-22 | W-14 #21, architect decision 1 |
+| 11 | Four tests exist as functions whose docstrings do **not** carry the id this plan allocates them: the tier-1 measured-pair test names `T-U-gen-15` and `-16` rather than `T-U-gen-15b`, and `T-U-appr-15`, `T-U-probe-56` and `T-U-probe-51b` carry the id only in the function name. Verified by reading every `tests/test_*.py` docstring on 2026-09-15 | Each docstring opens with its id, which is §0.2's own rule and what makes §12.1's traceability mechanical | verified 2026-09-15, not a log row |
+| 12 | `tests/test_approve.py`'s `test_appr_16` and `test_appr_17` carry no id in their docstrings, the ids `T-U-appr-16` and `T-U-appr-17` having been allocated to them above | Each docstring opens with its id, as item 11 requires of the other four | verified 2026-09-15, not a log row |
+
+| 13 | `upstream/chia-circt-assert.yml`, the workflow `03-LLD.md` §1.2 lists beside the Dockerfile and CHIA requires for every new one (`chia:AGENTS.md:124`), **does not exist**. `sync-to-chia.sh` copies whatever `upstream/.github/workflows/` holds and tolerates an empty directory, so the script is complete and the artefact is not | The workflow is written, and the sync copies it | W-16 #26 |
+| 14 | `tests/test_prompts.py` and `tests/test_budget_yaml.py` **are not written**, so `T-U-layout-01`'s module count is `xfail`ed against this row. The prompts are W-13's and `budget.yaml` is W-06's | Both modules written, both named in §1.3's mapping, and the `xfail` removed | W-16 #18 |
+| 15 | `probe_task.oracle_differential` names its two **simulator** sides `arm`, so `03-LLD.md` §14.5's walk fires on a name collision and `T-U-layout-02` is `xfail`ed. The design half is folded: the walk reads a branch's operand and matches `arm` or `_arm` | The local is renamed `side`, and the `xfail` is removed | W-16 #19 |
+| 16 | **Nine node modules return no `CounterBlock`**: only `corpus.py`, `generate_task.py`, `mutator_synth.py` and `bug_loop.py` do, so `03-LLD.md` §3.11's "every node of §3.2 returns exactly one" is unimplemented across the whole apparatus and `T-U-layout-07` is `xfail`ed. The driver does not repair it: `Campaign.call` synthesises a block from its own timing and records `counters_missing:<arm>:<stage>` as a named violation, which is §3.11's rule for an unbalanced block applied to a missing one | Each of `probe_task`, `triage_task`, `repair_adapter`, `gate`, `feedback`, `budget`, `ledger`, `store` and `results` returns its block. **A5 is the one node with a real obstacle**: `_COUNTER_STAGES` has no stage a feedback bundle belongs to, so either the stage list gains one or A5 is exempted in `03-LLD.md` §3.11, and the choice is the architect's | W-16 #22 |
+| 17 | `ProbeWriteTool.write_probe`'s docstring names `filename` and not `content`, and an MCP method's docstring is the text the model reads | Both arguments named. `T-U-layout-03`'s tool half asserts the plan's rule, one argument, so the test passes either way and the model is the one short-changed | W-16 #24 |
+| 18 | `cluster_single.yaml` activates a conda environment named `circtbugloop` that **does not exist on the implementation machine**, whose head environment is the uv venv at `~/.cache/chia-venv` | W-19 either creates that conda environment or edits the two command lists at deployment. The file is left as `03-LLD.md` §12.1 writes it, because editing a design's own artefact to match one host is the wrong repair | W-16 #25 |
+
+**Two things W-17 does not owe.** `T-U-triage-35`, W-10's owed live mirror test, **has been run** and
+is what produced FR-10.9's measurement, so it is closed. And the mismatch between
+`issue_mirror_issue_cap: 20000` in the committed `budget.yaml` and `600` in
+`contract/fixtures/run_manifest/discovery_01.json` is **not** a defect: the first is the campaign's
+row bound and the second is a fixture's, and architect decision 1 keeps the campaign's cap where it
+is.
