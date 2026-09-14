@@ -643,13 +643,22 @@ MLIR fixtures could show. The per-seed yield at the registered cap is 79/20 =
 **4.0 mutants**, against the five fixtures' 3.0 and v1's 1.6: a mutation arm
 whose per-seed yield at the cap was one probe is no longer the expectation.
 
-**One mutator cannot fire in the campaign.** `any.argv.disable_threading`
-matches `^--verify-diagnostics$`, and `generate_task.seed_argv_template` strips
-`--verify-diagnostics` in all four spellings before `mutate_seed` sees the
-vector (§4.2's probe-only options). It is dead in the arm and alive in this
-measurement only because the measurement uses the same stripping - it fires
-here on seeds whose FIRST run line carries the option in a spelling the strip
-does not reach. Recorded, not repaired: the freeze is write-once.
+**Twenty-one of the twenty-five fired; four never did**, over both seed sets at
+cap 20. Three of them are three of the four `argv` mutators:
+
+| Never fired | Its pattern | Why |
+|---|---|---|
+| `any.argv.disable_threading` | `^--verify-diagnostics$` | **it cannot fire in the campaign at all**: `generate_task.seed_argv_template` strips `--verify-diagnostics` in all four spellings before `mutate_seed` sees the vector (§4.2's probe-only options), so the one token it matches is the one token A4 removes |
+| `fir.argv.lowering_option_vars` | `^--verilog$` | no seed of these twenty-five invokes `firtool --verilog` |
+| `fir.argv.preserve_aggregate` | `^--lower-to-hw$` | likewise |
+| `sv.bind.self_target` | `(bind\s+)([a-zA-Z_]\w*)(\s+)[a-zA-Z_]\w*` | no `bind` statement in these seeds' `.sv` files |
+
+So the `argv` kind fires 26 times in this measurement and **every one of them is
+`any.argv.flag_delete`**, whose `^--?[a-zA-Z0-9_-]+` matches any flag. The other
+three are a corpus-coverage question for the last two and a **defect** for the
+first: `any.argv.disable_threading` is dead in the arm by construction, and the
+freeze being write-once it is recorded rather than repaired. Fifteen of the
+twenty-five fire over the twenty corpus seeds at the registered cap of 5.
 
 ## 10.7 The suite
 
