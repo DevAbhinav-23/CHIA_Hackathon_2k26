@@ -524,3 +524,13 @@ the transport under the surviving `models` object - six
 **USD 0.00**. The loop behaved correctly throughout: the turn was reported
 unsuccessful, `turn_usage` returned NULL counts and not zeros (K10), and
 `ledger.price` returned `None` and not a price.
+
+### W-12c (2026-09-16): the guard's constant, and the second synthesis
+
+Row 34's constant fixed, and the prompt row 33 said owed one sentence rewritten
+as a versioned second file. Full record:
+`analysis/measurements/2026-09-16-mutator-synthesis.md` §10.
+
+| # | Finding | Owed to |
+|---|---|---|
+| 35 | **`llm.CHARS_PER_TOKEN` is 2.0, and row 34 is CLOSED.** The constant was 3 and the one turn ever measured billed 619,603 input tokens for 1,509,080 prompt characters, **2.436 characters per token**, so the pre-authorisation under-charged by 11.3 % on the control that stops the campaign at `campaign_spend_cap_usd`. 2.0 is that measurement rounded DOWN to a safe value, not a second measurement: it over-estimates the same prompt's tokens by 22 %, which is the direction a cap must err in, and leaves headroom for a prompt shape tokenising worse than the synthesis's. It is not free - every turn is now authorised for more than it will cost, so the guard refuses slightly earlier than the money requires, and `authorised_usd` accumulates that slack across an arm. `T-U-gen-28` asserts the constant, the arithmetic at the new ratio, and the inequality against the measured pair, so a future edit back towards 3 fails on the measurement rather than on the literal | 03 §3.5.1's constant; 01 FR-18.10's third stop condition. Closes row 34 |

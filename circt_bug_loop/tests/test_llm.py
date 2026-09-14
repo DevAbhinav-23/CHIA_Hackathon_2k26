@@ -442,10 +442,22 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
         price_usd_per_m_input_tokens=0.75,
         price_usd_per_m_output_tokens=3.75)
 
-    # W1's formula, arithmetic and all: 3000 chars is 1000 prompt tokens.
+    # W1's formula, arithmetic and all: at 2.0 characters per token, 3000
+    # characters is 1500 prompt tokens.
     assert guard.worst_case_usd("x" * 3000) == round(
-        1000 / 1e6 * 0.75 + llm_module.MAX_OUTPUT_TOKENS / 1e6 * 3.75, 6)
+        1500 / 1e6 * 0.75 + llm_module.MAX_OUTPUT_TOKENS / 1e6 * 3.75, 6)
     assert llm_module.MAX_OUTPUT_TOKENS == 16000, "CHIA's own max_tokens default"
+
+    # W-12c, closing errata row 34. The constant must sit BELOW the one ratio
+    # ever measured - 1,509,080 prompt characters billed as 619,603 input
+    # tokens - so that the estimate OVER-counts tokens and the authorisation
+    # over-charges. At 3 it under-charged the only turn it has ever seen by
+    # 11.3 %, on the control that stops the campaign at its USD cap.
+    assert llm_module.CHARS_PER_TOKEN == 2.0
+    measured_chars, measured_tokens = 1509080, 619603
+    assert llm_module.CHARS_PER_TOKEN < measured_chars / measured_tokens
+    assert measured_chars / llm_module.CHARS_PER_TOKEN > measured_tokens, \
+        "an over-estimate of the token count is the safe direction"
 
     # Authorising accumulates, so two turns in one node bound each other even
     # though `spend_usd` is refreshed only per iteration (W10).

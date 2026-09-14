@@ -183,11 +183,22 @@ def tool_endpoints(tools) -> list:
 #: worst case of W1 is written against.
 MAX_OUTPUT_TOKENS = 16000
 
-#: Characters per token, for the pre-authorisation only. W1's own figure; it is
-#: an estimate and is used where an OVER-estimate is the safe direction, so a
-#: prompt that tokenises worse than three characters to the token is authorised
-#: for less than it costs by whatever the ratio is wrong by.
-CHARS_PER_TOKEN = 3
+#: Characters per token, for the pre-authorisation only. An estimate, used where
+#: an OVER-estimate of the token count is the safe direction: a prompt that
+#: tokenises to FEWER characters per token than this is authorised for less than
+#: it costs, by whatever the ratio is wrong by.
+#:
+#: **2.0, measured** (W-12c; errata row 34, which recorded it unfixed). W1's own
+#: figure was 3, and the project's first live turn billed 619,603 input tokens
+#: for a 1,509,080-character prompt - **2.436 characters per token**, so the
+#: estimate was 18.8 % low and the authorised USD 0.43727 sat 11.3 % BELOW the
+#: USD 0.486733 the turn cost. This is the control that stops the campaign at
+#: `campaign_spend_cap_usd`, so the constant must sit below the measurement and
+#: not at it: 2.0 over-estimates that same prompt's tokens by 22 %, which is the
+#: safe direction, and leaves headroom for a prompt shape tokenising worse than
+#: the synthesis's. It is not a second measurement; it is the first one rounded
+#: down to the nearest safe value.
+CHARS_PER_TOKEN = 2.0
 
 
 class SpendCapRefused(RuntimeError):
