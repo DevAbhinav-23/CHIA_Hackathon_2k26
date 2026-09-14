@@ -460,3 +460,256 @@ The API key was never printed, logged or written: the recording client stores no
 kwarg, and both `GEMINI_API_KEY` and `BUGLOOP_ALLOW_LIVE_MODEL` existed only
 inside the one subshell that ran the pass. Nothing under
 `~/bugloop-artefacts/synthesis/` carries a credential.
+
+---
+
+# 10. The second set (W-12c)
+
+**Run date** 2026-09-16 (IST), same host, same interpreter, in-process on the
+head, `PYTHONPATH=circt_bug_loop:circt_bug_loop/_shipped` in that order so
+`circt_bug_loop` is the checkout and `chia` is the staged patched copy.
+**Scope** errata row 34's constant, errata row 33's missing sentence, and one
+more live turn under a cap of USD 2.00.
+
+## 10.0 Verdict
+
+**Two turns were dispatched, one produced the set, and the first one's money
+was spent and not measured.** `circt_bug_loop/mutators/set_v2.json` carries
+**twenty-five** mutators of which **none** was dropped, against v1's eleven of
+twenty-two, and it is the first set of this project to carry an `argv` or a
+`line` mutator at all. The measured turn cost **USD 0.490623**. The unmeasured
+one is bounded below by USD 0.466 and above by USD 0.526 and is a defect of
+this task's own harness, not of the loop.
+
+## 10.1 The guard's constant (errata row 34, closed)
+
+`llm.CHARS_PER_TOKEN` is **2.0**, committed at `3f593ca`. Row 34 measured the
+only ratio this project has ever seen - 1,509,080 prompt characters billed as
+619,603 input tokens, **2.436 characters per token** - and the constant was 3,
+so the authorisation sat **11.3 % below** what the turn cost. 2.0 is that
+measurement rounded DOWN, which is the direction a cap must err in.
+
+| | v1's turn, at 3 | v2's turn, at 2.0 |
+|---|---|---|
+| Prompt characters | 1,509,080 | **1,512,467** |
+| Estimated input tokens | 503,027 | **756,234** |
+| Billed input tokens | 619,603 | **620,594** |
+| Estimate against the bill | **18.8 % LOW** | **21.9 % HIGH** |
+| Worst case, one call | USD 0.43727 | **USD 0.627175** |
+| Authorised, three attempts | USD 1.31181 | **USD 1.881525** |
+| Actually billed | USD 0.486733 | **USD 0.490623** |
+
+It is not free: every turn is now authorised for about a fifth more than it can
+cost, so `authorised_usd` accumulates slack across an arm and the guard refuses
+slightly earlier than the money requires. That is the trade a hard cap is for.
+
+## 10.2 The prompt, versioned rather than edited (errata row 33)
+
+`prompts/mutator_synth.md` is **untouched**: it is the record of the bytes
+`set_v1.json` holds, and the freeze is write-once. `prompts/mutator_synth_v2.md`
+is a second file beside it and `mutator_synth.prompt_path(set_version)` pairs
+each with the set it freezes, so `v1` still renders §8.3's original text.
+
+What v2 adds to §8.3's contract, and nothing else:
+
+1. **The engine, by name.** "THE REGULAR-EXPRESSION ENGINE IS PYTHON 3.10's
+   `re`, AND NOTHING ELSE", with the refused construct as the worked example -
+   `(?<=depth\s*=>\s*)` and the `look-behind requires fixed-width pattern` it
+   raises - and the rest of the PCRE-only syntax named (`\K`, possessive
+   quantifiers, atomic groups, recursion, conditionals, `\p{...}`, branch
+   reset), with the instruction to prefer a capture group to a look-behind.
+2. **`replacement` is never empty**, and what it may be for each kind: a
+   literal or a back-reference template or one of the four numeric operations
+   for `text`; exactly one of the three sequence operations for `line`; a
+   sequence operation or a replacing literal token for `argv`.
+3. **The three kinds, with two minimums**: at least two `argv` and at least two
+   `line` mutators, across all four of `mlir`, `fir`, `sv` and `any`.
+4. **The id rule spelled out**: `^[a-z0-9]+(\.[a-z0-9_]+){2,}$`.
+
+`T-U-prompt-09` asserts each of those is in the file and that v1's text does not
+name Python, so neither can be edited away by accident.
+
+## 10.3 The dry pass
+
+Same four substitutions as §9.2's, plus one: `llm.dispatch_turn` is wrapped so
+W1's `SpendGuard` authorises the turn three times over - `vertex`'s own
+`retries` is 3 - before anything is sent, and the harness records what it
+authorised. The constructed answer carries one entry per drop check the v2
+prompt is meant to prevent.
+
+| | |
+|---|---|
+| Issues selected | **487**, digest `5c78adce…` unchanged |
+| Prompt reaching the backend | **1,512,467 characters** |
+| Footer | 5 entries in, **3 kept, 2 dropped** - `bad_pattern` on a variable-width look-behind, `bad_replacement` on an empty string |
+| Kinds kept | `text` 1, `line` 1, `argv` 1 |
+| Freeze | written, `load_set(expected_sha=…)` accepts it, `frozen` true |
+| Thinking tokens | **900**, `observed: true` - the staged patched `vertex.py` |
+| Authorised before dispatch | USD **1.881525**, against the task's USD 2.00 |
+
+The two drops are the point: the parser still counts and records an entry the
+prompt told the model not to write.
+
+## 10.4 The live turn
+
+| | Ledger (`llm.turn_usage` -> `ledger.price`) | SDK (`usage_metadata`) |
+|---|---|---|
+| Input tokens | **620,594** (`prompt` 620,594 + `tool_use_prompt` 0) | `prompt_token_count` **620,594** |
+| Output tokens | **6,714** (`candidates` 3,040 + `thoughts` 3,674) | `candidates_token_count` **3,040** |
+| Thinking tokens | **3,674** | `thoughts_token_count` **3,674** |
+| | | `total_token_count` **627,308** |
+| `finish_reason` | | **STOP** |
+| **cost_usd** | **0.490623** | **0.490623** |
+
+`627,308 = 620,594 + 3,040 + 3,674`. Wall **109.2 s**; `num_turns` 1; `success`
+true; `stderr` empty. Priced the way unpatched CHIA counts - output =
+`candidates_token_count` only - the same turn costs **USD 0.478846**, so K11 is
+worth **USD 0.011777** here, 2.4 %, against 2.3 % on v1's turn.
+
+## 10.5 The frozen set
+
+| | |
+|---|---|
+| Path | `circt_bug_loop/mutators/set_v2.json`, committed `adbdd6d` |
+| `set_sha256` | **`e359c5249826676ed174a414a3f02f4400178e3a1687aeee11ed442fc02bef95`** |
+| `frozen` | **true** |
+| `synthesis_model` | `gemini-3.8-flash` |
+| `issues_used` / `issue_numbers_sha256` | 487 / `5c78adce…`, the same corpus as v1 |
+| Mutators returned / kept / **dropped** | 25 / 25 / **0** |
+| By kind | `text` **18**, `line` **3**, `argv` **4** |
+| By language | `mlir` **6**, `fir` **14**, `sv` **3**, `any` **2** |
+
+Against v1: 22 returned, 11 kept, **11 dropped** (10 `bad_pattern`, all one
+variable-width look-behind, and 1 `bad_replacement`), `text` 11 and nothing
+else, `any` 0. **The unstated sentence was the whole of the difference**: the
+model reached for exactly the constructs row 33 named, and told which engine
+compiles them it wrote none of them. Two of v2's own `fir.mem.*` mutators are
+v1's dropped ones rewritten as capture groups - `(depth\s*=>\s*)\d+` with
+`\g<1>1` where v1 wrote `(?<=depth\s*=>\s*)`.
+
+`mutators.SET_PATH` now resolves to the **newest** `set_v<n>.json` by the
+integer in its name, and `budget.MUTATOR_SET` reads that same resolution rather
+than spelling a version, so 8.1 rule 2 checks the ancestry of the file the
+manifest's digest is actually computed over. There is no `--mutator-set` flag:
+`load_set(path)` already takes any path a caller names, which is how an older
+set is replayed. `T-U-mut-13` asserts the ordering, that `set_dev.json` can
+never win it, and that the committed tree resolves to a frozen set.
+
+## 10.6 `mutate_seed`, on two seed sets
+
+Iteration 0, against the frozen set, with each seed's own argument vector taken
+from `generate_task.seed_argv_template` - A4's own call, probe-only options
+stripped - so the vector an `argv` mutator edits here is the one a probe carries.
+
+### The five recorded fixtures (§9.6's seeds, for comparison with v1)
+
+| Seed fixture | Test files | Mutants at cap 5 | Mutants, cap 20 | No-ops, cap 20 |
+|---|---|---|---|---|
+| `nine_test_files` | 9 | 5 | 20 | 33 |
+| `no_run_line` | 1 | 2 | 2 | 4 |
+| `not_wrapper` | 1 | 1 | 1 | 7 |
+| `sdk_inexact` | 1 | 3 | 3 | 5 |
+| `unsupported_shape` | 1 | 4 | 4 | 4 |
+| **Total** | 13 | **15** | **30** | **53** |
+
+v1 produced **8** mutants at cap 5 over the same five seeds and **18** at cap
+20, all `text`, all `mlir`. v2 produces **15** and **30**, and the zero-mutant
+seed is gone.
+
+**Two failures, both FR-05.7 working.** `no_run_line` is FR-01.9's excluded
+shape and has no argument vector at all, so `any.argv.disable_threading` and
+`any.argv.flag_delete` each raised once, were counted against their own ids,
+and the arm continued. The corpus never emits such a seed, so A4 cannot meet
+one: `seed_argv_template` raises on it before `mutate_seed` is reached.
+
+### Twenty corpus seeds, spanning `.fir` and `.sv`
+
+Selected from `tests/fixtures/corpus/filtered_187.json` - six whose tests are
+`.fir`, six `.sv`, eight `.mlir` under `circt-opt` - with the test text read by
+`git show <sha>:<path>` against the blobless clone.
+
+| | cap 5 (registered) | cap 20 |
+|---|---|---|
+| Seeds | 20 | 20 |
+| Mutants | **79** | **123** |
+| No-ops | 96 | 128 |
+| Failures | **0** | **0** |
+| By kind | `text` 37, `argv` 26, `line` 16 | `text` 76, `argv` 26, `line` 21 |
+| By language | `mlir` 28, `any` 26, `fir` 14, `sv` 11 | `mlir` 35, `any` 26, `fir` 50, `sv` 12 |
+| Seeds outside 63 bits | **0** | **0** |
+
+**Every kind fires** and **every language fires**, which neither v1 nor the five
+MLIR fixtures could show. The per-seed yield at the registered cap is 79/20 =
+**4.0 mutants**, against the five fixtures' 3.0 and v1's 1.6: a mutation arm
+whose per-seed yield at the cap was one probe is no longer the expectation.
+
+**One mutator cannot fire in the campaign.** `any.argv.disable_threading`
+matches `^--verify-diagnostics$`, and `generate_task.seed_argv_template` strips
+`--verify-diagnostics` in all four spellings before `mutate_seed` sees the
+vector (§4.2's probe-only options). It is dead in the arm and alive in this
+measurement only because the measurement uses the same stripping - it fires
+here on seeds whose FIRST run line carries the option in a spelling the strip
+does not reach. Recorded, not repaired: the freeze is write-once.
+
+## 10.7 The suite
+
+| Suite | Result |
+|---|---|
+| T0, before W-12c | 586 passed, 1 skipped, 50 deselected |
+| T0, after the constant, the prompt and the resolution | 590 passed, 1 skipped, 50 deselected |
+| T0, with `set_v2.json` committed and `--seed-sha` | **591 passed, 1 skipped, 50 deselected** |
+
+Five tests are new or changed and none was weakened: `T-U-prompt-09` (the v2
+text says what v1 did not), `T-U-msyn-10` (the prompt is versioned with its
+set), `T-U-mut-13` (the newest frozen set wins), `T-U-driver-44` (the pilot's
+seed subset), and `T-U-gen-28` and `T-U-mut-10`, which now assert the new
+constant against the measured ratio and name which function each of the
+mutators module's three reads is in. `T-U-budget-07` and `T-U-driver-02` build
+their frozen set from `budget.MUTATOR_SET` rather than spelling `set_v1.json`,
+which with a `set_v2.json` present had become a vacuous check.
+
+## 10.8 What went wrong
+
+1. **The first live attempt hung after a paid call, and its cost is not
+   measured.** The turn returned - the answer is on disk at
+   `~/bugloop-artefacts/synthesis/live-v2-attempt-0/transcript-0.md`, 9,203
+   bytes and a well-formed footer - and the process then sat for twelve minutes
+   in `VertexGeminiLLM._get_node_id`, which is `ray.get_runtime_context()`
+   inside a `try/except` that cannot catch a hang. **Measured
+   independently**: with a stale `/tmp/ray/ray_current_cluster` naming a
+   cluster that is down, `ray.get_runtime_context()` retries the GCS connection
+   for ever, five seconds at a time -
+   `Failed to connect to GCS at address 10.202.182.66:6379 within 5 seconds`,
+   then `Failed to get cluster ID from GCS server: TimedOut`, repeating. The
+   file is what a `chia down` leaves behind (W-19b §3.4 found the same file
+   hanging `ray.init(address="auto")`); it was removed before the second
+   attempt and the second attempt did not hang. Four call sites reach
+   `_get_node_id`, all on CHIA's own ERROR paths, so whichever of them the
+   first attempt took is also unrecorded. **Errata row 37.**
+   - The harness lost the counts because it wrote its report only at the end.
+     It now persists `usage-<n>.json` - token counts and `finish_reason` -
+     inside the client wrapper, the moment a call returns, so a later hang
+     cannot take the money with it.
+   - **The bound.** The prompt was the same 1,512,467 characters, so input is
+     620,594 tokens to within the sampling of a token, and output is at most
+     `MAX_OUTPUT_TOKENS` = 16,000 and at least the 9,203 bytes of answer.
+     **USD 0.466 to USD 0.526.** It is a bound and not a measurement, and the
+     task's own figure for W-12c is therefore `0.490623 + [0.466, 0.526]` =
+     **USD 0.957 to 1.017**, against the cap of USD 2.00.
+2. **`any.argv.disable_threading` is dead in the campaign** - §10.6.
+
+## 10.9 Artefacts
+
+| Path | What |
+|---|---|
+| `~/bugloop-artefacts/synthesis/live-v2/transcript-0.md` | the turn's own text |
+| `~/bugloop-artefacts/synthesis/live-v2/usage-0.json` | its token counts and `finish_reason`, written as the call returned |
+| `~/bugloop-artefacts/synthesis/live-v2/live-report.json` | every figure of §10.4 and §10.5 |
+| `~/bugloop-artefacts/synthesis/live-v2/mutate-report.json` | §10.6, per seed and per mutator id |
+| `~/bugloop-artefacts/synthesis/live-v2-attempt-0/` | the first attempt's answer, with no usage beside it |
+| `~/bugloop-artefacts/synthesis/dry-v2/dry-report.json` | §10.3 |
+| `circt_bug_loop/mutators/set_v2.json` | the frozen set |
+
+`GEMINI_API_KEY` and `BUGLOOP_ALLOW_LIVE_MODEL` existed only inside the one
+subshell that ran each live pass; the recording client stores no kwarg, and
+nothing under `~/bugloop-artefacts/synthesis/` carries a credential.
