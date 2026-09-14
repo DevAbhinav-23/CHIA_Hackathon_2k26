@@ -700,7 +700,7 @@ def test_u_probe_51_the_oracle_against_every_recorded_real_failure(
 
 @pytest.mark.t0
 def test_u_probe_51b_at_least_five_recorded_failures_are_committed() -> None:
-    """F-07's feature acceptance: the sample size `budget.yaml` records.
+    """T-U-probe-51b (FR-07.1): F-07's feature acceptance, at `budget.yaml`'s size.
 
     Pass criterion: at least `acceptance.recorded_failures` fixtures exist and
     they cover all three firing classes, so the oracle's acceptance is a
@@ -1611,7 +1611,7 @@ def test_u_probe_30b_the_digest_and_the_recorded_verilator_argv(
 @pytest.mark.needs_sdk
 def test_u_probe_56_the_node_end_to_end_and_a_constructed_divergent_pair(
         tmp_path, sdk_env) -> None:
-    """FR-08's feature acceptance, both halves, through `oracle_differential`.
+    """T-U-probe-56 (FR-08.1, FR-08.8): F-08's feature acceptance, both halves.
 
     First half: the clocked accumulator W-08 ran by hand agrees when the node
     runs it, the two `BUGLOOP` sequences being identical line for line over the

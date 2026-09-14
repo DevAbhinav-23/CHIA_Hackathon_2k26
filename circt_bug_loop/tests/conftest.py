@@ -15,7 +15,30 @@ from circt_bug_loop.contract import schema
 #: (03-LLD.md 1.4), so no module here may walk past its own directory.
 FIXTURES = Path(schema.__file__).resolve().parent / "fixtures"
 
+#: `tests/fixtures/`, which is this package's own and is where §13's
+#: `secrets/known_values.txt` lives.
+TEST_FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
 _INTERLOCK = "BUGLOOP_ALLOW_LIVE_MODEL"
+_API_KEY = "GEMINI_API_KEY"
+
+
+def known_values() -> dict:
+    """§13's three synthetic credential strings, by the variable each shapes.
+
+    Not one of them authenticates against anything: each is a fixed run of
+    characters with the SHAPE the secret grep searches for, so a row or a file
+    that leaked one is found by `T-U-store-10` and a request that somehow
+    carried one is refused by whoever receives it.
+    """
+    values = {}
+    for line in (TEST_FIXTURES / "secrets" / "known_values.txt").read_text(
+            encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        name, value = line.split()
+        values[name] = value
+    return values
 
 
 def call_node(fn, *args, **kwargs):
@@ -38,16 +61,33 @@ def call_node(fn, *args, **kwargs):
 
 @pytest.fixture(scope="session", autouse=True)
 def no_live_model() -> None:
-    """Refuse to run T0 to T2 with the live-model interlock set (04-Test-Plan.md 0.5).
+    """§0.5's rule, both halves: refuse the interlock, and set a synthetic key.
 
-    T3 is the one tier that sets it, and even there only the pilot does. A tier-0
-    run that reached a model would spend money and would make a recorded fixture
-    that no other run can reproduce, so the assertion is session-scoped and hard:
-    no test sets the variable, and a caller's environment must not either.
+    T3 is the one tier that sets the interlock, and even there only the pilot
+    does. A tier-0 run that reached a model would spend money and would make a
+    recorded fixture that no other run can reproduce, so the first half is
+    session-scoped and hard: no test sets the variable, and a caller's
+    environment must not either. Refusing to start is stronger than deleting it
+    and it is what the committed fixture did on its own until W-17.
+
+    The second half is §0.5's own and W-17 lands it: `GEMINI_API_KEY` is set to
+    the synthetic value of `fixtures/secrets/known_values.txt` for every test
+    below T3, so a code path that somehow reached the backend unmocked presents
+    a key that cannot authenticate rather than the operator's own. The two
+    halves are complementary: the interlock stops the construction and the key
+    would stop the request (`T-U-layout-08` (3) reads this fixture's effect).
     """
     assert _INTERLOCK not in os.environ, (
         f"{_INTERLOCK} is set; tiers T0 to T2 may not reach a model "
         "(04-Test-Plan.md 0.5). Unset it, or run the tier-3 suite deliberately.")
+    synthetic = known_values()[_API_KEY]
+    previous = os.environ.get(_API_KEY)
+    os.environ[_API_KEY] = synthetic
+    yield
+    if previous is None:
+        os.environ.pop(_API_KEY, None)
+    else:
+        os.environ[_API_KEY] = previous
 
 
 @pytest.fixture(scope="session", autouse=True)

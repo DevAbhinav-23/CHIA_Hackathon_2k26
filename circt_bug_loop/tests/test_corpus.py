@@ -967,3 +967,34 @@ def test_T_U_corpus_24(clone: str):
     empty = call_node(corpus.resolve_sites, clone, CORPUS_HEAD_SHA, [])
     assert (empty["resolved"], empty["rejected"]) == ([], [])
     assert empty["counters"].stage == "corpus" and empty["counters"].started == 0
+
+
+def test_T_U_corpus_39_the_clone_is_fetched_by_a_committed_script() -> None:
+    """T-U-corpus-39 (FR-01.11, FR-14.1): `fetch_clone.sh` and its one SHA.
+
+    New id (W-17, `04-Test-Plan.md` §16.8 item 9). §13 says the 400 MB clone is
+    **not** committed and that `tests/fixtures/fetch_clone.sh` is what a fresh
+    checkout runs to get it, so the script is the fixture. It reads the corpus
+    head out of `budget.yaml` rather than repeating it, which is the one way the
+    two cannot disagree, and it quotes the tag refspec, which is the one line
+    that goes wrong silently: an unquoted `refs/tags/firtool-*` is globbed by
+    the shell against the working directory and fetches nothing.
+
+    Fixture: `fixtures/fetch_clone.sh`, `budget.yaml`. Tier 0.
+    """
+    import subprocess
+
+    script = FIXTURES.parent / "fetch_clone.sh"
+    assert script.is_file() and script.stat().st_mode & 0o111, "committed and executable"
+    text = script.read_text(encoding="utf-8")
+    assert "--filter=blob:none" in text, "blobless: 400 MB and not 7 GB"
+    assert "'refs/tags/firtool-*:refs/tags/firtool-*'" in text, "the QUOTED refspec"
+    assert "set -euo pipefail" in text
+    assert CORPUS_HEAD_SHA not in text, "the head is read, never repeated"
+
+    # And the read really yields the committed head, run as the script runs it.
+    flow = Path(corpus.__file__).resolve().parent
+    extracted = subprocess.run(
+        ["sed", "-n", r's/^corpus_head_sha: *"\{0,1\}\([0-9a-f]\{40\}\).*/\1/p',
+         str(flow / "budget.yaml")], capture_output=True, text=True, check=True)
+    assert extracted.stdout.strip() == CORPUS_HEAD_SHA

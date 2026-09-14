@@ -564,18 +564,30 @@ def test_T_U_layout_08_one_construction_path():
 
 @pytest.mark.t0
 def test_T_U_layout_08_conftest_refuses():
-    """T-U-layout-08 (NFR-08): `conftest.py`'s own fixture is the session's refusal.
+    """T-U-layout-08 (NFR-08): `conftest.py`'s own fixture, both halves of §0.5.
 
-    It asserts the variable's absence rather than deleting it, which is the
-    stronger form the test plan's §17 anticipated, and this test reads that
-    effect: the interlock is absent for every test in this run. Fixture: none.
-    Tier 0.
+    This test reads the fixture's EFFECT and not its source, which is what §0.5
+    asks for. The interlock is absent for every test in this run, which the
+    fixture asserts rather than merely deleting: refusing to start is the
+    stronger form. And `GEMINI_API_KEY` holds the synthetic value of
+    `fixtures/secrets/known_values.txt`, so a code path that reached the backend
+    unmocked would present a key that cannot authenticate. Fixture:
+    `secrets/known_values.txt`. Tier 0.
     """
     from circt_bug_loop.tests import conftest
 
     assert bug_loop.LIVE_MODEL_ENV not in os.environ
     assert conftest._INTERLOCK == bug_loop.LIVE_MODEL_ENV
-    assert conftest.no_live_model.__wrapped__() is None
+
+    values = conftest.known_values()
+    assert set(values) == {"GITHUB_TOKEN", "GEMINI_API_KEY", "GOOGLE_API_KEY"}
+    assert os.environ["GEMINI_API_KEY"] == values["GEMINI_API_KEY"]
+    # Each has the SHAPE the secret grep looks for and authenticates against
+    # nothing: no real credential is ever committed (§13).
+    assert values["GITHUB_TOKEN"].startswith("ghp_") and len(values["GITHUB_TOKEN"]) == 40
+    assert values["GEMINI_API_KEY"].startswith("AQ.") and len(values["GEMINI_API_KEY"]) == 35
+    assert values["GOOGLE_API_KEY"].startswith("AIza") and len(values["GOOGLE_API_KEY"]) == 39
+    assert all(set(value[4:]) <= {"0"} for value in values.values())
 
 
 # ---------------------------------------------------------------------------

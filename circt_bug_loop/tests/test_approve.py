@@ -574,7 +574,7 @@ def test_appr_13_the_poll_matches_on_the_primary_fingerprint(tmp_path, monkeypat
 
 
 def test_appr_15_the_module_entry_runs_as_a_program(tmp_path):
-    """§13.2's entry, exercised as a program. The team repository packages
+    """T-U-appr-15 (FR-13.12): §13.2's entry, exercised as a program. The team repository packages
     nothing, so `python -m circt_bug_loop.approve` is the spelling that exists
     and the `bugloop-approve` console script is W-26's packaging work
     (erratum)."""
@@ -596,7 +596,7 @@ def test_appr_15_the_module_entry_runs_as_a_program(tmp_path):
 
 
 def test_appr_16_an_unknown_candidate_is_a_lookup_error(tmp_path):
-    """A typo in a candidate id is refused loudly rather than writing nothing
+    """T-U-appr-16 (FR-13.12): a typo in a candidate id is refused loudly rather than writing nothing
     quietly, which is the failure mode a human would not notice."""
     _store(tmp_path)
     with pytest.raises(LookupError, match="cand-9999"):
@@ -604,7 +604,7 @@ def test_appr_16_an_unknown_candidate_is_a_lookup_error(tmp_path):
 
 
 def test_appr_17_the_view_survives_a_missing_patch_and_a_missing_report(tmp_path):
-    """FR-13.12's view is rendered for every candidate that reaches it, held
+    """T-U-appr-17 (FR-13.12): the view is rendered for every candidate that reaches it, held
     ones included, so a hold is visible rather than being a blank screen."""
     store = _store(tmp_path, held="no_report")
     store.update("report", {"candidate_id": "cand-0001"}, {"path": "/nonexistent"})

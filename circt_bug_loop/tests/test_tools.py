@@ -297,7 +297,7 @@ def test_T_U_gen_18b_neither_tool_can_reach_a_shell():
 @pytest.mark.t1
 @pytest.mark.needs_sdk
 def test_T_U_gen_15b_the_measured_pair_of_the_real_clone(tool_servers):
-    """T-U-gen-15 and -16 (FR-04.4) against the clone §3.5's table measured.
+    """T-U-gen-15b (FR-04.4): §3.5's measured pair, against the real clone.
 
     `lib/Dialect/HW/HWTypes.cpp` at `b792c772` returns bytes beginning
     `//===- HWTypes.cpp`, its missing sibling returns git's own
