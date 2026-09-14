@@ -1,27 +1,4 @@
-"""B11: render the campaign's results artefact, or refuse and say what is missing.
-
-`03-LLD.md` §3.11 and §14.4, `02-HLD.md` §1.3, F-18. `render_results` is a pure
-function of `loop.db`: it opens no tool, runs no model and writes no file, so a
-render can be repeated on a finished campaign and produces the same text.
-
-**It refuses rather than omits.** The fourteen private checks of `_REFUSALS` are
-§14.4's table, in §3.11's order, one per element the results artefact must
-carry. `render_results` runs every one and collects every failure before it
-raises, so one render names every missing element rather than the first.
-
-**Three properties are not checks and are asserted over the output instead**
-(§14.4): the render succeeds from an empty confirmation set and states the zero
-(FR-18.7); the text contains no sentence comparing this loop's count to any
-external yield (FR-18.9), which this module discharges by naming none of them
-anywhere; and every number in the artefact traces to a tool-produced record
-(NFR-03), which is why the only inputs are the store, the manifest and the
-hand-labelled duplicate-pair set of FR-10.2, whose labels are the one human
-judgement the artefact reports and whose fingerprints still come from the store.
-
-`arm` is branched on here, and FR-18.1 permits exactly that: the ledger and the
-results table are the two places the value of `arm` may change what the
-apparatus does, and this module is the second of them.
-"""
+"""B11: render the campaign's results artefact, or refuse and say what is missing."""
 from __future__ import annotations
 
 import json
@@ -39,82 +16,39 @@ from circt_bug_loop.probe_task import classify_build
 from circt_bug_loop.store import LoopStore
 from circt_bug_loop.triage_task import labelled_fingerprint, rates
 
-#: The two arms, in the order every table prints them. `shared` is a ledger arm
-#: and never an arm of the comparison (FR-14.4).
+#: The two arms, in the order every table prints them.
 ARMS = ("seeded", "mutation")
 
-#: The six buckets of FR-18.6, in the order the taxonomy table prints them. The
-#: mapping that produces them is `gate.TAXONOMY` and is not restated here.
+#: The six buckets of FR-18.6, in the order the taxonomy table prints them.
 BUCKETS = ("unreproducible", "not_minimal", "invalid_input", "duplicate",
            "undecided", "new_bug")
 
-#: FR-06.9's seven build statuses, in the order the probe-outcome table prints
-#: them, plus contract 2.1's `tool_unavailable`. `parse_error` is printed as two
-#: rows keyed by `stopping_reason`, so the row is never read as "the tool
-#: rejected the input" when it means "the loop built an argv the tool would not
-#: take" (§3.6, NIT 2); `tool_unavailable` is last because it is the one row
-#: that says the probe decided nothing at all (N9).
+#: FR-06.9's seven build statuses.
 BUILD_STATUSES = ("clean_exit", "parse_error", "assertion", "fatal_error",
                   "crash", "timeout", "oom", "tool_unavailable")
 PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 
-#: The stages a MODEL TURN is charged to, which are the only ones whose null
-#: token counts are a missing measurement rather than an absent one: stages 1
-#: and 2 are A3's two turns, stage 6 is B7's, and stage 7 is the repair chain's
-#: recorded residual (ADR-D-03 addendum). An entry at any other stage has no
-#: tokens because no turn ran there (K10).
+#: The stages a MODEL TURN is charged to.
 MODEL_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
 
-#: `LedgerEntry.observed`'s declared keys (§2.7, contract 2.2). An entry whose
-#: block has another key set cannot be summed under the observed heading. The
-#: last four are the per-turn money row W-18b added: what the guard authorised,
-#: what ceiling the backend was given, what the turn billed and how many
-#: `generate_content` calls it took (errata row 38).
+#: `LedgerEntry.observed`'s declared keys (§2.7).
 OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
                  "authorised_usd", "ceiling_usd", "billed_usd", "calls"}
 
-#: The ledger stage the offline mutator synthesis is charged to, which is where
-#: FR-05.8's declaration gets its date (§3.11's counter stages).
+#: The ledger stage the offline mutator synthesis is charged to.
 SYNTHESIS_STAGE = "synthesis"
 
-#: The two ways `04-Test-Plan.md` §11 lets a row fail regeneration without it
-#: being a defect: a reduction the budget truncated (NFR-02 exempts it), and an
-#: image digest that is no longer available, which is a retention failure.
+#: The two ways `04-Test-Plan.md` §11 lets a row fail regeneration without it being a defect.
 BUDGET_TRUNCATED = "reduction_budget_truncated"
 IMAGE_UNAVAILABLE = "image_unavailable"
 
 
-#: FR-10.2's hand-labelled duplicate-pair set, as package DATA. It is not a
-#: test fixture: `render_results` takes it on every campaign, and W-19b measured
-#: what its absence cost - the driver called the node with no set at all, the
-#: gap fired on every run, and a campaign ran both four-hour arm windows and
-#: then died with a traceback instead of writing its artefact. `runtime_env`
-#: ships the package and not `tests/`, so a set under `tests/` could not have
-#: reached a worker either. `data/README.md` records what the set is.
+#: FR-10.2's hand-labelled duplicate-pair set, as package DATA.
 LABELLED_PAIRS = Path(__file__).resolve().parent / "data" / "labelled_pairs.json"
 
 
 def load_labelled_pairs(path=None) -> list:
-    """Read FR-10.2's labelled set into the four keys `render_results` reads.
-
-    The committed document carries the whole judgement - the rule, the
-    justification, the instant, and both sides' RECORDED FAILURES - and `a` and
-    `b` are those recorded failures and not two candidate ids. That is the whole
-    of the fix: the set is an EXTERNAL MEASUREMENT of the project, labelled by
-    hand before any fingerprint was computed, so its sides belong to no campaign
-    and a renderer that required the campaign's store to hold a fingerprint for
-    each of them refused at the end of every run (`T-S-regen-01`).
-
-    Returns:
-        list[dict] with keys `label`, `pair_id`, `rule`, and `a` and `b`, each
-        the side's own recorded failure as `triage_task.labelled_fingerprint`
-        takes it.
-    Worker:
-        head; one file read.
-    Raises:
-        OSError when the file is missing; ValueError on malformed JSON; KeyError
-        when a pair carries no `label` or no side.
-    """
+    """Read FR-10.2's labelled set into the four keys `render_results` reads."""
     document = json.loads(Path(path or LABELLED_PAIRS).read_text(encoding="utf-8"))
     return [{"label": pair["label"], "pair_id": pair["pair_id"],
              "rule": pair["rule"], "a": pair["a"], "b": pair["b"]}
@@ -122,21 +56,12 @@ def load_labelled_pairs(path=None) -> list:
 
 
 class ResultsIncomplete(Exception):
-    """Raised by `render_results` when the store lacks an element §14.4 lists.
-
-    Carries every missing element, not the first, so one render tells the
-    operator everything the artefact would have had to omit.
-    """
+    """Raised by `render_results` when the store lacks an element §14.4 lists."""
 
     def __init__(self, missing: list):
         self.missing = list(missing)
         super().__init__("the results artefact refuses to render; missing: "
                          + "; ".join(self.missing))
-
-
-# ---------------------------------------------------------------------------
-# Reading the store
-# ---------------------------------------------------------------------------
 
 
 def _by(rows: list, key: str) -> dict:
@@ -145,19 +70,7 @@ def _by(rows: list, key: str) -> dict:
 
 
 def _confirmed(filing: dict) -> bool:
-    """Report whether one filing carries maintainer evidence (G-27, FR-18.3).
-
-    A maintainer acted, and the evidence is a URL: the flag alone is a claim and
-    the URL is the record of it, so the headline counts a filing only where both
-    are present.
-
-    Returns:
-        bool.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Report whether one filing carries maintainer evidence (FR-18.3)."""
     return bool(filing["confirmed"]) and bool(filing["confirmation_url"])
 
 
@@ -175,22 +88,7 @@ def _percent(numerator: int, denominator: int) -> str:
 
 def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs,
            fingerprint_top_n: int) -> dict:
-    """Read every number the artefact prints, and record what the store lacks.
-
-    One pass over `loop.db` per table, joined on the ids §6.2 declares. Each
-    section lands in `facts` under its own key, and a section the store cannot
-    support lands as None with its reason in `facts["gaps"]`, which is what the
-    fourteen checks read.
-
-    Returns:
-        dict, one key per section plus "gaps", "qualifier", "run" and
-        "manifest".
-    Worker:
-        {"num_cpus": 0.1} per query, on the head where loop.db lives.
-    Raises:
-        ResultsIncomplete when the store holds no run row at all, there being
-        no artefact to refuse parts of; sqlite3.Error from any query.
-    """
+    """Read every number the artefact prints, and record what the store lacks."""
     run_id = manifest.run_manifest_id
     run = store.query_one("SELECT * FROM run WHERE run_manifest_id = ?", (run_id,))
     if run is None:
@@ -416,24 +314,7 @@ def _cutoff(facts: dict, stored: dict, gaps: dict) -> None:
 
 def _dedup_rates(facts: dict, labelled_pairs, fingerprints: dict, primary: list,
                  top_n: int, gaps: dict) -> None:
-    """FR-10.2's two measured rates, and the unstable fingerprints that qualify them.
-
-    The rates come from the LABELLED SET'S OWN RECORD and not from the store.
-    They are an external measurement of the project (`04-Test-Plan.md` §10,
-    A-05): the pairs were labelled by hand before any fingerprint was computed,
-    over recorded failures that belong to no campaign, and requiring the store
-    to carry a fingerprint for each side made the rates unreportable by exactly
-    the runs that most need them - a campaign that confirms nothing has no such
-    candidate, so `render_results` refused at the end of every run
-    (`T-S-regen-01`'s one remaining refusal).
-
-    The one refusal that stays is a set that is not there at all: a rate the
-    renderer invented for itself would be worse than a named gap.
-
-    `fingerprints` and `primary` are still the STORE's, and are still what
-    `facts["unstable"]` counts: an unstable fingerprint qualifies this run's
-    headline exactly as a collision does, and that is a fact about this run.
-    """
+    """FR-10.2's two measured rates, and the unstable fingerprints that qualify them."""
     facts["unstable"] = sum(1 for c in primary
                             if (fingerprints.get(c["candidate_id"]) or {})
                             .get("fingerprint_stable") == 0)
@@ -483,12 +364,7 @@ def _divergences(facts: dict, candidates: list, reports: list, differentials: di
 
 def _mutator_declaration(facts: dict, stored: dict, ledger_rows: list,
                          gaps: dict) -> None:
-    """FR-05.8's declaration: the synthesis input, its date and the frozen set's SHA.
-
-    The date is the `shared` ledger entry the offline synthesis is charged to,
-    which is where FR-14.4's acceptance puts it; the input is the issue mirror
-    the synthesis read, as the manifest records it.
-    """
+    """FR-05.8's declaration: the synthesis input, its date and the frozen set's SHA."""
     charged = [row for row in ledger_rows
                if row["stage"] == SYNTHESIS_STAGE and row["arm"] == "shared"]
     mirror = stored.get("issue_mirror") or {}
@@ -537,10 +413,7 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
         bucket["cost_usd"] += float(block["cost_usd"] or 0.0)
         if block["tokens_in"] is None or block["tokens_out"] is None:
             bucket["null_token_entries"] += 1
-            # K10: an entry the manifest says is METERED and whose tokens are
-            # null is a turn the run paid for and did not observe. It is the
-            # count that makes the USD total a lower bound by a stated amount
-            # rather than by an unstated one.
+            # K10: an entry the manifest says is METERED and whose tokens are null is a turn the run paid for and did not observe.
             if row["metered"] and row["stage"] in MODEL_STAGES:
                 unpriced += 1
         else:
@@ -552,23 +425,7 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
 
 
 def _authorisation(ledger_rows: list) -> dict:
-    """How close the pre-authorisation came to what the turns actually billed.
-
-    The one number errata row 38 exists for. `SpendGuard` authorises a turn
-    before it is sent and the ledger records what it billed; until W-18b the
-    two were 19.7x to 64.1x apart and NOTHING printed the ratio, so the
-    campaign's own artefact could not say the control was broken. A ratio ABOVE
-    1.0 is a turn that cost more than it was authorised for, which is the
-    campaign spending money the cap did not stop.
-
-    Returns:
-        {"turns", "max_ratio", "mean_ratio", "over_authorised", "hit_ceiling"};
-        the two ratios are None when no turn carried both figures.
-    Worker:
-        pure; it reads the rows it is handed.
-    Raises:
-        nothing.
-    """
+    """How close the pre-authorisation came to what the turns actually billed."""
     ratios, ceiling_hits = [], 0
     for row in ledger_rows:
         block = json.loads(row["observed_json"])
@@ -612,12 +469,7 @@ def _windows(facts: dict, store: LoopStore, manifest: RunManifest, ledger_rows: 
 
 def _taxonomy(facts: dict, primary: list, gates: dict, repairs: list,
               probe_results: list) -> None:
-    """FR-18.6's three counts: the gate's buckets, the repair phases, the probe outcomes.
-
-    No gap of its own: a candidate the gate never reached is counted in the
-    `no gate decision` row rather than dropped, which is what makes the sum
-    check meaningful.
-    """
+    """FR-18.6's three counts: the gate's buckets, the repair phases, the probe outcomes."""
     buckets = {bucket: 0 for bucket in BUCKETS}
     undecided_rows = 0
     for candidate in primary:
@@ -641,11 +493,7 @@ def _taxonomy(facts: dict, primary: list, gates: dict, repairs: list,
     for row in probe_results:
         if row["arm"] not in outcomes:
             continue
-        # `stopping_reason` is the reason the PROBE stopped since W3, so it is
-        # stage 3's own only while stage 3 is where the probe stopped; a
-        # `parse_error` that went on to the differential carries that verdict
-        # instead and is printed as the plain status rather than as a third
-        # `parse_error:` row that means something else.
+        # `stopping_reason` is the reason the PROBE stopped since W3.
         key = (f"parse_error:{row['stopping_reason']}"
                if row["build_status"] == "parse_error"
                and row["stopping_reason"] in PARSE_REASONS else row["build_status"])
@@ -654,35 +502,13 @@ def _taxonomy(facts: dict, primary: list, gates: dict, repairs: list,
 
 
 def _repair_view(row: Optional[dict]):
-    """The two fields `gate.decide` reads off a repair, from its stored row.
-
-    `decide` asks a repair whether it `fixed` the bug and whether `lit_ok`, and
-    nothing else; regenerating a gate decision therefore needs those two and not
-    a whole `RepairResult`, whose other twenty-odd fields the decision does not
-    read.
-
-    Returns:
-        an object carrying `fixed` and `lit_ok`, or None where no repair ran.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The two fields `gate.decide` reads off a repair, from its stored row."""
     return None if row is None else SimpleNamespace(fixed=row["fixed"],
                                                     lit_ok=row["lit_ok"])
 
 
 def _regeneration(facts: dict, store: LoopStore, candidates: list, gaps: dict) -> None:
-    """FR-18.11: re-derive every row from its recorded artefacts, and mark what will not.
-
-    The deterministic head-side stages are re-run here, from the store and from
-    the artefact tree: `probe_task.classify_build` over the recorded stderr, and
-    `gate.decide` over the recorded answers. Re-executing the tool stages inside
-    an image of the recorded digest is `04-Test-Plan.md` §11's system half and
-    is not attempted here; a row whose image is gone is marked
-    `image_unavailable`, which §11 calls a retention failure and not a
-    reproducibility one.
-    """
+    """FR-18.11: re-derive every row from its recorded artefacts, and mark what will not."""
     rows = []
     missing_results = []
     for candidate in candidates:
@@ -706,12 +532,7 @@ def _regeneration(facts: dict, store: LoopStore, candidates: list, gaps: dict) -
         else:
             stderr = Path(build["stderr_path"]).read_text(
                 encoding="utf-8", errors="backslashreplace")
-            # Against the BUILD's own status and not the ProbeResult's pair:
-            # since W3 `probe_result.stopping_reason` is the reason the PROBE
-            # stopped, wherever it stopped, and stage 3's own reason is not
-            # stored beside the status it refines. `build_result.status` is
-            # stage 3's record, written once and never updated, which is what
-            # FR-18.7's regeneration is about.
+            # Against the BUILD's own status and not the ProbeResult's pair.
             again = classify_build(build["exit_status"], build["signal"], stderr,
                                    build["limit_hit"])
             if again[0] != build["status"]:
@@ -744,11 +565,6 @@ def _regeneration(facts: dict, store: LoopStore, candidates: list, gaps: dict) -
     facts["regeneration"] = rows
 
 
-# ---------------------------------------------------------------------------
-# Rendering
-# ---------------------------------------------------------------------------
-
-
 def _table(lines: list, caption: str, header: list, rows: list, qualifier: str) -> None:
     """Append one qualified Markdown table; ADR-D-07 puts the qualifiers on every one."""
     lines += [f"**{caption}** ({qualifier or 'UNQUALIFIED'})", ""]
@@ -761,12 +577,7 @@ def _table(lines: list, caption: str, header: list, rows: list, qualifier: str) 
 
 
 def _render(facts: dict) -> str:
-    """Render the artefact from the facts, leaving out only what the store lacks.
-
-    A section whose fact is None prints the reason the store could not support
-    it, so the text and the refusal say the same thing; the refusal is what
-    stops the artefact being published with the hole in it.
-    """
+    """Render the artefact from the facts, leaving out only what the store lacks."""
     qualifier = facts["qualifier"]
     manifest: RunManifest = facts["manifest"]
     gaps = facts["gaps"]
@@ -1122,11 +933,6 @@ def _outcome_keys(facts: dict) -> list:
     return ordered
 
 
-# ---------------------------------------------------------------------------
-# The fourteen refusals (03-LLD.md 3.11, 14.4)
-# ---------------------------------------------------------------------------
-
-
 def _element(facts: dict, key: str, text: str, needle: str, element: str) -> list:
     """Refuse when the store could not support an element, or the text lacks it."""
     gap = facts["gaps"].get(key)
@@ -1244,8 +1050,7 @@ def _require_regeneration_marks(text: str, facts: dict) -> list:
                     "the regeneration check")
 
 
-#: §3.11's tuple, in §14.4's order. `len(_REFUSALS) == 14` is asserted by
-#: `tests/test_results.py`, and a fifteenth name in either document fails it.
+#: §3.11's tuple, in §14.4's order.
 _REFUSALS = (_require_headline, _require_secondaries, _require_validation_table,
              _require_qualifiers, _require_contamination, _require_disclosures,
              _require_lag, _require_cutoff, _require_dedup_rates,
@@ -1260,37 +1065,12 @@ def render_results(store: LoopStore, manifest: RunManifest, *,
                    fingerprint_top_n: int = 5) -> dict:
     """Render one run's results artefact as Markdown, or refuse and name what is missing.
 
-    Every number is read from `loop.db` and from the artefact tree it points at.
-    *labelled_pairs* is FR-10.2's hand-labelled duplicate-pair set, each entry
-    `{"label": "duplicate"|"distinct", "a": side, "b": side}` where a side is
-    the RECORDED FAILURE `data/labelled_pairs.json` carries. Both the labels and
-    the failures are the project's, recorded before any fingerprint was
-    computed, and the fingerprints are computed FROM THEM by
-    `triage_task.labelled_fingerprint` rather than looked up in this run's
-    store: the set is a committed measurement of the project and not a row of
-    the campaign, and requiring the store to hold a fingerprint per side made
-    the rates unreportable by every campaign that confirms nothing, which is the
-    refusal `T-S-regen-01` recorded at the end of every run.
-
-    *fingerprint_top_n* is `budget.yaml`'s registered `fingerprint_top_n`
-    (G-43), which is the N the labelled set was measured at; the driver passes
-    the run's own and the default is the registered `[DEFAULT]` of 5.
-
-    The render succeeds from an empty confirmation set and states the zero
-    (FR-18.7), and it names no external bug yield anywhere, so no sentence in
-    it can compare this loop's count to one (FR-18.9).
-
     Returns:
-        {"rendered": str, "counters": CounterBlock}, the Markdown artefact
-        ending in exactly one newline, and one artefact counted at stage
-        "results", which 3.11 requires of every node of 3.2.
+        {"rendered": str, "counters": CounterBlock}, the Markdown artefact ending in exactly one newline, and one artefact counted at stage "results", which 3.11 requires of every node of 3.2.
     Worker:
-        `@ChiaFunction(max_retries=0)` on the head, 600 s `[DEFAULT]` enforced
-        by the driver (§3.2); a pure function of the store, so a re-render is a
-        no-op.
+        `@ChiaFunction(max_retries=0)` on the head, 600 s `[DEFAULT]` enforced by the driver (§3.2).
     Raises:
-        ResultsIncomplete carrying every element the store cannot support, with
-        no partial artefact returned; sqlite3.Error from any query.
+        ResultsIncomplete carrying every element the store cannot support, with no partial artefact returned.
     """
     started_at = time.monotonic()
     facts = _facts(store, manifest, labelled_pairs, fingerprint_top_n)
