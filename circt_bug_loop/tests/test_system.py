@@ -665,18 +665,36 @@ def _stop_reasons(outcome: dict) -> list:
 @pytest.mark.t3
 @pytest.mark.needs_cluster
 def test_calib_01_calibration_mode_over_three_sampled_seeds(cluster, artefact_root):
-    """T-S-calib-01's first half: the manifest, and what the driver does with
-    the image it has (FR-02.7, FR-18.5).
+    """T-S-calib-01 (FR-02.7, FR-18.5): the eligible sample, or a named refusal.
 
-    FR-02.7 as written wants each sampled seed probed at ITS OWN parent commit,
-    and the fixed image is at one commit. This test records what the driver
-    actually does rather than asserting the requirement is met: the manifest
-    carries one `run_commit` per sampled seed with a non-null `seed_sha`, and
-    every probe nonetheless executes against the ONE image the cluster runs.
-    The gap is FR-02.7's, not the driver's, and the measurement record carries
-    the amendment it needs.
+    XFAIL until W-20b, and now a decided test. FR-02.7 wants each sampled seed
+    probed at ITS OWN parent commit; a run has one image and `probe_execute`
+    runs and hashes that image's binaries. `bug_loop.calibratable` is the rule
+    the disposition settled on: a seed is eligible exactly when its parent
+    shares the image's LLVM pin, because only then can the image's own SDK build
+    that parent. Every other seed is `not_calibratable_in_deployment` and is
+    excluded rather than probed at a commit the manifest does not name.
+
+    MEASURED on this corpus, 2026-09-15: **0 of 187** seed parents carry the
+    image's pin, over 44 distinct pins. So the eligible set is empty here and
+    the test SKIPS with that count rather than xfailing about a requirement -
+    which is the whole difference: the run now refuses by name, and this test
+    says why it cannot exercise the path that would follow.
     """
+    from circt_bug_loop import bug_loop as driver
+
     seeds = system_seeds()[:3]
+    pins = {seed.llvm_pin for seed in seeds}
+    eligible, ineligible = driver.calibratable(seeds, image_spec().circt_sha)
+    print(f"\nT-S-calib-01: {len(eligible)} of {len(seeds)} seeds are "
+          f"calibratable at the image's pin; {len(ineligible)} are "
+          f"{driver.NOT_CALIBRATABLE}; the seeds carry {len(pins)} distinct pins")
+    if not eligible:
+        pytest.skip(
+            f"no sampled seed shares the image's pin, so none is calibratable "
+            f"in this deployment ({driver.NOT_CALIBRATABLE}); the driver "
+            f"refuses a calibration run by name and the six host-built crash "
+            f"fixtures remain the oracle and reducer calibration (W-19b #6)")
     budget = tiny_budget(calibration_sample_shas=[s.seed_sha for s in seeds],
                          calibration_sample_size=3)
     run_id = uuid.uuid4().hex
@@ -697,9 +715,10 @@ def test_calib_01_calibration_mode_over_three_sampled_seeds(cluster, artefact_ro
     assert store.query_one(
         "SELECT 1 FROM run WHERE run_manifest_id = ? AND mode = 'calibration'",
         (run_id,)) is not None
-    pytest.xfail("FR-02.7 wants each calibration seed at its own parent commit "
-                 "and the fixed image is at one; the driver runs every probe "
-                 "against the run's image. Errata row W-19b-6.")
+    # Reached only where the eligible set is non-empty, which is the case the
+    # in-container incremental build is owed for (W-19b #6): every build ran at
+    # the seed's own parent commit, which is what makes FR-18.5's table true.
+    assert executed == {c.commit for c in manifest.run_commit}
 
 
 @pytest.mark.t3

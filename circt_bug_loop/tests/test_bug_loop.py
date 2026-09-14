@@ -1730,3 +1730,46 @@ def test_T_U_driver_42_the_trailer_names_no_model_that_did_not_run():
     trailer = assisted_by(recorded)
     assert trailer.startswith("Assisted-by: none")
     assert "gemini" not in trailer and "vertex" not in trailer
+
+
+def test_T_U_driver_43_only_seeds_on_the_images_pin_are_calibratable():
+    """T-U-driver-43 (W-19b #6, FR-02.7): the eligibility rule, and the refusal.
+
+    New id, W-20b. FR-02.7 wants each sampled seed probed at ITS OWN parent
+    commit; a run has one image and `probe_execute` runs and hashes that image's
+    binaries, so W-19b measured three calibration seeds whose manifest named
+    three different commits producing three `build_result` rows that all
+    recorded the image's. The rule is the pin: a seed is eligible exactly when
+    its parent's `llvm` gitlink is the run's, because only then can the image's
+    own SDK build that parent (FR-03.2's own equality).
+
+    Fixture: none; three constructed seeds. Tier 0.
+    """
+    pin, other = "1" * 40, "2" * 40
+    mine = seed_record("a" * 40)
+    mine.llvm_pin, mine.sdk_exact = pin, True
+    inexact = seed_record("b" * 40)
+    inexact.llvm_pin, inexact.sdk_exact = pin, False
+    elsewhere = seed_record("c" * 40)
+    elsewhere.llvm_pin, elsewhere.sdk_exact = other, True
+
+    eligible, excluded = bug_loop.calibratable([mine, inexact, elsewhere], pin)
+    assert eligible == ["a" * 40]
+    assert excluded == ["b" * 40, "c" * 40]
+    assert bug_loop.NOT_CALIBRATABLE == "not_calibratable_in_deployment"
+    # The empty case, which is this corpus's: 0 of 187 measured 2026-09-15.
+    assert bug_loop.calibratable([mine, inexact, elsewhere], "9" * 40) == (
+        [], ["a" * 40, "b" * 40, "c" * 40])
+
+    # And the draw is FROM the eligible set, refusing rather than sampling seeds
+    # no deployment can probe at their own commit.
+    with pytest.raises(ValueError) as raised:
+        bug_loop.draw_calibration(corpus_head_sha="d7e9", sample_size=20,
+                                  exact_pin_shas=eligible)
+    assert "eligible" in str(raised.value)
+
+    # The driver refuses a calibration run whose registered sample is all
+    # ineligible, by name and with both counts.
+    source = inspect.getsource(bug_loop.run_campaign)
+    assert 'PreflightFailed(\n            "calibration_sample"' in source
+    assert "NOT_CALIBRATABLE" in source

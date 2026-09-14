@@ -1616,7 +1616,11 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         confirmation_cutoff_date=budget.campaign_end_utc[:10],
         differential_driver=differential_driver(),
         started_utc=started_utc,
-        calibration_sample=(list(budget.calibration_sample_shas)
+        # The ELIGIBLE half of the registered sample, which the contract's own
+        # conditional requires to equal the `run_commit` entries' seed set
+        # (§2.4); the ineligible half is recorded in `seed.exclusion_reason` as
+        # `not_calibratable_in_deployment` (W-19b #6).
+        calibration_sample=(sorted(s.seed_sha for s in calibration_seeds)
                             if args.mode == "calibration" else None),
         sv_seeds_excluded=sv_seeds_excluded)
     schema.validate(manifest)
@@ -3382,13 +3386,58 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: Why a seed cannot be calibrated by a run whose image is built at one commit
+#: (W-19b #6). FR-02.7 wants each sampled seed probed at ITS OWN parent commit;
+#: a run has one image and `probe_execute` runs and hashes that image's
+#: binaries, so the only seeds a deployment can calibrate are those whose parent
+#: shares the image's LLVM pin, where the image's own SDK can build that parent
+#: incrementally. Every other seed is excluded under this reason rather than
+#: probed at a commit the manifest does not name.
+NOT_CALIBRATABLE = "not_calibratable_in_deployment"
+
+
+def calibratable(seeds, pin_sha: str) -> tuple:
+    """Split *seeds* into those a run pinned at *pin_sha* can calibrate, and the rest.
+
+    A seed is eligible when its parent's `llvm` gitlink IS the run's pin - the
+    equality FR-03.2 makes the image's own build condition - and when its SDK
+    tag is exact, which is ADR-D-01(d)'s existing rule. Anything else would need
+    the image's SDK to build a CIRCT commit it does not match, which FR-03.2
+    makes a hard build failure rather than a degradation.
+
+    MEASURED ON THIS CORPUS, 2026-09-15: **0 of 187** seed parents carry the
+    image's pin `6279700538792da0c5a08e17babfe9b6e824c69f`, and the 187 parents
+    are spread over 44 distinct pins, the commonest covering 27 seeds. So on
+    this deployment the eligible set is EMPTY, calibration mode refuses naming
+    the count, and no seed is silently probed at the wrong commit. The six
+    host-built crash fixtures remain the oracle and reducer calibration, as
+    W-09 recorded them.
+
+    Returns:
+        (eligible, excluded), two sorted lists of seed SHAs.
+    Worker:
+        pure; it reads two fields per seed.
+    Raises:
+        nothing.
+    """
+    eligible = sorted(s.seed_sha for s in seeds
+                      if s.sdk_exact and s.llvm_pin == pin_sha)
+    chosen = set(eligible)
+    return eligible, sorted(s.seed_sha for s in seeds if s.seed_sha not in chosen)
+
+
 def draw_calibration(*, corpus_head_sha: str, sample_size: int,
                      exact_pin_shas: list) -> list:
-    """Draw the calibration sample from the exact-pin seeds, reproducibly (ADR-D-01).
+    """Draw the calibration sample from the eligible seeds, reproducibly (ADR-D-01).
 
     `random.Random(corpus_head_sha)` is seeded by a value already in the budget
     file, so the draw is reproducible from the file itself and is a step of the
     pre-registration rather than of the run. It writes nothing.
+
+    *exact_pin_shas* is the set the sample is drawn FROM, and since W-20b the
+    caller narrows it with `calibratable` first: a sample drawn from seeds no
+    deployment can probe at their own parent commit is a sample of nothing
+    (W-19b #6).
 
     Returns:
         list[str], *sample_size* seed SHAs, sorted so the printed order is
@@ -3396,10 +3445,10 @@ def draw_calibration(*, corpus_head_sha: str, sample_size: int,
     Worker:
         pure; no resource, no process, no database handle.
     Raises:
-        ValueError when the exact-pin set is smaller than the sample.
+        ValueError when the set is smaller than the sample.
     """
     if len(exact_pin_shas) < sample_size:
-        raise ValueError(f"{len(exact_pin_shas)} exact-pin seeds cannot yield a "
+        raise ValueError(f"{len(exact_pin_shas)} eligible seeds cannot yield a "
                          f"sample of {sample_size}")
     return sorted(random.Random(corpus_head_sha).sample(sorted(exact_pin_shas),
                                                         sample_size))
@@ -3608,13 +3657,31 @@ def run_campaign(args, out) -> int:
                           budget.campaign_start_utc[:10],
                           budget.artefact_inline_cap_bytes)
     seeds = list(mined["seeds"])
+    # FR-02.7, as W-19b #6 leaves it: a run has ONE image and `probe_execute`
+    # runs and hashes its binaries, so a sampled seed can only be probed at its
+    # own parent commit where that parent shares the image's pin. The registered
+    # sample is narrowed to those, and the rest are recorded excluded rather
+    # than probed at a commit the manifest does not name.
+    eligible, _ineligible = calibratable(seeds, pin["pin_sha"])
+    sample = [s for s in (budget.calibration_sample_shas or []) if s in eligible]
+    if args.mode == "calibration" and not sample:
+        raise PreflightFailed(
+            "calibration_sample",
+            f"none of the {len(budget.calibration_sample_shas or [])} registered "
+            f"calibration seeds has the run's pin {pin['pin_sha'][:12]}: "
+            f"{len(eligible)} of {len(seeds)} mined seeds are eligible at all, so "
+            f"every sampled seed is {NOT_CALIBRATABLE} and a calibration run "
+            "would measure detection at the wrong commit (FR-02.7, W-19b #6)")
+    if args.mode == "calibration":
+        mined = {**mined, "exclusions": {
+            **dict(mined.get("exclusions") or {}),
+            **{sha: NOT_CALIBRATABLE for sha in _ineligible}}}
     manifest = build_manifest(
         args=args, budget=budget, pin=pin, image_spec=image_spec, mirror=mirror,
         cluster=cluster, mutator_set_sha=mutators.set_sha256(),
         repair_backend=repair_backend,
         run_manifest_id=args.resume or uuid.uuid4().hex, started_utc=started_utc,
-        calibration_seeds=[s for s in seeds
-                           if s.seed_sha in (budget.calibration_sample_shas or [])],
+        calibration_seeds=[s for s in seeds if s.seed_sha in sample],
         sv_seeds_excluded=(None if image_spec.slang_enabled
                            else list(mined["sv_seeds"])))
     run_root = Path(args.artefact_root) / manifest.run_manifest_id
@@ -3723,18 +3790,31 @@ def main(argv: Optional[list] = None, out=None) -> int:
         print(json.dumps(resolved_config(args), sort_keys=True, indent=2), file=out)
         return 0
     if args.draw_calibration:
-        from circt_bug_loop import corpus
+        from circt_bug_loop import corpus, pin_select
 
         budget = budget_module.load_budget._chia_original(
             args.budget, str(FLOW_DIR.parent))["budget"]
         mined = corpus.build_corpus._chia_original(
             args.clone, budget.corpus_head_sha, budget.campaign_start_utc[:10],
             budget.artefact_inline_cap_bytes)
+        # The draw is from the ELIGIBLE seeds since W-20b (W-19b #6): a sample
+        # drawn from seeds no deployment can probe at their own parent commit
+        # is a sample of nothing. The pin is A2's own walk over the clone, so
+        # the draw stays reproducible from the committed file plus that clone.
+        pin = pin_select.select_release_pinned_main._chia_original(
+            args.clone, ref="origin/main")
+        eligible, ineligible = calibratable(mined["seeds"], pin["pin_sha"])
+        print(f"pin {pin['pin_sha']}: {len(eligible)} of {len(mined['seeds'])} "
+              f"seeds are calibratable, {len(ineligible)} are "
+              f"{NOT_CALIBRATABLE}", file=out)
+        if len(eligible) < budget.calibration_sample_size:
+            print(f"no sample of {budget.calibration_sample_size} can be drawn "
+                  f"(FR-02.7, W-19b #6)", file=sys.stderr)
+            return 2
         print("\n".join(draw_calibration(
             corpus_head_sha=budget.corpus_head_sha,
             sample_size=budget.calibration_sample_size,
-            exact_pin_shas=[s.seed_sha for s in mined["seeds"] if s.sdk_exact])),
-            file=out)
+            exact_pin_shas=eligible)), file=out)
         return 0
     try:
         return run_campaign(args, out)
