@@ -67,7 +67,7 @@ filings_per_day: 3
 filings_total: 10
 
 # --- the campaign's own window ----------------------------------------------
-campaign_start_utc: "2026-09-20T00:00:00+00:00"
+campaign_start_utc: "2026-09-15T00:00:00+00:00"
 campaign_end_utc:   "2026-09-24T11:59:00+00:00"
 
 # --- the corpus (FR-01.11) --------------------------------------------------
