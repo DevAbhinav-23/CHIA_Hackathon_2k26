@@ -322,3 +322,29 @@ def _render_one(name: str, monkeypatch, tmp_path, mirror, repo) -> str:  # noqa:
             {"model_id": "gemini-3.8-flash", "set_dir": str(tmp_path / "sets"),
              "mirror_refreshed_utc": "2026-09-13T00:00:00+00:00"})
     return rendered["text"]
+
+
+def test_T_U_prompt_10_both_reading_turns_are_told_the_build_commit():
+    """T-U-prompt-10 (W-23): the syntax must exist where the tools are built."""
+    stage_2 = prompt_text("probe_write.md")
+    for phrase in ("THE SOURCE YOU CAN READ IS THE BUILD COMMIT",
+                   "must\nexist AT THE BUILD COMMIT",
+                   "grep the source for each one before you write it",
+                   "may be stale", "does not parse"):
+        assert phrase in stage_2, phrase
+
+    stage_1 = prompt_text("seed_read.md")
+    assert "BOTH must exist AT THE BUILD COMMIT" in stage_1
+    assert "check each one with grep before you name it" in stage_1
+
+    # It survives the render, with the seed's own cap substituted into it.
+    written = generate_task.render_probe_write(
+        seed(), "a class", [], schema.FeedbackBundle(
+            run_manifest_id="r", seed_sha=seed().seed_sha, arm="seeded",
+            iteration=0, entries=[], abandoned=False,
+            terminating_condition=None), "/tmp/probe", {"per_seed_probe_cap": 4})
+    assert "THE SOURCE YOU CAN READ IS THE BUILD COMMIT" in written
+    assert "spends one of the 4 inputs this seed gets" in written
+    assert "$cap" not in written
+    assert "BOTH must exist AT THE BUILD COMMIT" in generate_task.render_seed_read(
+        seed(), {"per_seed_probe_cap": 4})

@@ -47,9 +47,10 @@ PART A - THE ROOT CAUSE CLASS.
 PART B - SIBLING SITES.
   Name up to $max_sites OTHER places in CIRCT where the same class of mistake
   plausibly still applies. A site is a file path and a symbol in that file, and
-  BOTH must exist in the tree right now - check each one with grep before you
-  name it, because a site that does not resolve is discarded and wastes the
-  budget that produced it.
+  BOTH must exist AT THE BUILD COMMIT, which is the tree you can read right now
+  and is not the seed's own commit - check each one with grep before you name it,
+  because a site that does not resolve is discarded and wastes the budget that
+  produced it.
   Prefer sites that are analogous in structure rather than merely nearby in the
   directory tree: the same pattern in a different dialect is a better sibling
   than the next function down in the same file.

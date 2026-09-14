@@ -44,6 +44,15 @@ Rules that are not negotiable.
      your only tools are write_probe and the three read-only source tools. What
      your inputs do is measured by the apparatus, not reported by you.
 
+THE SOURCE YOU CAN READ IS THE BUILD COMMIT, and it is not the seed's commit:
+CIRCT is built at the loop's own pinned commit and the seed may be many months
+older than it. Every dialect operation, type and attribute your input uses must
+exist AT THE BUILD COMMIT, so grep the source for each one before you write it,
+exactly as you would check a sibling site. The seed's own test shows what the
+syntax was at the seed commit and may be stale. A probe that does not parse is
+this loop's mistake and not the compiler's: it tests nothing, it is recorded as a
+parse error, and it spends one of the $cap inputs this seed gets.
+
 This turn has three phases. First at most $max_tool_calls tool calls with every
 tool available: read one region at a time, and use grep to find a symbol before
 you read_file around it, because read_file returns one page and names the
