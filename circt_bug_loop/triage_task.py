@@ -1041,7 +1041,7 @@ def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     frames = strip_prologue(list(verdict.frames)) if verdict else []
     return {
         "observed_behaviour": _observed(verdict),
-        "reduced_case": _read_text(reduced.path if reduced else None),
+        "reduced_case": _read_text(reduced.path if reduced else None).strip(),
         "repro_command": (verdict.repro_command if verdict else None),
         "build_identity": "\n".join([
             f"- CIRCT commit: {image.get('circt_sha')}",
@@ -1163,8 +1163,11 @@ def _dedup_lines(dedup: Optional[DedupVerdict]) -> Optional[str]:
     lines = [f"- Verdict: {dedup.verdict}"]
     for key in _EVIDENCE_KEYS:
         value = dedup.evidence.get(key)
-        if value not in (None, [], ""):
-            lines.append(f"- {key}: {value}")
+        if value in (None, [], ""):
+            continue
+        if isinstance(value, list):
+            value = ", ".join(str(item) for item in value)
+        lines.append(f"- {key}: {value}")
     return "\n".join(lines)
 
 
