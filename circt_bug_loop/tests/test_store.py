@@ -26,6 +26,7 @@ import yaml
 import circt_bug_loop
 from circt_bug_loop import store
 from circt_bug_loop.contract import schema
+from circt_bug_loop.tests.conftest import call_node
 
 pytestmark = pytest.mark.t0
 
@@ -215,7 +216,7 @@ def test_T_U_store_03(tmp_path: Path):
 
     artefact_dir = str(tmp_path / "probe-01")
     big = "x" * (cap + 1)
-    path = store.artefact_write(artefact_dir, "input.mlir", big)
+    path = call_node(store.artefact_write, artefact_dir, "input.mlir", big)
     assert Path(path).stat().st_size == cap + 1
     assert schema.bound_text(big, path, cap) is None       # the row holds the path
     assert schema.bound_text("x" * cap, path, cap) is not None
@@ -228,20 +229,20 @@ def test_T_U_store_04(tmp_path: Path):
     """T-U-store-04 (FR-17.8): the marker is first in and last out, and survives a kill."""
     artefact_dir = tmp_path / "probe-01"
     marker = artefact_dir / store.PARTIAL
-    store.artefact_write(str(artefact_dir), store.PARTIAL, b"")
+    call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, b"")
     assert marker.is_file() and marker.stat().st_size == 0
 
-    store.artefact_write(str(artefact_dir), "stdout.txt", "boom\n")
+    call_node(store.artefact_write, str(artefact_dir), "stdout.txt", "boom\n")
     assert marker.is_file(), "a killed stage leaves the marker and its output"
     assert (artefact_dir / "stdout.txt").read_text() == "boom\n"
 
     other = tmp_path / "probe-02"
-    store.artefact_write(str(other), "stderr.txt", b"")
+    call_node(store.artefact_write, str(other), "stderr.txt", b"")
     assert (other / store.PARTIAL).is_file(), "written before anything else"
 
     loop = open_store(tmp_path)
     seed_rows(loop, artefact_dir=str(artefact_dir))
-    store.artefact_write(str(artefact_dir), store.PARTIAL, None, store=loop)
+    call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, None, store=loop)
     assert not marker.exists()
     assert (artefact_dir / "stdout.txt").is_file(), "nothing else is deleted"
 
@@ -250,16 +251,16 @@ def test_T_U_store_05(tmp_path: Path):
     """T-U-store-05 (FR-17.8): no completion record, no marker removal."""
     loop = open_store(tmp_path)
     artefact_dir = tmp_path / "probe-01"
-    store.artefact_write(str(artefact_dir), store.PARTIAL, b"")
+    call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, b"")
 
     with pytest.raises(ValueError, match="no completion record"):
-        store.artefact_write(str(artefact_dir), store.PARTIAL, None, store=loop)
+        call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, None, store=loop)
     with pytest.raises(ValueError, match="no completion record"):
-        store.artefact_write(str(artefact_dir), store.PARTIAL, None)
+        call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, None)
     assert (artefact_dir / store.PARTIAL).is_file()
 
     seed_rows(loop, artefact_dir=str(artefact_dir))
-    store.artefact_write(str(artefact_dir), store.PARTIAL, None, store=loop)
+    call_node(store.artefact_write, str(artefact_dir), store.PARTIAL, None, store=loop)
     assert not (artefact_dir / store.PARTIAL).exists()
 
 
@@ -296,7 +297,7 @@ def test_T_U_store_07(tmp_path: Path):
     """T-U-store-07 (FR-17.2): one row per probe and per candidate, joined, on disk."""
     loop = open_store(tmp_path)
     artefact_dir = tmp_path / "probe-01"
-    store.artefact_write(str(artefact_dir), "stdout.txt", "")
+    call_node(store.artefact_write, str(artefact_dir), "stdout.txt", "")
     seed_rows(loop, artefact_dir=str(artefact_dir))
 
     joined = loop.query(
@@ -463,8 +464,8 @@ def test_T_U_store_10(tmp_path: Path):
     """T-U-store-10 (FR-17.5, NFR-06): no credential in any row or any file."""
     loop = open_store(tmp_path)
     artefact_dir = tmp_path / "probe-01"
-    store.artefact_write(str(artefact_dir), "stdout.txt", "assertion failed\n")
-    store.artefact_write(str(artefact_dir), "repro.sh", "#!/bin/sh\ncirct-opt case.mlir\n")
+    call_node(store.artefact_write, str(artefact_dir), "stdout.txt", "assertion failed\n")
+    call_node(store.artefact_write, str(artefact_dir), "repro.sh", "#!/bin/sh\ncirct-opt case.mlir\n")
     seed_rows(loop, artefact_dir=str(artefact_dir))
 
     haystack = [json.dumps(row) for table in

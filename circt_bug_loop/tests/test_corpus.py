@@ -22,6 +22,7 @@ import pytest
 
 from circt_bug_loop import corpus
 from circt_bug_loop.contract import schema
+from circt_bug_loop.tests.conftest import call_node
 
 #: This module's own fixture root. Reached from `__file__` and never above it,
 #: which is `conftest.py`'s rule: the flow lives at two depths (`03-LLD.md`
@@ -37,19 +38,6 @@ SINCE = "2024-09-11"
 
 #: `budget.yaml`'s `artefact_inline_cap_bytes` (`04-Test-Plan.md` T-U-corpus-23).
 INLINE_CAP_BYTES = 262144
-
-#: Calling a `@ChiaFunction` locally runs it in-process, but CHIA's profiler
-#: still asks Ray whether a collector actor exists, and that question starts a
-#: local Ray instance the first time. Ray's own startup emits a `FutureWarning`
-#: about accelerator environment variables and leaks two `/dev/null` handles
-#: that surface later as `ResourceWarning`s, which pytest re-raises as
-#: `PytestUnraisableExceptionWarning`; under `-W error` all three would fail
-#: whichever tier-1 test happened to call a node first. They are Ray's notices
-#: about Ray, so the node-calling tests ignore exactly those three classes and
-#: nothing else. No test here opens a file of its own.
-_RAY_WARNING = pytest.mark.filterwarnings(
-    "ignore::FutureWarning", "ignore::ResourceWarning",
-    "ignore::pytest.PytestUnraisableExceptionWarning")
 
 
 def logical_line(name: str) -> str:
@@ -634,7 +622,7 @@ def clone() -> str:
 def mined(clone: str) -> dict:
     """One real mine at the corpus HEAD, shared by every tier-1 test below."""
     started = time.monotonic()
-    result = corpus.build_corpus(clone, CORPUS_HEAD_SHA, SINCE, INLINE_CAP_BYTES)
+    result = call_node(corpus.build_corpus, clone, CORPUS_HEAD_SHA, SINCE, INLINE_CAP_BYTES)
     result["wall_seconds"] = time.monotonic() - started
     if result["counts"]["missing_blobs"]:
         pytest.skip("the clone could not produce every test blob, which offline "
@@ -644,7 +632,6 @@ def mined(clone: str) -> dict:
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_01(mined: dict):
     """T-U-corpus-01 (FR-01.1): 187 records and 171 non-null tags at the HEAD.
 
@@ -673,7 +660,6 @@ def test_T_U_corpus_01(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_02(mined: dict):
     """T-U-corpus-02 (FR-01.1): the SHA set is PIN's own filtered candidate set.
 
@@ -698,7 +684,6 @@ def test_T_U_corpus_02(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_03(mined: dict):
     """T-U-corpus-03 (FR-01.5): the SdkMap, 38 groups, median 3, maximum 27."""
     sdk_map = mined["sdk_map"]
@@ -714,7 +699,6 @@ def test_T_U_corpus_03(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_04(mined: dict):
     """T-U-corpus-04 (FR-01.7): 16 inexact seeds, every one exactly 1 bump away."""
     inexact = [s for s in mined["seeds"] if not s.sdk_exact]
@@ -729,7 +713,6 @@ def test_T_U_corpus_04(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_05(mined: dict):
     """T-U-corpus-05 (FR-01.4): both bucketings, and the 16-way split.
 
@@ -762,7 +745,6 @@ def test_T_U_corpus_05(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_17(mined: dict):
     """T-U-corpus-17 (FR-01.9): the no-`RUN:`-line seeds, counted and excluded.
 
@@ -785,7 +767,6 @@ def test_T_U_corpus_17(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_18(mined: dict):
     """T-U-corpus-18 (FR-01.12): ordered test paths, and their distribution."""
     distribution = Counter(len(s.test_paths) for s in mined["seeds"])
@@ -798,7 +779,6 @@ def test_T_U_corpus_18(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_20(mined: dict):
     """T-U-corpus-20 (FR-01.3, FR-01.10): every count, against M1's own tables.
 
@@ -829,7 +809,6 @@ def test_T_U_corpus_20(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_21(mined: dict, clone: str):
     """T-U-corpus-21 (FR-01.1): `diff` is that git command's output, verbatim.
 
@@ -850,7 +829,6 @@ def test_T_U_corpus_21(mined: dict, clone: str):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_22(mined: dict):
     """T-U-corpus-22 (FR-01.12, FR-05.1): one batched `cat-file`, not 228.
 
@@ -871,7 +849,6 @@ def test_T_U_corpus_22(mined: dict):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_23(mined: dict, clone: str):
     """T-U-corpus-23 (FR-01.9, FR-17.7): the over-cap exclusion, driven for real.
 
@@ -882,7 +859,7 @@ def test_T_U_corpus_23(mined: dict, clone: str):
     `bound_text` would return None for them.
     """
     assert mined["counts"]["seed_text_over_cap"] == 0
-    capped = corpus.build_corpus(clone, CORPUS_HEAD_SHA, SINCE, 1)
+    capped = call_node(corpus.build_corpus, clone, CORPUS_HEAD_SHA, SINCE, 1)
     assert capped["counts"]["seed_text_over_cap"] == 187
     assert set(capped["exclusions"].values()) == {"seed_text_over_cap"}
     assert len(capped["seeds"]) == 187
@@ -895,7 +872,6 @@ def test_T_U_corpus_23(mined: dict, clone: str):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_19(mined: dict, clone: str):
     """T-U-corpus-19 (FR-01.6): two runs on one clone are byte-identical.
 
@@ -903,7 +879,7 @@ def test_T_U_corpus_19(mined: dict, clone: str):
     that may differ is the `CounterBlock`'s own wall clock, which is a
     measurement of the run and not of the corpus.
     """
-    again = corpus.build_corpus(clone, CORPUS_HEAD_SHA, SINCE, INLINE_CAP_BYTES)
+    again = call_node(corpus.build_corpus, clone, CORPUS_HEAD_SHA, SINCE, INLINE_CAP_BYTES)
     first = "".join(schema.to_json(s) for s in mined["seeds"])
     second = "".join(schema.to_json(s) for s in again["seeds"])
     assert first == second
@@ -915,12 +891,11 @@ def test_T_U_corpus_19(mined: dict, clone: str):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_16(clone: str):
     """T-U-corpus-16 (FR-01.11): a moved HEAD stops the run, naming both SHAs."""
     wrong = "0" * 40
     with pytest.raises(corpus.CorpusError) as caught:
-        corpus.build_corpus(clone, wrong, SINCE, INLINE_CAP_BYTES)
+        call_node(corpus.build_corpus, clone, wrong, SINCE, INLINE_CAP_BYTES)
     assert caught.value.reason == "head_moved"
     message = str(caught.value)
     assert CORPUS_HEAD_SHA in message and wrong in message
@@ -928,7 +903,6 @@ def test_T_U_corpus_16(clone: str):
 
 
 @pytest.mark.t1
-@_RAY_WARNING
 def test_T_U_corpus_15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """T-U-corpus-15 (FR-01.8): no tags fails loudly, naming the refspec.
 
@@ -954,7 +928,7 @@ def test_T_U_corpus_15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     head = run("rev-parse", "HEAD").stdout.strip()
 
     with pytest.raises(corpus.CorpusError) as caught:
-        corpus.build_corpus(str(repo), head, SINCE, INLINE_CAP_BYTES)
+        call_node(corpus.build_corpus, str(repo), head, SINCE, INLINE_CAP_BYTES)
     assert caught.value.reason == "no_tags"
     message = str(caught.value)
     assert "refs/tags/firtool-*" in message and "quote it" in message
@@ -975,7 +949,6 @@ def test_T_U_corpus_15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.t1
 @pytest.mark.needs_sdk
-@_RAY_WARNING
 def test_T_U_corpus_24(clone: str):
     """T-U-corpus-24 (FR-04.1): `resolve_sites`, the head's one tree query.
 
@@ -987,9 +960,9 @@ def test_T_U_corpus_24(clone: str):
     sites = [{"file": "lib/Dialect/HW/HWTypes.cpp", "symbol": "parseHWArray"},
              {"file": "lib/Dialect/HW/HWTypes.cpp", "symbol": "zzzNoSuchSymbol"},
              {"file": "lib/Dialect/HW/NoSuchFile.cpp", "symbol": "anything"}]
-    answer = corpus.resolve_sites(clone, CORPUS_HEAD_SHA, sites)
+    answer = call_node(corpus.resolve_sites, clone, CORPUS_HEAD_SHA, sites)
     assert answer["resolved"] == [sites[0]]
     assert [r["reason"] for r in answer["rejected"]] == ["no_symbol", "no_such_file"]
     assert [r["file"] for r in answer["rejected"]] == [s["file"] for s in sites[1:]]
-    assert corpus.resolve_sites(clone, CORPUS_HEAD_SHA, []) == {"resolved": [],
-                                                               "rejected": []}
+    assert call_node(corpus.resolve_sites, clone, CORPUS_HEAD_SHA, []) == {
+        "resolved": [], "rejected": []}

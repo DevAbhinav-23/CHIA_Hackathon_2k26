@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+from chia.base.ChiaFunction import ChiaFunction
+
 from circt_bug_loop.contract import schema
 from circt_bug_loop.contract.schema import ContractError
 
@@ -1085,6 +1087,7 @@ def _completed(store: "LoopStore", artefact_dir: str) -> bool:
     return False
 
 
+@ChiaFunction(max_retries=0)
 def artefact_write(artefact_dir: str, relative_path: str, data,
                    *, mode: int = 0o644, store: Optional["LoopStore"] = None) -> str:
     """Write one file into the artefact tree, under the directory's PARTIAL marker.

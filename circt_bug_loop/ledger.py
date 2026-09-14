@@ -32,6 +32,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
 
+from chia.base.ChiaFunction import ChiaFunction
+
 from circt_bug_loop.contract.schema import (BudgetFile, ContractError, LedgerEntry,
                                             validate)
 from circt_bug_loop.store import BudgetLedger, LoopStore
@@ -75,6 +77,7 @@ def price(tokens_in: Optional[int], tokens_out: Optional[int],
                  + tokens_out / 1e6 * budget.price_usd_per_m_output_tokens, 6)
 
 
+@ChiaFunction(max_retries=0)
 def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None:
     """Price *entry* and append it to ledger_entry. Nothing ever updates a row.
 

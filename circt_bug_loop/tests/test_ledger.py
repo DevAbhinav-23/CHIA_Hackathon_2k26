@@ -21,6 +21,7 @@ from circt_bug_loop import budget as budget_module
 from circt_bug_loop import ledger as ledger_module
 from circt_bug_loop import store
 from circt_bug_loop.contract import schema
+from circt_bug_loop.tests.conftest import call_node
 from circt_bug_loop.tests.test_store import open_store, seed_rows
 
 pytestmark = pytest.mark.t0
@@ -65,7 +66,7 @@ def entry(entry_id: str, *, arm="seeded", scope="stage", stage="stage_3",
 def accrue_all(db_path: str, entries, funds=None) -> None:
     """Append every entry of *entries* against *funds* (§9.5's file by default)."""
     for one in entries:
-        ledger_module.accrue(one, db_path, funds or budget())
+        call_node(ledger_module.accrue, one, db_path, funds or budget())
 
 
 def test_T_U_ledger_01(tmp_path: Path):
@@ -78,11 +79,11 @@ def test_T_U_ledger_01(tmp_path: Path):
     loop = open_store(tmp_path)
     seed_rows(loop)
     for arm in ("seeded", "mutation", "shared"):
-        ledger_module.accrue(entry(f"e-{arm}", arm=arm), db_path, budget())
+        call_node(ledger_module.accrue, entry(f"e-{arm}", arm=arm), db_path, budget())
     assert len(loop.query("SELECT 1 FROM ledger_entry")) == 3
 
     with pytest.raises(schema.ContractError) as caught:
-        ledger_module.accrue(entry("e-4", arm="both"), db_path, budget())
+        call_node(ledger_module.accrue, entry("e-4", arm="both"), db_path, budget())
     assert caught.value.code == "E004_BAD_ENUM"
 
     with pytest.raises(sqlite3.IntegrityError):
@@ -98,14 +99,14 @@ def test_T_U_ledger_02(tmp_path: Path):
     db_path = str(tmp_path / "loop.db")
     loop = open_store(tmp_path)
     seed_rows(loop)
-    ledger_module.accrue(entry("e-1", scope="arm_window", stage="stage_3",
+    call_node(ledger_module.accrue, entry("e-1", scope="arm_window", stage="stage_3",
                                amount=14400.0), db_path, budget())
-    ledger_module.accrue(entry("e-2", scope="stage"), db_path, budget())
+    call_node(ledger_module.accrue, entry("e-2", scope="stage"), db_path, budget())
     assert sorted(r["scope"] for r in loop.query("SELECT scope FROM ledger_entry")) \
         == ["arm_window", "stage"]
 
     with pytest.raises(schema.ContractError) as caught:
-        ledger_module.accrue(entry("e-3", scope="campaign"), db_path, budget())
+        call_node(ledger_module.accrue, entry("e-3", scope="campaign"), db_path, budget())
     assert caught.value.code == "E004_BAD_ENUM"
 
 
@@ -120,7 +121,7 @@ def test_T_U_ledger_03(tmp_path: Path):
         entry("s-1", arm="seeded", amount=7.0)])
 
     with pytest.raises(schema.ContractError) as caught:
-        ledger_module.accrue(entry("w-seeded-2", scope="arm_window", amount=1.0),
+        call_node(ledger_module.accrue, entry("w-seeded-2", scope="arm_window", amount=1.0),
                              db_path, budget())
     assert caught.value.code == "E005_CONDITIONAL_REQUIRED"
     assert "w-seeded" in str(caught.value)
@@ -233,18 +234,18 @@ def test_T_U_ledger_08(tmp_path: Path):
     funds = budget()
 
     vertex = entry("v-1", stage="stage_2", tokens_in=1100, tokens_out=700)
-    ledger_module.accrue(vertex, db_path, funds)
+    call_node(ledger_module.accrue, vertex, db_path, funds)
     assert tuple(sorted(vertex.observed)) == tuple(sorted(_OBSERVED_KEYS))
     assert vertex.observed["cost_usd"] == ledger_module.price(1100, 700, funds)
     assert vertex.metered is True
 
     fallback = entry("c-1", stage="stage_2", metered=False)
-    ledger_module.accrue(fallback, db_path, funds)
+    call_node(ledger_module.accrue, fallback, db_path, funds)
     assert fallback.observed["tokens_in"] is None
     assert fallback.observed["cost_usd"] is None and fallback.metered is False
 
     stage_7 = entry("r-1", stage="stage_7", metered=True)
-    ledger_module.accrue(stage_7, db_path, funds)
+    call_node(ledger_module.accrue, stage_7, db_path, funds)
     assert stage_7.metered is True and stage_7.observed["tokens_in"] is None
     assert stage_7.observed["cost_usd"] is None, "a null is an absence, not a zero"
 
@@ -268,7 +269,7 @@ def test_T_U_ledger_08(tmp_path: Path):
         recorded = schema.from_json(text, schema.LedgerEntry)
         assert schema.to_json(recorded) == text, f"{path} is not canonical"
         cost = recorded.observed["cost_usd"]
-        ledger_module.accrue(recorded, db_path, funds)
+        call_node(ledger_module.accrue, recorded, db_path, funds)
         assert recorded.observed["cost_usd"] == cost
         assert (cost is None) == (recorded.observed["tokens_in"] is None)
         assert recorded.metered is (recorded.observed["tokens_in"] is not None)
@@ -318,11 +319,11 @@ def test_T_U_ledger_10(tmp_path: Path):
     charged = entry("v-1", stage="stage_1", observed={
         "cpu_seconds": 0.5, "tokens_in": backend_usage["prompt_token_count"],
         "tokens_out": backend_usage["candidates_token_count"], "cost_usd": 99.0})
-    ledger_module.accrue(charged, db_path, funds)
+    call_node(ledger_module.accrue, charged, db_path, funds)
     assert charged.observed["cost_usd"] == 0.000034, "the backend's cost is ignored"
 
     unmetered = entry("c-1", stage="stage_1", metered=False)
-    ledger_module.accrue(unmetered, db_path, funds)
+    call_node(ledger_module.accrue, unmetered, db_path, funds)
     assert unmetered.observed["cost_usd"] is None
     aggregated = ledger_module.aggregate(_RUN, db_path, today=_DAY)
     assert aggregated.spend_usd == 0.000034

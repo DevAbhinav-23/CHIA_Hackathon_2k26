@@ -31,6 +31,8 @@ from pathlib import Path
 
 import yaml
 
+from chia.base.ChiaFunction import ChiaFunction
+
 from circt_bug_loop.contract.schema import (Arm, BudgetFile, ContractError,
                                             LedgerSnapshot, validate)
 
@@ -113,6 +115,7 @@ def _relative(path: str, repo_root: str) -> str:
     return relative
 
 
+@ChiaFunction(max_retries=0)
 def load_budget(path: str, repo_root: str, *, run_start_utc=None,
                 manifest_budget_file_sha: str = None,
                 exact_pin_shas=None) -> BudgetFile:

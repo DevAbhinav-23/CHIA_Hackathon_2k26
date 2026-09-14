@@ -50,6 +50,29 @@ def no_live_model() -> None:
         "(04-Test-Plan.md 0.5). Unset it, or run the tier-3 suite deliberately.")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def no_local_ray():
+    """Assert that no test of tiers T0 to T2 started a local Ray (0.4).
+
+    `call_node` exists so that every node keeps `03-LLD.md` §3.2's decorator
+    while a unit test stays in-process, and the way that stops being true is
+    quiet: one test that calls the wrapper instead starts a local Ray through
+    the profiler, costs seconds, and leaks the warnings `-W error` then turns
+    into a failure somewhere else. This is the check that names it here. The
+    two cluster tiers legitimately hold a Ray, so it is skipped when either of
+    `04-Test-Plan.md` §0.3's cluster variables is set.
+    """
+    yield
+    if os.environ.get("BUGLOOP_CLUSTER") or os.environ.get("CHIA_LIVE_CLUSTER"):
+        return
+    import ray
+
+    assert not ray.is_initialized(), (
+        "a test started a local Ray: call every @ChiaFunction node through "
+        "conftest.call_node (04-Test-Plan.md 0.4), which calls its "
+        "_chia_original and leaves the decorator in place.")
+
+
 @pytest.fixture(scope="session")
 def fixtures_dir() -> Path:
     """The committed contract fixture directory."""

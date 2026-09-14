@@ -21,7 +21,7 @@ import yaml
 from circt_bug_loop import budget as budget_module
 from circt_bug_loop import store
 from circt_bug_loop.contract import schema
-from circt_bug_loop.tests.conftest import FIXTURES
+from circt_bug_loop.tests.conftest import FIXTURES, call_node
 
 pytestmark = pytest.mark.t0
 
@@ -65,7 +65,8 @@ class Repo:
     def load(self, **kwargs):
         """`load_budget` against this repository's budget file."""
         kwargs.setdefault("run_start_utc", _RUN_START)
-        return budget_module.load_budget(str(self.budget), str(self.root), **kwargs)
+        return call_node(budget_module.load_budget, str(self.budget), str(self.root),
+                         **kwargs)
 
 
 def edited(**changes) -> str:
