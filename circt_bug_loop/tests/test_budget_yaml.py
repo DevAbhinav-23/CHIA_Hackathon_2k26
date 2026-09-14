@@ -205,12 +205,18 @@ def test_T_U_byaml_05_the_registration_rule_holds_on_the_committed_bytes(tmp_pat
     assert "budget.yaml" in str(refused.value)
 
 
-#: W-18's pilot pre-registration, beside the campaign's (§1.1). A separate FILE
-#: and not an edit, FR-14.7 forbidding an edit to a registered one.
+#: The pilot pre-registration, beside the campaign's (§1.1). A separate FILE and
+#: not an edit, FR-14.7 forbidding an edit to a registered one.
 PILOT = COMMITTED.with_name("budget-pilot.yaml")
 
-#: The eight values the pilot changes, and the whole of what it changes.
-PILOT_CHANGES = {"arm_window_seconds": 900.0, "campaign_spend_cap_usd": 5.0,
+#: The eight values the pilot changes, and the whole of what it changes. The
+#: window and the cap are PILOT 2's (`registration/pilot-2`, W-18b): pilot 1
+#: registered 900 s and USD 5.00 and spent 7.163957 of it, so the run that
+#: measures the fix gets a shorter window and a smaller cap. The two keys
+#: contract 2.2 added are NOT in this map, and must not be: they are the fix
+#: under measurement and the pilot must carry the campaign's own values for
+#: them or it measures something else.
+PILOT_CHANGES = {"arm_window_seconds": 600.0, "campaign_spend_cap_usd": 3.0,
                  "generated_inputs_per_day": 200, "filings_per_day": 0,
                  "filings_total": 0, "per_seed_probe_cap": 3,
                  "per_seed_iteration_cap": 1, "calibration_sample_size": 0,
@@ -238,7 +244,9 @@ def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_eight_values(tmp_path
     assert pilot["filings_per_day"] == 0 and pilot["filings_total"] == 0
     assert len(pilot["calibration_sample_shas"]) == pilot["calibration_sample_size"]
     for key in ("price_usd_per_m_input_tokens", "price_usd_per_m_output_tokens",
-                "corpus_head_sha", "model_id", "fingerprint_top_n"):
+                "corpus_head_sha", "model_id", "fingerprint_top_n",
+                # The fix under measurement, which the pilot may not shrink.
+                "max_tool_iterations", "minimal_case_lines"):
         assert pilot[key] == campaign[key], key
 
     # And it LOADS as a campaign would: §9.2's six checks against a history that
@@ -249,6 +257,6 @@ def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_eight_values(tmp_path
     repo.register()
     loaded = call_node(budget_module.load_budget, str(repo.budget), str(repo.root),
                        run_start_utc=_RUN_START, campaign=True)
-    assert loaded["budget"].campaign_spend_cap_usd == 5.0
-    assert loaded["budget"].arm_window_seconds == 900.0
+    assert loaded["budget"].campaign_spend_cap_usd == 3.0
+    assert loaded["budget"].arm_window_seconds == 600.0
     assert loaded["registration"]["tag"] == "registration/campaign-01"
