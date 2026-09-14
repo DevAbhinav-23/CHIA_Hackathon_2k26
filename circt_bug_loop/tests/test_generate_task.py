@@ -87,13 +87,16 @@ def replay(monkeypatch, tool_servers):  # noqa: F811
 
         def _dispatch(system_message, user_message, tools, *, stage,
                       timeout_seconds, model_id, guard=None,
-                      max_tool_iterations=None):
+                      max_tool_iterations=None, final_tool_names=None,
+                      final_tool_iterations=0):
             turn = state["pending"].pop(0)
             state["calls"].append({"prompt": user_message, "tools": list(tools),
                                    "system_message": system_message,
                                    "timeout_seconds": timeout_seconds,
                                    "model_id": model_id, "stage": stage,
-                                   "max_tool_iterations": max_tool_iterations})
+                                   "max_tool_iterations": max_tool_iterations,
+                                   "final_tool_names": final_tool_names,
+                                   "final_tool_iterations": final_tool_iterations})
             for name, content in (turn.get("files") or {}).items():
                 tools[-1].write_probe(name, content)
             if turn.get("raises") is not None:

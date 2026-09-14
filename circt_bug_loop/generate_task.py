@@ -178,6 +178,10 @@ class SourceReadTool(ChiaTool):
         return _truncate(out, self.cap_bytes)
 
 
+#: The `ProbeWriteTool` method stage 2's write phase is restricted to, by suffix.
+WRITE_PROBE_METHOD = "write_probe"
+
+
 class ProbeWriteTool(ChiaTool):
     """MCP tool: write one probing-input file into this iteration's probe directory."""
 
@@ -187,7 +191,7 @@ class ProbeWriteTool(ChiaTool):
         super().__init__(name, task_options=task_options)
         os.makedirs(probe_dir, exist_ok=True)
         self.probe_dir = os.path.realpath(probe_dir)
-        self.mcp.add_tool(self.write_probe, name=f"{name}_write_probe")
+        self.mcp.add_tool(self.write_probe, name=f"{name}_{WRITE_PROBE_METHOD}")
         super().__post_init__()
 
     def write_probe(self, filename: str, content: str) -> str:
@@ -316,6 +320,11 @@ def render_seed_read(seed: SeedRecord, cfg: dict) -> str:
                    max_tool_calls=tool_iterations(cfg, "stage_1"))
 
 
+def write_calls(cfg: dict) -> int:
+    """Stage 2's write-phase budget: one call per probe the cap allows, and one spare."""
+    return int(cfg["per_seed_probe_cap"]) + 1
+
+
 def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
                        feedback: FeedbackBundle, probe_dir: str,
                        cfg: dict) -> str:
@@ -330,6 +339,7 @@ def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
                    probe_dir=probe_dir,
                    cap=int(cfg["per_seed_probe_cap"]),
                    max_tool_calls=tool_iterations(cfg, "stage_2"),
+                   write_calls=write_calls(cfg),
                    feedback=render_feedback(feedback))
 
 
@@ -473,7 +483,8 @@ def iteration_dir(cfg: dict, seed_sha: str, iteration: int) -> str:
 
 
 def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
-          logs: dict) -> dict:
+          logs: dict, *, final_tool_names: Optional[list] = None,
+          final_tool_iterations: int = 0) -> dict:
     """Run one stage's turn and persist FR-04.6's five files whatever happens."""
     name = f"llm_{stage}"
     logs[f"{name}.prompt.md"] = _write(directory, f"{name}.prompt.md", prompt)
@@ -487,7 +498,9 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
                              model_id=cfg["model_id"],
                              guard=cfg.get("spend_guard"),
                              max_tool_iterations=(cfg.get("max_tool_iterations")
-                                                  or {}).get(_TURN_STAGE[stage]))
+                                                  or {}).get(_TURN_STAGE[stage]),
+                             final_tool_names=final_tool_names,
+                             final_tool_iterations=final_tool_iterations)
         return turn
     finally:
         turn["wall_seconds"] = time.monotonic() - started
@@ -600,7 +613,9 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
             _turn("probe_write",
                   render_probe_write(seed, root_cause_class, sites, feedback,
                                      probe_dir, cfg),
-                  tools, cfg, directory, logs).get("result") or "",
+                  tools, cfg, directory, logs,
+                  final_tool_names=[WRITE_PROBE_METHOD],
+                  final_tool_iterations=write_calls(cfg)).get("result") or "",
             ("probes",))
         specs, truncated, rejections = emit_specs(
             written, seed, iteration, cap, probe_dir, cfg["run_manifest_id"],
@@ -690,11 +705,12 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
 
 __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
            "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS", "STALE_AT_BUILD",
-           "TURN_FAILED_FILE",
+           "TURN_FAILED_FILE", "WRITE_PROBE_METHOD",
            "ProbeWriteTool", "SourceReadTool", "check_tool", "emit_specs",
            "generate_mutation", "generate_seeded",
            "iteration_dir",
            "probe_argv", "probe_id", "render_argv_template",
            "render_feedback", "render_probe_write", "render_seed_read",
            "render_sites", "render_test_files",
-           "seed_argv_template", "seed_language", "seed_stale_at_build"]
+           "seed_argv_template", "seed_language", "seed_stale_at_build",
+           "write_calls"]
