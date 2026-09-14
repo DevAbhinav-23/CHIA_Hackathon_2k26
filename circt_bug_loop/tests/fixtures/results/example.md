@@ -151,6 +151,8 @@ The campaign spent USD 0.30 in total, both arms and the shared stages together, 
 
 None of these four is the budget. The budget is one elapsed wall-clock second of an arm's fixed window, and the table above is what the run was observed to consume while spending it. The USD total is a **lower bound excluding stage 7**, whose per-turn token counts the repair chain does not return: its turns are dispatched remotely and the counting copy of the model object dies with the worker.
 
+**Unpriced turns: 1.** That is the number of metered model-stage entries whose token counts were never observed, so they carry a null cost rather than a zero and the USD total above excludes every one of them. A turn that raised inside the tool loop reports nothing at all, however many model calls it had already made, and so does every stage-7 attempt by construction; the figure is what the lower bound is a lower bound BY, counted rather than described.
+
 ## 8. Declarations and disclosures
 
 **The mutator synthesis is the one place the mutation arm sees bug reports.** The frozen mutator set `1111111111111111111111111111111111111111111111111111111111111111` was synthesised at 2026-09-17T11:00:00+00:00 by vertex:gemini-3.8-flash from the mirrored issue set refreshed at 2026-09-19T00:00:00+00:00 (588 issues, all). That is Mut4All's design, which this arm reimplements, and not a leak in the experiment: the arm reads no report during the campaign, and the set was frozen and committed before the pre-registration.

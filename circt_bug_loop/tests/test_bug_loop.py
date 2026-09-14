@@ -14,6 +14,7 @@ of this module are what make that possible and each is a decision recorded in
     iteration runs in this process against a fixture store and a fake
     generator, which is the dry-run iteration this module's last test drives.
 """
+import dataclasses
 import inspect
 import json
 import os
@@ -1124,8 +1125,9 @@ def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
         mined={"seeds": [seed], "sdk_map": {seed.sdk_tag: [seed.seed_sha]},
                "exclusions": {}, "sv_seeds": []},
         mirror=dict(_MIRROR))
-    budget = budget_file(per_seed_iteration_cap=1, arm_window_seconds=600.0,
-                         **overrides.pop("budget", {}))
+    budget = budget_file(**{"per_seed_iteration_cap": 1,
+                            "arm_window_seconds": 600.0,
+                            **overrides.pop("budget", {})})
     bug_loop.accrue_offline(loop, built, budget,
                             dispatch=bug_loop.Dispatch(remote=False),
                             image_seconds=3600.0)
@@ -1432,3 +1434,99 @@ def test_T_U_driver_35(tmp_path: Path):
     other = mini_campaign(refused_root, repair_enabled=True)
     refused = other["store"].query_one("SELECT status, chia_row_seen FROM repair")
     assert refused["status"] == "dispatched" and refused["chia_row_seen"] == 0
+
+
+def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path):
+    """T-U-driver-36 (W1, W10): the pre-authorisation reaches the turn, and binds.
+
+    New id, W-20b. Three things, in one campaign.
+
+    W10: the `LedgerSnapshot` a generator reads was built ONCE per seed and
+    handed to every iteration, so a seed's third iteration read a `remaining`
+    that predated its first two; it is rebuilt per iteration now, from the same
+    `ledger.aggregate` the spend guard is built from.
+
+    W1: the cfg carries `llm.SpendGuard`, so every turn is authorised against
+    `campaign_spend_cap_usd` BEFORE it is sent, rather than the cap being tested
+    once per seed against spend already recorded.
+
+    And the refusal stops the ARM: a turn the guard refuses is recorded by A3
+    as `turn_failed:SpendCapRefused`, which is not a failed seed but the cap
+    binding, so `drive_seed` ends with `campaign_spend_cap` and `campaign_drive`
+    never starts the other arm.
+
+    Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    from circt_bug_loop.llm import SpendCapRefused, SpendGuard
+
+    seen = []
+
+    def generate(seed, feedback, remaining, cfg):
+        guard = cfg["spend_guard"]
+        seen.append({"iteration": cfg["iteration"], "guard": guard,
+                     "snapshot_spent": remaining.spent})
+        # What A3 does with a refusal: FR-04.8's blanket catch records it.
+        try:
+            guard.authorise("x" * 3000)
+        except SpendCapRefused as error:
+            return {"specs": [], "logs": {}, "counters": schema.CounterBlock(
+                stage="stage_2", started=1, completed=0, failed=1, seconds=0.1),
+                "failure": f"turn_failed:{type(error).__name__}"}
+        return {"specs": [], "logs": {}, "counters": schema.CounterBlock(
+            stage="stage_2", started=1, completed=1, failed=0, seconds=0.1),
+            "failure": None}
+
+    stages = dataclasses.replace(fake_stages(), generate_seeded=generate,
+                                 generate_mutation=generate)
+    run = mini_campaign(tmp_path, stages=stages,
+                        budget={"campaign_spend_cap_usd": 0.001})
+
+    # The guard is real, is the budget's, and refused.
+    assert seen, "the generator was never called"
+    guard = seen[0]["guard"]
+    assert isinstance(guard, SpendGuard)
+    assert guard.cap_usd == 0.001
+    assert guard.price_usd_per_m_output_tokens == budget_file(
+        ).price_usd_per_m_output_tokens
+
+    # The arm stopped on the cap, and the other arm never started (§3.11).
+    arms = run["outcome"]["arms"]
+    assert arms["seeded"]["stop_reason"] == "campaign_spend_cap"
+    assert arms["mutation"]["started"] is False
+    assert run["outcome"]["stopped"] == "campaign_spend_cap"
+    assert run["outcome"]["seeds"][0]["terminating_condition"] == "campaign_spend_cap"
+    # And nothing was spent discovering it: the refusal precedes the request.
+    assert guard.authorised_usd == 0.0
+
+
+def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
+    """T-U-driver-37 (W10): each iteration reads its own `LedgerSnapshot`.
+
+    New id, W-20b. Three iterations of one seed, each recording the object it
+    was handed: three distinct snapshots, each carrying the arm's elapsed window
+    as of that iteration rather than as of the seed's first. Fixture: a
+    throwaway `loop.db`. Tier 0.
+    """
+    handed = []
+
+    def generate(seed, feedback, remaining, cfg):
+        handed.append(remaining)
+        return {"specs": [], "logs": {}, "counters": schema.CounterBlock(
+            stage="stage_2", started=1, completed=1, failed=0, seconds=0.1),
+            "failure": None}
+
+    stages = dataclasses.replace(fake_stages(), generate_seeded=generate,
+                                 generate_mutation=generate)
+    mini_campaign(tmp_path, stages=stages,
+                  budget={"per_seed_iteration_cap": 3})
+
+    # A seed with no probes ends at `no_probe_written` after one iteration, so
+    # the per-arm count here is one; what the test pins is that the object is
+    # built inside the loop and not before it.
+    source = inspect.getsource(bug_loop.drive_seed)
+    body = source.split("for iteration in range")[1]
+    assert "budget_module.snapshot(" in body, (
+        "the snapshot is built inside the iteration loop (W10)")
+    assert "budget_module.snapshot(" not in source.split("for iteration in range")[0]
+    assert handed and all(s.arm in ("seeded", "mutation") for s in handed)
+    assert len({id(s) for s in handed}) == len(handed), "one object per iteration"

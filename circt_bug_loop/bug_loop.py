@@ -2505,17 +2505,40 @@ class Campaign:
         self.now = now or time.monotonic
         self.bin_dir = bin_dir
 
-    def cfg(self, *, iteration: int, artefact_dir: Optional[str] = None) -> dict:
+    def cfg(self, *, iteration: int, artefact_dir: Optional[str] = None,
+            spend_usd: Optional[float] = None) -> dict:
         """This run's `generator_cfg`, carrying the head placement K4 needs.
 
         One method and not four call sites, so the placement cannot be supplied
         to some stages and forgotten by others: A3's `SourceReadTool` and B7's
         are the same tool with the same reason to be pinned to the head.
+
+        *spend_usd* is the ledger's campaign spend as of this iteration; given
+        one, the cfg carries W1's `SpendGuard` and every turn the stage runs is
+        pre-authorised against the cap before it is sent.
         """
-        return generator_cfg(self.manifest, self.budget,
-                             clone_path=self.clone_path, iteration=iteration,
-                             artefact_dir=artefact_dir,
-                             head_options=self.head_options)
+        cfg = generator_cfg(self.manifest, self.budget,
+                            clone_path=self.clone_path, iteration=iteration,
+                            artefact_dir=artefact_dir,
+                            head_options=self.head_options)
+        cfg["spend_guard"] = self.spend_guard(
+            self.spend_usd() if spend_usd is None else spend_usd)
+        return cfg
+
+    def spend_usd(self) -> float:
+        """This run's campaign spend, read from the ledger right now."""
+        return float(ledger_module.aggregate(
+            self.manifest.run_manifest_id, self.store.db_path).spend_usd)
+
+    def spend_guard(self, spend_usd: float):
+        """W1's pre-authorisation record, at *spend_usd*."""
+        from circt_bug_loop.llm import SpendGuard
+
+        return SpendGuard(
+            cap_usd=float(self.budget.campaign_spend_cap_usd),
+            spend_usd=float(spend_usd),
+            price_usd_per_m_input_tokens=self.budget.price_usd_per_m_input_tokens,
+            price_usd_per_m_output_tokens=self.budget.price_usd_per_m_output_tokens)
 
     def call(self, name: str, fn: Callable, *args, **kwargs):
         """Dispatch one stage, fold its counters in, charge it, and return its result.
@@ -2910,20 +2933,28 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
     out = {"seed_sha": seed.seed_sha, "arm": arm, "iterations": 0, "probes": [],
            "terminating_condition": "iteration_cap"}
     bundle = empty_feedback(campaign.manifest, seed, arm, 1)
-    snapshot = budget_module.snapshot(
-        ledger_module.aggregate(campaign.manifest.run_manifest_id,
-                                campaign.store.db_path), arm, campaign.budget)
+    snapshot = None
     for iteration in range(1, campaign.budget.per_seed_iteration_cap + 1):
         if deadline is not None and campaign.now() >= deadline:
             out["terminating_condition"] = "arm_window"
             return out
-        cfg = campaign.cfg(iteration=iteration)
+        # PER ITERATION, not once per seed (W10, W1): the snapshot A5 and the
+        # generator read is FR-16's "how much is left", and a seed's third
+        # iteration was being told what was true before its first; the same
+        # read is what the turn-level spend guard is built from.
+        aggregate = ledger_module.aggregate(campaign.manifest.run_manifest_id,
+                                            campaign.store.db_path)
+        snapshot = budget_module.snapshot(aggregate, arm, campaign.budget)
+        cfg = campaign.cfg(iteration=iteration, spend_usd=aggregate.spend_usd)
         try:
             generated = campaign.call(
                 f"generate_{arm}", campaign.stages.generator(arm), seed, bundle,
                 snapshot, cfg, _arm=arm, _key=f"{seed.seed_sha}:{iteration}")
         except Exception as error:
             out["terminating_condition"] = f"generator_failed:{type(error).__name__}"
+            return out
+        if _spend_refused(generated.get("failure")):
+            out["terminating_condition"] = "campaign_spend_cap"
             return out
         out["iterations"] = iteration
         specs = list(generated.get("specs", []))
@@ -2949,6 +2980,17 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             out["terminating_condition"] = "abandoned"
             return out
     return out
+
+
+def _spend_refused(failure: Optional[str]) -> bool:
+    """Whether a stage's recorded failure is W1's pre-authorisation refusing.
+
+    A3 and B7 catch every exception and record it as `turn_failed:<class>`
+    (FR-04.8, FR-11.8), which is right for a backend error and wrong for this
+    one: a turn refused because the campaign's USD cap would be reached is not
+    a failed seed, it is the cap binding, and the arm stops.
+    """
+    return bool(failure) and failure.endswith("SpendCapRefused")
 
 
 def _next_feedback(campaign: Campaign, results: list, previous: FeedbackBundle,
@@ -3009,6 +3051,11 @@ def campaign_drive(campaign: Campaign, seeds: list, *, arms=None) -> dict:
             out["seeds"].append(record)
             seeds_run += 1
             probes_run += len(record["probes"])
+            # W1: a turn refused by the pre-authorisation stops the arm HERE,
+            # without waiting for the next `_arm_stop` to find the money gone.
+            if record["terminating_condition"] == "campaign_spend_cap":
+                reason = "campaign_spend_cap"
+                break
         reason = reason or _arm_stop(campaign, arm, deadline) or "seed_set_exhausted"
         seconds = round(campaign.now() - started, 6)
         out["arms"][arm] = {"stop_reason": reason, "seconds": seconds,

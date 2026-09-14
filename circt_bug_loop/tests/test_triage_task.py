@@ -294,7 +294,7 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
             self.stopped = True
 
     def dispatch_turn(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id):
+                      timeout_seconds, model_id, guard=None):
         assert os.environ.get("BUGLOOP_ALLOW_LIVE_MODEL") is None
         seen.update(system_message=system_message, timeout_seconds=timeout_seconds,
                     model_id=model_id, prompt=user_message, tools=tools,
@@ -1504,7 +1504,7 @@ def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkey
     seen = {}
 
     def dispatch_turn(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id):
+                      timeout_seconds, model_id, guard=None):
         seen["tools"] = list(tools)
         seen["stage"] = stage
         return {"result": _turn_text("report_write_ok"), "stream": "", "stderr": "",

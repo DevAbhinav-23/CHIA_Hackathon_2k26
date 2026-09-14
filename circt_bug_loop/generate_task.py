@@ -601,7 +601,8 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
         turn = dispatch_turn(GENERATE_SYSTEM_MESSAGE, prompt, tools,
                              stage=_TURN_STAGE[stage],
                              timeout_seconds=int(cfg.get("timeout_seconds", 2400)),
-                             model_id=cfg["model_id"])
+                             model_id=cfg["model_id"],
+                             guard=cfg.get("spend_guard"))
         return turn
     finally:
         turn["wall_seconds"] = time.monotonic() - started
@@ -632,15 +633,21 @@ def _resolve_sites(sites: list, cfg: dict) -> dict:
 
 
 def _turn_cost(stage: str, logs: dict, cfg: dict) -> dict:
-    """Build 2.7's `turn_cost` for one stage's spend, priced where a price exists."""
+    """Build 2.7's `turn_cost` for one stage's spend, priced where a price exists.
+
+    `tokens_in` and `tokens_out` are `llm.turn_usage`'s, which fold K11's two
+    billed fields in and are NULL for a turn whose counts were never observed
+    (K10); a null count yields a null cost and `metered` false, never a zero.
+    """
     usage = (logs.get("usage") or {}).get(stage) or {}
     tokens_in = usage.get("tokens_in")
     tokens_out = usage.get("tokens_out")
     price_in = cfg.get("price_usd_per_m_input_tokens")
     price_out = cfg.get("price_usd_per_m_output_tokens")
     cost = None
-    if tokens_in is not None and price_in is not None and price_out is not None:
-        cost = (tokens_in / 1e6) * price_in + (tokens_out or 0) / 1e6 * price_out
+    if (tokens_in is not None and tokens_out is not None
+            and price_in is not None and price_out is not None):
+        cost = (tokens_in / 1e6) * price_in + tokens_out / 1e6 * price_out
     return {"turn": stage, "wall_seconds": (logs.get("wall_seconds") or {}).get(stage, 0.0),
             "tokens_in": tokens_in, "tokens_out": tokens_out,
             "cost_usd": cost, "metered": tokens_in is not None}

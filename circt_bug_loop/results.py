@@ -58,6 +58,13 @@ BUILD_STATUSES = ("clean_exit", "parse_error", "assertion", "fatal_error",
                   "crash", "timeout", "oom", "tool_unavailable")
 PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 
+#: The stages a MODEL TURN is charged to, which are the only ones whose null
+#: token counts are a missing measurement rather than an absent one: stages 1
+#: and 2 are A3's two turns, stage 6 is B7's, and stage 7 is the repair chain's
+#: recorded residual (ADR-D-03 addendum). An entry at any other stage has no
+#: tokens because no turn ran there (K10).
+MODEL_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
+
 #: `LedgerEntry.observed`'s four declared keys (§2.7). An entry whose block has
 #: another key set cannot be summed under the observed heading.
 OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd"}
@@ -475,6 +482,7 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
     totals = {arm: {"cpu_seconds": 0.0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
                     "null_token_entries": 0}
               for arm in ARMS + ("shared",)}
+    unpriced = 0
     for row in ledger_rows:
         block = json.loads(row["observed_json"])
         bucket = totals[row["arm"]]
@@ -482,10 +490,17 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
         bucket["cost_usd"] += float(block["cost_usd"] or 0.0)
         if block["tokens_in"] is None or block["tokens_out"] is None:
             bucket["null_token_entries"] += 1
+            # K10: an entry the manifest says is METERED and whose tokens are
+            # null is a turn the run paid for and did not observe. It is the
+            # count that makes the USD total a lower bound by a stated amount
+            # rather than by an unstated one.
+            if row["metered"] and row["stage"] in MODEL_STAGES:
+                unpriced += 1
         else:
             bucket["tokens_in"] += int(block["tokens_in"])
             bucket["tokens_out"] += int(block["tokens_out"])
     facts["observed"] = totals
+    facts["unpriced_turns"] = unpriced
 
 
 def _windows(facts: dict, store: LoopStore, manifest: RunManifest, ledger_rows: list,
@@ -906,6 +921,14 @@ def _render(facts: dict) -> str:
             "excluding stage 7**, whose per-turn token counts the repair chain does "
             "not return: its turns are dispatched remotely and the counting copy of "
             "the model object dies with the worker.",
+            "",
+            f"**Unpriced turns: {facts['unpriced_turns']}.** That is the number of "
+            "metered model-stage entries whose token counts were never observed, so "
+            "they carry a null cost rather than a zero and the USD total above "
+            "excludes every one of them. A turn that raised inside the tool loop "
+            "reports nothing at all, however many model calls it had already made, "
+            "and so does every stage-7 attempt by construction; the figure is what "
+            "the lower bound is a lower bound BY, counted rather than described.",
             "",
         ]
 

@@ -178,6 +178,83 @@ def tool_endpoints(tools) -> list:
             for tool in tools or []]
 
 
+#: What CHIA's Vertex backend caps ONE `generate_content` call's output at
+#: (`chia:chia/models/vertex.py:226`), which is the quantity the pre-authorised
+#: worst case of W1 is written against.
+MAX_OUTPUT_TOKENS = 16000
+
+#: Characters per token, for the pre-authorisation only. W1's own figure; it is
+#: an estimate and is used where an OVER-estimate is the safe direction, so a
+#: prompt that tokenises worse than three characters to the token is authorised
+#: for less than it costs by whatever the ratio is wrong by.
+CHARS_PER_TOKEN = 3
+
+
+class SpendCapRefused(RuntimeError):
+    """A turn was refused because its worst case would reach the USD cap (W1)."""
+
+
+@dataclasses.dataclass
+class SpendGuard:
+    """The money a turn is authorised against, BEFORE it is dispatched (W1).
+
+    `ledger.stop_reason` tests spend ALREADY RECORDED, and `_arm_stop` asks it
+    once per seed; between two asks a seed can run three iterations of two turns
+    each plus five probes' worth of stage-6 and stage-7 chains, so the overshoot
+    was a whole seed's spend and was unbounded from above. This is the
+    pre-authorisation: every turn, before it is sent, and the arm stops on the
+    refusal rather than after the money is gone.
+
+    The worst case is W1's own formula, `(prompt_chars / 3 + max_output_tokens)`
+    priced at the two rates. IT BOUNDS ONE `generate_content` CALL: a turn with
+    tools runs a loop of up to `max_tool_iterations` (100) of them
+    (`chia:chia/models/vertex.py:227`), so for such a turn the authorised figure
+    is a FLOOR and not the true worst case. Recorded rather than absorbed; the
+    observed spend of the turn that overran still stops the arm at the next
+    authorisation, so the overshoot is bounded by one turn and no longer by one
+    seed.
+
+    `authorised_usd` accumulates the worst case of every turn this guard has
+    let through, so two turns inside one node are authorised against each
+    other even though `spend_usd` is only refreshed per iteration (W10).
+    """
+
+    cap_usd: float
+    spend_usd: float
+    price_usd_per_m_input_tokens: float
+    price_usd_per_m_output_tokens: float
+    max_output_tokens: int = MAX_OUTPUT_TOKENS
+    authorised_usd: float = 0.0
+
+    def worst_case_usd(self, prompt: str) -> float:
+        """The most one model call on *prompt* can cost, at the two prices."""
+        tokens_in = len(prompt or "") / CHARS_PER_TOKEN
+        return round(
+            tokens_in / 1e6 * self.price_usd_per_m_input_tokens
+            + self.max_output_tokens / 1e6 * self.price_usd_per_m_output_tokens, 6)
+
+    def authorise(self, prompt: str) -> float:
+        """Authorise one turn on *prompt*, or refuse it.
+
+        Returns:
+            float, the worst case that was authorised.
+        Worker:
+            pure; it reads its own fields.
+        Raises:
+            SpendCapRefused when the cap would be reached. Nothing is sent.
+        """
+        worst = self.worst_case_usd(prompt)
+        total = self.spend_usd + self.authorised_usd + worst
+        if total >= self.cap_usd:
+            raise SpendCapRefused(
+                f"refusing the turn: USD {self.spend_usd:.4f} spent plus "
+                f"{self.authorised_usd:.4f} already authorised plus a worst case "
+                f"of {worst:.4f} reaches campaign_spend_cap_usd "
+                f"{self.cap_usd:.4f} (FR-18.10, W1)")
+        self.authorised_usd += worst
+        return worst
+
+
 def worker_env() -> Mapping[str, str]:
     """The environment `llm_turn` builds its client from: the LLM WORKER's own.
 
@@ -209,8 +286,7 @@ def llm_turn(request: dict) -> dict:
 
     Returns:
         {"result": str, "stream": str, "stderr": str, "success": bool,
-         "usage": {"tokens_in": int, "tokens_out": int, "num_turns": int,
-                   "model": str | None}, "counters": CounterBlock}.
+         "usage": `turn_usage`'s dict, "counters": CounterBlock}.
     Worker:
         {"llm": 1.0}; the MCP tool servers stay where their own task_options put
         them and are reached over HTTP from here.
@@ -230,22 +306,68 @@ def llm_turn(request: dict) -> dict:
     llm = build_llm(request["system_message"], int(request["timeout_seconds"]),
                     request["model_id"], env=worker_env())
     cli = llm.prompt(request["prompt"], list(request.get("tools") or []))
-    meta = dict(getattr(llm, "_last_metadata", {}) or {})
     success = bool(getattr(cli, "success", False))
     return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
             "success": success,
-            "usage": {"tokens_in": meta.get("input_tokens", 0),
-                      "tokens_out": meta.get("output_tokens", 0),
-                      "num_turns": meta.get("num_turns", 0),
-                      "model": meta.get("model")},
+            "usage": turn_usage(getattr(llm, "_last_metadata", None)),
             "counters": CounterBlock(stage=stage, started=1,
                                      completed=int(success),
                                      failed=int(not success),
                                      seconds=time.monotonic() - started)}
 
 
+def turn_usage(metadata) -> dict:
+    """One turn's billed token counts, or nulls when none were observed.
+
+    Two defects, one function (K10, K11).
+
+    K11: `thoughts_token_count` and `tool_use_prompt_token_count` are SEPARATE
+    scalars from `candidates_token_count` and `prompt_token_count` - the SDK's
+    own description of `total_token_count` is the sum of all four - and CHIA
+    sums neither, so whatever the model thinks was billed and not counted.
+    `upstream/vertex-usage.patch` publishes the two, pre-flight check 14 proves
+    the patch is in the file a worker imports, and here thinking is folded into
+    the OUTPUT count (ADR-D-03: thinking tokens are billed as output) and the
+    tool-use prompt into the INPUT count, so `ledger.price`'s two-price
+    arithmetic needs no third rate and no fourth number.
+
+    K10: `_last_metadata` is reset at the top of EVERY attempt and assigned only
+    at the very end of a successful one, so a turn that raised inside the tool
+    loop - after up to `max_tool_iterations` calls - left it empty, and reading
+    it with a ZERO default priced that turn at USD 0.00. A zero is a
+    measurement; an absence is not. An empty or missing block yields NULL
+    counts, `ledger.price` returns None for them, and the entry carries no
+    money at all rather than carrying none.
+
+    Returns:
+        {"tokens_in": int | None, "tokens_out": int | None,
+         "thinking_tokens": int | None, "tool_use_prompt_tokens": int | None,
+         "num_turns": int, "model": str | None, "observed": bool}.
+    Worker:
+        pure; it reads one mapping.
+    Raises:
+        nothing.
+    """
+    meta = dict(metadata or {})
+    # The patched backend publishes `input_tokens` on every path that ran at
+    # all, including the `finally` of a turn that raised; a block without it is
+    # a turn whose counts were never observed.
+    if "input_tokens" not in meta:
+        return {"tokens_in": None, "tokens_out": None, "thinking_tokens": None,
+                "tool_use_prompt_tokens": None, "num_turns": meta.get("num_turns", 0),
+                "model": meta.get("model"), "observed": False}
+    thinking = int(meta.get("thinking_tokens") or 0)
+    tool_use = int(meta.get("tool_use_prompt_tokens") or 0)
+    return {"tokens_in": int(meta.get("input_tokens") or 0) + tool_use,
+            "tokens_out": int(meta.get("output_tokens") or 0) + thinking,
+            "thinking_tokens": thinking, "tool_use_prompt_tokens": tool_use,
+            "num_turns": meta.get("num_turns", 0), "model": meta.get("model"),
+            "observed": True}
+
+
 def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
-                  timeout_seconds: int, model_id: str) -> dict:
+                  timeout_seconds: int, model_id: str,
+                  guard: Optional[SpendGuard] = None) -> dict:
     """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn.
 
     A3, A7 and B7 all reach a model through this one line, and none of them
@@ -256,13 +378,22 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
     same node runs in this process, which is what a driver-less replay and an
     offline synthesis do.
 
+    *guard* is W1's pre-authorisation and is the LAST thing between the loop and
+    a model request: this is the one function every turn of the campaign passes
+    through, so it is where a turn can still be refused for free. It is optional
+    because the offline mutator synthesis precedes the registration commit and
+    has no ledger to be authorised against (8.3).
+
     Returns:
         `llm_turn`'s dict, whichever way it ran.
     Worker:
         the `llm` worker under Ray; the caller's process without one.
     Raises:
-        whatever the backend raises, unchanged.
+        SpendCapRefused before anything is sent, when *guard* refuses; whatever
+        the backend raises, unchanged, after that.
     """
+    if guard is not None:
+        guard.authorise(prompt)
     request = {"system_message": system_message, "prompt": prompt,
                "tools": tool_endpoints(tools), "stage": stage,
                "timeout_seconds": int(timeout_seconds), "model_id": model_id}
@@ -315,7 +446,8 @@ def parse_json_footer(text: str, required: tuple) -> dict:
     return decoded
 
 
-__all__ = ["MODEL_BACKEND", "LiveModelRefused", "PromptContractError",
-           "ToolEndpoint", "build_llm", "dispatch_turn", "llm_turn",
-           "parse_json_footer", "require_live_model", "tool_endpoints",
-           "worker_env"]
+__all__ = ["MODEL_BACKEND", "MAX_OUTPUT_TOKENS", "CHARS_PER_TOKEN",
+           "LiveModelRefused", "PromptContractError", "SpendCapRefused",
+           "SpendGuard", "ToolEndpoint", "build_llm", "dispatch_turn",
+           "llm_turn", "parse_json_footer", "require_live_model",
+           "tool_endpoints", "turn_usage", "worker_env"]

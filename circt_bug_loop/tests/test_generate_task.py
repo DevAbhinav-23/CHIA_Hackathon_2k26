@@ -115,7 +115,7 @@ def replay(monkeypatch, tool_servers):  # noqa: F811
         state = {"calls": [], "pending": list(turns)}
 
         def _dispatch(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id):
+                      timeout_seconds, model_id, guard=None):
             turn = state["pending"].pop(0)
             state["calls"].append({"prompt": user_message, "tools": list(tools),
                                    "system_message": system_message,

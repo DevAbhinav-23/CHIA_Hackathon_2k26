@@ -19,6 +19,7 @@ import ast
 import inspect
 import os
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -197,7 +198,8 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
     turn = call_node(llm_turn, turn_request("ping", []))
 
     assert turn["usage"] == {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
-                             "model": MODEL_ID}
+                             "model": MODEL_ID, "thinking_tokens": 0,
+                             "tool_use_prompt_tokens": 0, "observed": True}
     assert turn["result"] == "PONG" and turn["success"] is True
     assert turn["stderr"] == "" and "generate_content" in turn["stream"]
 
@@ -336,3 +338,133 @@ def test_T_U_gen_25_the_tool_loop_runs_offline(monkeypatch, fake_vertex, tmp_pat
     assert response.role == "user"
     assert response.parts[0].function_response.name == "src_x__read_file"
     assert response.parts[0].function_response.response == {"result": "circt\n"}
+
+
+# ---------------------------------------------------------------------------
+# K10, K11: what a turn's usage says, and what it refuses to say
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.t0
+def test_T_U_gen_26_the_two_billed_fields_are_counted():
+    """K11: thinking is output, the tool-use prompt is input, and both are billed.
+
+    New id, W-20b. `thoughts_token_count` and `tool_use_prompt_token_count` are
+    SEPARATE scalars from the two CHIA sums - the SDK's own description of
+    `total_token_count` is the sum of all four, verified against the installed
+    `google-genai` here - so `campaign_spend_cap_usd` bound late by whatever the
+    model thought. The patched backend publishes both under the two names this
+    reads; `test_upstream_patches.py` is what proves the patch does, and
+    pre-flight check 14 is what proves it is in the file a worker imports.
+
+    The turn is not run: the INSTALLED chia is the unpatched one, and what is
+    under test here is the loop's own arithmetic over the patched backend's
+    block. Fixture: none. Tier 0.
+    """
+    from google.genai import types
+
+    # The four are four distinct scalars, asserted against the SDK itself.
+    fields = types.GenerateContentResponseUsageMetadata.model_fields
+    for name in ("prompt_token_count", "candidates_token_count",
+                 "thoughts_token_count", "tool_use_prompt_token_count"):
+        assert name in fields, name
+
+    usage = llm_module.turn_usage({
+        "input_tokens": 100, "output_tokens": 20, "thinking_tokens": 900,
+        "tool_use_prompt_tokens": 7, "num_turns": 3, "model": MODEL_ID})
+    assert usage["thinking_tokens"] == 900 and usage["tool_use_prompt_tokens"] == 7
+    assert usage["tokens_in"] == 107 and usage["tokens_out"] == 920
+    assert usage["observed"] is True
+    # The SDK's own `total_token_count` is the sum of the four, so the loop's
+    # two now carry all of it and none of it twice.
+    assert usage["tokens_in"] + usage["tokens_out"] == 100 + 20 + 900 + 7
+
+    # And the money follows: 900 thinking tokens at the OUTPUT rate is what the
+    # loop would otherwise have priced at nothing at all (ADR-D-03).
+    from circt_bug_loop import ledger as ledger_module
+    from circt_bug_loop.tests.test_bug_loop import budget_file
+
+    budget = budget_file()
+    priced = ledger_module.price(usage["tokens_in"], usage["tokens_out"], budget)
+    unpatched = ledger_module.price(100, 20, budget)
+    assert priced > unpatched * 8
+
+    # The two names are the patch's own, so a rename upstream fails here.
+    patch = (Path(llm_module.__file__).resolve().parents[1] / "upstream"
+             / "vertex-usage.patch").read_text(encoding="utf-8")
+    assert '"thinking_tokens"' in patch and '"tool_use_prompt_tokens"' in patch
+
+
+@pytest.mark.t0
+def test_T_U_gen_27_an_unobserved_turn_is_null_and_never_zero():
+    """K10: an empty `_last_metadata` yields nulls, so the ledger records no money.
+
+    New id, W-20b. `VertexGeminiLLM.prompt` resets `_last_metadata` at the top
+    of EVERY attempt and assigns the real counts only at the very end of a
+    successful one, so a turn that raised inside the tool loop - after up to
+    `max_tool_iterations` = 100 `generate_content` calls - left it empty, and
+    `meta.get("input_tokens", 0)` then priced that turn at USD 0.00. A zero is
+    a measurement and an absence is not (FR-14.6). Fixture: none. Tier 0.
+    """
+    from circt_bug_loop import ledger as ledger_module
+    from circt_bug_loop.tests.test_bug_loop import budget_file
+
+    for empty in (None, {}, {"model": MODEL_ID}):
+        usage = llm_module.turn_usage(empty)
+        assert usage["tokens_in"] is None and usage["tokens_out"] is None
+        assert usage["thinking_tokens"] is None
+        assert usage["tool_use_prompt_tokens"] is None
+        assert usage["observed"] is False
+        assert ledger_module.price(usage["tokens_in"], usage["tokens_out"],
+                                   budget_file()) is None
+    # A turn that DID report, even all zeros, is a measurement and prices.
+    observed = llm_module.turn_usage({"input_tokens": 0, "output_tokens": 0})
+    assert observed["observed"] is True and observed["tokens_in"] == 0
+    assert ledger_module.price(0, 0, budget_file()) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# W1: the per-turn pre-authorisation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.t0
+def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
+    """W1: the worst case is computed and refused BEFORE anything is sent.
+
+    New id, W-20b. `ledger.stop_reason` tests spend ALREADY RECORDED and
+    `_arm_stop` asks it once per seed, so the overshoot was a whole seed's
+    spend: three iterations of two turns each plus five probes' stage-6 and
+    stage-7 chains. Fixture: none. Tier 0.
+    """
+    guard = llm_module.SpendGuard(
+        cap_usd=5.0, spend_usd=0.0,
+        price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+
+    # W1's formula, arithmetic and all: 3000 chars is 1000 prompt tokens.
+    assert guard.worst_case_usd("x" * 3000) == round(
+        1000 / 1e6 * 0.75 + llm_module.MAX_OUTPUT_TOKENS / 1e6 * 3.75, 6)
+    assert llm_module.MAX_OUTPUT_TOKENS == 16000, "CHIA's own max_tokens default"
+
+    # Authorising accumulates, so two turns in one node bound each other even
+    # though `spend_usd` is refreshed only per iteration (W10).
+    first = guard.authorise("x" * 3000)
+    assert guard.authorised_usd == first
+    guard.authorise("x" * 3000)
+    assert guard.authorised_usd == pytest.approx(2 * first)
+
+    # And the refusal: a spend already at the cap stops the turn, and nothing
+    # is dispatched - `llm_turn` is a sentinel that fails the test if reached.
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original",
+                        lambda request: pytest.fail("a refused turn was sent"))
+    tight = llm_module.SpendGuard(
+        cap_usd=0.01, spend_usd=0.0,
+        price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+    with pytest.raises(llm_module.SpendCapRefused) as raised:
+        llm_module.dispatch_turn("be terse", "ping", [], stage="stage_2",
+                                 timeout_seconds=60, model_id=MODEL_ID,
+                                 guard=tight)
+    assert "campaign_spend_cap_usd" in str(raised.value)
+    assert tight.authorised_usd == 0.0, "a refused turn authorises nothing"

@@ -90,7 +90,7 @@ def turn(monkeypatch):
         state = {"calls": []}
 
         def _dispatch(system_message, user_message, tools, *, stage,
-                      timeout_seconds, model_id):
+                      timeout_seconds, model_id, guard=None):
             state["calls"].append({"prompt": user_message, "tools": list(tools),
                                    "system_message": system_message,
                                    "timeout_seconds": timeout_seconds,

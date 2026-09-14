@@ -381,7 +381,7 @@ def _render_one(name: str, monkeypatch, tmp_path, mirror, repo) -> str:  # noqa:
     rendered = {}
 
     def _dispatch(system_message, user_message, tools, *, stage,
-                  timeout_seconds, model_id):
+                  timeout_seconds, model_id, guard=None):
         rendered["text"] = user_message
         raise PromptContractError("no_block")
 

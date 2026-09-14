@@ -1449,7 +1449,8 @@ def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
         return dispatch_turn(TRIAGE_SYSTEM_MESSAGE, prompt, [tool],
                              stage="stage_6",
                              timeout_seconds=int(cfg.get("timeout_seconds", 1200)),
-                             model_id=cfg["model_id"])
+                             model_id=cfg["model_id"],
+                             guard=cfg.get("spend_guard"))
     finally:
         stop = getattr(tool, "stop", None)
         if callable(stop):
