@@ -41,9 +41,20 @@ BASSERT_G = SMOKE / "bassert_g" / "bin"
 SDK_LIBS = f"{SMOKE / 'circt-sdk' / 'lib'}:{SMOKE / 'shim'}"
 SYMBOLIZER = SMOKE / "circt-sdk" / "bin" / "llvm-symbolizer"
 
-#: The roots the host build splits CIRCT across: sources in `src/`, generated
-#: `.inc` files under the build tree. The image has one root for both.
+#: The roots the LIVE host build splits CIRCT across: sources in `src/`,
+#: generated `.inc` files under the build tree. The image has one root for both.
 HOST_ROOTS = (f"{SMOKE / 'src'}/", f"{SMOKE / 'bassert_g'}/")
+
+#: The prefixes the RECORDED traces carry, as literals. They belong to the
+#: fixtures and not to this host: `stderr/trace.txt` and `crashes/crash_01/`
+#: were captured on the mining host and their frame paths are verbatim, so a
+#: test that rebuilt them from `Path.home()` would pass only there.
+TRACE_ROOTS = ("/home/adi/.cache/chia-pin-smoke/src/",
+               "/home/adi/.cache/chia-pin-smoke/bassert_g/")
+TRACE_TOOL = "/home/adi/.cache/chia-pin-smoke/bassert_g/bin/circt-opt"
+CRASH_01_ROOTS = ("/home/adi/.cache/chia-pin-smoke/w09/wt143/",
+                  "/home/adi/.cache/chia-pin-smoke/w09/b143/")
+CRASH_01_TOOL = "/home/adi/.cache/chia-pin-smoke/w09/b143/bin/circt-opt"
 
 LIMITS = {"probe_wall_seconds": 60, "probe_address_space_bytes": 4 * 1024 ** 3,
           "probe_cpu_seconds": 45, "probe_output_byte_cap": 1_000_000}
@@ -102,9 +113,9 @@ def _build(status: str, stderr_name: str, tmp_path: Path, **over) -> BuildResult
     fields = dict(
         probe_id="p-0000000001", run_manifest_id="r" * 32, run_commit="c" * 40,
         image_digest="sha256:" + "0" * 64, status=status,
-        binary_path=str(BASSERT_G / "circt-opt"), binary_sha256="d" * 64,
+        binary_path=TRACE_TOOL, binary_sha256="d" * 64,
         argv=["prlimit", "--as=1", "--cpu=1:6", "--nofile=1024", "--",
-              str(BASSERT_G / "circt-opt"), "nested.mlir", "-o", "/dev/null"],
+              TRACE_TOOL, "nested.mlir", "-o", "/dev/null"],
         exit_status=None, signal="SIGSEGV", limit_hit=None, cpu_seconds=0.1,
         wall_seconds=0.2, peak_rss_bytes=1024, worker_hostname="h",
         worker_node_id="", child_pid=1, stdout_path=str(tmp_path / "stdout.txt"),
@@ -115,7 +126,7 @@ def _build(status: str, stderr_name: str, tmp_path: Path, **over) -> BuildResult
 
 
 def _oracle(build: BuildResult, tmp_path: Path, **over):
-    kwargs = dict(circt_roots=HOST_ROOTS, symbolizer=str(tmp_path / "absent"))
+    kwargs = dict(circt_roots=TRACE_ROOTS, symbolizer=str(tmp_path / "absent"))
     kwargs.update(over)
     return call_node(oracle_primary, build, _image_spec(), str(tmp_path), **kwargs)
 
@@ -542,11 +553,9 @@ def test_u_probe_24b_a_circt_rooted_crash_is_in_scope(tmp_path) -> None:
     """
     crash = FIXTURES / "crashes" / "crash_01"
     expected = json.loads((crash / "expected.json").read_text())
-    roots = (f"{SMOKE / 'w09' / 'wt143'}/", f"{SMOKE / 'w09' / 'b143'}/")
-    build = _build("crash", "clean.txt", tmp_path,
-                   binary_path=str(SMOKE / "w09" / "b143" / "bin" / "circt-opt"),
+    build = _build("crash", "clean.txt", tmp_path, binary_path=CRASH_01_TOOL,
                    stderr_path=str(crash / "stderr.txt"))
-    verdict = _oracle(build, tmp_path, circt_roots=roots)
+    verdict = _oracle(build, tmp_path, circt_roots=CRASH_01_ROOTS)
     assert verdict.prologue_dropped == expected["prologue_dropped"]
     assert verdict.fingerprint_frame == expected["fingerprint_frame"]
     stripped = strip_prologue(verdict.frames)
@@ -564,8 +573,7 @@ def test_u_probe_25_the_repro_command_drops_the_prlimit_prefix(tmp_path) -> None
     concern and not the report's; it is written to `repro.sh`, executable.
     """
     verdict = _oracle(_build("crash", "segv.txt", tmp_path), tmp_path)
-    assert verdict.repro_command == \
-        f"{BASSERT_G / 'circt-opt'} nested.mlir -o /dev/null"
+    assert verdict.repro_command == f"{TRACE_TOOL} nested.mlir -o /dev/null"
     assert "prlimit" not in verdict.repro_command
     script = tmp_path / "repro.sh"
     assert verdict.repro_command in script.read_text()
@@ -583,7 +591,8 @@ def test_u_probe_26_the_flag_state_and_the_version(tmp_path, sdk_env) -> None:
     the version.
     """
     _needs_sdk()
-    build = _build("crash", "segv.txt", tmp_path)
+    build = _build("crash", "segv.txt", tmp_path,
+                   binary_path=str(BASSERT_G / "circt-opt"))
     verdict = _oracle(build, tmp_path)
     assert "-UNDEBUG" in verdict.flag_string
     assert "Optimized build." in verdict.tool_version_output
@@ -968,7 +977,8 @@ def test_u_probe_35_reducer_aborted_routes_to_the_textual_reducer(
     assert build.status == "crash" and build.signal == "SIGSEGV"
     assert build.limit_hit is None and build.exit_status is None
 
-    verdict = _oracle(build, probe, symbolizer=str(SYMBOLIZER))
+    verdict = _oracle(build, probe, circt_roots=HOST_ROOTS,
+                      symbolizer=str(SYMBOLIZER))
     assert verdict.fired is True and verdict.oracle_class == "crash"
     assert verdict.prologue_dropped == 4
     assert len(verdict.frames) > 100

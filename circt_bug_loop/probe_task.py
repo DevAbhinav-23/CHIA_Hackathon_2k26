@@ -29,8 +29,8 @@ from circt_bug_loop.circt_core import (ALLOCATION_FAILURE_LITERALS, CIRCT_BIN_DI
                                        CIRCT_ROOTS, CPU_HARD_MARGIN_SECONDS,
                                        circt_exec_probe, circt_reduce_run,
                                        circt_symbolize)
-from circt_bug_loop.ddmin import ddmin
 from circt_bug_loop.contract import schema
+from circt_bug_loop.ddmin import ddmin
 from circt_bug_loop.store import (BuildResult, Frame, ImageSpec, OracleVerdict,
                                   ReducedCase)
 
@@ -43,7 +43,7 @@ PROBE_WALL_MARGIN_SECONDS = 60
 #: §3.6's three allocation-failure literals, under the name §3.6 gives them.
 _ALLOC_LITERALS = ALLOCATION_FAILURE_LITERALS
 
-#: The two §3.10 helpers are called IN PROCESS and never dispatched: a nested
+#: The three §3.10 helpers are called IN PROCESS and never dispatched: a nested
 #: `chia_remote` would ask for a second {"circt": 1} slot for the same probe and
 #: deadlock a cluster whose apparatus concurrency is the slot count (§12.1).
 #: CHIA stores the undecorated function on the wrapper
@@ -51,6 +51,7 @@ _ALLOC_LITERALS = ALLOCATION_FAILURE_LITERALS
 #: profiler, and the local Ray session it starts, out of a unit test.
 _exec_probe = circt_exec_probe._chia_original
 _symbolize = circt_symbolize._chia_original
+_reduce = circt_reduce_run._chia_original
 
 #: The diagnostic that separates FR-06.6's two `parse_error` reasons: a pass the
 #: seed's RUN: line named and CIRCT has since renamed exits non-zero exactly as
@@ -813,11 +814,6 @@ def _width(mlir_type: str) -> int:
 
 # --- 3.6.4 B5, the reducer --------------------------------------------------
 
-#: The six output-mode flags `circt-verilog` takes (§4.4), one of which a
-#: `.sv` probe's argv carries and which §4.7's third row keeps.
-_OUTPUT_MODE_FLAGS = ("--lint-only", "--parse-only", "--import-only",
-                      "--ir-moore", "--ir-llhd", "--ir-hw")
-
 #: §4.7's first row: the tools whose input is MLIR text whatever its extension.
 _MLIR_TOOLS = ("circt-opt", "circt-translate", "arcilator")
 
@@ -1024,7 +1020,7 @@ def _lift(lift: str, source: Path, directory: Path, bin_dir: str,
 
 def _reduce_run(input_path: str, script: str, out_path: str, limits: dict,
                 bin_dir: str) -> dict:
-    return circt_reduce_run._chia_original(
+    return _reduce(
         input_path, script, out_path,
         wall_seconds=limits["reduction_wall_seconds"],
         sigkill_grace_seconds=limits["reduction_sigkill_grace_seconds"],
