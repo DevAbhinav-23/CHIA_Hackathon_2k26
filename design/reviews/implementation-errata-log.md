@@ -558,7 +558,7 @@ The first run of `run_campaign`'s pre-flight on a cluster. Full record:
 Errata rows 37 and 38, FR-11's stage-6 turn, FR-13.3's gate question 2, and the
 mini pilot that measures the money control. Six commits, each with its tests.
 Suite at the end: `pytest circt_bug_loop/tests -q --strict-markers -W error -m
-"not t2 and not t3"` gives **635 passed, 1 skipped, 16 deselected**.
+"not t2 and not t3"` gives **634 passed, 1 skipped, 16 deselected**.
 
 | # | Finding | Owed to |
 |---|---|---|
