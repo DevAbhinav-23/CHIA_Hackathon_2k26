@@ -252,7 +252,7 @@ syntactically without ever seeing the diff or the root-cause class, following
 Mut4All's design for mutators synthesised by a language model \cite{mut4all}.
 
 Both arms spend the same pre-registered budget, one elapsed wall-clock second of
-an arm's fixed window: they run one after the other, each for four hours, on the
+an arm's fixed window: they run one after the other, each for two hours, on the % 7,200 s per arm: budget.yaml arm_window_seconds; errata row 53
 same cluster at the same concurrency.
 Safety caps bound damage rather than effort, at 2,000 generated inputs per arm
 per day, 3 filings per day and 10 in the campaign, every probe held to 60
@@ -348,8 +348,8 @@ Gate precision, confirmed over filed & \textit{pending} & \textit{pending} \\
 Repairs merged & \textit{pending} & \textit{pending} \\
 % the four rows below: render_results section 6, "The budget: both windows and the campaign's spend" (example.md 6)
 \multicolumn{3}{@{}l}{\textit{The budget, in its own unit}}\\
-Window, seconds & 14{,}400 & 14{,}400 \\
-% 14,400 s per arm, pre-registered: circt_bug_loop/budget.yaml, arm_window_seconds
+Window, seconds & 7{,}200 & 7{,}200 \\
+% 7,200 s per arm in the final budget.yaml (commit 927b2af; W-22 tag pending): pilot 1 ran at about USD 0.6 a minute, so two four-hour arms would pass the USD 200 cap inside the first arm: implementation-errata-log.md row 53
 Elapsed, seconds & \textit{pending} & \textit{pending} \\
 Stopped by & \textit{pending} & \textit{pending} \\
 Spend, US dollars & \textit{pending} & \textit{pending} \\
