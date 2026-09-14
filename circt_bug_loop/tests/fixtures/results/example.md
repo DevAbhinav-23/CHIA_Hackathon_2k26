@@ -107,7 +107,7 @@ Sum check: 2 = 2 repair attempts.
 | mutation | stage_2 | `stale_at_build` | 1 | firtool rejects this seed's own test/Dialect/FIRRTL/errors.mlir at e1d47b09c3a6f582041b9e7d63c085a4f27b1d09 |
 | seeded | stage_2 | `prompt_contract:no_block` | 2 | PromptContractError: no_block |
 
-3 turns produced no probing input at all and so appear in no other table: a turn that raised, a turn whose output the footer contract refused, or a seed whose own test its entry tool no longer accepts at the run commit. The detail is the first 120 characters of the first such turn's own record.
+3 turns produced no probing input at all. Such a turn appears in no other table, nothing downstream of stage 2 having run for it: it raised, its output failed the footer contract, or its seed's own test is one the entry tool no longer accepts at the run commit. The detail is the first 120 characters of the first such turn's own record.
 
 ## 4. Seeded-bug validation, reported separately
 

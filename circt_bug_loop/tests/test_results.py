@@ -431,7 +431,7 @@ def test_T_U_results_17(tmp_path):
     assert counted == {("mutation", "`stale_at_build`"): 1,
                        ("seeded", "`prompt_contract:no_block`"): 2}
     assert sum(counted.values()) == len(store.query("SELECT 1 FROM turn_failure"))
-    assert "3 turns produced no probing input at all" in taxonomy
+    assert "3 turns produced no probing input at all." in taxonomy
     # The detail is the stored one, cut at the cap and never beyond it.
     for row in failures["rows"]:
         assert len(row[4]) <= TURN_FAILURE_DETAIL_CAP
@@ -446,7 +446,7 @@ def test_the_turn_failure_table_renders_for_a_store_with_no_rows(tmp_path):
 
     failures = tables(taxonomy)[-1]
     assert failures["rows"] == [["none", "", "", "0", ""]]
-    assert "0 turns produced no probing input at all" in taxonomy
+    assert "0 turns produced no probing input at all." in taxonomy
 
 
 def test_T_U_results_18(tmp_path):

@@ -789,12 +789,12 @@ def _render(facts: dict) -> str:
             for (arm, stage, kind), entry in sorted(failures.items())]
            or [["none", "", "", 0, ""]], qualifier)
     lines += [
-        f"{_count(sum(e['turns'] for e in failures.values()), 'turn')} produced "
-        "no probing input at all and so appear in no other table: a turn that "
-        "raised, a turn whose output the footer contract refused, or a seed whose "
-        "own test its entry tool no longer accepts at the run commit. The detail "
-        f"is the first {TURN_FAILURE_DETAIL_CAP} characters of the first such "
-        "turn's own record.",
+        f"{_count(sum(e['turns'] for e in failures.values()), 'turn')} produced no "
+        "probing input at all. Such a turn appears in no other table, nothing "
+        "downstream of stage 2 having run for it: it raised, its output failed "
+        "the footer contract, or its seed's own test is one the entry tool no "
+        f"longer accepts at the run commit. The detail is the first "
+        f"{TURN_FAILURE_DETAIL_CAP} characters of the first such turn's own record.",
         "",
         "## 4. Seeded-bug validation, reported separately",
         "",
