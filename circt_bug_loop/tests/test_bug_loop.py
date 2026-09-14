@@ -1264,6 +1264,28 @@ def test_a_failed_generator_turn_is_kept_on_the_seed_record(tmp_path: Path):
     assert bug_loop._failed_stage({"wall_seconds": {"seed_read": 71.5}}) == "stage_1"
 
 
+def test_a_stale_seed_names_itself_and_takes_no_probe(tmp_path: Path):
+    """Pilot 4 D-2: the arm stops on the seed, under its own terminating condition."""
+    def generate(seed, feedback, remaining, cfg):
+        assert "probe_limits" in cfg and cfg["bin_dir"], "A4 can run the seed's test"
+        return {"specs": [], "logs": {},
+                "counters": schema.CounterBlock(stage="stage_2", started=0,
+                                                completed=0, failed=0, seconds=0.1),
+                "failure": bug_loop.STALE_AT_BUILD,
+                "failure_detail": "circt-opt rejects this seed's own test"}
+
+    stages = dataclasses.replace(fake_stages(), generate_mutation=generate)
+    run = mini_campaign(tmp_path, stages=stages)
+
+    mutation, = [s for s in run["outcome"]["seeds"] if s["arm"] == "mutation"]
+    assert mutation["terminating_condition"] == bug_loop.STALE_AT_BUILD
+    assert mutation["probes"] == []
+    assert mutation["verdicts"]["stage_2"]["failure"] == bug_loop.STALE_AT_BUILD
+    # The seeded arm is untouched by its sibling's staleness.
+    seeded, = [s for s in run["outcome"]["seeds"] if s["arm"] == "seeded"]
+    assert seeded["terminating_condition"] == "iteration_cap"
+
+
 def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
     """T-U-driver-37 (W10): each iteration reads its own `LedgerSnapshot`."""
     handed = []

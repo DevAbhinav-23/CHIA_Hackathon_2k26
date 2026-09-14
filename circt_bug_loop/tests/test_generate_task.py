@@ -1,5 +1,6 @@
 """`generate_task.py` (A3): `04-Test-Plan.md` §1.6."""
 import ast
+import dataclasses
 import inspect
 import json
 import os
@@ -413,6 +414,64 @@ def test_generate_mutation_emits_validated_specs_with_no_model(config, monkeypat
         assert spec.source_test_path in seed().test_paths
         assert spec.turn_cost["turn"] is None and spec.turn_cost["metered"] is False
         assert Path(spec.input_path).is_file()
+
+
+def mutation_snapshot() -> schema.LedgerSnapshot:
+    """The mutation arm's remaining allowance, which A4 never reads."""
+    return schema.LedgerSnapshot(arm="mutation", unit="wall_clock_seconds",
+                                 spent=0.0, cap=14400.0)
+
+
+def stand_in_tool(tmp_path: Path, exit_status: int) -> dict:
+    """A bin dir whose entry tool exits *exit_status*, and the limits it runs under."""
+    bin_dir = tmp_path / f"bin{exit_status}"
+    bin_dir.mkdir()
+    tool = bin_dir / seed().entry_tool
+    tool.write_text(f"#!/bin/sh\necho 'the tool rejected this' >&2\n"
+                    f"exit {exit_status}\n", encoding="utf-8")
+    tool.chmod(0o755)
+    return {"bin_dir": str(bin_dir),
+            "probe_limits": {"probe_wall_seconds": 60,
+                             "probe_address_space_bytes": 4294967296,
+                             "probe_cpu_seconds": 45,
+                             "probe_output_byte_cap": 1000000}}
+
+
+@pytest.mark.t0
+def test_a_seed_its_entry_tool_now_rejects_is_stale_and_is_not_mutated(config,
+                                                                       tmp_path):
+    """Pilot 4 D-2: every mutant of a seed that no longer parses inherits the rejection."""
+    config.update(stand_in_tool(tmp_path, 1))
+    result = call_node(generate_mutation, seed(), empty_feedback(),
+                       mutation_snapshot(), config)
+
+    assert result["specs"] == []
+    assert result["failure"] == generate_task.STALE_AT_BUILD
+    assert seed().test_paths[0] in result["failure_detail"]
+    assert config["run_commit"] in result["failure_detail"]
+    stderr = (Path(config["artefact_dir"])
+              / generate_task.STALE_STDERR_FILE).read_text(encoding="utf-8")
+    assert "the tool rejected this" in stderr, "what the tool said is kept"
+
+
+@pytest.mark.t0
+def test_a_seed_that_still_runs_is_mutated_without_lits_own_two_options(config,
+                                                                       tmp_path):
+    """FR-01.9: a mutant is judged by the oracle, never by diagnostic expectations."""
+    config.update(stand_in_tool(tmp_path, 0))
+    record = dataclasses.replace(seed(), argv_template=[
+        ["%s", "-lower-handshake-to-hw", "--split-input-file",
+         "--verify-diagnostics"]])
+    result = call_node(generate_mutation, record, empty_feedback(),
+                       mutation_snapshot(), config)
+
+    assert result["failure"] is None
+    assert len(result["specs"]) == config["per_seed_probe_cap"]
+    for spec in result["specs"]:
+        assert not any("verify-diagnostics" in token or "split-input-file" in token
+                       for token in spec.argv), spec.argv
+    # Only the argv is stripped: lit's own annotations stay in the mutant's text.
+    assert all("// RUN:" in spec.input_text for spec in result["specs"])
 
 
 @pytest.mark.t0

@@ -27,6 +27,7 @@ from circt_bug_loop import budget as budget_module
 from circt_bug_loop import ledger as ledger_module
 from circt_bug_loop.circt_core import CIRCT_BIN_DIR
 from circt_bug_loop.contract import schema
+from circt_bug_loop.generate_task import STALE_AT_BUILD
 from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBundle,
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
@@ -1524,6 +1525,8 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
             "price_usd_per_m_output_tokens": budget.price_usd_per_m_output_tokens,
             "mutator_set_path": None,
             "mutator_set_sha": manifest.mutator_set_sha,
+            # A4 runs the seed's own test before it mutates it (FR-01.9, W-19c).
+            "probe_limits": probe_limits(budget),
             "head_options": head_options,
             "here_options": here_options,
             "max_tool_iterations": dict(budget.max_tool_iterations)}
@@ -1643,6 +1646,7 @@ class Campaign:
                             head_options=self.head_options)
         cfg["spend_guard"] = self.spend_guard(
             self.spend_usd() if spend_usd is None else spend_usd)
+        cfg["bin_dir"] = self.bin_dir
         return cfg
 
     def spend_usd(self) -> float:
@@ -1997,7 +2001,10 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             if probe["probe_result"] is not None:
                 results.append(probe["probe_result"])
         if not specs:
-            out["terminating_condition"] = "no_probe_written"
+            # A4 skips a seed whose own test its entry tool no longer accepts.
+            out["terminating_condition"] = (
+                generated["failure"] if generated.get("failure") == STALE_AT_BUILD
+                else "no_probe_written")
             return out
         bundle = _next_feedback(campaign, results, bundle, seed, iteration,
                                 [s.probe_id for s in specs], snapshot,

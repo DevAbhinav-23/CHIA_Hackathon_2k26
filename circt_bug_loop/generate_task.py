@@ -16,6 +16,7 @@ from chia.base.ChiaFunction import ChiaFunction, get
 from chia.base.tools.ChiaTool import ChiaTool
 
 from circt_bug_loop import corpus, mutators
+from circt_bug_loop.circt_core import CIRCT_BIN_DIR, circt_exec_probe
 from circt_bug_loop.contract.schema import (ContractError, CounterBlock,
                                             FeedbackBundle, LedgerSnapshot,
                                             ProbeSpec, SeedRecord, bound_text,
@@ -335,6 +336,40 @@ def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
 #: The three reasons a declared probe is dropped, counted and never repaired.
 REJECTION_REASONS = ("no_file_written", "tool_mismatch", "contract_error")
 
+#: What the mutation arm records for a seed its entry tool no longer accepts.
+STALE_AT_BUILD = "stale_at_build"
+
+#: Where the staleness check leaves the seed's own test and what the tool said of it.
+STALE_INPUT_FILE = "seed_input"
+STALE_STDERR_FILE = "seed_build.stderr"
+
+
+def seed_stale_at_build(seed: SeedRecord, argv_template: list, cfg: dict,
+                        directory: str) -> bool:
+    """Whether the seed's own unmutated test is now rejected by its entry tool.
+
+    A seed whose test no longer parses at the run commit teaches the mutation
+    arm nothing: every mutant inherits the rejection. A tool that dies by a
+    signal on that test is a finding and not staleness, so only an ordinary
+    non-zero exit counts.
+    """
+    text = seed.test_files.get(seed.test_paths[0]) if seed.test_paths else ""
+    limits = cfg.get("probe_limits") or {}
+    binary = os.path.join(cfg.get("bin_dir") or CIRCT_BIN_DIR, seed.entry_tool)
+    if not text or not limits or not os.path.isfile(binary):
+        return False
+    suffix = _SUFFIX_BY_LANGUAGE.get(seed_language(seed), ".mlir")
+    path = _write(directory, STALE_INPUT_FILE + suffix, text)
+    out = circt_exec_probe._chia_original(
+        binary, probe_argv(seed, path, argv_template), cwd=directory,
+        wall_seconds=limits["probe_wall_seconds"],
+        address_space_bytes=limits["probe_address_space_bytes"],
+        cpu_seconds=limits["probe_cpu_seconds"],
+        output_byte_cap=limits["probe_output_byte_cap"])
+    _write(directory, STALE_STDERR_FILE, out["stderr"])
+    return (out["signal"] is None and out["limit_hit"] is None
+            and out["exit_status"] not in (0, None))
+
 
 def check_tool(spec: ProbeSpec, seed: SeedRecord) -> None:
     """Raise E010 unless a spec's tool is the seed's classified entry tool."""
@@ -601,7 +636,7 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
     """Apply the frozen mutator set to every changed test file of one seed.
 
     Returns:
-        {"specs": list[ProbeSpec], "no_ops": int, "mutator_failures": dict, "logs": dict, "counters": CounterBlock}.
+        {"specs": list[ProbeSpec], "no_ops": int, "mutator_failures": dict, "logs": dict, "failure": str | None, "failure_detail": str | None, "counters": CounterBlock}.
     Worker:
         {"circt": 1}.
     Raises:
@@ -613,10 +648,19 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
     cap_bytes = int(cfg.get("artefact_inline_cap_bytes", 262144))
     directory = iteration_dir(cfg, seed.seed_sha, iteration)
     probe_dir = str(Path(directory) / "probes")
+    argv_template = seed_argv_template(seed)
+    if seed_stale_at_build(seed, argv_template, cfg, directory):
+        return {"specs": [], "no_ops": 0, "mutator_failures": {}, "logs": {},
+                "failure": STALE_AT_BUILD,
+                "failure_detail": f"{seed.entry_tool} rejects this seed's own "
+                                  f"{seed.test_paths[0]} at {cfg['run_commit']}",
+                "counters": CounterBlock(stage="stage_2", started=0, completed=0,
+                                         failed=0,
+                                         seconds=time.monotonic() - started)}
     mutator_set = mutators.load_set(cfg.get("mutator_set_path"),
                                     expected_sha=cfg.get("mutator_set_sha"))
     produced, no_ops, failures = mutators.mutate_seed(
-        seed, iteration, cap, mutator_set, seed_argv_template(seed))
+        seed, iteration, cap, mutator_set, argv_template)
     specs = []
     for mutator_id, source_test_path, text, seed_int, argv in produced:
         try:
@@ -637,18 +681,20 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
             failures[mutator_id] = failures.get(mutator_id, 0) + 1
             failures.setdefault("_causes", {})[mutator_id] = str(error)
     return {"specs": specs, "no_ops": no_ops, "mutator_failures": failures,
-            "logs": {}, "counters": CounterBlock(
+            "logs": {}, "failure": None, "failure_detail": None,
+            "counters": CounterBlock(
                 stage="stage_2", started=len(produced), completed=len(specs),
                 failed=len(produced) - len(specs),
                 seconds=time.monotonic() - started)}
 
 
 __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
-           "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS", "TURN_FAILED_FILE",
+           "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS", "STALE_AT_BUILD",
+           "TURN_FAILED_FILE",
            "ProbeWriteTool", "SourceReadTool", "check_tool", "emit_specs",
            "generate_mutation", "generate_seeded",
            "iteration_dir",
            "probe_argv", "probe_id", "render_argv_template",
            "render_feedback", "render_probe_write", "render_seed_read",
            "render_sites", "render_test_files",
-           "seed_argv_template", "seed_language"]
+           "seed_argv_template", "seed_language", "seed_stale_at_build"]

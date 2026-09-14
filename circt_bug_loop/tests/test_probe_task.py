@@ -179,6 +179,27 @@ def test_u_probe_02_to_06_and_10_11_40_the_status_table(
 
 
 @pytest.mark.t0
+def test_the_diagnostic_verifiers_own_lines_decide_nothing() -> None:
+    """Pilot 4 D-2: without `-verify-diagnostics` the verifier's noise is exit 0.
+
+    MEASURED against the run's own image: `circt-opt` prints
+    `expected error ... was not produced` for every `expected-*` comment
+    whether or not the option is given, and only the option makes it exit 1.
+    Stripping the option leaves the oracle to judge the mutant, and the lines
+    it leaves behind must not be read as a verdict.
+    """
+    noise = ("input.mlir:4:6: error: expected error \"failed to legalize "
+             "operation 'moore.variable'\" was not produced\n"
+             "  // expected-error @below {{failed to legalize operation "
+             "'moore.variable'}}\n")
+    assert classify_build(0, None, noise, None) == ("clean_exit", "")
+    # The seed's own test at the run commit: a real parse error underneath it.
+    real = "input.mlir:23:8: error: custom op 'moore.conversion' is unknown\n"
+    assert classify_build(1, None, real + noise, None) == ("parse_error",
+                                                           "tool_rejected_input")
+
+
+@pytest.mark.t0
 def test_u_probe_12_the_test_order_and_the_oom_second_conjunct() -> None:
     """T-U-probe-12 (FR-06.7): the order, and `oom`'s second conjunct."""
     both = _stderr("both.txt")
