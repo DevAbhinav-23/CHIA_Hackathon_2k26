@@ -1,0 +1,370 @@
+{
+  "format_version": 1,
+  "frozen": true,
+  "mutators": [
+    {
+      "derived_from": [
+        316,
+        319,
+        328,
+        429,
+        436,
+        446,
+        847,
+        1350
+      ],
+      "description": "zero out bitwidth of UInt or SInt types",
+      "id": "fir.width.zero",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(?:UInt|SInt)<(\\d+)>",
+      "replacement": "zero"
+    },
+    {
+      "derived_from": [
+        243,
+        314,
+        323,
+        423,
+        1270,
+        2763
+      ],
+      "description": "mutate bitwidth by one to provoke width inference or truncation discrepancies",
+      "id": "fir.width.off_by_one",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(?:UInt|SInt)<(\\d+)>",
+      "replacement": "off_by_one"
+    },
+    {
+      "derived_from": [
+        204,
+        4734,
+        8350
+      ],
+      "description": "force memory depth to 1 triggering corner-case address indexing",
+      "id": "fir.mem.depth_one",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(depth\\s*=>\\s*)\\d+",
+      "replacement": "\\g<1>1"
+    },
+    {
+      "derived_from": [
+        477,
+        478,
+        746,
+        844
+      ],
+      "description": "set memory read latency to zero",
+      "id": "fir.mem.latency_zero",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(read-latency\\s*=>\\s*)\\d+",
+      "replacement": "\\g<1>0"
+    },
+    {
+      "derived_from": [
+        430,
+        1288,
+        2514
+      ],
+      "description": "set head extraction parameter to 0",
+      "id": "fir.primop.head_zero",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(head\\s*\\([^,]+,\\s*)\\d+(\\s*\\))",
+      "replacement": "\\g<1>0\\g<2>"
+    },
+    {
+      "derived_from": [
+        431,
+        432,
+        671
+      ],
+      "description": "set tail extraction parameter to 0",
+      "id": "fir.primop.tail_zero",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(tail\\s*\\([^,]+,\\s*)\\d+(\\s*\\))",
+      "replacement": "\\g<1>0\\g<2>"
+    },
+    {
+      "derived_from": [
+        326,
+        331,
+        1512
+      ],
+      "description": "shift amount exceeding operand bitwidth",
+      "id": "fir.primop.shr_overflow",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(shr\\s*\\([^,]+,\\s*)\\d+(\\s*\\))",
+      "replacement": "\\g<1>65536\\g<2>"
+    },
+    {
+      "derived_from": [
+        183,
+        2299
+      ],
+      "description": "mutate integer parameter to negative one",
+      "id": "fir.param.neg_one",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(parameter\\s+\\w+\\s*=\\s*)\\d+",
+      "replacement": "\\g<1>-1"
+    },
+    {
+      "derived_from": [
+        1465,
+        2546,
+        4780,
+        7266
+      ],
+      "description": "replace RHS of connect with destination identifier to create self-loop",
+      "id": "fir.connect.self_assign",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(\\b([a-zA-Z_]\\w*)\\s*<=\\s*)[a-zA-Z_]\\w*",
+      "replacement": "\\g<1>\\g<2>"
+    },
+    {
+      "derived_from": [
+        419,
+        423,
+        919
+      ],
+      "description": "convert standard connect to partial connect",
+      "id": "fir.connect.partial_promote",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "<=",
+      "replacement": "<-"
+    },
+    {
+      "derived_from": [
+        2,
+        550,
+        681
+      ],
+      "description": "rename declaration to a reserved keyword",
+      "id": "fir.decl.keyword_rename",
+      "kind": "text",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "(wire|reg|inst)\\s+([a-zA-Z_]\\w*)",
+      "replacement": "\\1 reg"
+    },
+    {
+      "derived_from": [
+        316,
+        426,
+        2269,
+        3417
+      ],
+      "description": "convert integer type width to 0",
+      "id": "mlir.type.i0_zero",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(?<![\\w.])i(\\d+)",
+      "replacement": "zero"
+    },
+    {
+      "derived_from": [
+        2404,
+        7399
+      ],
+      "description": "shift comb.extract starting bit offset by one",
+      "id": "mlir.comb.extract_off_by_one",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(comb\\.extract\\s+[^\\n]+from\\s+)(\\d+)",
+      "replacement": "off_by_one"
+    },
+    {
+      "derived_from": [
+        4084,
+        5605,
+        9731
+      ],
+      "description": "duplicate an operand in comb.concat",
+      "id": "mlir.comb.concat_duplicate",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(comb\\.concat\\s+)(%\\w+)",
+      "replacement": "\\1\\2, \\2"
+    },
+    {
+      "derived_from": [
+        955
+      ],
+      "description": "substitute constant with 65-bit boundary value",
+      "id": "mlir.hw.constant_65bit",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "hw\\.constant\\s+-?\\d+\\s*:\\s*i\\d+",
+      "replacement": "hw.constant 18446744073709551616 : i65"
+    },
+    {
+      "derived_from": [
+        8833
+      ],
+      "description": "inject path separators into inner symbol names",
+      "id": "mlir.sym.slash_nested",
+      "kind": "text",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "(sym\\s+@)([a-zA-Z_]\\w*)",
+      "replacement": "\\1\"\\2/nested\""
+    },
+    {
+      "derived_from": [
+        1356,
+        2335
+      ],
+      "description": "prefix packed struct with reg keyword",
+      "id": "sv.type.reg_struct",
+      "kind": "text",
+      "language": "sv",
+      "mutates_argv": false,
+      "pattern": "\\b(struct\\s+packed\\b)",
+      "replacement": "reg \\1"
+    },
+    {
+      "derived_from": [
+        4097,
+        5665
+      ],
+      "description": "bind instance back to its own target module creating bind-under-bind",
+      "id": "sv.bind.self_target",
+      "kind": "text",
+      "language": "sv",
+      "mutates_argv": false,
+      "pattern": "(bind\\s+)([a-zA-Z_]\\w*)(\\s+)[a-zA-Z_]\\w*",
+      "replacement": "\\1\\2\\3\\2"
+    },
+    {
+      "derived_from": [
+        534,
+        859,
+        860,
+        8461
+      ],
+      "description": "swap adjacent operation definitions to test out-of-order SSA resolution",
+      "id": "mlir.op.line_swap",
+      "kind": "line",
+      "language": "mlir",
+      "mutates_argv": false,
+      "pattern": "^\\s*%\\w+\\s*=",
+      "replacement": "swap"
+    },
+    {
+      "derived_from": [
+        1757,
+        5391,
+        7415
+      ],
+      "description": "duplicate connect or assignment statements to test multiple writes",
+      "id": "fir.stmt.line_duplicate",
+      "kind": "line",
+      "language": "fir",
+      "mutates_argv": false,
+      "pattern": "^\\s*[a-zA-Z_]\\w*(\\.[a-zA-Z_]\\w*)*\\s*<=",
+      "replacement": "duplicate"
+    },
+    {
+      "derived_from": [
+        438,
+        854,
+        4084
+      ],
+      "description": "delete variable declaration line to test forward references and scope hoisting",
+      "id": "sv.decl.line_delete",
+      "kind": "line",
+      "language": "sv",
+      "mutates_argv": false,
+      "pattern": "^\\s*(wire|reg|logic)\\s+",
+      "replacement": "delete"
+    },
+    {
+      "derived_from": [
+        690,
+        1001,
+        4342,
+        7194
+      ],
+      "description": "force single-threaded pass execution to uncover race condition behaviors",
+      "id": "any.argv.disable_threading",
+      "kind": "argv",
+      "language": "any",
+      "mutates_argv": true,
+      "pattern": "^--verify-diagnostics$",
+      "replacement": "--mlir-disable-threading"
+    },
+    {
+      "derived_from": [
+        854,
+        3515
+      ],
+      "description": "remove command-line flags to test unexpected pass combinations",
+      "id": "any.argv.flag_delete",
+      "kind": "argv",
+      "language": "any",
+      "mutates_argv": true,
+      "pattern": "^--?[a-zA-Z0-9_-]+",
+      "replacement": "delete"
+    },
+    {
+      "derived_from": [
+        2404,
+        2514,
+        3547,
+        7399
+      ],
+      "description": "inject disallowLocalVariables and disallowPackedArrays lowering options",
+      "id": "fir.argv.lowering_option_vars",
+      "kind": "argv",
+      "language": "fir",
+      "mutates_argv": true,
+      "pattern": "^--verilog$",
+      "replacement": "--lowering-options=disallowLocalVariables,disallowPackedArrays"
+    },
+    {
+      "derived_from": [
+        5462,
+        7423
+      ],
+      "description": "force aggregate preservation across lower-types",
+      "id": "fir.argv.preserve_aggregate",
+      "kind": "argv",
+      "language": "fir",
+      "mutates_argv": true,
+      "pattern": "^--lower-to-hw$",
+      "replacement": "--preserve-aggregate=all"
+    }
+  ],
+  "set_version": "v2",
+  "synthesis_input": {
+    "issue_numbers_sha256": "5c78adcea2166c7b768452413409e453502607305e879da2a8e0acba371fa5ae",
+    "issues_used": 487,
+    "mirror_refreshed_utc": "2026-09-14T10:55:15+00:00",
+    "query": "closed issues labelled bug, the full history",
+    "repo": "llvm/circt"
+  },
+  "synthesis_model": "gemini-3.8-flash",
+  "synthesised_utc": "2026-09-14T12:29:24+00:00"
+}

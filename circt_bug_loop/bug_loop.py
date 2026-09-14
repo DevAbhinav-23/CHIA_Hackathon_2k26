@@ -3410,6 +3410,12 @@ def build_parser() -> argparse.ArgumentParser:
     # recorded run that dispatched it would be a run with a turn in it.
     parser.add_argument("--generator", default="model",
                         choices=("model", "recorded"))
+    # W-18. A pilot is a campaign over a NAMED subset of the corpus; without it
+    # a short window measures whichever seeds the corpus happens to order first.
+    # It narrows only the list `campaign_drive` is handed - the mined corpus,
+    # its exclusions and the store's seed rows are unchanged - and a named seed
+    # the corpus does not hold refuses the run.
+    parser.add_argument("--seed-sha", action="append", default=None, metavar="SHA")
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument("--resume", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--dry-run", action="store_true")
@@ -3463,6 +3469,39 @@ def calibratable(seeds, pin_sha: str) -> tuple:
     return eligible, sorted(s.seed_sha for s in seeds if s.seed_sha not in chosen)
 
 
+def seed_subset(seeds: list, named: list, corpus_head_sha: str) -> list:
+    """Narrow *seeds* to the SHAs *named*, in the order they were named (W-18).
+
+    A pilot drives a chosen subset of the corpus, so a short window reaches the
+    seeds it was designed around instead of whichever the corpus orders first.
+    Only the list `campaign_drive` is handed is narrowed: the mined corpus, its
+    exclusions and the store's seed rows are unchanged, so the run still records
+    what the corpus held.
+
+    A named seed the corpus does not hold REFUSES the run and is never silently
+    omitted, because a pilot that quietly drove eleven of twelve seeds would
+    report eleven as though twelve had been asked for. A repeated SHA is
+    de-duplicated, one seed being one seed however often it is named.
+
+    Returns:
+        list[SeedRecord], the named seeds in the named order.
+    Worker:
+        pure; no resource, no process, no database handle.
+    Raises:
+        PreflightFailed("seed_subset", detail) naming every absent SHA.
+    """
+    order = {sha: index for index, sha in enumerate(dict.fromkeys(named))}
+    present = {seed.seed_sha for seed in seeds}
+    absent = sorted(sha for sha in order if sha not in present)
+    if absent:
+        raise PreflightFailed(
+            "seed_subset",
+            f"--seed-sha names {len(absent)} seed(s) the corpus at "
+            f"{corpus_head_sha[:12]} does not hold: {absent}")
+    return sorted((seed for seed in seeds if seed.seed_sha in order),
+                  key=lambda seed: order[seed.seed_sha])
+
+
 def draw_calibration(*, corpus_head_sha: str, sample_size: int,
                      exact_pin_shas: list) -> list:
     """Draw the calibration sample from the eligible seeds, reproducibly (ADR-D-01).
@@ -3510,6 +3549,7 @@ def resolved_config(args) -> dict:
             "chia_package": str(_CHIA_PKG), "issue_solver": str(_ISSUE_SOLVER),
             "repair_backend": args.repair_backend,
             "generator": args.generator,
+            "seed_sha": list(args.seed_sha or []),
             "repair_enabled": repair_enabled(args)}
 
 
@@ -3698,6 +3738,18 @@ def run_campaign(args, out) -> int:
                           budget.campaign_start_utc[:10],
                           budget.artefact_inline_cap_bytes)
     seeds = list(mined["seeds"])
+    # W-18: a PILOT drives a named subset of the corpus, so a small run reaches
+    # the seeds it was designed around instead of the first few the corpus
+    # happens to order. The mined corpus is unchanged - `mined` still carries
+    # every seed and every exclusion, and the store still records them - and
+    # only the list handed to `campaign_drive` is narrowed. A named seed the
+    # corpus does not hold is a refusal and never a silent omission, because a
+    # pilot that quietly ran eleven of twelve seeds would report eleven as if
+    # twelve had been asked for.
+    if args.seed_sha:
+        seeds = seed_subset(seeds, args.seed_sha, budget.corpus_head_sha)
+        print(f"--seed-sha: {len(seeds)} of {len(mined['seeds'])} mined seeds, "
+              "in the order named", file=out)
     # FR-02.7, as W-19b #6 leaves it: a run has ONE image and `probe_execute`
     # runs and hashes its binaries, so a sampled seed can only be probed at its
     # own parent commit where that parent shares the image's pin. The registered

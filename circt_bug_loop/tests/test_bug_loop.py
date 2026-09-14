@@ -110,8 +110,10 @@ def registered_repo(tmp_path: Path, *, mutator_after: bool = False,
                             "GIT_COMMITTER_DATE": when})
 
     source = Path(budget_module.BUDGET_YAML).read_text(encoding="utf-8")
-    frozen = flow / "set_v1.json"
-    frozen.write_text('{"set_version": "v1"}\n', encoding="utf-8")
+    # The set `budget.MUTATOR_SET` resolves to, not a spelled version: check 2
+    # asks about the file the run's digest is computed over (W-12c).
+    frozen = flow / Path(budget_module.MUTATOR_SET).name
+    frozen.write_text('{"set_version": "vN"}\n', encoding="utf-8")
     budget_path = repo / "circt_bug_loop" / "budget.yaml"
     if not mutator_after:
         commit("the mutator set", 1)
@@ -122,7 +124,7 @@ def registered_repo(tmp_path: Path, *, mutator_after: bool = False,
                        env={**os.environ, "GIT_COMMITTER_DATE":
                             "2026-09-18T02:00:00+00:00"})
     if mutator_after:
-        frozen.write_text('{"set_version": "v1", "edited": true}\n', encoding="utf-8")
+        frozen.write_text('{"set_version": "vN", "edited": true}\n', encoding="utf-8")
         commit("the set, edited after", 3)
     return repo
 
@@ -1825,3 +1827,37 @@ def test_T_U_driver_43_only_seeds_on_the_images_pin_are_calibratable():
     source = inspect.getsource(bug_loop.run_campaign)
     assert 'PreflightFailed(\n            "calibration_sample"' in source
     assert "NOT_CALIBRATABLE" in source
+
+
+@pytest.mark.t0
+def test_T_U_driver_44_the_pilots_seed_subset_is_named_ordered_and_refusable():
+    """T-U-driver-44 (W-18): `--seed-sha` narrows the DRIVEN list and nothing else.
+
+    New id, W-18. A pilot runs a short window over seeds it was designed around,
+    and taking the corpus's own first twelve would measure whichever seeds
+    `build_corpus` happens to order first. The subset is the named SHAs in the
+    named order, a repeat is one seed, and a SHA the corpus does not hold
+    REFUSES the run - a pilot that silently drove eleven of twelve would report
+    eleven as though twelve had been asked for. Fixture: three `SeedRecord`s
+    built here. Tier 0.
+    """
+    first, second, third = (seed_record("a" * 40), seed_record("b" * 40),
+                            seed_record("c" * 40))
+    mined = [first, second, third]
+
+    # The named order wins over the corpus's, and a repeat is one seed.
+    subset = bug_loop.seed_subset(mined, ["c" * 40, "a" * 40, "c" * 40], "d" * 40)
+    assert [seed.seed_sha for seed in subset] == ["c" * 40, "a" * 40]
+    assert mined == [first, second, third], "the mined corpus is not narrowed"
+
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.seed_subset(mined, ["a" * 40, "9" * 40], "d7e94049" + "0" * 32)
+    assert raised.value.check == "seed_subset"
+    assert "9" * 40 in str(raised.value) and "d7e94049" in str(raised.value)
+
+    # The flag itself: repeatable, absent by default, and printed by --print-config.
+    parsed = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--seed-sha", "a" * 40, "--seed-sha", "b" * 40])
+    assert parsed.seed_sha == ["a" * 40, "b" * 40]
+    assert bug_loop.build_parser().parse_args(["--mode", "discovery"]).seed_sha is None
+    assert bug_loop.resolved_config(parsed)["seed_sha"] == ["a" * 40, "b" * 40]

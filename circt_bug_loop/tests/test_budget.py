@@ -225,16 +225,21 @@ def test_T_U_budget_07(repo: Repo, tmp_path: Path):
     assert out["budget"].budget_file_sha == repo.git(
         "log", "-1", "--format=%H", "--", "circt_bug_loop/budget.yaml").strip()
 
-    later = repo.commit("circt_bug_loop/mutators/set_v1.json",
-                        '{"set_version": "v1"}\n', when=_EARLY - timedelta(days=1))
+    # The set the RUN hashes, which since W-12c is the newest frozen one and is
+    # read off `budget.MUTATOR_SET`: spelling a version here would check a file
+    # no campaign loads, and `mutators/set_v1.json`'s commit is an ancestor of
+    # everything once a `set_v2.json` exists, so the literal passed vacuously.
+    frozen = f"circt_bug_loop/{budget_module.MUTATOR_SET}"
+    later = repo.commit(frozen, '{"set_version": "vN"}\n',
+                        when=_EARLY - timedelta(days=1))
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load(campaign=True)
     message = str(caught.value)
-    assert "mutators/set_v1.json" in message and "FR-05.2" in message
+    assert budget_module.MUTATOR_SET in message and "FR-05.2" in message
     assert later in message and "registration/campaign-01" in message
 
     ordered = Repo(tmp_path / "ordered")
-    ordered.commit("circt_bug_loop/mutators/set_v1.json", '{"set_version": "v1"}\n')
+    ordered.commit(frozen, '{"set_version": "vN"}\n')
     ordered.commit("circt_bug_loop/budget.yaml", COMPLETE.read_text(encoding="utf-8"))
     ordered.register()
     assert ordered.load(campaign=True).budget_file_sha, \
