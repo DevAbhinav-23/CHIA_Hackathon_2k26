@@ -27,6 +27,7 @@ import yaml
 
 from circt_bug_loop import budget as budget_module
 from circt_bug_loop import bug_loop
+from circt_bug_loop import results as results_module
 from circt_bug_loop.contract import schema
 from circt_bug_loop.store import (BuildResult, DedupVerdict, DifferentialVerdict,
                                   Fingerprint, Frame, ImageSpec, OracleVerdict,
@@ -1154,10 +1155,11 @@ def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
     bug_loop.finish_run(loop, built, "2026-09-19T09:00:00+00:00")
     return {"store": loop, "manifest": built, "outcome": outcome, "seed": seed,
             "counters": counters,
-            # FR-10.2's labelled set is a human judgement over this campaign's
-            # own candidates: the two primary ones are different bugs.
-            "labelled_pairs": [{"label": "distinct", "a": "c-p-000000000001",
-                                "b": "c-p-100000000001"}]}
+            # FR-10.2's labelled set is the project's own external measurement
+            # (W-12): recorded failures labelled by hand before any fingerprint
+            # was computed, belonging to no campaign, so the driver passes the
+            # committed set and this store is asked about none of it.
+            "labelled_pairs": results_module.load_labelled_pairs()}
 
 
 def test_T_U_driver_30(tmp_path: Path, capsys):
@@ -1678,7 +1680,7 @@ def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written
     package data, which is also the only place `runtime_env` would ship it
     from. Fixture: `circt_bug_loop/data/labelled_pairs.json`. Tier 0.
     """
-    from circt_bug_loop import results as results_module
+    # results_module is imported at module scope
 
     assert results_module.LABELLED_PAIRS.is_file()
     assert results_module.LABELLED_PAIRS.parent.name == "data"
@@ -1686,7 +1688,12 @@ def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written
     pairs = results_module.load_labelled_pairs()
     assert len(pairs) >= 20
     assert {p["label"] for p in pairs} == {"duplicate", "distinct"}
-    assert all(isinstance(p["a"], str) and isinstance(p["b"], str) for p in pairs)
+    # W-12: a side is the RECORDED FAILURE and not a candidate id. The set is an
+    # external measurement of the project, so the renderer fingerprints it from
+    # the file and asks this run's store about none of it.
+    assert all(isinstance(p["a"], dict) and isinstance(p["b"], dict) for p in pairs)
+    assert all({"candidate_id", "oracle_class", "frame_names"} <= set(p[side])
+               for p in pairs for side in ("a", "b"))
 
     # The driver catches the refusal, writes it down and exits non-zero, with
     # the ledger and the store already complete.
@@ -1696,14 +1703,30 @@ def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written
     assert "results_refused.txt" in source
     assert "return 3" in source
 
-    # And the refusal really is the one the labelled set causes on a store that
-    # holds no fingerprint for either side, which is every campaign's today.
+    # And the labelled set no longer causes a refusal on a store that holds no
+    # fingerprint for either side, which is every campaign's. That refusal fired
+    # at the end of EVERY run and is the one `T-S-regen-01` recorded; the rates
+    # now render from the file. The refusal kept is a set that is not there.
     run = mini_campaign(tmp_path)
-    with pytest.raises(results_module.ResultsIncomplete) as raised:
+    for missing in (
+            _render_refusals(results_module, run, pairs),
+            _render_refusals(results_module, run, None)):
+        assert not any("labelled duplicate-pair set names candidates" in m
+                       for m in missing), missing
+    assert any("none was supplied" in m
+               for m in _render_refusals(results_module, run, None))
+    assert not any("duplicate-pair set" in m
+                   for m in _render_refusals(results_module, run, pairs))
+
+
+def _render_refusals(results_module, run, pairs) -> list:
+    """Every element one render refuses, or the empty list when it renders."""
+    try:
         results_module.render_results._chia_original(
             run["store"], run["manifest"], labelled_pairs=pairs)
-    assert any("labelled duplicate-pair set names candidates" in m
-               for m in raised.value.missing), raised.value.missing
+    except results_module.ResultsIncomplete as refusal:
+        return list(refusal.missing)
+    return []
 
 
 def test_T_U_driver_42_the_trailer_names_no_model_that_did_not_run():

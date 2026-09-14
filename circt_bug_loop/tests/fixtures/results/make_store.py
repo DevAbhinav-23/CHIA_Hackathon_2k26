@@ -25,11 +25,14 @@ the artefact tree at the path `build_result.stderr_path` names, so FR-18.11's
 regeneration check re-runs `probe_task.classify_build` over genuine tool output
 and not over a string written to make it pass.
 
-The labelled duplicate-pair set this store carries is three **distinct**-labelled
-pairs: a four-candidate campaign holds no two candidates of one bug, so the
-false-merge rate has no denominator here and the campaign's own set is
-`04-Test-Plan.md` §10's twenty. `tests/test_results.py` builds the duplicate
-case by adding a candidate that shares a fingerprint.
+The labelled duplicate-pair set this store carries is **the committed one**,
+`data/labelled_pairs.json`, and no longer three pairs invented to name this
+store's own candidates. FR-10.2's set is an external measurement of the project
+(`04-Test-Plan.md` §10): its sides are recorded failures labelled by hand before
+any fingerprint was computed, they belong to no campaign, and the renderer
+fingerprints them from the file. A fixture set naming `c-0001` was the shape
+that made `render_results` demand the store hold them, which is the refusal
+`T-S-regen-01` recorded at the end of every run.
 
 Run it as a program to write the store somewhere for inspection:
 
@@ -58,13 +61,14 @@ CONTRACT_FIXTURES = Path(schema.__file__).resolve().parent / "fixtures"
 #: The recorded tool stderr of `04-Test-Plan.md` §13, one capture per outcome.
 STDERR_FIXTURES = Path(__file__).resolve().parents[1] / "stderr"
 
-#: FR-10.2's labelled set, as `render_results` takes it: the label is the human
-#: judgement and the fingerprints come from the store.
-LABELLED_PAIRS = [
-    {"label": "distinct", "a": "c-0001", "b": "c-0002"},
-    {"label": "distinct", "a": "c-0002", "b": "c-0003"},
-    {"label": "distinct", "a": "c-0001", "b": "c-0003"},
-]
+#: FR-10.2's labelled set, as `render_results` takes it and as the driver passes
+#: it: the committed set itself, read through the one loader the driver uses, so
+#: this fixture cannot drift from what a campaign renders.
+def labelled_pairs() -> list:
+    """The committed FR-10.2 set, which is the one a real render is given."""
+    from circt_bug_loop.results import load_labelled_pairs
+
+    return load_labelled_pairs()
 
 #: The six probes, in dispatch order: (probe id, arm, seed, iteration, tool,
 #: stderr capture, exit status, signal, build status, stopping reason).
@@ -416,7 +420,7 @@ def build(root: Path) -> tuple:
          "confirmed_at_utc": None, "confirmation_url": None}])
 
     _ledger(store)
-    return store, run_manifest, [dict(pair) for pair in LABELLED_PAIRS]
+    return store, run_manifest, labelled_pairs()
 
 
 def main(argv: list) -> int:

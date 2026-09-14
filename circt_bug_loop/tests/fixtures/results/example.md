@@ -26,7 +26,7 @@ A confirmed bug is one a maintainer acted on, evidenced by a URL; distinct is on
 
 **Confirmation cut-off.** Maintainer confirmation lags the budget window: a filing is confirmed when a maintainer labels, comments on or fixes it, which happens after the window has closed. Confirmations recorded after 2026-09-23 are not counted in the headline above.
 
-**Dedup rates, which qualify the headline.** Collision rate 0/3 = 0.0000; false-merge rate 0/0 = 0.0000, both measured over the hand-labelled duplicate-pair set. 1 candidate carries an unstable fingerprint, which qualifies the headline exactly as a collision does and never merges.
+**Dedup rates, which qualify the headline.** Collision rate 1/11 = 0.0909; false-merge rate 1/11 = 0.0909, both measured over the hand-labelled duplicate-pair set. 1 candidate carries an unstable fingerprint, which qualifies the headline exactly as a collision does and never merges.
 
 **Seed sets.** The seeded arm probed 2 seeds and the mutation arm 2; the two sets are identical, which FR-18.2 requires within a mode.
 

@@ -236,7 +236,7 @@ def test_T_U_results_04(tmp_path):
     text = render(store, manifest, pairs)
     assert text.count("(mode discovery, seed set 187)") == len(tables(text))
 
-    facts = _facts(store, manifest, pairs)
+    facts = _facts(store, manifest, pairs, 5)
     stripped = text.replace("**Distinct confirmed bugs per arm** "
                             "(mode discovery, seed set 187)",
                             "**Distinct confirmed bugs per arm**")
@@ -335,17 +335,31 @@ def test_T_U_results_09(tmp_path):
     re-run found unstable, which qualifies the headline exactly as a collision
     does. The refusal is the labelled pair set not being supplied at all: the
     rates are a measurement of the project, not a row of the campaign.
+
+    **W-12: the set is external, and the store is not asked about it.** The
+    pairs are `data/labelled_pairs.json`'s own recorded failures, labelled by
+    hand before any fingerprint was computed, and the renderer fingerprints
+    them from the file. The numbers below are therefore the project's measured
+    rates and are the same for every run; a set whose sides the campaign's store
+    has never heard of renders, which is what it must do, a campaign that
+    confirms nothing having no such candidate. Before this the renderer demanded
+    a store fingerprint per side and refused at the end of EVERY run, which is
+    the one refusal `T-S-regen-01` recorded.
     """
     store, manifest, pairs = campaign(tmp_path)
     rates = next(line for line in render(store, manifest, pairs).splitlines()
                  if line.startswith("**Dedup rates"))
-    assert "Collision rate 0/3 = 0.0000" in rates
-    assert "false-merge rate 0/0 = 0.0000" in rates
+    assert "Collision rate 1/11 = 0.0909" in rates
+    assert "false-merge rate 1/11 = 0.0909" in rates
     assert "1 candidate carries an unstable fingerprint" in rates
 
+    # The one refusal that stays: no set at all.
     only(refuse(store, manifest, None), "none was supplied")
-    only(refuse(store, manifest, [{"label": "distinct", "a": "c-0001", "b": "c-9999"}]),
-         "names candidates the store has no fingerprint for", "c-9999")
+    # A side the store has never fingerprinted is rendered, not refused.
+    unknown = [dict(pair, a=dict(pair["a"], candidate_id="c-9999")) for pair in pairs]
+    assert "Collision rate" in next(
+        line for line in render(store, manifest, unknown).splitlines()
+        if line.startswith("**Dedup rates"))
 
 
 def test_T_U_results_10(tmp_path):

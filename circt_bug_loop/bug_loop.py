@@ -3755,7 +3755,8 @@ def run_campaign(args, out) -> int:
     try:
         rendered = results_module.render_results(
             store, manifest,
-            labelled_pairs=results_module.load_labelled_pairs())["rendered"]
+            labelled_pairs=results_module.load_labelled_pairs(),
+            fingerprint_top_n=budget.fingerprint_top_n)["rendered"]
     except results_module.ResultsIncomplete as refusal:
         (run_root / "results" / "results_refused.txt").write_text(
             "\n".join(refusal.missing) + "\n", encoding="utf-8")

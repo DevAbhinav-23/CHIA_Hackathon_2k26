@@ -36,6 +36,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from string import Template
+from types import SimpleNamespace
 from typing import Literal, Optional
 
 from chia.base.ChiaFunction import ChiaFunction
@@ -310,6 +311,46 @@ def rates(pairs: list) -> dict:
             "false_merge_rate": false_merges / len(duplicate) if duplicate else 0.0,
             "collisions": collisions, "distinct_pairs": len(distinct),
             "false_merges": false_merges, "duplicate_pairs": len(duplicate)}
+
+
+def labelled_fingerprint(side: dict, top_n: int) -> Fingerprint:
+    """One side of an FR-10.2 labelled pair, fingerprinted from the pair's own record.
+
+    The labelled duplicate-pair set is an EXTERNAL MEASUREMENT of the project
+    and not a row of any campaign: `04-Test-Plan.md` §10 has it labelled by hand,
+    by the architect, BEFORE any fingerprint was computed, and each side carries
+    the recorded failure it was labelled from. Its rates are therefore derived
+    here, from the file, and never by looking a candidate id up in a run's
+    store - which is what lets a campaign that confirms nothing still report
+    them, and what stopped `render_results` refusing at the end of every run
+    (`T-S-regen-01`'s one remaining refusal).
+
+    *side* is one `data/labelled_pairs.json` side: `candidate_id`,
+    `oracle_class`, `frame_names`, `signal`, `reduced`, and the assertion or
+    fatal fields its class carries.
+
+    Returns:
+        Fingerprint, exactly as `compute_fingerprint` computes it for a live
+        candidate; the same function, so the measurement is of the fingerprint
+        the campaign uses and not of a second implementation of it.
+    Worker:
+        pure; it reads one mapping and runs no query.
+    Raises:
+        KeyError when *side* carries no `candidate_id`, `oracle_class` or
+        `frame_names`, those being what the labelled set is required to record.
+    """
+    verdict = SimpleNamespace(
+        probe_id=side["candidate_id"], oracle_class=side["oracle_class"],
+        assertion_text=side.get("assertion_text"),
+        assertion_site=side.get("assertion_site"),
+        fingerprint_frame=side.get("fingerprint_frame"),
+        # `strip_prologue` reads a frame's function and its module, and a
+        # labelled side records the names alone: an unresolved libc frame is
+        # already gone from what was recorded.
+        frames=[SimpleNamespace(function=name, module="")
+                for name in side["frame_names"]])
+    return compute_fingerprint(verdict, side.get("signal"),
+                               side.get("reduced", ""), top_n)
 
 
 # ---------------------------------------------------------------------------
@@ -1521,6 +1562,7 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "ReportIncomplete",
            "normalise_expr", "normalise_site", "structural_hash",
            "compute_fingerprint", "is_duplicate", "partition", "rates",
+           "labelled_fingerprint",
            "MIRROR_PAGE_CEILING", "mirror_tokens", "mirror_screen",
            "mirror_walk", "frame_paths", "frame_symbols",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",

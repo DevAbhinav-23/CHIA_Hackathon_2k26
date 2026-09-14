@@ -36,8 +36,8 @@ from circt_bug_loop import ledger as ledger_module
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.gate import TAXONOMY, decide
 from circt_bug_loop.probe_task import classify_build
-from circt_bug_loop.store import Fingerprint, LoopStore
-from circt_bug_loop.triage_task import rates
+from circt_bug_loop.store import LoopStore
+from circt_bug_loop.triage_task import labelled_fingerprint, rates
 
 #: The two arms, in the order every table prints them. `shared` is a ledger arm
 #: and never an arm of the comparison (FR-14.4).
@@ -91,14 +91,20 @@ LABELLED_PAIRS = Path(__file__).resolve().parent / "data" / "labelled_pairs.json
 
 
 def load_labelled_pairs(path=None) -> list:
-    """Read FR-10.2's labelled set into the three keys `render_results` reads.
+    """Read FR-10.2's labelled set into the four keys `render_results` reads.
 
     The committed document carries the whole judgement - the rule, the
-    justification, the instant, and both sides' recorded failures - and the
-    renderer needs the label and two candidate ids, which are the sides' own.
+    justification, the instant, and both sides' RECORDED FAILURES - and `a` and
+    `b` are those recorded failures and not two candidate ids. That is the whole
+    of the fix: the set is an EXTERNAL MEASUREMENT of the project, labelled by
+    hand before any fingerprint was computed, so its sides belong to no campaign
+    and a renderer that required the campaign's store to hold a fingerprint for
+    each of them refused at the end of every run (`T-S-regen-01`).
 
     Returns:
-        list[dict] with keys `label`, `a`, `b`, `pair_id` and `rule`.
+        list[dict] with keys `label`, `pair_id`, `rule`, and `a` and `b`, each
+        the side's own recorded failure as `triage_task.labelled_fingerprint`
+        takes it.
     Worker:
         head; one file read.
     Raises:
@@ -107,8 +113,7 @@ def load_labelled_pairs(path=None) -> list:
     """
     document = json.loads(Path(path or LABELLED_PAIRS).read_text(encoding="utf-8"))
     return [{"label": pair["label"], "pair_id": pair["pair_id"],
-             "rule": pair["rule"], "a": pair["a"]["candidate_id"],
-             "b": pair["b"]["candidate_id"]}
+             "rule": pair["rule"], "a": pair["a"], "b": pair["b"]}
             for pair in document["pairs"]]
 
 
@@ -164,7 +169,8 @@ def _percent(numerator: int, denominator: int) -> str:
     return f"{numerator}/{denominator} ({100.0 * numerator / denominator:.1f}%)"
 
 
-def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs) -> dict:
+def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs,
+           fingerprint_top_n: int) -> dict:
     """Read every number the artefact prints, and record what the store lacks.
 
     One pass over `loop.db` per table, joined on the ids §6.2 declares. Each
@@ -240,7 +246,8 @@ def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs) -> dict:
     _disclosures(facts, repairs, gaps)
     _lag(facts, stored, gaps)
     _cutoff(facts, stored, gaps)
-    _dedup_rates(facts, labelled_pairs, fingerprints, primary, gaps)
+    _dedup_rates(facts, labelled_pairs, fingerprints, primary,
+                 fingerprint_top_n, gaps)
     _divergences(facts, candidates, reports, differentials, _by(probes, "probe_id"), gaps)
     _mutator_declaration(facts, stored, ledger_rows, gaps)
     _observed(facts, ledger_rows, gaps)
@@ -404,8 +411,25 @@ def _cutoff(facts: dict, stored: dict, gaps: dict) -> None:
 
 
 def _dedup_rates(facts: dict, labelled_pairs, fingerprints: dict, primary: list,
-                 gaps: dict) -> None:
-    """FR-10.2's two measured rates, and the unstable fingerprints that qualify them."""
+                 top_n: int, gaps: dict) -> None:
+    """FR-10.2's two measured rates, and the unstable fingerprints that qualify them.
+
+    The rates come from the LABELLED SET'S OWN RECORD and not from the store.
+    They are an external measurement of the project (`04-Test-Plan.md` §10,
+    A-05): the pairs were labelled by hand before any fingerprint was computed,
+    over recorded failures that belong to no campaign, and requiring the store
+    to carry a fingerprint for each side made the rates unreportable by exactly
+    the runs that most need them - a campaign that confirms nothing has no such
+    candidate, so `render_results` refused at the end of every run
+    (`T-S-regen-01`'s one remaining refusal).
+
+    The one refusal that stays is a set that is not there at all: a rate the
+    renderer invented for itself would be worse than a named gap.
+
+    `fingerprints` and `primary` are still the STORE's, and are still what
+    `facts["unstable"]` counts: an unstable fingerprint qualifies this run's
+    headline exactly as a collision does, and that is a fact about this run.
+    """
     facts["unstable"] = sum(1 for c in primary
                             if (fingerprints.get(c["candidate_id"]) or {})
                             .get("fingerprint_stable") == 0)
@@ -415,24 +439,11 @@ def _dedup_rates(facts: dict, labelled_pairs, fingerprints: dict, primary: list,
             "duplicate-pair set of FR-10.2 and none was supplied")
         facts["dedup_rates"] = None
         return
-    unknown = sorted({side for pair in labelled_pairs for side in (pair["a"], pair["b"])
-                      if side not in fingerprints})
-    if unknown:
-        gaps["dedup_rates"] = (
-            "the labelled duplicate-pair set names candidates the store has no "
-            f"fingerprint for: {unknown}")
-        facts["dedup_rates"] = None
-        return
-
-    def side(candidate_id: str) -> Fingerprint:
-        row = fingerprints[candidate_id]
-        return Fingerprint(probe_id=candidate_id, basis=row["basis"], value=row["value"],
-                           frame_tuple=json.loads(row["frame_tuple_json"]),
-                           structural_hash=row["structural_hash"],
-                           fingerprint_stable=None)
-
-    facts["dedup_rates"] = rates([{"label": pair["label"], "a": side(pair["a"]),
-                                   "b": side(pair["b"])} for pair in labelled_pairs])
+    facts["dedup_rates"] = rates(
+        [{"label": pair["label"],
+          "a": labelled_fingerprint(pair["a"], top_n),
+          "b": labelled_fingerprint(pair["b"], top_n)}
+         for pair in labelled_pairs])
 
 
 def _divergences(facts: dict, candidates: list, reports: list, differentials: dict,
@@ -1182,16 +1193,25 @@ _REFUSALS = (_require_headline, _require_secondaries, _require_validation_table,
 
 @ChiaFunction(max_retries=0)
 def render_results(store: LoopStore, manifest: RunManifest, *,
-                   labelled_pairs: Optional[list] = None) -> dict:
+                   labelled_pairs: Optional[list] = None,
+                   fingerprint_top_n: int = 5) -> dict:
     """Render one run's results artefact as Markdown, or refuse and name what is missing.
 
     Every number is read from `loop.db` and from the artefact tree it points at.
     *labelled_pairs* is FR-10.2's hand-labelled duplicate-pair set, each entry
-    `{"label": "duplicate"|"distinct", "a": candidate_id, "b": candidate_id}`;
-    the labels are human judgements recorded before any fingerprint was
-    computed, and the fingerprints they are measured against still come from
-    the store. It is a parameter because the labelled set is a committed
-    measurement of the project and not a row of the campaign.
+    `{"label": "duplicate"|"distinct", "a": side, "b": side}` where a side is
+    the RECORDED FAILURE `data/labelled_pairs.json` carries. Both the labels and
+    the failures are the project's, recorded before any fingerprint was
+    computed, and the fingerprints are computed FROM THEM by
+    `triage_task.labelled_fingerprint` rather than looked up in this run's
+    store: the set is a committed measurement of the project and not a row of
+    the campaign, and requiring the store to hold a fingerprint per side made
+    the rates unreportable by every campaign that confirms nothing, which is the
+    refusal `T-S-regen-01` recorded at the end of every run.
+
+    *fingerprint_top_n* is `budget.yaml`'s registered `fingerprint_top_n`
+    (G-43), which is the N the labelled set was measured at; the driver passes
+    the run's own and the default is the registered `[DEFAULT]` of 5.
 
     The render succeeds from an empty confirmation set and states the zero
     (FR-18.7), and it names no external bug yield anywhere, so no sentence in
@@ -1210,7 +1230,7 @@ def render_results(store: LoopStore, manifest: RunManifest, *,
         no partial artefact returned; sqlite3.Error from any query.
     """
     started_at = time.monotonic()
-    facts = _facts(store, manifest, labelled_pairs)
+    facts = _facts(store, manifest, labelled_pairs, fingerprint_top_n)
     text = _render(facts)
     missing = [complaint for check in _REFUSALS for complaint in check(text, facts)]
     if missing:

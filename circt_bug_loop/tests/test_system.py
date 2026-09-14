@@ -846,7 +846,7 @@ def test_regen_01_the_render_refuses_for_exactly_one_reason(cluster, artefact_ro
     # recorded a mark or a pass for each. A run whose probes never fired the
     # oracle has no candidate, and the zero is the answer, not a gap - which is
     # what `_regeneration` leaving no entry in `facts["gaps"]` says.
-    facts = results_module._facts(store, manifest, None)
+    facts = results_module._facts(store, manifest, None, 5)
     assert "regeneration_marks" not in facts["gaps"], facts["gaps"]
     rows = facts["regeneration"]
     candidates = store.query(
