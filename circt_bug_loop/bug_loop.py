@@ -1454,12 +1454,20 @@ def model_ids(*, model_id: str, repair_backend: str,
             "mutator_synthesis": campaign, "repair_adapt": repair}
 
 
-def stages_metered(*, arms, repair_backend: str, repair_enabled: bool) -> dict:
+def stages_metered(*, arms, repair_backend: str, repair_enabled: bool,
+                   model_turns: bool = True) -> dict:
     """Return one bool per stage id: whether the loop can meter that stage (FR-14.8).
 
     Stages 1 and 2 are metered only where the seeded arm runs, no model running
     on the mutation arm at all; stage 7 is metered exactly where its backend is
     the campaign's, which on a default run it is.
+
+    *model_turns* is `--generator model`. Under `--generator recorded` the three
+    model-bearing nodes are replaced and NO turn is made anywhere, so stages 1,
+    2 and 6 are not metered either - which is also what makes the report's
+    `Assisted-by:` trailer honest, the trailer being read off this map
+    (W-19b #7): a report whose first line says NO MODEL TURN WAS MADE used to
+    end by naming `vertex:gemini-3.8-flash`.
 
     Returns:
         dict whose key set is exactly the contract's `_STAGE_IDS`.
@@ -1470,9 +1478,11 @@ def stages_metered(*, arms, repair_backend: str, repair_enabled: bool) -> dict:
     """
     seeded = "seeded" in tuple(arms)
     metered = {stage: True for stage in schema._STAGE_IDS}
-    metered["stage_1"] = seeded
-    metered["stage_2"] = seeded
-    metered["stage_7"] = bool(repair_enabled) and repair_backend == _METERED_REPAIR_BACKEND
+    metered["stage_1"] = seeded and model_turns
+    metered["stage_2"] = seeded and model_turns
+    metered["stage_6"] = bool(model_turns)
+    metered["stage_7"] = (bool(repair_enabled) and bool(model_turns)
+                          and repair_backend == _METERED_REPAIR_BACKEND)
     return metered
 
 
@@ -1593,8 +1603,10 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         model_ids=model_ids(model_id=budget.model_id,
                             repair_backend=backend,
                             repair_model=args.repair_model),
-        stages_metered=stages_metered(arms=arms, repair_backend=backend,
-                                      repair_enabled=repair_enabled(args)),
+        stages_metered=stages_metered(
+            arms=arms, repair_backend=backend,
+            repair_enabled=repair_enabled(args),
+            model_turns=getattr(args, "generator", "model") != "recorded"),
         mutator_set_sha=mutator_set_sha,
         x_policy=probe_task.X_POLICY,
         issue_mirror={k: mirror[k]
@@ -2327,7 +2339,8 @@ def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
         nothing. A record that cannot fill the template yields B7's own
         failure-shaped empty Report, as an unparseable answer does.
     """
-    from circt_bug_loop.triage_task import ReportIncomplete, render_report
+    from circt_bug_loop.triage_task import (ReportIncomplete, assisted_by_model,
+                                            render_report)
 
     started = time.monotonic()
     validate_candidate(candidate)
@@ -2348,7 +2361,7 @@ def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
                     candidate_id=candidate.candidate_id, path="", template=template,
                     title="", classification="untriaged", classification_reason="",
                     rendered_sha256="",
-                    assisted_by=manifest.model_ids["triage_report"],
+                    assisted_by=assisted_by_model(manifest) or "none",
                     fields_present=[]),
                 "logs": logs, "failure": f"report_incomplete:{error}",
                 "counters": CounterBlock(stage="stage_6", started=1, completed=0,
@@ -2364,7 +2377,7 @@ def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
                 title=NO_TURN_PROSE, classification=classification,
                 classification_reason=NO_TURN_PROSE,
                 rendered_sha256=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
-                assisted_by=manifest.model_ids["triage_report"],
+                assisted_by=assisted_by_model(manifest) or "none",
                 fields_present=list(points)),
             "logs": logs, "failure": None,
             "counters": CounterBlock(stage="stage_6", started=1, completed=1,
@@ -2763,10 +2776,22 @@ def _close_probe(campaign: Campaign, out: dict, artefact_dir: str) -> None:
     A probe whose stage 3 never returned has no `ProbeResult` to write and its
     marker therefore stays, which is the marker doing its job: the directory
     holds whatever the dead stage had written and nothing is deleted.
+
+    THE STOPPING REASON IS COPIED ONTO THE RECORD HERE (W3). The driver assigned
+    `result.stopping_stage` five times and `result.stopping_reason` never, so
+    the column carried stage 3's build classification for the life of the probe:
+    a candidate that reached the gate and was refused as `not_minimal` was
+    recorded as `assertion_fired`, and `feedback._reason` rendered
+    `f"{build_status}:{stopping_reason}"` into every `FeedbackEntry` - so the
+    model driving the seeded arm's next iteration was told the wrong thing about
+    what happened to its last probe, which is exactly the signal FR-16 exists to
+    carry.
     """
     result = out["probe_result"]
     if result is None:
         return
+    result.stopping_stage = out["stopping_stage"]
+    result.stopping_reason = out["stopping_reason"]
     write_probe_result(campaign.store, result, artefact_dir)
     write_artefact(artefact_dir, PARTIAL, None, store=campaign.store)
 
@@ -3638,8 +3663,23 @@ def run_campaign(args, out) -> int:
 
     from circt_bug_loop import results as results_module
 
-    rendered = results_module.render_results(store, manifest)["rendered"]
+    # W-19b #4: the artefact is rendered AFTER the ledger and the store are
+    # complete, with FR-10.2's labelled set supplied, and a refusal is written
+    # down rather than raised out of `main` as a traceback. A campaign used to
+    # run both four-hour arm windows and then die without writing its results.
     (run_root / "results").mkdir(parents=True, exist_ok=True)
+    try:
+        rendered = results_module.render_results(
+            store, manifest,
+            labelled_pairs=results_module.load_labelled_pairs())["rendered"]
+    except results_module.ResultsIncomplete as refusal:
+        (run_root / "results" / "results_refused.txt").write_text(
+            "\n".join(refusal.missing) + "\n", encoding="utf-8")
+        print(f"the results artefact refused to render; "
+              f"{len(refusal.missing)} element(s) named in "
+              f"{run_root / 'results' / 'results_refused.txt'}", file=out)
+        print(json.dumps(outcome["arms"], sort_keys=True, indent=2), file=out)
+        return 3
     (run_root / "results" / "results.md").write_text(rendered, encoding="utf-8")
     print(json.dumps(outcome["arms"], sort_keys=True, indent=2), file=out)
     return 0

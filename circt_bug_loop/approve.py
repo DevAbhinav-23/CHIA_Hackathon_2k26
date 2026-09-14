@@ -158,17 +158,31 @@ def refusal(store: LoopStore, case: dict, caps: dict) -> Optional[str]:
                 f"{filing['approver']} at {filing['approved_at_utc']}: approval "
                 f"is per report and does not repeat (FR-13.13)")
 
+    # Both caps are PER CAMPAIGN RUN (W11). `loop.db` persists across runs and
+    # `--resume` depends on that, so a lifetime count against
+    # `budget.filings_total` held every report of every campaign after the
+    # tenth approval, whichever run had made it. The lifetime figure is shown
+    # beside the run's for information and is compared against nothing.
+    run_id = candidate["run_manifest_id"]
     today = _utc()[:10]
+    lifetime = store.query_one("SELECT COUNT(*) AS n FROM filing")["n"]
     filed_today = store.query_one(
-        "SELECT COUNT(*) AS n FROM filing WHERE approved_at_utc LIKE ?",
-        (f"{today}%",))["n"]
+        "SELECT COUNT(*) AS n FROM filing "
+        "JOIN candidate ON candidate.candidate_id = filing.candidate_id "
+        "WHERE candidate.run_manifest_id = ? AND filing.approved_at_utc LIKE ?",
+        (run_id, f"{today}%"))["n"]
     if filed_today >= caps["filings_per_day"]:
         return (f"the per-UTC-day filing cap is {caps['filings_per_day']} and "
-                f"{filed_today} have been approved on {today}: held (FR-13.8)")
-    total = store.query_one("SELECT COUNT(*) AS n FROM filing")["n"]
+                f"{filed_today} have been approved on {today} in this run: held "
+                f"(FR-13.8); {lifetime} across every run, for information")
+    total = store.query_one(
+        "SELECT COUNT(*) AS n FROM filing "
+        "JOIN candidate ON candidate.candidate_id = filing.candidate_id "
+        "WHERE candidate.run_manifest_id = ?", (run_id,))["n"]
     if total >= caps["filings_total"]:
         return (f"the total filing cap is {caps['filings_total']} and {total} "
-                f"have been approved: held (FR-13.8)")
+                f"have been approved in this run: held (FR-13.8); {lifetime} "
+                f"across every run, for information")
 
     evidence = json.loads((case["dedup"] or {}).get("evidence_json") or "{}")
     if GOOD_FIRST_ISSUE in (evidence.get("issue_labels") or []):

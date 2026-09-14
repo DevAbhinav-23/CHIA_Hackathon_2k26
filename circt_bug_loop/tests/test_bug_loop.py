@@ -1626,3 +1626,107 @@ def test_T_U_driver_39_recorded_mode_needs_no_credential(monkeypatch, capsys):
         ["--mode", "discovery", "--generator", "recorded"])
     assert bug_loop.repair_enabled(args) is False
     assert bug_loop.resolved_config(args)["repair_enabled"] is False
+
+
+def test_T_U_driver_40_the_probe_record_carries_the_reason_it_stopped(tmp_path: Path):
+    """T-U-driver-40 (W3, FR-16): `stopping_reason` is the PROBE's, not stage 3's.
+
+    New id, W-20b. The driver assigned `result.stopping_stage` five times and
+    `result.stopping_reason` never, so the column carried stage 3's build
+    classification for the life of the probe: a candidate that reached the gate
+    carried `assertion_fired`, and `feedback._reason` renders
+    `f"{build_status}:{stopping_reason}"` into every `FeedbackEntry`, so the
+    model driving the seeded arm's next iteration was told the wrong thing
+    about what happened to its last probe - the signal FR-16 exists to carry.
+    Fixture: a throwaway `loop.db`. Tier 0.
+    """
+    run = mini_campaign(tmp_path)
+    rows = run["store"].query(
+        "SELECT probe_result.stopping_stage, probe_result.stopping_reason, "
+        "probe_result.build_status FROM probe_result WHERE run_manifest_id = ?",
+        (_RUN,))
+    assert rows, "the campaign wrote no probe_result row"
+    reached = {(row["stopping_stage"], row["stopping_reason"]) for row in rows}
+    # The fake stages take some probes to the gate and some down the
+    # differential path; no recorded reason is stage 3's classification, which
+    # is the whole of W3.
+    assert ("gate", "new_bug") in reached, reached
+    assert any(stage != "stage_3" for stage, _ in reached), reached
+    for row in rows:
+        assert row["stopping_reason"] not in (
+            "assertion_fired", "not_run", "tool_rejected_input"), row
+
+    # And what the outcome dict said is what the row says, field for field.
+    for seed in run["outcome"]["seeds"]:
+        for probe in seed["probes"]:
+            row = run["store"].query_one(
+                "SELECT stopping_stage, stopping_reason FROM probe_result "
+                "WHERE probe_id = ?", (probe["probe_id"],))
+            assert row["stopping_stage"] == probe["stopping_stage"]
+            assert row["stopping_reason"] == probe["stopping_reason"]
+
+
+def test_T_U_driver_41_the_labelled_set_is_package_data_and_a_refusal_is_written(
+        tmp_path: Path):
+    """T-U-driver-41 (W-19b #4): the set has a non-test home and the driver reads it.
+
+    New id, W-20b. `run_campaign` called `render_results(store, manifest)` with
+    no way to pass FR-10.2's labelled set at all, `_dedup_rates`'s gap fired on
+    every run, `ResultsIncomplete` is a bare `Exception` and `main` caught four
+    other classes - so a campaign ran both four-hour arm windows and then died
+    with a traceback instead of writing its results artefact. The set is now
+    package data, which is also the only place `runtime_env` would ship it
+    from. Fixture: `circt_bug_loop/data/labelled_pairs.json`. Tier 0.
+    """
+    from circt_bug_loop import results as results_module
+
+    assert results_module.LABELLED_PAIRS.is_file()
+    assert results_module.LABELLED_PAIRS.parent.name == "data"
+    assert "tests" not in results_module.LABELLED_PAIRS.parts
+    pairs = results_module.load_labelled_pairs()
+    assert len(pairs) >= 20
+    assert {p["label"] for p in pairs} == {"duplicate", "distinct"}
+    assert all(isinstance(p["a"], str) and isinstance(p["b"], str) for p in pairs)
+
+    # The driver catches the refusal, writes it down and exits non-zero, with
+    # the ledger and the store already complete.
+    source = inspect.getsource(bug_loop.run_campaign)
+    assert "load_labelled_pairs()" in source
+    assert "except results_module.ResultsIncomplete" in source
+    assert "results_refused.txt" in source
+    assert "return 3" in source
+
+    # And the refusal really is the one the labelled set causes on a store that
+    # holds no fingerprint for either side, which is every campaign's today.
+    run = mini_campaign(tmp_path)
+    with pytest.raises(results_module.ResultsIncomplete) as raised:
+        results_module.render_results._chia_original(
+            run["store"], run["manifest"], labelled_pairs=pairs)
+    assert any("labelled duplicate-pair set names candidates" in m
+               for m in raised.value.missing), raised.value.missing
+
+
+def test_T_U_driver_42_the_trailer_names_no_model_that_did_not_run():
+    """T-U-driver-42 (W-19b #7, FR-11.6): `Assisted-by:` follows `stages_metered`.
+
+    New id, W-20b. `render_report` read the trailer off
+    `manifest.model_ids['triage_report']` in three places, so a
+    `--generator recorded` report whose FIRST line says no model turn was made
+    still ended `Assisted-by: vertex:gemini-3.8-flash`. Fixture: none. Tier 0.
+    """
+    from circt_bug_loop.triage_task import assisted_by, assisted_by_model
+
+    live = manifest(args=parsed_args())
+    assert live.stages_metered["stage_6"] is True
+    assert assisted_by_model(live) == live.model_ids["triage_report"]
+    assert assisted_by(live) == f"Assisted-by: {live.model_ids['triage_report']}"
+
+    recorded = manifest(args=parsed_args(generator="recorded"))
+    assert recorded.stages_metered["stage_6"] is False
+    assert recorded.stages_metered["stage_1"] is False
+    assert recorded.stages_metered["stage_2"] is False
+    assert recorded.stages_metered["stage_7"] is False
+    assert assisted_by_model(recorded) is None
+    trailer = assisted_by(recorded)
+    assert trailer.startswith("Assisted-by: none")
+    assert "gemini" not in trailer and "vertex" not in trailer

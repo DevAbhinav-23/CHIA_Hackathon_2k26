@@ -80,6 +80,38 @@ BUDGET_TRUNCATED = "reduction_budget_truncated"
 IMAGE_UNAVAILABLE = "image_unavailable"
 
 
+#: FR-10.2's hand-labelled duplicate-pair set, as package DATA. It is not a
+#: test fixture: `render_results` takes it on every campaign, and W-19b measured
+#: what its absence cost - the driver called the node with no set at all, the
+#: gap fired on every run, and a campaign ran both four-hour arm windows and
+#: then died with a traceback instead of writing its artefact. `runtime_env`
+#: ships the package and not `tests/`, so a set under `tests/` could not have
+#: reached a worker either. `data/README.md` records what the set is.
+LABELLED_PAIRS = Path(__file__).resolve().parent / "data" / "labelled_pairs.json"
+
+
+def load_labelled_pairs(path=None) -> list:
+    """Read FR-10.2's labelled set into the three keys `render_results` reads.
+
+    The committed document carries the whole judgement - the rule, the
+    justification, the instant, and both sides' recorded failures - and the
+    renderer needs the label and two candidate ids, which are the sides' own.
+
+    Returns:
+        list[dict] with keys `label`, `a`, `b`, `pair_id` and `rule`.
+    Worker:
+        head; one file read.
+    Raises:
+        OSError when the file is missing; ValueError on malformed JSON; KeyError
+        when a pair carries no `label` or no side.
+    """
+    document = json.loads(Path(path or LABELLED_PAIRS).read_text(encoding="utf-8"))
+    return [{"label": pair["label"], "pair_id": pair["pair_id"],
+             "rule": pair["rule"], "a": pair["a"]["candidate_id"],
+             "b": pair["b"]["candidate_id"]}
+            for pair in document["pairs"]]
+
+
 class ResultsIncomplete(Exception):
     """Raised by `render_results` when the store lacks an element §14.4 lists.
 
@@ -559,8 +591,14 @@ def _taxonomy(facts: dict, primary: list, gates: dict, repairs: list,
     for row in probe_results:
         if row["arm"] not in outcomes:
             continue
+        # `stopping_reason` is the reason the PROBE stopped since W3, so it is
+        # stage 3's own only while stage 3 is where the probe stopped; a
+        # `parse_error` that went on to the differential carries that verdict
+        # instead and is printed as the plain status rather than as a third
+        # `parse_error:` row that means something else.
         key = (f"parse_error:{row['stopping_reason']}"
-               if row["build_status"] == "parse_error" else row["build_status"])
+               if row["build_status"] == "parse_error"
+               and row["stopping_reason"] in PARSE_REASONS else row["build_status"])
         outcomes[row["arm"]][key] = outcomes[row["arm"]].get(key, 0) + 1
     facts["outcomes"] = outcomes
 
@@ -618,9 +656,15 @@ def _regeneration(facts: dict, store: LoopStore, candidates: list, gaps: dict) -
         else:
             stderr = Path(build["stderr_path"]).read_text(
                 encoding="utf-8", errors="backslashreplace")
+            # Against the BUILD's own status and not the ProbeResult's pair:
+            # since W3 `probe_result.stopping_reason` is the reason the PROBE
+            # stopped, wherever it stopped, and stage 3's own reason is not
+            # stored beside the status it refines. `build_result.status` is
+            # stage 3's record, written once and never updated, which is what
+            # FR-18.7's regeneration is about.
             again = classify_build(build["exit_status"], build["signal"], stderr,
                                    build["limit_hit"])
-            if again != (result["build_status"], result["stopping_reason"]):
+            if again[0] != build["status"]:
                 marks.append(f"build_classification_differs:{again[0]}:{again[1]}")
 
         reduced = store.query_one("SELECT * FROM reduced_case WHERE probe_id = ?",
@@ -1177,4 +1221,5 @@ def render_results(store: LoopStore, manifest: RunManifest, *,
                 seconds=time.monotonic() - started_at)}
 
 
-__all__ = ["render_results", "ResultsIncomplete", "ARMS", "BUCKETS"]
+__all__ = ["render_results", "ResultsIncomplete", "ARMS", "BUCKETS",
+           "LABELLED_PAIRS", "load_labelled_pairs"]

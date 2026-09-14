@@ -193,8 +193,18 @@ def aggregate(run_manifest_id: str, db_path: str, *, today: str = None) -> Budge
         if row["stop_reason"] is not None and arm in stops:
             stops[arm] = row["stop_reason"]
 
-    filings = store.query("SELECT approved_at_utc FROM filing")
+    # THIS RUN's filings (W11). `filing` is keyed by candidate and carries no
+    # run id of its own, so the predicate is the join. A lifetime count here is
+    # what made `stop_reason` return `filings_total` from the very first
+    # `_arm_stop` of every campaign after the tenth approval: `loop.db` persists
+    # across runs and `--resume` depends on that.
+    filings = store.query(
+        "SELECT filing.approved_at_utc FROM filing "
+        "JOIN candidate ON candidate.candidate_id = filing.candidate_id "
+        "WHERE candidate.run_manifest_id = ?", (run_manifest_id,))
+    lifetime = store.query("SELECT approved_at_utc FROM filing")
     return BudgetLedger(
+        filings_lifetime_total=len(lifetime),
         run_manifest_id=run_manifest_id,
         per_arm_window=per_arm_window,
         per_arm_stage=per_arm_stage,

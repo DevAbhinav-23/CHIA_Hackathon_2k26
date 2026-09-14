@@ -1,6 +1,6 @@
 {
   "arm": "mutation",
-  "artefact_dir": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-a23e35189e1c",
+  "artefact_dir": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-bd637a22ab0f",
   "assertion_site": null,
   "assertion_text": null,
   "build_status": "parse_error",
@@ -10,7 +10,7 @@
   "limit_hit": null,
   "oracle_class": null,
   "oracle_fired": false,
-  "probe_id": "p-a23e35189e1c",
+  "probe_id": "p-bd637a22ab0f",
   "reduced_path": null,
   "reduced_text": null,
   "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",

@@ -314,3 +314,78 @@ def _run_mutation(record: schema.SeedRecord, tmp_path, cap: int) -> dict:
                       "run_manifest_id": "run-1",
                       "artefact_dir": str(tmp_path / "iter_0"),
                       "mutator_set_path": str(mutators.DEVELOPMENT_SET)})
+
+
+@pytest.mark.t0
+def test_T_U_mut_11_the_seed_int_fits_a_signed_sqlite_integer():
+    """T-U-mut-11 (W-19b #2, §8.2 rule 5): the derivation is masked to 63 bits.
+
+    New id, W-20b. `int.from_bytes(digest[:8], "big")` is an UNSIGNED 64-bit
+    integer and SQLite's INTEGER is SIGNED, so `write_probe` raised
+    `OverflowError` out of `SQLiteNode.execute` - OUTSIDE `drive_probe`'s try,
+    so it propagated through `drive_seed` and `campaign_drive` and stopped the
+    whole campaign. Measured then: 9998 of 20000 derivations exceeded
+    `2**63 - 1`, and the expected time to failure in a pilot's mutation arm was
+    the second probe.
+
+    Pass criterion: over the same 20000 derivations, none exceeds it; each is
+    still deterministic in its five inputs and distinct across them; and a real
+    `sqlite3` accepts the largest one this function can now produce.
+
+    Fixture: none. Tier 0.
+    """
+    import sqlite3
+
+    seen = set()
+    for index in range(20000):
+        value = mutators.mutant_seed_int("a" * 40, f"test/{index}.mlir",
+                                         "mlir.text.int.flip", 1, index)
+        assert 0 <= value <= mutators.SEED_INT_MASK, (index, value)
+        seen.add(value)
+    assert len(seen) == 20000, "the mask did not collapse two derivations into one"
+    assert mutators.SEED_INT_MASK == 2 ** 63 - 1
+
+    # Deterministic in all five inputs, and different in each of them.
+    first = mutators.mutant_seed_int("a" * 40, "t.mlir", "m.t.i.flip", 1, 0)
+    assert first == mutators.mutant_seed_int("a" * 40, "t.mlir", "m.t.i.flip", 1, 0)
+    for changed in (("b" * 40, "t.mlir", "m.t.i.flip", 1, 0),
+                    ("a" * 40, "u.mlir", "m.t.i.flip", 1, 0),
+                    ("a" * 40, "t.mlir", "m.t.i.zero", 1, 0),
+                    ("a" * 40, "t.mlir", "m.t.i.flip", 2, 0),
+                    ("a" * 40, "t.mlir", "m.t.i.flip", 1, 1)):
+        assert mutators.mutant_seed_int(*changed) != first
+
+    # The bound is SQLite's own, asserted against SQLite and not against a
+    # comment: the mask's value stores and the next integer up does not.
+    connection = sqlite3.connect(":memory:")
+    connection.execute("CREATE TABLE t (v INTEGER)")
+    connection.execute("INSERT INTO t VALUES (?)", (mutators.SEED_INT_MASK,))
+    with pytest.raises(OverflowError):
+        connection.execute("INSERT INTO t VALUES (?)", (mutators.SEED_INT_MASK + 1,))
+    connection.close()
+
+
+@pytest.mark.t0
+def test_T_U_mut_12_every_committed_mutation_spec_fits():
+    """T-U-mut-12 (W-19b #2): no committed `ProbeSpec` carries an unstorable seed.
+
+    New id, W-20b. Both recorded mutation fixtures were over `2**63 - 1` when
+    the defect was found; they were re-recorded by the masked derivation.
+    Fixture: `contract/fixtures/**/probe_spec/*.json`. Tier 0.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    from circt_bug_loop.contract import schema as _schema
+
+    root = _Path(_schema.__file__).resolve().parent / "fixtures"
+    specs = sorted(root.rglob("probe_spec/*.json"))
+    assert specs, "no committed ProbeSpec fixture"
+    mutation = 0
+    for path in specs:
+        value = _json.loads(path.read_text(encoding="utf-8"))["mutator_seed_int"]
+        if value is None:
+            continue
+        mutation += 1
+        assert 0 <= value <= mutators.SEED_INT_MASK, (path.name, value)
+    assert mutation >= 2, "the mutation arm's fixtures are the ones at risk"

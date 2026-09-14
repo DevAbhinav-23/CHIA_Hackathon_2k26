@@ -6,7 +6,7 @@
   "metered": true,
   "observed": {
     "cost_usd": null,
-    "cpu_seconds": 0.3115,
+    "cpu_seconds": 0.33382,
     "tokens_in": null,
     "tokens_out": null
   },

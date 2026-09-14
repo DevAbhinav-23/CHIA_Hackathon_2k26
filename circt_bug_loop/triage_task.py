@@ -1106,6 +1106,42 @@ def render_report(template: Literal["primary", "differential"],
     return Template(text).substitute(values)
 
 
+def assisted_by_model(manifest: RunManifest) -> Optional[str]:
+    """The model that ACTUALLY ran stage 6, or None when no turn was made.
+
+    Read off `RunManifest.stages_metered["stage_6"]`, which is the run's own
+    statement about whether stage 6 was a model turn, and not off `model_ids`,
+    which is what the run would have used had it made one.
+    """
+    if not manifest.stages_metered.get("stage_6", True):
+        return None
+    return manifest.model_ids["triage_report"]
+
+
+def assisted_by(manifest: RunManifest) -> str:
+    """FR-11.6's trailer: the model that ACTUALLY ran, or a sentence saying none.
+
+    `RunManifest.stages_metered["stage_6"]` is the run's own statement about
+    whether stage 6 was a model turn. Under `--generator recorded` it is False
+    and no turn was made anywhere, and the rendered report's first line says
+    exactly that - while its last line said `Assisted-by: vertex:gemini-3.8-flash`,
+    because this was read off `model_ids` in three places with nothing asking
+    whether the model had run (W-19b #7). One artefact cannot state both.
+
+    Returns:
+        str, the trailer line.
+    Worker:
+        pure; it reads two manifest fields.
+    Raises:
+        nothing.
+    """
+    model = assisted_by_model(manifest)
+    if model is None:
+        return ("Assisted-by: none. No model turn was made for this report "
+                "(FR-11.8); every figure in it is read off the record.")
+    return f"Assisted-by: {model}"
+
+
 def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                     verdict: Optional[OracleVerdict],
                     dedup: Optional[DedupVerdict],
@@ -1143,7 +1179,7 @@ def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
             "- This screen is incomplete by construction (FR-15.3): a seed's "
             "siblings may be fixed in commits whose subjects do not name them."]),
         "fingerprint": candidate.fingerprint,
-        "assisted_by": f"Assisted-by: {manifest.model_ids['triage_report']}",
+        "assisted_by": assisted_by(manifest),
     }
 
 
@@ -1165,7 +1201,7 @@ def _differential_values(candidate: CandidateRecord,
                 "divergence_point": None, "stimulus": None, "x_policy": None,
                 "prior_art": None, "arm": candidate.arm,
                 "build_identity": None,
-                "assisted_by": f"Assisted-by: {manifest.model_ids['triage_report']}"}
+                "assisted_by": assisted_by(manifest)}
     driver = dict(manifest.differential_driver)
     return {
         "arcilator_behaviour": (
@@ -1196,7 +1232,7 @@ def _differential_values(candidate: CandidateRecord,
             f"- Build flags: {image.get('flag_string')}",
             "- Built with -UNDEBUG, so the compiler's internal checks are on."]),
         "arm": candidate.arm,
-        "assisted_by": f"Assisted-by: {manifest.model_ids['triage_report']}",
+        "assisted_by": assisted_by(manifest),
     }
 
 
@@ -1338,7 +1374,7 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         report = Report(candidate_id=candidate.candidate_id, path="",
                         template=template, title="", classification="untriaged",
                         classification_reason=reason, rendered_sha256="",
-                        assisted_by=manifest.model_ids["triage_report"],
+                        assisted_by=assisted_by_model(manifest) or "none",
                         fields_present=[])
         return {"report": report, "logs": logs, "failure": failure,
                 "counters": CounterBlock(
@@ -1354,7 +1390,7 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         title=prose["title"], classification=classification,
         classification_reason=reason,
         rendered_sha256=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
-        assisted_by=manifest.model_ids["triage_report"],
+        assisted_by=assisted_by_model(manifest) or "none",
         fields_present=list(points))
     return {"report": report, "logs": logs, "failure": None,
             "counters": CounterBlock(
@@ -1488,5 +1524,6 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "MIRROR_PAGE_CEILING", "mirror_tokens", "mirror_screen",
            "mirror_walk", "frame_paths", "frame_symbols",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",
+           "assisted_by", "assisted_by_model",
            "issue_mirror_refresh", "dedup_and_screen", "triage_report",
            "render_report"]

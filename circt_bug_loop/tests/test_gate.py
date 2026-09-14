@@ -538,10 +538,19 @@ def test_gate_23_the_second_conjunct_after_parse(tmp_path, monkeypatch):
     assert pipeline.q3_after_parse is True and pipeline.q3_valid is True
 
 
-def test_gate_23b_no_frame_and_no_pipeline_leaves_it_unanswered(tmp_path,
+def test_gate_23b_no_frame_and_no_pipeline_refuses_as_undecided(tmp_path,
                                                                 monkeypatch):
-    """The None branch: nothing in the record decides the conjunct, and an
-    unanswered conjunct does not fail a question that the check itself passed."""
+    """W5, FR-13.10: an undecidable conjunct leaves question 3 UNANSWERED.
+
+    Rewritten by W-20b. `_after_parse` returns None when there is no in-scope
+    frame with a line and no pass pipeline, which is the ordinary shape of a
+    `fatal_error` candidate whose frames are empty; `gate_decide` downgraded
+    only on an explicit False, so an undecidable second conjunct was neither a
+    refusal nor an `undecided` bucket - it PASSED question 3 and the candidate
+    went on to question 4 and to a human. FR-13.10's rule is that an unanswered
+    question refuses, and `decide` already turns a null answer into question 3
+    and the `undecided` bucket; what was missing was the null.
+    """
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir)
     store = _store(tmp_path, candidate, argv=["-o", "/dev/null"])
@@ -549,7 +558,14 @@ def test_gate_23b_no_frame_and_no_pipeline_leaves_it_unanswered(tmp_path,
     decision, _, _ = _decide(tmp_path, monkeypatch, candidate=candidate,
                              store=store)
     assert decision.q3_after_parse is None
-    assert decision.q3_valid is True
+    assert decision.q3_valid is None
+    assert decision.stopped_at_question == 3
+    assert decision.decision == "nothing"
+    assert decision.taxonomy_bucket == "undecided"
+    # The CHECK itself passed, which is why the refusal has to come from the
+    # conjunct: `q3_validity_basis` records what the check said.
+    assert decision.q3_validity_basis in ("parsed", "checker_failed")
+    assert decision.q4_new is None, "question 4 is not reached"
 
 
 def test_gate_26_question_three_runs_at_the_candidates_own_commit(tmp_path,

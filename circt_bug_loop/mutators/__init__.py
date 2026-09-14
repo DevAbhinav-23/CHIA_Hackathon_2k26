@@ -38,6 +38,12 @@ from typing import Optional
 #: of any language when it declares `any`.
 LANGUAGES = ("mlir", "fir", "sv", "any")
 
+#: What a derived mutant seed is masked to (W-19b finding 2). SQLite's INTEGER
+#: is a SIGNED 64-bit value and `mutant_seed_int` derived an unsigned one, so
+#: half of every mutation arm's probes raised `OverflowError` on their way into
+#: the store and stopped the campaign.
+SEED_INT_MASK = 2 ** 63 - 1
+
 #: 8.1's `kind` values, and the seven named replacement operations.
 KINDS = ("text", "line", "argv")
 NUMERIC_OPERATIONS = ("flip", "zero", "max", "off_by_one")
@@ -267,10 +273,20 @@ def mutant_seed_int(seed_sha: str, test_path: str, mutator_id: str,
     Derived rather than drawn, so the whole arm is reproducible from the
     `SeedRecord` and the frozen set with no state carried between calls, and
     `random.seed()` is never called on the module-level generator (FR-05.3).
+
+    MASKED TO 63 BITS (W-19b finding 2). `int.from_bytes(digest[:8], "big")` is
+    an UNSIGNED 64-bit integer and SQLite's INTEGER is SIGNED, so `write_probe`
+    raised `OverflowError` out of `SQLiteNode.execute` - outside `drive_probe`'s
+    own `try`, so it propagated through `drive_seed` and `campaign_drive` and
+    stopped the whole campaign. Measured: 9998 of 20000 derivations exceeded
+    `2**63 - 1`, both committed mutation `ProbeSpec` fixtures were already over
+    it, and the expected time to failure in a pilot's mutation arm was the
+    SECOND probe. The mask lands before A7 freezes any set, so the mutation
+    baseline is defined once, by the masked derivation.
     """
     digest = hashlib.sha256(
         f"{seed_sha}|{test_path}|{mutator_id}|{iteration}|{index}".encode("utf-8"))
-    return int.from_bytes(digest.digest()[:8], "big")
+    return int.from_bytes(digest.digest()[:8], "big") & SEED_INT_MASK
 
 
 def mutate_seed(seed, iteration: int, cap: int, mutator_set: dict,
@@ -329,7 +345,7 @@ def mutate_seed(seed, iteration: int, cap: int, mutator_set: dict,
 
 
 __all__ = ["DEVELOPMENT_SET", "FROZEN_SET", "ID", "KINDS", "LANGUAGES",
-           "MAX_INT", "NAMED_OPERATIONS", "NUMERIC_OPERATIONS",
+           "MAX_INT", "NAMED_OPERATIONS", "NUMERIC_OPERATIONS", "SEED_INT_MASK",
            "SEQUENCE_OPERATIONS", "SET_PATH", "MutatorError", "MutatorSetError",
            "apply", "eligible", "language_of", "load_set", "mutant_seed_int",
            "mutate_seed", "set_sha256"]

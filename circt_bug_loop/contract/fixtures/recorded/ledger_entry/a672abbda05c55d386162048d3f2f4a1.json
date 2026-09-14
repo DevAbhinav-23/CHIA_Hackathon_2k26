@@ -1,12 +1,12 @@
 {
-  "amount": 0.3115,
+  "amount": 0.33382,
   "arm": "shared",
   "contract_version": "2.1",
   "entry_id": "a672abbda05c55d386162048d3f2f4a1",
   "metered": false,
   "observed": {
     "cost_usd": null,
-    "cpu_seconds": 0.3115,
+    "cpu_seconds": 0.33382,
     "tokens_in": null,
     "tokens_out": null
   },

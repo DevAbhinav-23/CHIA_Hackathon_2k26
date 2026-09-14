@@ -364,3 +364,78 @@ def test_T_U_ledger_11(tmp_path: Path):
     assert ledger_module.stop_reason(aggregated, "mutation", generous) is None
     tight = budget(campaign_spend_cap_usd=0.001, arm_window_seconds=1.0)
     assert ledger_module.stop_reason(aggregated, "seeded", tight) == "campaign_spend_cap"
+
+
+@pytest.mark.t0
+def test_T_U_ledger_15_filing_caps_are_per_run(tmp_path: Path):
+    """T-U-ledger-15 (W11, FR-13.8): the caps count THIS run's filings.
+
+    New id, W-20b. `aggregate` ran `SELECT approved_at_utc FROM filing` with no
+    predicate and `stop_reason` compared the count against
+    `budget.filings_total`; `loop.db` persists across runs and `--resume`
+    depends on that, so after ten lifetime approvals every arm of every
+    subsequent run returned `filings_total` from its very first `_arm_stop` and
+    mined nothing. Whether the caps are per campaign or lifetime is a question
+    FR-13.8 does not settle and the code had chosen lifetime by omission. The
+    lifetime figure is still reported, for information.
+
+    Fixture: a throwaway `loop.db` carrying two runs' filings. Tier 0.
+    """
+    loop = open_store(tmp_path)
+    seed_rows(loop)                                  # run-01, one candidate
+    caps = budget(filings_total=2, filings_per_day=2)
+
+    def approve(candidate_id: str, when: str) -> None:
+        loop.insert("filing", {
+            "candidate_id": candidate_id, "approver": "adi",
+            "approved_at_utc": when, "decision": "report",
+            "licence_confirmed": 1, "licence_confirmed_at_utc": when,
+            "url_source": "pasted", "issue_number": None, "issue_url": None,
+            "prefill_url_length": None, "prefill_fallback_reason": None,
+            "confirmed": 0, "confirmed_at_utc": None, "confirmation_url": None})
+
+    # Another run's candidates, and two filings approved against them.
+    loop.insert("run", {
+        "run_manifest_id": "run-02", "mode": "discovery", "seed_set": "171",
+        "manifest_json": "{}", "budget_file_sha": "b" * 40,
+        "cluster_yaml_sha": "c" * 40, "artefact_root": "/artefacts",
+        "started_utc": "2026-09-20T00:00:00+00:00", "ended_utc": None})
+    for index in range(2):
+        probe_id, candidate_id = f"probe-o{index}", f"cand-o{index}"
+        loop.insert("probe", {
+            "probe_id": probe_id, "run_manifest_id": "run-02", "seed_sha": "a" * 40,
+            "arm": "seeded", "iteration": 1, "tool": "circt-opt", "argv_json": "[]",
+            "polarity": "expect_zero", "shape": "plain", "input_path": "/in.mlir",
+            "mutator_id": None, "mutator_seed_int": None, "source_test_path": None,
+            "spec_json": "{}", "artefact_dir": "/artefacts/run-02"})
+        loop.insert("candidate", {
+            "candidate_id": candidate_id, "local_id": None, "probe_id": probe_id,
+            "run_manifest_id": "run-02", "arm": "seeded", "run_commit": "e" * 40,
+            "image_digest": "sha256:aa", "oracle_class": "assertion",
+            "assertion_text": "x", "assertion_site": "A.cpp:1",
+            "frame_tuple_json": "[]", "out_of_scope_root": 0,
+            "contaminated_symbol": 0, "contaminated_file": 0,
+            "contamination_lower_bound": "seed_commit", "triage_class": "bug",
+            "held_reason": None, "taxonomy_bucket": None,
+            "artefact_dir": "/artefacts/run-02",
+            "created_utc": "2026-09-20T01:00:00+00:00"})
+        approve(candidate_id, f"{_DAY}T00:00:00+00:00")
+
+    # This run has none of them.
+    ledger = ledger_module.aggregate(_RUN, loop.db_path, today=_DAY)
+    assert ledger.filings_total == 0 and ledger.filings_today == 0
+    assert ledger.filings_lifetime_total == 2
+    assert ledger_module.stop_reason(ledger, "seeded", caps) is None
+
+    # One of its own is counted, and the second binds the cap.
+    approve("cand-01", f"{_DAY}T00:00:00+00:00")
+    ledger = ledger_module.aggregate(_RUN, loop.db_path, today=_DAY)
+    assert (ledger.filings_total, ledger.filings_lifetime_total) == (1, 3)
+    assert ledger_module.stop_reason(ledger, "seeded", caps) is None
+
+    seed_rows(loop, probe_id="probe-02", candidate_id="cand-02",
+              artefact_dir="/artefacts/run-01/probe-02")
+    approve("cand-02", f"{_DAY}T00:00:00+00:00")
+    ledger = ledger_module.aggregate(_RUN, loop.db_path, today=_DAY)
+    assert (ledger.filings_total, ledger.filings_lifetime_total) == (2, 4)
+    assert ledger_module.stop_reason(ledger, "seeded", caps) == "filings_total"

@@ -45,7 +45,7 @@ from pathlib import Path
 
 import pytest
 
-from circt_bug_loop import triage_task
+from circt_bug_loop import results, triage_task
 from circt_bug_loop.contract import schema
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, Frame,
@@ -82,7 +82,14 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 MIRROR = FIXTURES / "mirror"
 DEDUP = FIXTURES / "dedup"
 TRIAGE = FIXTURES / "triage"
-PAIRS = sorted((DEDUP / "pairs").glob("*.json"))
+#: FR-10.2's labelled set, read from its PACKAGE HOME. It moved out of
+#: `tests/fixtures/dedup/pairs/` at W-20b: `render_results` takes it on every
+#: campaign and `runtime_env` ships the package and not `tests/`, so a set under
+#: `tests/` could reach neither the driver nor a worker (W-19b #4). The tests
+#: read the same file the flow does, which is the point of moving it.
+PAIRS = [_p for _p in json.loads(
+    results.LABELLED_PAIRS.read_text(encoding="utf-8"))["pairs"]]
+PAIR_BY_ID = {_p["pair_id"]: _p for _p in PAIRS}
 
 #: A synthetic value. No test reads a real token and no fixture carries one.
 FAKE_TOKEN = "synthetic-not-a-real-token"
@@ -437,14 +444,14 @@ def test_triage_03_crash_fingerprint_is_the_signal_and_one_frame():
     """T-U-triage-03 (FR-10.1): signal plus the first stripped CIRCT frame, not
     the top-N tuple, and §3.7.1's measurement is asserted as a property of the
     labelled set rather than quoted."""
-    side = json.loads((DEDUP / "pairs/04.json").read_text())["a"]
+    side = PAIR_BY_ID["04"]["a"]
     fingerprint = _fingerprint_of(side)
     assert fingerprint.basis == "frames"
     assert fingerprint.value == "SIGSEGV\ncirct::sim::StringConcatOp::fold SimOps.cpp"
     assert ":" not in fingerprint.value.split("\n")[1].split(" ")[-1], \
         "no line number, so a one-line edit does not split one bug"
 
-    unstable = json.loads((DEDUP / "pairs/22.json").read_text())
+    unstable = PAIR_BY_ID["22"]
     left, right = _fingerprint_of(unstable["a"]), _fingerprint_of(unstable["b"])
     assert unstable["label"] == "duplicate"
     assert left.value != right.value, (
@@ -499,8 +506,7 @@ def test_triage_07_duplicate_relation_is_an_equivalence_relation():
     """T-U-triage-07 (FR-10.2): reflexive, symmetric and transitive over every
     ordered triple of the labelled pair set of §10."""
     items = []
-    for index, path in enumerate(PAIRS):
-        pair = json.loads(path.read_text())
+    for pair in PAIRS:
         items.append(_fingerprint_of(pair["a"], probe_id=f"{pair['pair_id']}a"))
         items.append(_fingerprint_of(pair["b"], probe_id=f"{pair['pair_id']}b"))
 
@@ -518,8 +524,7 @@ def test_triage_08_partition_does_not_depend_on_candidate_order():
     """T-U-triage-08 (FR-10.2): 100 shuffles of the candidate list give one
     partition, compared as a set of frozensets."""
     items = []
-    for path in PAIRS:
-        pair = json.loads(path.read_text())
+    for pair in PAIRS:
         for side in ("a", "b"):
             item = _fingerprint_of(pair[side], probe_id=f"{pair['pair_id']}{side}")
             item.fingerprint_stable = True
@@ -538,8 +543,7 @@ def test_triage_09_measured_collision_and_false_merge_rates(capsys):
     """T-U-triage-09 (FR-10.2, A-05): both rates are computed and printed; the
     test asserts they are reported, not that either meets a threshold."""
     pairs, by_rule = [], {}
-    for path in PAIRS:
-        raw = json.loads(path.read_text())
+    for raw in PAIRS:
         assert raw["label"] in ("duplicate", "distinct")
         assert raw["justification"] and raw["labelled_utc"]
         by_rule.setdefault(raw["rule"], []).append(raw["pair_id"])
@@ -902,7 +906,7 @@ def test_triage_15_screening_makes_no_github_request(tmp_path, monkeypatch):
     store = _store(tmp_path)
     _mirror_rows(store, json.loads((DEDUP / "known_issue/issues.json").read_text()))
 
-    pairs = [json.loads(path.read_text()) for path in PAIRS]
+    pairs = list(PAIRS)
     screened = 0
     while screened < 50:
         for pair in pairs:

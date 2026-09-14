@@ -241,24 +241,24 @@ def replay_turns(monkey: list, texts: list, files: dict) -> None:
     the code under test and the turn's TEXT is the recording.
     """
     pending = list(texts)
-    original_build, original_dispatch = generate_task.build_llm, generate_task.dispatch_turn
+    original_dispatch = generate_task.dispatch_turn
 
-    def _build(system_message, timeout_seconds, model_id, **kwargs):
-        return {"model": model_id}
-
-    def _dispatch(llm, user_message, tools, *, stage="stage_2"):
+    # Since K2 the node builds no backend at all - the client is `llm_turn`'s,
+    # on the `llm` worker - so `dispatch_turn` is the one call to replace and
+    # what it receives is the turn request's fields.
+    def _dispatch(system_message, user_message, tools, *, stage,
+                  timeout_seconds, model_id, guard=None):
         text = pending.pop(0)
         for name, content in (files.pop(text[:24], {}) or {}).items():
             tools[-1].write_probe(name, content)
         return {"result": text, "stream": f"[stream]\n{text}", "stderr": "",
                 "success": True,
-                "usage": {"tokens_in": 0, "tokens_out": 0, "num_turns": 1,
-                          "model": "replayed"}}
+                "usage": {"tokens_in": 0, "tokens_out": 0, "thinking_tokens": 0,
+                          "tool_use_prompt_tokens": 0, "num_turns": 1,
+                          "model": "replayed", "observed": True}}
 
-    generate_task.build_llm = _build
     generate_task.dispatch_turn = _dispatch
-    monkey.append(lambda: (setattr(generate_task, "build_llm", original_build),
-                           setattr(generate_task, "dispatch_turn", original_dispatch)))
+    monkey.append(lambda: setattr(generate_task, "dispatch_turn", original_dispatch))
 
 
 def record(root: Path) -> dict:
@@ -382,6 +382,9 @@ def record(root: Path) -> dict:
     args = SimpleNamespace(
         mode="discovery", arm="both", artefact_root=str(artefacts),
         repair_backend="vertex", repair_model=None, no_repair=False,
+        # W-19b's flag, which `repair_enabled` reads: this run is the `model`
+        # one with its two turns replayed, not the recorded-generator mode.
+        generator="model",
         forum_post_url="https://llvm.discourse.group/t/circt-bug-loop/0",
         forum_post_date="2026-09-14")
     manifest = bug_loop.build_manifest(

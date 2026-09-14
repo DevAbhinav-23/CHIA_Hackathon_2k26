@@ -438,8 +438,17 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 fields["q3_valid"], fields["q3_validity_basis"] = True, "parsed"
             else:
                 fields["q3_valid"], fields["q3_validity_basis"] = False, "parsed"
+            # FR-13.15's second conjunct, and FR-13.10 for its third case. The
+            # conjunct is UNDECIDABLE when there is no in-scope frame with a
+            # line and no pass pipeline, which is the ordinary shape of a
+            # `fatal_error` candidate whose frames are empty; only an explicit
+            # False downgraded, so an undecidable conjunct PASSED question 3
+            # silently (W5). An unanswered question refuses, and `decide` turns
+            # a null answer into question 3 and the `undecided` bucket.
             if fields["q3_valid"] and fields["q3_after_parse"] is False:
                 fields["q3_valid"] = False
+            elif fields["q3_valid"] and fields["q3_after_parse"] is None:
+                fields["q3_valid"] = None
             if fields["q3_valid"]:
                 # --- 4. is it new? -----------------------------------------
                 fields["q4_new"], fields["q4_reason"] = _question_4(candidate, dedup)

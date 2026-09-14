@@ -686,11 +686,17 @@ class BudgetLedger:
     per_arm_stage: dict               # arm -> {stage -> seconds occupancy}
     shared_stage: dict                # stage -> seconds occupancy, charged to no arm
     inputs_today: dict                # arm -> count, against the per-day safety cap
-    filings_today: int
-    filings_total: int
+    filings_today: int                # THIS RUN's, per UTC day (W11)
+    filings_total: int                # THIS RUN's (W11)
     spend_usd: float                  # campaign-wide, both arms and shared; 3.11
     per_arm_spend_usd: dict           # arm -> USD, reported beside the window
     stop_reason: dict                 # arm -> the cap or window that stopped it, or None
+    #: Every filing the store holds, whatever run approved it. Reported for
+    #: information and never compared against a cap: `loop.db` persists across
+    #: runs (`--resume` depends on it), so counting lifetime against
+    #: `budget.filings_total` stopped every arm of every later campaign at its
+    #: very first `_arm_stop` and mined nothing (W11).
+    filings_lifetime_total: int = 0
 
 
 @dataclass(kw_only=True)

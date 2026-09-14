@@ -1,0 +1,1019 @@
+{
+ "description": "FR-10.2's hand-labelled duplicate-pair set. Each pair is a HUMAN judgement about whether two recorded failures are the same bug, recorded before any fingerprint was computed over them; `triage_task.rates` measures the collision and false-merge rates by fingerprinting both sides and comparing the verdict to the label. It is package DATA and not a test fixture: `results.render_results` takes it as a parameter on every campaign, and W-19b measured a run that died with a traceback instead of writing its artefact because the driver had no way to pass one.",
+ "format_version": 1,
+ "pairs": [
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c01a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c01b",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "justification": "assertion_01's failure re-derived byte-differently; the assertion text and its file:line are unchanged, so it is one bug.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "01",
+   "rule": "R1"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c02a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c02b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "justification": "assertion_02's failure re-derived byte-differently; the assertion text and its file:line are unchanged, so it is one bug.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "02",
+   "rule": "R1"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:656",
+    "assertion_text": "detail::isPresent(Val) && \"dyn_cast on a non-existent value\"",
+    "candidate_id": "c03a",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::TypedAttr>"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_03"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:656",
+    "assertion_text": "detail::isPresent(Val) && \"dyn_cast on a non-existent value\"",
+    "candidate_id": "c03b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::TypedAttr>"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_03"
+   },
+   "justification": "assertion_03's failure re-derived byte-differently; the assertion text and its file:line are unchanged, so it is one bug.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "03",
+   "rule": "R1"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c04a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c04b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @Bar(in %x : i8, out o : i8) {\n  %z = comb.add %x, %x : i8\n  hw.output %z : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "justification": "crash_01's SIGSEGV re-derived from a renamed input; the signal and the first CIRCT frame are unchanged, so it is one bug.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "04",
+   "rule": "R1"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c05a",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c05b",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @Bar(in %x : i8, out o : i8) {\n  %z = comb.add %x, %x : i8\n  hw.output %z : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "justification": "fatal_error_01's refusal re-derived from a renamed input; the LLVM ERROR message and the first CIRCT frame are unchanged.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "05",
+   "rule": "R1"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c06a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "mutation",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c06b",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "justification": "assertion_01 reached once from a seeded probe and once from a mutation probe; the apparatus cannot tell the arms apart and the failure is identical.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "06",
+   "rule": "R2"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c07a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "b": {
+    "arm": "mutation",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c07b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "justification": "assertion_02 reached once from a seeded probe and once from a mutation probe; the apparatus cannot tell the arms apart and the failure is identical.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "07",
+   "rule": "R2"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c08a",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "b": {
+    "arm": "mutation",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c08b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "justification": "assertion_04 reached once from a seeded probe and once from a mutation probe; the apparatus cannot tell the arms apart and the failure is identical.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "08",
+   "rule": "R2"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c09a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "b": {
+    "arm": "mutation",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c09b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "justification": "crash_01 reached once from a seeded probe and once from a mutation probe; the apparatus cannot tell the arms apart and the failure is identical.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "09",
+   "rule": "R2"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c10a",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "b": {
+    "arm": "mutation",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c10b",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "justification": "fatal_error_01 reached once from a seeded probe and once from a mutation probe; the apparatus cannot tell the arms apart and the failure is identical.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "10",
+   "rule": "R2"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c11a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c11b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "justification": "One LLVM cast assertion fired from MooreToCore's VariableOpConversion and one from ElaborateObject; the shared Casting.h text is the generic cast<> check and the two lines are different.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "11",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:656",
+    "assertion_text": "detail::isPresent(Val) && \"dyn_cast on a non-existent value\"",
+    "candidate_id": "c12a",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::TypedAttr>"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_03"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c12b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "justification": "Two different LLVM casting assertions, dyn_cast against cast, from two different lines of Casting.h.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "12",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c13a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c13b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::verify SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "circt::sim::StringConcatOp::verify"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "justification": "Two SIGSEGVs in SimOps.cpp whose first CIRCT frame is a different member of the same op: fold against verify.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "13",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c14a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:231",
+    "assertion_text": "!candidateTopLevels.empty() && \"the instance graph must have at least one node\"",
+    "candidate_id": "c14b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "justification": "Two assertions one line apart in InstanceGraph.cpp, on different conditions.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "14",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c15a",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c15b",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "VariableOpConversion::matchAndRewrite",
+     "mlir::ConversionPattern::matchAndRewrite"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "justification": "Two fatal-error refusals in MooreToCore.cpp from two different conversion patterns.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "15",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c16a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c16b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "justification": "The case the assertion fingerprint cannot separate: assertion_04's failure as it would have been recorded under assertion_01's SDK, where the generic cast<> check sits at the same Casting.h line. Two different bugs, one fingerprint.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "16",
+   "rule": "R3"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c17a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:656",
+    "assertion_text": "detail::isPresent(Val) && \"dyn_cast on a non-existent value\"",
+    "candidate_id": "c17b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::TypedAttr>"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_03"
+   },
+   "justification": "assertion_01 and assertion_03 reduced to the same small module up to SSA and symbol renaming, so their structural hashes are equal; the assertion text and the frames are not, and the structural hash merges nothing.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "17",
+   "rule": "R4"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c18a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.156.0/include/llvm/Support/Casting.h:560",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c18b",
+    "fatal_message": null,
+    "fingerprint_frame": "ElaborateObjectPass::elaborateClass ElaborateObject.cpp",
+    "frame_names": [
+     "append<llvm::StringRef &>",
+     "operator<<<llvm::StringRef &>",
+     "operator",
+     "operator",
+     "operator"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_04"
+   },
+   "justification": "assertion_02 and assertion_04 reduced to the same small module up to SSA and symbol renaming, so their structural hashes are equal; the assertion text and the frames are not, and the structural hash merges nothing.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "18",
+   "rule": "R4"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c19a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c19b",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "justification": "crash_01 and fatal_error_01 reduced to the same small module up to SSA and symbol renaming, so their structural hashes are equal; the assertion text and the frames are not, and the structural hash merges nothing.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "19",
+   "rule": "R4"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/sdk-1.143.0/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "candidate_id": "c20a",
+    "fatal_message": null,
+    "fingerprint_frame": "VariableOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "createZeroValue",
+     "VariableOpConversion::matchAndRewrite",
+     "_M_reset",
+     "~_Optional_payload",
+     "~_Optional_base"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_01"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c20b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+     "getAbstractAttribute",
+     "getTypeID",
+     "classof<mlir::Attribute>",
+     "isPossible",
+     "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+   },
+   "justification": "assertion_01 and crash_01 reduced to the same small module up to SSA and symbol renaming, so their structural hashes are equal; the assertion text and the frames are not, and the structural hash merges nothing.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "20",
+   "rule": "R4"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c21a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+     "append<const char (&)[68]>",
+     "operator<<<const char (&)[68]>",
+     "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+     "SVTraceIVerilogPass::runOnOperation",
+     "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c21b",
+    "fatal_message": "Unsupported type for data layout",
+    "fingerprint_frame": "ClassNewOpConversion::matchAndRewrite MooreToCore.cpp",
+    "frame_names": [
+     "",
+     "",
+     "mlir::DataLayout::getTypeABIAlignment",
+     "mlir::detail::DataLayoutTypeInterfaceInterfaceTraits::Model<mlir::LLVM::LLVMStructType>::getTypeSizeInBits",
+     "mlir::detail::getDefaultTypeSizeInBits"
+    ],
+    "oracle_class": "fatal_error",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/fatal_error_01"
+   },
+   "justification": "assertion_02 and fatal_error_01 reduced to the same small module up to SSA and symbol renaming, so their structural hashes are equal; the assertion text and the frames are not, and the structural hash merges nothing.",
+   "label": "distinct",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "21",
+   "rule": "R4"
+  },
+  {
+   "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c22a",
+    "fatal_message": null,
+    "fingerprint_frame": "parseHWArray HWTypes.cpp",
+    "frame_names": [
+     "parseHWArray",
+     "circt::hw::ArrayType::parse",
+     "generatedTypeParser",
+     "mlir::detail::Parser::parseToken",
+     "mlir::Lexer::lexToken"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "03-LLD.md 3.7.1's ten-run measurement"
+   },
+   "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c22b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::hw::ArrayType::parse HWTypes.cpp.inc",
+    "frame_names": [
+     "circt::hw::ArrayType::parse",
+     "generatedTypeParser",
+     "mlir::detail::Parser::parseToken",
+     "mlir::Lexer::lexToken",
+     "mlir::detail::Parser::parseType"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "03-LLD.md 3.7.1's ten-run measurement"
+   },
+   "justification": "One !hw.array stack overflow, run twice. 03-LLD.md 3.7.1 measured the fingerprint frame taking three values over ten runs of this input, because the guard page is hit at a different point in the recursion each time. It is one bug and the rule splits it.",
+   "label": "duplicate",
+   "labelled_by": "architect, before any fingerprint was computed",
+   "labelled_utc": "2026-09-14",
+   "pair_id": "22",
+   "rule": "R1"
+  }
+ ],
+ "source": "W-10 §10, twenty-two pairs; eleven duplicate, eleven distinct, at least four per rule and five R4"
+}
