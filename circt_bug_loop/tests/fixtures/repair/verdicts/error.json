@@ -1,0 +1,10 @@
+{
+  "status": "error",
+  "reproduced": false,
+  "logs": {
+    "assess": {
+      "success": false
+    }
+  },
+  "notes": "git reset failed:\nfatal: bad object"
+}

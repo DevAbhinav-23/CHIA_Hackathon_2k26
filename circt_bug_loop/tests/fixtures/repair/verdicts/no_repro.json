@@ -1,0 +1,19 @@
+{
+  "status": "no_repro",
+  "reproduced": false,
+  "logs": {
+    "assess": {
+      "success": true
+    },
+    "repro": {
+      "success": true
+    },
+    "fix": {
+      "success": true
+    },
+    "writeup": {
+      "success": true
+    }
+  },
+  "repro_tail": "0 errors"
+}

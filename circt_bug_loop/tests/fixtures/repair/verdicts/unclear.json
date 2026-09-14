@@ -1,0 +1,19 @@
+{
+  "status": "unclear",
+  "reproduced": false,
+  "logs": {
+    "assess": {
+      "success": false
+    },
+    "repro": {
+      "success": true
+    },
+    "fix": {
+      "success": true
+    },
+    "writeup": {
+      "success": true
+    }
+  },
+  "notes": "the expected behaviour is not clear from the report"
+}
