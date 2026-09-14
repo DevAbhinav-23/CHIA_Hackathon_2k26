@@ -1253,13 +1253,28 @@ def interlock_probe(*, env=None, need_key: bool = True) -> dict:
             "key_ok": bool(key) and not key.startswith("${") if need_key else True}
 
 
-def check_12_live_model(*, head: dict, workers: dict) -> None:
-    """Check 12: the interlock and the key are set, and agree, on head and workers.
+def check_12_live_model(*, workers: dict, head: Optional[dict] = None) -> None:
+    """Check 12: the interlock and the key are set, and agree, wherever a turn is built.
 
-    *head* and each value of *workers* is what `interlock_probe` returned there,
-    which is two booleans; this check never sees a credential. A failure names
-    the worker and the variable and stops the run before one turn is dispatched,
-    so a campaign cannot discover the misconfiguration eight seeds in.
+    Each value of *workers*, and *head* when it is given, is what
+    `interlock_probe` returned there, which is two booleans; this check never
+    sees a credential. A failure names the place and the variable and stops the
+    run before one turn is dispatched, so a campaign cannot discover the
+    misconfiguration eight seeds in.
+
+    **The head is checked only where a turn would be BUILT there** (W-18), which
+    is a driver running with no Ray. Under Ray, `llm_turn` constructs the client
+    on the `llm` worker from that worker's own environment (K2, W7) and the
+    driver holds no credential at all - and §11.2 forbids forwarding one to it,
+    because `bug_loop_submit.sh`'s `--runtime-env-json` values are stored in the
+    job's metadata and shown by `chia job` and the dashboard. Requiring the head
+    to carry it made the submitted wrapper - which §11.2 mandates for NFR-09's
+    retrievable logs - unable to start any live campaign: `head:
+    BUGLOOP_ALLOW_LIVE_MODEL is not exactly '1'`, on a machine that needs
+    neither variable. The deliberate act the interlock exists for is still
+    required and is still the operator's: the `-e` lines expand from the
+    operator's own shell at `chia up`, and the worker rows below are what prove
+    it happened.
 
     Returns:
         None.
@@ -1269,7 +1284,13 @@ def check_12_live_model(*, head: dict, workers: dict) -> None:
     Raises:
         PreflightFailed("live_model", detail) naming the place and the variable.
     """
-    for where, result in [("head", head)] + sorted(workers.items()):
+    if not workers:
+        raise PreflightFailed(
+            "live_model",
+            "no llm worker to check: a live run reaches a model through an "
+            "`llm` container and this cluster advertises none (K2, FR-14.5)")
+    for where, result in ([("head", head)] if head is not None else []) \
+            + sorted(workers.items()):
         if not result.get("interlock_ok"):
             raise PreflightFailed(
                 "live_model", f"{where}: {LIVE_MODEL_ENV} is not exactly '1'")
@@ -3756,8 +3777,11 @@ def run_campaign(args, out) -> int:
         model_resources = {name: resource for name, resource in resources.items()
                            if "llm" in resource
                            or ("repair" in resource and repair_enabled(args))}
-        check_12_live_model(head=interlock_probe(),
-                            workers=interlock_probes(dispatch, model_resources))
+        check_12_live_model(
+            # The head is checked only where a turn would be built there, and
+            # under Ray it never is - see the check's own docstring (W-18).
+            head=None if ray.is_initialized() else interlock_probe(),
+            workers=interlock_probes(dispatch, model_resources))
     repair_backend = check_13_vertex_branch(
         issue_task_path=shipped["issue_task"],
         repair_backend=args.repair_backend,

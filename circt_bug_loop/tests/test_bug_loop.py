@@ -374,6 +374,25 @@ def test_T_U_driver_27():
         assert "bugloop_llm" in str(raised.value), label
         assert "k" != str(raised.value), label
 
+    # W-18: the head is checked only where a turn would be BUILT there. Under
+    # Ray it never is - `llm_turn` builds the client on the `llm` worker from
+    # that worker's own environment - and 11.2 forbids forwarding the key or the
+    # interlock to a submitted driver, so requiring them of the head made the
+    # submit wrapper unable to start any live campaign.
+    unset = bug_loop.interlock_probe(env={})
+    bug_loop.check_12_live_model(workers={"bugloop_llm": probe})
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_12_live_model(head=unset, workers={"bugloop_llm": probe})
+    assert "head" in str(raised.value)
+    # And an empty worker map is a refusal and not a pass: a live run with no
+    # `llm` container has nowhere to build a client.
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_12_live_model(workers={})
+    assert "llm" in str(raised.value)
+    # The driver decides by asking Ray, not by a flag.
+    assert "head=None if ray.is_initialized() else interlock_probe()" in \
+        inspect.getsource(bug_loop.run_campaign)
+
 
 def test_T_U_driver_28a():
     """T-U-driver-28 (13.1, K7, K11): the checks are named functions, in order.
