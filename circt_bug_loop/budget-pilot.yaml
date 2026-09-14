@@ -3,22 +3,22 @@
 # A COPY of budget.yaml with eight values changed, listed below. It is a separate
 # file because FR-14.7 forbids editing a registered budget file, and because the
 # pilot and the campaign are two pre-registrations with two tags: this one is
-# `registration/pilot-3` and the campaign's is W-22's. `bug_loop.py --budget
+# `registration/pilot-4` and the campaign's is W-22's. `bug_loop.py --budget
 # circt_bug_loop/budget-pilot.yaml` selects it; the flag already existed.
 #
-# PILOT 3 (W-18d, 2026-09-14), registered as `registration/pilot-3`. Pilot 2
-# measured the pre-authorisation fix and found the next defect: a turn whose
-# tool loop ran out returned EMPTY, so its whole spend bought nothing. This
-# registration measures W-18d's four fixes - the forced final answer, the paged
-# reads, the raised per-stage caps, and a stage 7 that runs only for a new
-# candidate and is bounded while it does. One value changes from pilot 2:
+# PILOT 4 (W-18e, 2026-09-14), registered as `registration/pilot-4`. Pilot 3
+# measured the forced final answer firing and coming back with NO PART AT ALL,
+# and it measured its own cap binding first: USD 3.00 pre-authorises exactly one
+# stage-1 turn at `stage_1: 12`, so the second turn was refused before dispatch
+# and the mutation arm never started. This registration measures W-18e's two
+# fixes - a final answer that is told to answer and forbidden to call, and a
+# results artefact that renders an arm which never started. One value changes
+# from pilot 3:
 #
-#   arm_window_seconds        600 -> 900     15 minutes an arm, 30 for the run
-#   (and budget.yaml's own raised max_tool_iterations, which is part of the fix
-#    under measurement and is NOT pilot-specific)
+#   campaign_spend_cap_usd      3.0 -> 6.0   two stage-1 turns fit, not one
 #
 # WHAT IS DIFFERENT FROM budget.yaml, and why:
-#   campaign_spend_cap_usd  200.0 -> 3.0     the pilot's own hard stop
+#   campaign_spend_cap_usd  200.0 -> 6.0     the pilot's own hard stop
 #   arm_window_seconds      14400 -> 900     15 minutes an arm, 30 for the run
 #   per_seed_probe_cap          5 -> 3       a short window over few seeds
 #   per_seed_iteration_cap      3 -> 1       one generation per seed per arm
@@ -60,8 +60,10 @@ model_id: gemini-3.8-flash
 # driver stops BOTH arms when the cumulative cost_usd of the ledger reaches it
 # (FR-18.10's third stop condition), and the results artefact states the spend.
 # 200 against the user's USD 300 credit, leaving headroom for the pilot and for
-# a re-run.
-campaign_spend_cap_usd: 3.0
+# a re-run. 6.00 here: pilot 3 measured one stage-1 turn pre-authorised at
+# 2.729162, so a cap of 3.00 admitted one turn and refused the second before
+# dispatch, and the mutation arm never opened a window at all.
+campaign_spend_cap_usd: 6.0
 
 # The two prices the ledger turns tokens into money with. The backend reports
 # usage_metadata token counts and no price, so the arithmetic is the ledger's:
