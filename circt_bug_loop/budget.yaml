@@ -35,7 +35,7 @@ model_id: gemini-3.8-flash
 # (FR-18.10's third stop condition), and the results artefact states the spend.
 # 200 against the user's USD 300 credit, leaving headroom for the pilot and for
 # a re-run.
-campaign_spend_cap_usd: 200.0
+campaign_spend_cap_usd: 100.0
 
 # The two prices the ledger turns tokens into money with. The backend reports
 # usage_metadata token counts and no price, so the arithmetic is the ledger's:
