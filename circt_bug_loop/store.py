@@ -1,16 +1,4 @@
-"""loop.db: the LoopStore, its DDL, and every apparatus-internal record.
-
-Nothing here crosses the seam. contract/schema.py is imported for the seven
-members that do; the reverse import does not exist and tests/test_layout.py
-asserts it.
-
-The DDL below is 03-LLD.md 6.2 and 6.3 verbatim; tests/test_store.py compares
-the two texts for equality, so a table that drifts from the design fails rather
-than being discovered by a query. LoopStore is 6.1's construction: a SQLiteNode
-pinned to the head when Ray is up, and a direct sqlite3 connection carrying the
-same PRAGMA defaults when it is not, which is what lets every tier-0 test run
-the real statements with no cluster (chia:chia/database/sqlite_node.py:105-143).
-"""
+"""loop.db: the LoopStore, its DDL, and every apparatus-internal record."""
 from __future__ import annotations
 
 import hashlib
@@ -32,21 +20,7 @@ from circt_bug_loop.contract import schema
 from circt_bug_loop.contract.schema import ContractError, CounterBlock
 
 def sha256_file(path: str) -> str:
-    """The SHA-256 of one file's bytes, hex, streamed a megabyte at a time.
-
-    One implementation and not three (N3): `probe_task` hashes the tool binary
-    it is about to run (FR-06.1) and `repair_adapter` hashes `repro.sh` before
-    and after the chain and every tool binary after the restore (FR-12.11), and
-    each had spelled the same seven lines.
-
-    Returns:
-        str, 64 hex characters.
-    Worker:
-        the caller's; it reads one file and runs no process.
-    Raises:
-        OSError when the file cannot be read. A caller for whom an absent file
-        is an ANSWER catches it and says so, which is `probe_task`'s case.
-    """
+    """The SHA-256 of one file's bytes, hex, streamed a megabyte at a time."""
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
         for block in iter(lambda: handle.read(1 << 20), b""):
@@ -55,12 +29,7 @@ def sha256_file(path: str) -> str:
 
 
 def utc_now() -> str:
-    """This moment, as the ISO 8601 string every `*_utc` column carries.
-
-    One implementation and not three (N3): the driver and the approval CLI both
-    stamp rows of this store, and a second spelling is a second answer to "what
-    is the format" waiting to diverge.
-    """
+    """This moment, as the ISO 8601 string every `*_utc` column carries."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
@@ -402,14 +371,7 @@ CREATE INDEX IF NOT EXISTS ix_mirror_state          ON issue_mirror(state);
 CREATE INDEX IF NOT EXISTS ix_filing_confirmed      ON filing(confirmed);
 """
 
-#: The one table 6.2 does NOT declare, and the reason it is a statement of its
-#: own rather than a row of `_DDL_TABLES` (errata row 32): `T-U-store-01`
-#: compares `_DDL_TABLES` to 03-LLD.md 6.2 for TEXTUAL equality, so a column
-#: added to the `run` table there would either fail that comparison or need an
-#: edit to a design document W-12 may not make. W-12 turned the pre-registration
-#: into an annotated tag, and the architect's decision asks the run to record
-#: WHICH registration it was checked against; `RunManifest.budget_file_sha`
-#: stays the run's identity and gains nothing, so the contract does not move.
+#: The one table 6.2 does NOT declare.
 _DDL_REGISTRATION = """\
 CREATE TABLE IF NOT EXISTS registration (
     run_manifest_id     TEXT PRIMARY KEY REFERENCES run(run_manifest_id),
@@ -424,27 +386,20 @@ _SCHEMA = _DDL_TABLES + "\n" + _DDL_INDEXES + "\n" + _DDL_REGISTRATION
 #: The zero-byte marker of FR-17.8, named once.
 PARTIAL = "PARTIAL"
 
-#: SQLiteNode's own connect defaults, mirrored by the direct connection so the
-#: two paths differ in dispatch and in nothing else
-#: (chia:chia/database/sqlite_node.py:105-143).
+#: SQLiteNode's own connect defaults.
 _BUSY_TIMEOUT_S = 30.0
 _SYNCHRONOUS = "NORMAL"
 
-#: A table or column name is interpolated into SQL, never bound, so it is
-#: checked rather than trusted (chia:chia/database/base.py's _IDENT_RE, which
-#: cannot be imported here without importing ray).
+#: A table or column name is interpolated into SQL.
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: /proc's mount table, a module constant so a test can point the check at a
-#: recorded one. WAL corrupts on network storage, so the path is refused rather
-#: than warned about (chia:chia/database/sqlite_node.py:29-33).
+#: /proc's mount table, a module constant so a test can point the check at a recorded one.
 _MOUNTINFO = "/proc/self/mountinfo"
 _NETWORK_FSTYPES = frozenset({"nfs", "nfs4", "cifs", "smbfs", "smb3", "9p",
                               "afs", "ceph", "glusterfs", "fuse.sshfs",
                               "fuse.s3fs", "lustre", "beegfs"})
 
-#: The tables whose rows are a directory's completion record (6.5, FR-17.8).
-#: A probe row is written before the probe runs and is therefore not one.
+#: The tables whose rows are a directory's completion record (FR-17.8).
 _COMPLETION_TABLES = ("probe_result", "candidate")
 
 
@@ -457,7 +412,7 @@ class SdkMap:
 
 @dataclass(kw_only=True)
 class ImageSpec:
-    """What B1 built, and the hashes that prove a probe ran it (FR-03.10, FR-03.16)."""
+    """What B1 built, and the hashes that prove a probe ran it (FR-03.10)."""
     circt_sha: str
     sdk_tag: str
     targets: list[str]
@@ -471,21 +426,13 @@ class ImageSpec:
     lit_discovered_count: int         # FR-03.17
     assertion_nonreferencing: list[str]   # FR-03.5's named objects, compared as a set
     tool_hashes: dict                 # tool name -> SHA-256 hex of the published binary
-    #: SHA-256 over 4.11.1's six-key build manifest. The TAG names the CIRCT
-    #: commit alone, which is the Dockerfile's own scheme, so two images of one
-    #: commit built with a different SDK tag, target list, flag string, slang
-    #: setting or base image share a tag and differ HERE (K1). It is NOT a
-    #: column of `image`: 6.2's DDL is frozen against 03-LLD 6.2 by
-    #: `T-U-store-01` and the design pass is what adds one, so the digest is
-    #: durable as `<artefact_dir>/image_manifest.json`, which B1 writes beside
-    #: `lit_discovery.txt` (errata W-20b). Defaulted so a record built from a
-    #: stored row, which carries no such column, still constructs.
+    #: SHA-256 over 4.11.1's six-key build manifest.
     manifest_digest: str = ""
 
 
 @dataclass(kw_only=True)
 class BuildResult:
-    """One probe execution (FR-06.4, FR-06.5, FR-06.9). Produced by B2."""
+    """One probe execution (FR-06.4)."""
     probe_id: str
     run_manifest_id: str
     run_commit: str
@@ -513,14 +460,7 @@ class BuildResult:
 
 @dataclass(kw_only=True)
 class Frame:
-    """One stack frame of LLVM's crash trace, resolved (FR-07.4). In OracleVerdict.
-
-    LLVM prints two shapes and 3.6.2 parses both. A `dladdr` frame ends
-    "(<module>+0x<offset>)" and carries module and offset, which is what the
-    symboliser needs; a print-time-symbolised frame ends "<file>:<line>:<col>"
-    and carries no module, because LLVM already resolved it. `shape` records
-    which, so no reader has to infer it from an empty field.
-    """
+    """One stack frame of LLVM's crash trace, resolved (FR-07.4)."""
     index: int
     address: str                      # "0x..." as printed by LLVM's own trace
     shape: Literal["module_offset", "attributed"]
@@ -534,7 +474,7 @@ class Frame:
 
 @dataclass(kw_only=True)
 class OracleVerdict:
-    """The primary oracle's answer for one probe (F-07). Produced by B3."""
+    """The primary oracle's answer for one probe (F-07)."""
     probe_id: str
     fired: bool
     oracle_class: Optional[Literal["assertion", "fatal_error", "crash"]]
@@ -555,7 +495,7 @@ class OracleVerdict:
 
 @dataclass(kw_only=True)
 class DifferentialVerdict:
-    """arcilator against Verilator for one probe (F-08). Produced by B4."""
+    """arcilator against Verilator for one probe (F-08)."""
     probe_id: str
     verdict: Literal["agree", "diverge", "diverge_x_policy", "not_applicable",
                      "harness_failure"]
@@ -576,7 +516,7 @@ class DifferentialVerdict:
 
 @dataclass(kw_only=True)
 class ReducedCase:
-    """The output of stage 5 (F-09). Produced by B5."""
+    """The output of stage 5 (F-09)."""
     probe_id: str
     reducer: Literal["circt-reduce", "textual-ddmin", "none"]
     reduced: bool
@@ -617,8 +557,7 @@ class DedupVerdict:
     verdict: Literal["new", "duplicate_of_candidate", "known_open_issue",
                      "known_closed_issue", "fixed_post_pin", "dedup_unavailable"]
     evidence: dict                    # keys: matched_key, matched_token, issue_number,
-                                      # issue_url, issue_state, issue_labels,
-                                      # fixing_commit, duplicate_of_candidate_id
+                                      # issue_url, issue_state, issue_labels, fixing_commit, duplicate_of_candidate_id.
 
 
 _DEDUP_EVIDENCE_KEYS = {"matched_key", "matched_token", "issue_number", "issue_url",
@@ -638,15 +577,12 @@ _DEDUP_EVIDENCE_REQUIRED = {
 
 @dataclass(kw_only=True)
 class Report:
-    """The issue-shaped artefact a maintainer would read (G-25, FR-11.3)."""
+    """The issue-shaped artefact a maintainer would read (FR-11.3)."""
     candidate_id: str
     path: str                         # <probe dir>/report.md
     template: Literal["primary", "differential"]
     title: str
-    # `duplicate` is W-18b's: a candidate the screen matched to ANOTHER
-    # candidate of this run is not a known ISSUE, the maintainers having never
-    # seen it, and calling it one was the only value available. `Report` is not
-    # a contract member, so the value costs no version bump.
+    # `duplicate` is W-18b's.
     classification: Literal["bug", "invalid_input", "known_issue", "duplicate",
                             "untriaged"]
     classification_reason: str        # at most 4 sentences [DEFAULT], 3.8.3
@@ -657,7 +593,7 @@ class Report:
 
 @dataclass(kw_only=True)
 class RepairResult:
-    """CHIA's own chain result, unchanged in shape (FR-12.7). Produced by B8."""
+    """CHIA's own chain result, unchanged in shape (FR-12.7)."""
     candidate_id: str
     local_id: int                     # the synthetic identifier of FR-12.2
     status: Literal["fixed", "attempted", "no_repro", "unclear", "not_a_bug", "error"]
@@ -681,17 +617,12 @@ class RepairResult:
     restore_log: str
     backend: str                      # cfg["backend"], "vertex" by default (3.8, 13.1)
     token_capture: str                # why this stage's tokens are or are not observed
-    # token_capture is "unavailable_remote_dispatch" on every backend CHIA's
-    # chain implements, including vertex: _turn dispatches the turn with
-    # chia_remote, so the LLM copy that accumulates _last_metadata dies on the
-    # worker and QueryResult carries no usage (3.8, FR-14.6). It is a field of
-    # RepairResult and NOT of LedgerEntry.observed, whose four declared keys are
-    # frozen by 2.2's rule: adding one would be a MAJOR bump to 3.0.
+    # token_capture is "unavailable_remote_dispatch" on every backend CHIA's chain implements, including vertex.
 
 
 @dataclass(kw_only=True)
 class GateDecision:
-    """The four answers and the verdict (F-13). Produced by B9a."""
+    """The four answers and the verdict (F-13)."""
     candidate_id: str
     q1_reproduce: Optional[bool]
     q1_original_worker: Optional[str]
@@ -717,7 +648,7 @@ class GateDecision:
 
 @dataclass(kw_only=True)
 class FilingRecord:
-    """One human approval, and the filing it authorised (F-13, F-20)."""
+    """One human approval, and the filing it authorised (F-13)."""
     candidate_id: str
     approver: str
     approved_at_utc: str
@@ -747,22 +678,13 @@ class BudgetLedger:
     spend_usd: float                  # campaign-wide, both arms and shared; 3.11
     per_arm_spend_usd: dict           # arm -> USD, reported beside the window
     stop_reason: dict                 # arm -> the cap or window that stopped it, or None
-    #: Every filing the store holds, whatever run approved it. Reported for
-    #: information and never compared against a cap: `loop.db` persists across
-    #: runs (`--resume` depends on it), so counting lifetime against
-    #: `budget.filings_total` stopped every arm of every later campaign at its
-    #: very first `_arm_stop` and mined nothing (W11).
+    #: Every filing the store holds, whatever run approved it.
     filings_lifetime_total: int = 0
 
 
 @dataclass(kw_only=True)
 class CandidateRecord:
-    """One probing input for which an oracle fired (G-23), and every downstream
-    verdict about it. 02-HLD.md 5.3 is its field list; this is that list typed.
-
-    Apparatus-internal: it crosses nothing, and ProbeResult carries what the
-    generator is allowed to see.
-    """
+    """One probing input for which an oracle fired (G-23), and every downstream verdict about it."""
     candidate_id: str
     probe_id: str
     run_manifest_id: str
@@ -803,30 +725,14 @@ class CandidateRecord:
     held_reason: Optional[str] = None
 
 
-# ---------------------------------------------------------------------------
-# Connection and placement
-# ---------------------------------------------------------------------------
-
-
 def _ray_initialised() -> bool:
-    """Report whether this process is already inside a Ray session.
-
-    Read out of sys.modules rather than by importing ray: a process that has
-    never imported ray cannot have initialised it, and importing it here would
-    make every tier-0 test pay for a framework the head-side modules do not
-    otherwise need.
-    """
+    """Report whether this process is already inside a Ray session."""
     ray = sys.modules.get("ray")
     return bool(ray is not None and ray.is_initialized())
 
 
 def _fstype(path: str) -> str:
-    """Return the filesystem type of the mount *path* lands on, or '' if unknown.
-
-    The longest mount point that prefixes *path* wins, which is how the kernel
-    resolves it. _MOUNTINFO is a module constant so a test can point this at a
-    recorded table instead of the host's.
-    """
+    """Return the filesystem type of the mount *path* lands on, or '' if unknown."""
     try:
         lines = Path(_MOUNTINFO).read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -848,14 +754,7 @@ def _fstype(path: str) -> str:
 
 
 def _connect(db_path: str, *, read_only: bool = False) -> sqlite3.Connection:
-    """Open one connection carrying SQLiteNode's own PRAGMA defaults.
-
-    WAL, a 30 s busy timeout, synchronous=NORMAL, foreign_keys=ON and
-    isolation_level=None so writes take BEGIN IMMEDIATE explicitly, exactly as
-    chia:chia/database/sqlite_node.py:105-143 does. This is the whole of the
-    no-Ray path: the same statements against the same file, dispatched in
-    process instead of as a Ray task.
-    """
+    """Open one connection carrying SQLiteNode's own PRAGMA defaults."""
     conn = sqlite3.connect(db_path, timeout=_BUSY_TIMEOUT_S, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.execute(f"PRAGMA busy_timeout={int(_BUSY_TIMEOUT_S * 1000)}")
@@ -875,25 +774,7 @@ def _ident(name: str) -> str:
 
 
 def init_schema(node: Any) -> None:
-    """Create every table of 03-LLD.md 6.2 and every index of 6.3, idempotently.
-
-    Plus `registration`, which 6.2 does not declare; see `_DDL_REGISTRATION`.
-
-    *node* is either the SQLiteNode of 6.1, whose init_schema member runs the
-    script as a Ray task on the pinned head, or an open sqlite3.Connection,
-    which runs it here. Both take the same text, so the schema cannot differ
-    between a campaign and a test. Every statement is CREATE ... IF NOT EXISTS,
-    so a second call writes nothing.
-
-    Returns:
-        None.
-    Worker:
-        none of its own; the SQLiteNode member it calls declares
-        {"num_cpus": 0.1} and is pinned to the head by pin_to_current_node.
-    Raises:
-        sqlite3.Error from the script, or whatever ray.get re-raises from the
-        member call; TypeError if *node* is neither shape.
-    """
+    """Create every table of 03-LLD.md 6.2 and every index of 6.3, idempotently."""
     if isinstance(node, sqlite3.Connection):
         node.executescript(_SCHEMA)
         return
@@ -905,18 +786,7 @@ def init_schema(node: Any) -> None:
 
 
 class LoopStore:
-    """loop.db on the head's local disk, as a SQLiteNode.
-
-    Constructed after ray.init(), because SQLiteNode pins to the current (head)
-    Ray node and dispatches its members as Ray tasks. Never on network storage:
-    WAL's shared-memory coordination only works between processes on one
-    machine (C-14, chia:chia/database/sqlite_node.py:29-33).
-
-    Outside a Ray session there is no node to dispatch to, so the same
-    statements run through one direct connection carrying the node's own
-    PRAGMA defaults. That is what makes every store test tier 0: the SQL is
-    real, the file is real, and only the dispatch is absent.
-    """
+    """loop.db on the head's local disk, as a SQLiteNode."""
 
     def __init__(self, db_path: str) -> None:
         """Open loop.db at *db_path*, pinned to the head, and ensure the schema."""
@@ -943,7 +813,6 @@ class LoopStore:
             finally:
                 conn.close()
 
-    # -- dispatch -----------------------------------------------------------
 
     def _get(self, member: str, *args) -> Any:
         """Run one SQLiteNode member, remotely under Ray and locally without it."""
@@ -952,35 +821,13 @@ class LoopStore:
             return get(getattr(self.node, member).chia_remote(*args))
         return _LOCAL_MEMBERS[member](self.db_path, *args)
 
-    # -- writes -------------------------------------------------------------
 
     def insert(self, table: str, row: dict) -> None:
-        """Insert one row into *table*, one dict key per column.
-
-        The caller renders the canonical-JSON text for the _json columns; this
-        member adds no ORM and no coercion.
-
-        Returns:
-            None.
-        Worker:
-            {"num_cpus": 0.1}, the SQLiteNode member's own declaration.
-        Raises:
-            ValueError on a column name that is not a plain SQL identifier;
-            sqlite3.IntegrityError on a primary-key or foreign-key violation.
-        """
+        """Insert one row into *table*, one dict key per column."""
         self._get("execute", *_insert_sql(table, row))
 
     def insert_many(self, table: str, rows: list[dict]) -> None:
-        """Insert *rows* into *table* in one transaction; an empty list is a no-op.
-
-        Returns:
-            None.
-        Worker:
-            {"num_cpus": 0.1}.
-        Raises:
-            ValueError on a column name that is not a plain SQL identifier or
-            on rows whose key sets differ; sqlite3.IntegrityError as insert.
-        """
+        """Insert *rows* into *table* in one transaction; an empty list is a no-op."""
         if not rows:
             return
         columns = list(rows[0])
@@ -991,16 +838,7 @@ class LoopStore:
         self._get("executemany", sql, [tuple(r[c] for c in columns) for r in rows])
 
     def update(self, table: str, key: dict, fields: dict) -> None:
-        """Set *fields* on the rows of *table* that *key* selects.
-
-        Returns:
-            None.
-        Worker:
-            {"num_cpus": 0.1}.
-        Raises:
-            ValueError on an empty key or field set, or on a name that is not a
-            plain SQL identifier; sqlite3.Error from the statement.
-        """
+        """Set *fields* on the rows of *table* that *key* selects."""
         if not fields or not key:
             raise ValueError("update takes a non-empty key and a non-empty field set")
         sets = ", ".join(f"{_ident(c)} = ?" for c in fields)
@@ -1009,46 +847,16 @@ class LoopStore:
                   tuple(fields.values()) + tuple(key.values()))
 
     def transaction(self, ops: list) -> None:
-        """Run *ops* atomically: BEGIN IMMEDIATE, each op in order, COMMIT.
-
-        6.4's batching member. Each op is the (sql, params) pair
-        SQLiteNode.transaction takes, and any error rolls the whole batch back
-        (chia:chia/database/sqlite_node.py:377-423).
-
-        Returns:
-            None.
-        Worker:
-            {"num_cpus": 0.1}.
-        Raises:
-            TypeError on an op that is not a (sql, params) pair;
-            sqlite3.Error from any statement, the batch rolled back.
-        """
+        """Run *ops* atomically: BEGIN IMMEDIATE, each op in order, COMMIT."""
         self._get("transaction", list(ops))
 
-    # -- reads --------------------------------------------------------------
 
     def query(self, sql: str, params: tuple = ()) -> list[dict]:
-        """Return every row *sql* selects, as a list of dicts.
-
-        Returns:
-            list[dict], one per row, column name to value.
-        Worker:
-            {"num_cpus": 0.1}; the connection is opened query_only.
-        Raises:
-            sqlite3.Error from the statement.
-        """
+        """Return every row *sql* selects, as a list of dicts."""
         return self._get("query", sql, params)
 
     def query_one(self, sql: str, params: tuple = ()) -> Optional[dict]:
-        """Return the first row *sql* selects, or None.
-
-        Returns:
-            dict or None.
-        Worker:
-            {"num_cpus": 0.1}; the connection is opened query_only.
-        Raises:
-            sqlite3.Error from the statement.
-        """
+        """Return the first row *sql* selects, or None."""
         return self._get("query_one", sql, params)
 
 
@@ -1092,11 +900,7 @@ def _local_transaction(db_path: str, ops: list) -> None:
 
 
 def _immediate(conn: sqlite3.Connection, ops: list) -> None:
-    """BEGIN IMMEDIATE, each op in order, COMMIT; any error rolls the batch back.
-
-    chia:chia/database/sqlite_node.py:146-165 and 377-423, mirrored rather than
-    imported so the no-Ray path needs no chia import at all.
-    """
+    """BEGIN IMMEDIATE, each op in order, COMMIT; any error rolls the batch back."""
     conn.execute("BEGIN IMMEDIATE")
     try:
         for i, op in enumerate(ops):
@@ -1141,16 +945,9 @@ def _local_query_one(db_path: str, sql: str, params: tuple = ()) -> Optional[dic
 
 
 #: The five SQLiteNode members LoopStore dispatches, and their in-process twins.
-#: init_schema is not among them: it is a module-level function of its own,
-#: because both shapes of *node* have to reach the same script.
 _LOCAL_MEMBERS = {"execute": _local_execute, "executemany": _local_executemany,
                   "transaction": _local_transaction, "query": _local_query,
                   "query_one": _local_query_one}
-
-
-# ---------------------------------------------------------------------------
-# The artefact tree (6.5, FR-17.7, FR-17.8)
-# ---------------------------------------------------------------------------
 
 
 def _completed(store: "LoopStore", artefact_dir: str) -> bool:
@@ -1168,18 +965,10 @@ def artefact_write(artefact_dir: str, relative_path: str, data,
                    store: Optional["LoopStore"] = None) -> dict:
     """Write one file into the artefact tree, and count the write (3.11).
 
-    A four-line wrapper around `write_artefact`, which is 6.5's body unchanged
-    and is what every in-process caller uses, because what a caller needs is the
-    path. The split exists because 3.11 requires every node of 3.2 to return
-    `{"counters": CounterBlock}` and this body has three return statements
-    (W-17, errata row 22).
-
     Returns:
-        {"path": str, "counters": CounterBlock}, the path written (or, on a
-        removal, the marker's), and one write counted at stage "artefact".
+        {"path": str, "counters": CounterBlock}, the path written (or, on a removal, the marker's), and one write counted at stage "artefact".
     Worker:
-        {"num_cpus": 0.1} on the head; the artefact root is one host directory
-        bind-mounted at the identical path on every worker (FR-17.9).
+        {"num_cpus": 0.1} on the head.
     Raises:
         whatever `write_artefact` raises, unchanged.
     """
@@ -1194,39 +983,11 @@ def artefact_write(artefact_dir: str, relative_path: str, data,
 
 def write_artefact(artefact_dir: str, relative_path: str, data,
                    *, mode: int = 0o644, store: Optional["LoopStore"] = None) -> str:
-    """Write one file into the artefact tree, under the directory's PARTIAL marker.
-
-    Every other file goes on disk with the marker already present: the marker is
-    created here whenever it is absent, which is FR-17.8's "written before the
-    stage begins writing anything else into the directory" enforced rather than
-    asked for. Nothing is ever deleted, and nothing over
-    artefact_inline_cap_bytes is inlined into a row: the return value is the
-    path a row carries, and contract.bound_text is the one place the cap itself
-    is applied (6.5, FR-17.7).
-
-    relative_path == PARTIAL is the marker protocol and nothing else is. An
-    empty *data* writes the zero-byte marker, a None *data* removes it, and the
-    removal is refused unless *store* holds a completion record for the
-    directory, so a stage that merely passed through cannot clear another
-    stage's marker.
-
-    Returns:
-        str, the absolute path written (or, on a removal, the marker's path).
-    Worker:
-        {"num_cpus": 0.1} on the head; the artefact root is one host directory
-        bind-mounted at the identical path on every worker (FR-17.9).
-    Raises:
-        ValueError on a relative artefact_dir, on a relative_path that escapes
-        it, on a None *data* outside the marker protocol, or on a marker
-        removal with no completion record; OSError from the write itself.
-    """
+    """Write one file into the artefact tree, under the directory's PARTIAL marker."""
     root = Path(artefact_dir)
     if not root.is_absolute():
         raise ValueError(f"artefact_dir must be absolute; got {artefact_dir!r}")
-    # `realpath` and not `normpath` (N6): `normpath` is textual, so a symlink
-    # ALREADY INSIDE the artefact directory - one a stage or a reducer put
-    # there - is followed on the write and the bytes land wherever it points.
-    # The root is resolved too, so a symlinked artefact root still compares.
+    # `realpath` and not `normpath` (N6).
     resolved_root = Path(os.path.realpath(str(root)))
     target = Path(os.path.realpath(str(root / relative_path)))
     if resolved_root not in target.parents:
@@ -1260,13 +1021,7 @@ def write_artefact(artefact_dir: str, relative_path: str, data,
     return str(target)
 
 
-# ---------------------------------------------------------------------------
-# validate_candidate (2.9)
-# ---------------------------------------------------------------------------
-
-#: The table of 2.9, as three field groups. "The eleven reducer through
-#: reduced_path plus the four size fields" is the prose; the table itself lists
-#: nine and nine is what this tuple is.
+#: The table of 2.9, as three field groups.
 _REDUCTION_FIELDS = ("reducer", "reduced", "fixpoint", "budget_truncated",
                      "reduced_path", "size_before_bytes", "size_after_bytes",
                      "size_before_ops", "size_after_ops")
@@ -1274,41 +1029,17 @@ _DEDUP_FIELDS = ("fingerprint", "fingerprint_stable", "structural_hash",
                  "dedup_basis", "dedup_verdict", "dedup_evidence")
 _GATE_FIELDS = ("gate_answers", "gate_decision", "taxonomy_bucket")
 
-#: Of the dedup group, the four a candidate must carry by the time it reaches
-#: the gate. fingerprint is governed by the fingerprint rule (E012) and
-#: fingerprint_stable is null until the gate's re-run has run (K3).
+#: Of the dedup group, the four a candidate must carry by the time it reaches the gate.
 _DEDUP_REQUIRED = ("structural_hash", "dedup_basis", "dedup_verdict", "dedup_evidence")
 
-#: The last row of 2.9's table: required in BOTH columns, a differential
-#: candidate's frame_tuple being the empty list, which is a value and not a None.
+#: The last row of 2.9's table.
 _ALWAYS_REQUIRED = ("frame_tuple", "frames_resolved", "frames_with_location",
                     "out_of_scope_root", "contaminated_symbol", "contaminated_file",
                     "contamination_lower_bound")
 
 
 def validate_candidate(candidate: "CandidateRecord") -> None:
-    """Raise ContractError unless *candidate* satisfies every rule of its class.
-
-    Checks, in this order: the class partition below; the fingerprint rule; the
-    assertion-field rule; and the dedup-evidence key set and its per-verdict
-    required keys. Returns None on success. It repairs, defaults and coerces
-    nothing, and it never reads the database: the caller assembles the object
-    with load_candidate() first.
-
-    Called by dedup_and_screen before the candidate row is written, by
-    triage_report before the report renders, by gate_decide before question 1,
-    and by render_results over every row it counts, so a malformed candidate is
-    refused at whichever of the four it reaches first (FR-10.5, FR-10.8,
-    FR-13.14).
-
-    Returns:
-        None.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ContractError with one of the seven codes of 2.9: E003, E004, E005,
-        E006, E011, E012 and E013.
-    """
+    """Raise ContractError unless *candidate* satisfies every rule of its class."""
     hints = typing.get_type_hints(CandidateRecord)
     for name, annotation in hints.items():
         value = getattr(candidate, name)
@@ -1391,25 +1122,7 @@ def _j(value):
 
 
 def load_candidate(store: "LoopStore", candidate_id: str) -> "CandidateRecord":
-    """Join the six tables that hold one candidate back into one record.
-
-    candidate persists twenty of CandidateRecord's fields and the rest live in
-    oracle_verdict, reduced_case, fingerprint, dedup_verdict and gate_decision
-    (NIT 3). This is the only reader of those five that returns a
-    CandidateRecord, and what validate_candidate is given.
-
-    A differential candidate has no reduced_case, fingerprint, dedup_verdict or
-    gate_decision row by construction, so a missing row leaves its fields None,
-    which is exactly what 2.9's table requires of that class.
-
-    Returns:
-        CandidateRecord, assembled; the caller validates it.
-    Worker:
-        {"num_cpus": 0.1} per query, on the head.
-    Raises:
-        LookupError when no candidate row carries *candidate_id*;
-        sqlite3.Error from any of the six queries.
-    """
+    """Join the six tables that hold one candidate back into one record."""
     row = store.query_one("SELECT * FROM candidate WHERE candidate_id = ?",
                           (candidate_id,))
     if row is None:
