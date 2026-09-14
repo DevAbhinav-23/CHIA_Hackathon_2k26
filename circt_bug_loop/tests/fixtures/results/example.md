@@ -1,0 +1,172 @@
+# Results: the closed CIRCT bug loop
+
+Run `7c1f4a9d6e2b48c0a53f81d27e6b09c4`. Mode discovery, seed set 187. Arms run sequentially, seeded then mutation, each for 14400 wall-clock seconds.
+
+Every table below carries the mode and the seed set it was taken under, and every number in it comes from a tool-produced record in `loop.db`.
+
+## 1. Headline
+
+**Distinct confirmed bugs per arm** (mode discovery, seed set 187)
+
+| arm | distinct confirmed bugs | confirmed filings | filings | distinct excluding contaminated |
+|---|---|---|---|---|
+| seeded | 1 | 1 | 2 | 0 |
+| mutation | 0 | 0 | 0 | 0 |
+
+A confirmed bug is one a maintainer acted on, evidenced by a URL; distinct is one per primary fingerprint, so two filings sharing a fingerprint count once. The seeded arm confirmed 1 distinct bug. The mutation arm confirmed 0 distinct bugs.
+
+**Contaminated candidates, counted apart (FR-15.2)** (mode discovery, seed set 187)
+
+| arm | contaminated candidates | distinct confirmed bugs excluding them |
+|---|---|---|
+| seeded | 1 | 0 |
+| mutation | 0 | 0 |
+
+**Lag.** The campaign ran at a pin 41 commits and 6.0 days behind `main`, on `firtool-1.86.0`; the current pin window contains a release. A longer lag mechanically lowers the filing rate, because more candidates come back already fixed and every such candidate fails the gate's fourth question.
+
+**Confirmation cut-off.** Maintainer confirmation lags the budget window: a filing is confirmed when a maintainer labels, comments on or fixes it, which happens after the window has closed. Confirmations recorded after 2026-09-23 are not counted in the headline above.
+
+**Dedup rates, which qualify the headline.** Collision rate 0/3 = 0.0000; false-merge rate 0/0 = 0.0000, both measured over the hand-labelled duplicate-pair set. 1 candidate carries an unstable fingerprint, which qualifies the headline exactly as a collision does and never merges.
+
+**Seed sets.** The seeded arm probed 2 seeds and the mutation arm 2; the two sets are identical, which FR-18.2 requires within a mode.
+
+## 2. Secondary results
+
+**The five secondaries per arm** (mode discovery, seed set 187)
+
+| arm | candidates before dedup | candidates after dedup | filings | gate precision | repairs merged | repro.sh overwritten |
+|---|---|---|---|---|---|---|
+| seeded | 2 | 2 | 2 | 1/2 (50.0%) | 1 | 1 |
+| mutation | 1 | 0 | 0 | n/a (0 filings) | 0 | 0 |
+
+Gate precision is confirmed filings over filings. A merged repair is a filed patch a maintainer acted on, which is the same evidence the headline takes. `repro.sh overwritten` counts the repair attempts whose reproduce turn replaced the script the loop pre-wrote, so that "confirms rather than invents" is reported per attempt rather than assumed.
+
+## 3. Failure taxonomy
+
+**FR-18.6's mapping, from gate stopping value to bucket** (mode discovery, seed set 187)
+
+| gate question | stopping value | bucket |
+|---|---|---|
+| 1 | did_not_reproduce | unreproducible |
+| 2 | no_reducer | not_minimal |
+| 2 | not_fixpoint | not_minimal |
+| 2 | reduced_false | not_minimal |
+| 2 | reduction_changed_failure | not_minimal |
+| 3 | invalid_input | invalid_input |
+| 4 | dedup_basis_insufficient | undecided |
+| 4 | dedup_unavailable | undecided |
+| 4 | duplicate_of_candidate | duplicate |
+| 4 | fixed_post_pin | duplicate |
+| 4 | known_closed_issue | duplicate |
+| 4 | known_open_issue | duplicate |
+| none | passed all four | new_bug |
+
+**Candidates at the gate, one bucket each** (mode discovery, seed set 187)
+
+| bucket | candidates |
+|---|---|
+| unreproducible | 0 |
+| not_minimal | 0 |
+| invalid_input | 0 |
+| duplicate | 1 |
+| undecided | 0 |
+| new_bug | 2 |
+| no gate decision | 0 |
+
+Sum check: 3 bucketed = 3 candidates reaching the gate. 1 differential candidate excluded by construction: they never enter the gate and are counted in the divergences list instead.
+
+**Repair attempts, by the phase that failed** (mode discovery, seed set 187)
+
+| failing phase | attempts |
+|---|---|
+| fix | 1 |
+| none (the attempt ran to the end) | 1 |
+
+Sum check: 2 = 2 repair attempts.
+
+**Probe outcomes, by build status** (mode discovery, seed set 187)
+
+| outcome | seeded | mutation |
+|---|---|---|
+| clean_exit | 1 | 1 |
+| parse_error:tool_rejected_input | 0 | 0 |
+| parse_error:tool_rejected_argv | 0 | 1 |
+| assertion | 1 | 0 |
+| fatal_error | 0 | 1 |
+| crash | 1 | 0 |
+| timeout | 0 | 0 |
+| oom | 0 | 0 |
+
+`parse_error` is printed as two rows: `tool_rejected_input` is the tool refusing the probing input, and `tool_rejected_argv` is the tool refusing the argument vector the loop built, which is an apparatus defect and not a property of the input. They sum to the `parse_error` total.
+
+## 4. Seeded-bug validation, reported separately
+
+**Seeded-bug validation, which contributes nothing to the headline** (mode discovery, seed set 187)
+
+| seed | sdk exact | eligible seeded/mutation | probes | candidates | filings |
+|---|---|---|---|---|---|
+| `3f9a1c0e7b4d` | True | 1/1 | 2 | 2 | 1 |
+| `7b2d48e1a05c` | False | 1/1 | 4 | 2 | 1 |
+
+This table is separate from the discovery result above and contributes nothing to it: validation establishes that the apparatus finds a bug it was pointed at, and the headline counts bugs nobody pointed it at.
+
+## 5. Divergences observed
+
+**Divergences observed, counted apart from the candidate count** (mode discovery, seed set 187)
+
+| candidate | arm | seed | verdict | first divergent signal | cycle | report |
+|---|---|---|---|---|---|---|
+| `c-0004` | mutation | `7b2d48e1a05c` | diverge | out_sum | 37 | arcilator and Verilator disagree on out_sum at cycle 37 |
+
+1 divergence observed. A divergence produces an informational report and nothing else: it enters no gate, is never filed, and is counted neither in the candidate count nor in the headline.
+
+## 6. The budget: both windows and the campaign's spend
+
+**Both arm windows, on the primary budget unit** (mode discovery, seed set 187)
+
+| arm | window (s) | elapsed (s) | unspent (s) | stopped by | spend (USD) |
+|---|---|---|---|---|---|
+| seeded | 14400 | 14400 | 0 | its own window | 0.13 |
+| mutation | 14400 | 9000 | 5400 | generated_inputs_per_day | 0.00 |
+
+The campaign spent USD 0.30 in total, both arms and the shared stages together, against the pre-registered cap. Where an arm was stopped by a safety cap rather than by its window, the unspent balance above is what it did not get to use, and the comparison is qualified by exactly that much.
+
+**Shared stages, charged to no arm** (mode discovery, seed set 187)
+
+| stage | seconds |
+|---|---|
+| image | 3600 |
+| synthesis | 420 |
+
+## 7. Observed, and not the budget
+
+**Tokens, money and CPU time: observations, NOT the budget** (mode discovery, seed set 187)
+
+| arm | prompt tokens | output tokens | USD | CPU seconds | entries with null token counts |
+|---|---|---|---|---|---|
+| seeded | 94149 | 14934 | 0.1260 | 12880 | 5 |
+| mutation | 0 | 0 | 0.0000 | 8129 | 4 |
+| shared | 188400 | 9600 | 0.1770 | 29100 | 1 |
+
+None of these four is the budget. The budget is one elapsed wall-clock second of an arm's fixed window, and the table above is what the run was observed to consume while spending it. The USD total is a **lower bound excluding stage 7**, whose per-turn token counts the repair chain does not return: its turns are dispatched remotely and the counting copy of the model object dies with the worker.
+
+## 8. Declarations and disclosures
+
+**The mutator synthesis is the one place the mutation arm sees bug reports.** The frozen mutator set `1111111111111111111111111111111111111111111111111111111111111111` was synthesised at 2026-09-17T11:00:00+00:00 by vertex:gemini-3.8-flash from the mirrored issue set refreshed at 2026-09-19T00:00:00+00:00 (588 issues, all). That is Mut4All's design, which this arm reimplements, and not a leak in the experiment: the arm reads no report during the campaign, and the set was frozen and committed before the pre-registration.
+
+**The contamination screen is incomplete.** It matches a candidate against the commits that touched the seed's files and symbols, and a seed's siblings may be fixed in commits whose subjects do not name them; a candidate this screen calls clean may still be one the upstream history knows about.
+
+**The repair stage is unscreened.** CHIA's executor runs unchanged, so the repair agent sees whatever its own chain shows it, and this run made 2 repair attempts on vertex. Nothing in the screen above applies to them.
+
+## 9. Regeneration
+
+**Every results row, regenerated from its recorded artefacts** (mode discovery, seed set 187)
+
+| candidate | arm | regenerated | marks |
+|---|---|---|---|
+| `c-0001` | seeded | yes |  |
+| `c-0002` | seeded | yes |  |
+| `c-0003` | mutation | yes |  |
+| `c-0004` | mutation | yes |  |
+
+4 rows regenerated and 0 marked. A marked row is **not reported as a result**: the deterministic stages were re-run from the stored inputs and disagreed with the record, or the artefacts they need are gone. Replaying a stored value through the bypass is never accepted as evidence for a tool stage.
