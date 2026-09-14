@@ -369,14 +369,18 @@ def test_T_U_driver_13():
 
 
 def test_T_U_driver_17():
-    """T-U-driver-17 (FR-12.1): `_PY_MODULES` is 13.1's fourteen entries, in its order.
+    """T-U-driver-17 (FR-12.1): `_PY_MODULES` is 13.1's entries, in its order.
 
-    The shipped list is `runtime_env()`'s, which substitutes the package
-    directory for the flow's own nine wherever `__init__.py` makes them a
-    package; CHIA's `issue_task.py` and `circt_util.py` travel in both forms,
-    which is FR-12.1's point. Fixture: none. Tier 0.
+    Fifteen and not the table's fourteen: `llm.py` is the join's own module
+    (3.5.1, architect decision 3), and a CHIA checkout that shipped the other
+    fourteen would ship no backend at all. The shipped list is `runtime_env()`'s,
+    which substitutes the package directory for the flow's own ten wherever
+    `__init__.py` makes them a package; CHIA's `issue_task.py` and
+    `circt_util.py` travel in both forms, which is FR-12.1's point. Fixture:
+    none. Tier 0.
     """
-    assert len(bug_loop._PY_MODULES) == 14
+    assert len(bug_loop._PY_MODULES) == 15
+    assert str(bug_loop.FLOW_DIR / "llm.py") in bug_loop._PY_MODULES
     assert bug_loop._PY_MODULES[-2:] == [
         str(bug_loop._ISSUE_SOLVER / "issue_task.py"),
         str(bug_loop._ISSUE_SOLVER / "circt_util.py")]

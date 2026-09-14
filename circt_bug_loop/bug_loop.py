@@ -67,12 +67,16 @@ _CHIA_PKG = Path(chia.__path__[0]).resolve()
 _CHIA_ROOT = _CHIA_PKG.parent
 _ISSUE_SOLVER = _CHIA_ROOT / "examples" / "circt_issue_solver"
 
-#: 13.1's fourteen `py_modules` entries, in its order, shipped by the driver's
-#: own `ray.init`. See `runtime_env` below for the one substitution this tree
-#: forces on it.
+#: 13.1's `py_modules` entries, in its order, shipped by the driver's own
+#: `ray.init`. Fifteen and not the table's fourteen: `llm.py` is the join's own
+#: module (3.5.1, architect decision 3) and every stage that reaches a model
+#: imports it, so a CHIA checkout that shipped the other fourteen would ship no
+#: backend at all. See `runtime_env` below for the one substitution this tree
+#: forces on the list.
 _PY_MODULES = [
     str(FLOW_DIR / "probe_task.py"),
     str(FLOW_DIR / "generate_task.py"),
+    str(FLOW_DIR / "llm.py"),
     str(FLOW_DIR / "triage_task.py"),
     str(FLOW_DIR / "repair_adapter.py"),
     str(FLOW_DIR / "gate.py"),
@@ -989,10 +993,10 @@ def stages_metered(*, arms, repair_backend: str, repair_enabled: bool) -> dict:
 
 
 def _model_backend() -> str:
-    """The campaign backend, read from the supply half's own constant (3.5.1)."""
-    from circt_bug_loop import generate_task
+    """The campaign backend, read from `llm.py`'s own constant (3.5.1)."""
+    from circt_bug_loop import llm
 
-    return generate_task.MODEL_BACKEND
+    return llm.MODEL_BACKEND
 
 
 def differential_driver() -> dict:

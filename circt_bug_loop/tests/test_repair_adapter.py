@@ -4,11 +4,10 @@
 is replaced by a recording stand-in installed as the `issue_task` module the
 repair worker would import (`03-LLD.md` §13.1 ships it through `py_modules`), so
 `run_issue_remote`'s own signature and result shape are what the adapter is
-tested against, and `_turn` is never entered. `generate_task.py` is W-13's and
-does not exist yet, so `_fake_generate` installs §3.5.1's interlock under that
-name; when W-13 lands the stand-in is replaced and no assertion below changes,
-because none of them is about the backend. That substitution is an erratum
-candidate and is recorded in `design/reviews/implementation-errata-log.md`.
+tested against, and `_turn` is never entered. §3.5.1's interlock is **not**
+stubbed at all since the join: it is `llm.require_live_model`, which
+`repair_adapter` imports at module scope (architect decision 3), and
+`_recording_interlock` wraps the real function to remember what it was asked.
 
 **Every node is called through `conftest.call_node`**, which invokes the
 undecorated original: calling the wrapper routes through
@@ -36,7 +35,7 @@ from pathlib import Path
 
 import pytest
 
-from circt_bug_loop import repair_adapter
+from circt_bug_loop import llm, repair_adapter
 from circt_bug_loop.contract import schema
 from circt_bug_loop.repair_adapter import (BUILD_JOBS, CFG_KEYS, LOCAL_ID_BASE,
                                            LOCAL_ID_MAX, PHASE_TIMEOUTS,
@@ -176,37 +175,24 @@ class _CirctUtil:
         return {"success": self.build_ok, "log_tail": "ninja: no work to do."}
 
 
-class _LiveModelRefused(RuntimeError):
-    """§3.5.1's exception, under the stand-in."""
+def _recording_interlock(monkeypatch):
+    """Record every `require_live_model` call, and run the REAL one.
 
-
-def _fake_generate(monkeypatch):
-    """Install §3.5.1's interlock as `circt_bug_loop.generate_task` (W-13's file).
-
-    The two halves are the real rule and not a stub: the gate is
-    `BUGLOOP_ALLOW_LIVE_MODEL == "1"` on every backend, and the key half is
-    checked only where the repair backend is the campaign's.
+    Since the join the interlock is `llm.py`'s and `repair_adapter` imports it
+    at module scope (architect decision 3), so there is no stand-in module to
+    install and no second copy of the rule: what runs is `03-LLD.md` §3.5.1's
+    own function, and this wrapper only remembers what it was asked.
     """
-    import circt_bug_loop
+    recorder = types.SimpleNamespace(calls=[])
+    real = llm.require_live_model
 
-    module = types.ModuleType("circt_bug_loop.generate_task")
-    module.MODEL_BACKEND = "vertex"
-    module.LiveModelRefused = _LiveModelRefused
-    module.calls = []
+    def require_live_model(purpose, **kwargs):
+        recorder.calls.append({"purpose": purpose,
+                               "need_key": kwargs.get("need_key", True)})
+        return real(purpose, **kwargs)
 
-    def require_live_model(purpose, *, need_key=True):
-        module.calls.append({"purpose": purpose, "need_key": need_key})
-        if os.environ.get("BUGLOOP_ALLOW_LIVE_MODEL") != "1":
-            raise _LiveModelRefused(f"refusing a live model turn for {purpose}")
-        key = (os.environ.get("GEMINI_API_KEY") or "").strip()
-        if need_key and (not key or key.startswith("${")):
-            raise _LiveModelRefused("GEMINI_API_KEY is unset, empty or unexpanded")
-        return key if need_key else None
-
-    module.require_live_model = require_live_model
-    monkeypatch.setitem(sys.modules, "circt_bug_loop.generate_task", module)
-    monkeypatch.setattr(circt_bug_loop, "generate_task", module, raising=False)
-    return module
+    monkeypatch.setattr(repair_adapter, "require_live_model", require_live_model)
+    return recorder
 
 
 def _bin_dir(tmp_path, manifest, *, match=True):
@@ -230,7 +216,7 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
     if live:
         monkeypatch.setenv("BUGLOOP_ALLOW_LIVE_MODEL", "1")
         monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
-    generate = _fake_generate(monkeypatch)
+    generate = _recording_interlock(monkeypatch)
     manifest = manifest or _manifest(tmp_path)
     candidate = candidate or _candidate(tmp_path)
     bin_dir = _bin_dir(tmp_path, manifest, match=match)
@@ -724,13 +710,13 @@ def test_repair_22_the_interlock_gates_stage_seven(tmp_path, monkeypatch):
     proceeds where it is `claude`, a fallback having its own credential."""
     chain = _Recorder({"status": "fixed"})
     monkeypatch.delenv("BUGLOOP_ALLOW_LIVE_MODEL", raising=False)
-    with pytest.raises(_LiveModelRefused):
+    with pytest.raises(llm.LiveModelRefused):
         _attempt(tmp_path, monkeypatch, chain=chain, live=False)
     assert chain.calls == [], "not one request may be made behind the interlock"
 
     monkeypatch.setenv("BUGLOOP_ALLOW_LIVE_MODEL", "1")
     monkeypatch.setenv("GEMINI_API_KEY", "${GEMINI_API_KEY}")
-    with pytest.raises(_LiveModelRefused, match="GEMINI_API_KEY"):
+    with pytest.raises(llm.LiveModelRefused, match="GEMINI_API_KEY"):
         _attempt(tmp_path / "b", monkeypatch, chain=chain, live=False)
     assert chain.calls == []
 

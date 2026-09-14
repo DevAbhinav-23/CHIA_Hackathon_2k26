@@ -29,7 +29,7 @@ from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop import generate_task, mutators
+from circt_bug_loop import llm, mutators
 from circt_bug_loop.contract.schema import CounterBlock
 
 #: 8.3's prompt, beside this module (1.1). `cfg["mutator_synth"]` overrides it.
@@ -249,10 +249,10 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
         issue_count=len(issues), issue_digest=issue_digest(issues),
         issues=render_issues(issues),
         languages=", ".join(languages), target_count=int(target_count))
-    llm = generate_task.build_llm(SYNTH_SYSTEM_MESSAGE, int(timeout_seconds),
-                                  cfg["model_id"])
-    turn = generate_task.dispatch_turn(llm, prompt, [])
-    answer = generate_task.parse_json_footer(turn.get("result") or "", ("mutators",))
+    backend = llm.build_llm(SYNTH_SYSTEM_MESSAGE, int(timeout_seconds),
+                            cfg["model_id"])
+    turn = llm.dispatch_turn(backend, prompt, [])
+    answer = llm.parse_json_footer(turn.get("result") or "", ("mutators",))
     kept, dropped = parse_mutators(answer)
 
     document = {

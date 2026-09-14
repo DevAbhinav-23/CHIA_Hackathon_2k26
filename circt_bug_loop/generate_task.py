@@ -1,23 +1,25 @@
-"""A3, A4, the campaign backend and the two agent-facing tools (03-LLD.md 3.5).
+"""A3, A4 and the two agent-facing tools (03-LLD.md 3.5).
 
-Four things live here and nothing else does: the backend glue of 3.5.1, which is
-the ONLY place in the loop's own modules that names `VertexGeminiLLM` and the
-only path any stage has to a live model turn; 7.1's output-contract parser;
-`SourceReadTool` and `ProbeWriteTool`, the two tools F-04 gives an agent, both
-read-only or write-bounded BY CONSTRUCTION rather than by instruction (W10); and
-the two generators, A3's two model turns and A4's deterministic mutator run,
-which implement one `Generator` interface (2.5) and emit one `ProbeSpec` shape
-so that nothing below the seam can tell the arms apart (FR-05.4, FR-18.1).
+Three things live here and nothing else does: `SourceReadTool` and
+`ProbeWriteTool`, the two tools F-04 gives an agent, both read-only or
+write-bounded BY CONSTRUCTION rather than by instruction (W10); the two
+generators, A3's two model turns and A4's deterministic mutator run, which
+implement one `Generator` interface (2.5) and emit one `ProbeSpec` shape so that
+nothing below the seam can tell the arms apart (FR-05.4, FR-18.1); and the
+prompt rendering the two of them share.
 
-Three deviations from 03-LLD.md, each recorded in
+**The backend, the interlock, the turn and 7.1's parser moved to `llm.py` on
+2026-09-15** (architect decision 3, LLD §16.2, §3.5.1). This module is the
+SUPPLY half, and the apparatus half may not import it (FR-16.1,
+05-Work-Plan.md 2.3), so holding them here forced `triage_task.py` and
+`repair_adapter.py` into function-local imports and gave 7.1's "one function,
+shared by all four" parser a second copy. They are imported back below, because
+`_turn` calls two of them and because a test substitutes them by this module's
+name.
+
+Two deviations from 03-LLD.md, each recorded in
 `design/reviews/implementation-errata-log.md` rather than absorbed:
 
-  * `parse_json_footer` and `PromptContractError` are DEFINED here and not
-    imported. 7.1 calls the parser "one function, shared by all four" and names
-    no module; `triage_task.py` (W-10) defined its own two days earlier, and the
-    supply half may not import the apparatus half (FR-16.1, 05-Work-Plan.md
-    2.3), so the import can only run the other way. The join (W-17) removes one
-    of the two copies, and the one it removes is the apparatus half's.
   * Nothing here imports `store.py`, which 1.3's layout rule (2) forbids a
     supply-half module, so A3 writes its own artefacts through `_write` below
     rather than through `store.artefact_write`. `_write` keeps FR-17.8's
@@ -32,8 +34,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
-import socket
 import subprocess
 import time
 from pathlib import Path
@@ -49,17 +49,9 @@ from circt_bug_loop.contract.schema import (ContractError, CounterBlock,
                                             FeedbackBundle, LedgerSnapshot,
                                             ProbeSpec, SeedRecord, bound_text,
                                             validate)
-
-# ---------------------------------------------------------------------------
-# 3.5.1 The backend, the interlock and the turn
-# ---------------------------------------------------------------------------
-
-#: RunManifest.backend. One backend per run (C-20), named here and in no other
-#: module of the loop.
-MODEL_BACKEND = "vertex"
-
-_LIVE_MODEL_ENV = "BUGLOOP_ALLOW_LIVE_MODEL"
-_API_KEY_ENV = "GEMINI_API_KEY"
+from circt_bug_loop.llm import (MODEL_BACKEND, LiveModelRefused,  # noqa: F401
+                                PromptContractError, build_llm, dispatch_turn,
+                                llm_turn, parse_json_footer, require_live_model)
 
 #: 7.2 and 7.3 live beside this module (1.1). `cfg["seed_read"]` and
 #: `cfg["probe_write"]` override them, which is how the driver passes the copy
@@ -77,162 +69,6 @@ GENERATE_SYSTEM_MESSAGE = (
 #: FR-17.8's marker, spelled here rather than imported from `store.py`, which a
 #: supply-half module may not import (1.3's layout rule 2).
 _PARTIAL = "PARTIAL"
-
-
-class LiveModelRefused(RuntimeError):
-    """A real model backend was asked for without the live-call interlock set."""
-
-
-def require_live_model(purpose: str, *, need_key: bool = True) -> Optional[str]:
-    """Refuse to set up a live model turn unless the interlock allows one.
-
-    Returns:
-        str, the stripped API key, when *need_key*; None otherwise.
-    Worker:
-        the caller's; wherever a live turn is about to be set up, which is
-        `build_llm` below and `repair_adapter.repair_adapt` before it invokes
-        CHIA's own chain (3.8).
-    Raises:
-        LiveModelRefused when BUGLOOP_ALLOW_LIVE_MODEL is not exactly "1", or
-        when *need_key* and GEMINI_API_KEY is unset, empty or unexpanded.
-        Nothing else. No network call is made here.
-    """
-    # Exactly "1". An unset variable, an empty one and an unexpanded "${...}"
-    # all fail this, which is the safe direction.
-    if os.environ.get(_LIVE_MODEL_ENV) != "1":
-        raise LiveModelRefused(
-            f"refusing to set up a live model turn for {purpose}: "
-            f"set {_LIVE_MODEL_ENV}=1 to allow a real model request "
-            "(03-LLD.md 3.5.1; ADR-D-03, superseding section and addendum)")
-    if not need_key:
-        return None
-    key = (os.environ.get(_API_KEY_ENV) or "").strip()
-    # An UNEXPANDED reference is a literal, not an empty value: CHIA's loader
-    # substitutes ${VAR} from os.environ and leaves the text alone when the
-    # variable is unset (chia:chia/cluster/config.py:304), so a container
-    # brought up without the key holds the reference itself as its value.
-    # Catching it here turns a 403 from Vertex into a refusal on the head.
-    if not key or key.startswith("${"):
-        raise LiveModelRefused(
-            f"{_API_KEY_ENV} is unset, empty or an unexpanded reference on "
-            f"{socket.gethostname()}: the cluster YAML passes it with -e and the "
-            "operator sources ~/.config/bugloop/gemini.env before `chia up` (11.2)")
-    return key
-
-
-def build_llm(system_message: str, timeout_seconds: int, model_id: str):
-    """Build the campaign backend, refusing to reach the network unbidden.
-
-    Returns:
-        VertexGeminiLLM, configured for Vertex AI express mode: one API key, no
-        project and no location.
-    Worker:
-        the caller's; the object it returns is serialised to an `llm` worker by
-        `llm_turn`.
-    Raises:
-        LiveModelRefused, from `require_live_model` above. Nothing else. No
-        network call is made here: constructing the backend opens no connection.
-    """
-    from chia.models.vertex import VertexGeminiLLM
-
-    key = require_live_model(f"{MODEL_BACKEND}:{model_id}")
-    llm = VertexGeminiLLM(
-        model=model_id,
-        system_message=system_message,
-        timeout_seconds=timeout_seconds,
-        project=None,
-        location=None,
-        # api_key: express mode. http_options.timeout: MILLISECONDS, and the
-        # only thing that bounds the request, because VertexGeminiLLM stores
-        # timeout_seconds and never reads it (chia:chia/models/vertex.py:219,
-        # 240, and nowhere else).
-        client_kwargs={"api_key": key,
-                       "http_options": {"timeout": int(timeout_seconds * 1000)}},
-    )
-    # Express mode takes an API key and NO project and NO location. CHIA's
-    # constructor defaults location to "us-central1" and project to
-    # $GOOGLE_CLOUD_PROJECT (chia:chia/models/vertex.py:242-247), and
-    # google-genai raises ValueError("Project/location and API key are mutually
-    # exclusive in the client initializer.") on that pair. Two assignments, and
-    # CHIA is unchanged.
-    llm.project = None
-    llm.location = None
-    return llm
-
-
-@ChiaFunction(resources={"llm": 1.0}, max_retries=0)
-def llm_turn(llm, user_message: str, tools: list) -> dict:
-    """Run one model turn on an `llm` worker and bring its token counts home.
-
-    Returns:
-        {"result": str, "stream": str, "stderr": str, "success": bool,
-         "usage": {"tokens_in": int, "tokens_out": int, "num_turns": int,
-                   "model": str | None}}.
-    Worker:
-        {"llm": 1.0}; the MCP tool servers stay where their own task_options put
-        them and are reached over HTTP from here.
-    Raises:
-        whatever the backend raises. A3, A7 and B7 each catch it and record it
-        as their stage's turn failure (FR-04.8, FR-11.8).
-    """
-    # A DIRECT call, not llm.prompt.options(...).chia_remote(...): the vertex
-    # backend accumulates its token counts on the LLM OBJECT
-    # (chia:chia/models/vertex.py:479-482, 579) and returns a QueryResult that
-    # carries none (chia:chia/base/llm_call.py:15-35), so a remote dispatch
-    # would count on a copy that dies with the task and FR-14.6 would be
-    # unsatisfiable. This node holds {"llm": 1.0} in that copy's place.
-    cli = llm.prompt(user_message, tools)
-    meta = dict(getattr(llm, "_last_metadata", {}) or {})
-    return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
-            "success": bool(getattr(cli, "success", False)),
-            "usage": {"tokens_in": meta.get("input_tokens", 0),
-                      "tokens_out": meta.get("output_tokens", 0),
-                      "num_turns": meta.get("num_turns", 0),
-                      "model": meta.get("model")}}
-
-
-# ---------------------------------------------------------------------------
-# 7.1 The output contract
-# ---------------------------------------------------------------------------
-
-_JSON_BLOCK = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL)
-
-
-class PromptContractError(Exception):
-    """A turn's output did not end in the fenced json block 7.1 demands."""
-
-
-def parse_json_footer(text: str, required: tuple) -> dict:
-    """Parse the LAST fenced json block of a turn's output (7.1).
-
-    The last block wins, which is CHIA's own rule for its DECISION footer
-    (`chia:examples/circt_issue_solver/issue_task.py:28-29`): a model that
-    reconsiders mid-answer leaves both blocks and the final one is the answer.
-    `_JSON_BLOCK` is non-greedy, so `finditer` yields every block in order and
-    the body is the LAST match's group; `re.search` would yield the first and
-    would be the opposite rule.
-
-    Returns:
-        dict, the decoded object, carrying every key in *required*.
-    Worker:
-        pure; it runs in whichever process read the turn's output.
-    Raises:
-        PromptContractError(reason) with reason one of "no_block", "not_json",
-        "not_object" or "missing:<key>". Nothing else.
-    """
-    blocks = list(_JSON_BLOCK.finditer(text or ""))
-    if not blocks:
-        raise PromptContractError("no_block")
-    try:
-        decoded = json.loads(blocks[-1].group("body"))
-    except (ValueError, TypeError):
-        raise PromptContractError("not_json") from None
-    if not isinstance(decoded, dict):
-        raise PromptContractError("not_object")
-    for key in required:
-        if key not in decoded:
-            raise PromptContractError(f"missing:{key}")
-    return decoded
 
 
 # ---------------------------------------------------------------------------
@@ -738,20 +574,6 @@ def iteration_dir(cfg: dict, seed_sha: str, iteration: int) -> str:
                / f"seed_{seed_sha}" / f"iter_{iteration}")
 
 
-def dispatch_turn(llm, user_message: str, tools: list) -> dict:
-    """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn.
-
-    A3, A7 and B7 all reach a model through this one line. Under Ray the node
-    is dispatched and holds an `llm` slot, which is what caps the campaign's
-    concurrent prompts at the container count (FR-14.5); with no Ray running
-    there is no cluster to dispatch to and the same node runs in this process,
-    which is what a driver-less replay and an offline synthesis do.
-    """
-    if ray.is_initialized():
-        return get(llm_turn.chia_remote(llm, user_message, tools))
-    return llm_turn._chia_original(llm, user_message, tools)
-
-
 def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
           logs: dict) -> dict:
     """Run one stage's turn and persist FR-04.6's five files whatever happens.
@@ -962,13 +784,12 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
                 seconds=time.monotonic() - started)}
 
 
-__all__ = ["MODEL_BACKEND", "GENERATE_SYSTEM_MESSAGE", "PROMPTS",
+__all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
            "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS",
-           "LiveModelRefused", "PromptContractError", "ProbeWriteTool",
-           "SourceReadTool", "build_llm", "check_tool", "emit_specs",
-           "dispatch_turn", "generate_mutation", "generate_seeded",
-           "iteration_dir", "llm_turn",
-           "parse_json_footer", "probe_argv", "probe_id", "render_argv_template",
+           "ProbeWriteTool", "SourceReadTool", "check_tool", "emit_specs",
+           "generate_mutation", "generate_seeded",
+           "iteration_dir",
+           "probe_argv", "probe_id", "render_argv_template",
            "render_feedback", "render_probe_write", "render_seed_read",
-           "render_sites", "render_test_files", "require_live_model",
+           "render_sites", "render_test_files",
            "seed_argv_template", "seed_language"]

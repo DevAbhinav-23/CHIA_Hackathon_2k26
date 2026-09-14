@@ -9,14 +9,11 @@ decorators `03-LLD.md` §3.2's column gives them, and `T-U-triage-33` asserts th
 placement statically off `_chia_options`.
 
 **The model layer is mocked and no test may reach a model** (`04-Test-Plan.md`
-§0.5). `03-LLD.md` §3.7.4 puts B7's backend in `generate_task.build_llm` and
-`generate_task.llm_turn`, and `generate_task.py` is W-13's and is not written
-yet, so `_fake_generate` installs a stand-in module under that name and
-`triage_report`'s lazy import finds it. When W-13 lands, this fixture becomes
-`04-Test-Plan.md` §0.3's `fake_vertex` recipe, which mocks `google.genai` and
-runs `build_llm` and `llm_turn` for real; the assertions below do not change,
-because none of them is about the backend. That substitution is an erratum
-candidate and is recorded in `design/reviews/implementation-errata-log.md`.
+§0.5). Since the join B7's backend and turn are `llm.build_llm` and
+`llm.dispatch_turn` (`03-LLD.md` §3.5.1, architect decision 3), imported by
+`triage_task` at module scope, so `_fake_generate` substitutes those two names
+on this module and nothing else. `SourceReadTool` stays `generate_task`'s and is
+still reached through B7's one lazy import.
 
 **The GitHub layer replays a recorded response set and mocks nothing**
 (`04-Test-Plan.md` §0.3): `_recording_transport` serves
@@ -53,16 +50,17 @@ from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, Frame,
                                   LoopStore, OracleVerdict, ReducedCase)
 from circt_bug_loop.tests.conftest import call_node
+from circt_bug_loop.llm import PromptContractError, parse_json_footer
 from circt_bug_loop.triage_task import (DIFFERENTIAL_POINTS,
                                         MIRROR_TOKEN_MIN_CHARS,
-                                        PRIMARY_POINTS, PromptContractError,
+                                        PRIMARY_POINTS,
                                         ReportIncomplete, cap_sentences,
                                         compute_fingerprint, dedup_and_screen,
                                         frame_paths, frame_symbols,
                                         is_duplicate, issue_mirror_refresh,
                                         mirror_screen, mirror_tokens,
                                         normalise_expr, normalise_site,
-                                        parse_json_footer, partition, rates,
+                                        partition, rates,
                                         render_report, scan_commits,
                                         structural_hash, triage_report)
 
@@ -257,12 +255,23 @@ def _recording_transport(monkeypatch, payload, *, fail_after_pages=None):
 
 
 def _fake_generate(monkeypatch, turn=None, *, raises=None):
-    """Install the stand-in `circt_bug_loop.generate_task` B7 imports lazily."""
+    """Substitute the two `llm.py` calls B7 makes, and nothing else.
+
+    Since the join the backend, the turn and the footer parser are `llm.py`'s
+    and are imported by `triage_task` at module scope, so the two names are
+    substituted where B7 reads them rather than by installing a module. The
+    tool is still a stand-in HERE, because a real `SourceReadTool` stands up an
+    MCP server and needs a git repository; `T-U-triage-36` constructs the real
+    one and is what pins the call site.
+    """
     import circt_bug_loop
 
     seen = {}
 
     class SourceReadTool:
+        # Two positional parameters, which is the call site's shape and NOT
+        # §3.5's five: errata row "W-13 #2" and architect decision 4. The join's
+        # third fix corrects both and adds T-U-triage-36.
         def __init__(self, clone_path, run_commit):
             self.clone_path, self.run_commit, self.stopped = clone_path, run_commit, False
 
@@ -275,7 +284,7 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
                     model_id=model_id)
         return object()
 
-    def llm_turn(llm, user_message, tools):
+    def dispatch_turn(llm, user_message, tools):
         seen.update(prompt=user_message, tools=tools)
         if raises is not None:
             raise raises
@@ -284,9 +293,9 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
                 "usage": {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
                           "model": "gemini-3.8-flash"}}
 
+    monkeypatch.setattr(triage_task, "build_llm", build_llm)
+    monkeypatch.setattr(triage_task, "dispatch_turn", dispatch_turn)
     module = types.ModuleType("circt_bug_loop.generate_task")
-    module.build_llm = build_llm
-    module.llm_turn = llm_turn
     module.SourceReadTool = SourceReadTool
     monkeypatch.setitem(sys.modules, "circt_bug_loop.generate_task", module)
     monkeypatch.setattr(circt_bug_loop, "generate_task", module, raising=False)

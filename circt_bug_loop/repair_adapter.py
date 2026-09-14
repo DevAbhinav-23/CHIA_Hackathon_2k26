@@ -43,6 +43,7 @@ import chia
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract.schema import RunManifest
+from circt_bug_loop.llm import MODEL_BACKEND, require_live_model
 from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
                                   RepairResult, Report)
 
@@ -382,12 +383,12 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     # The interlock, unconditionally and BEFORE the cfg is built: CHIA's _turn
     # builds its own backend inside CHIA's file, which cannot carry the loop's
     # refusal, so stage 7 would otherwise be the one path to a model that the
-    # gate of 3.5.1 does not cover (3.8, T-U-layout-08).
-    from circt_bug_loop import generate_task
-
-    generate_task.require_live_model(
+    # gate of 3.5.1 does not cover (3.8, T-U-layout-08). It is `llm.py`'s and is
+    # imported at module scope: that module is neither half (architect decision
+    # 3), so reaching it crosses no seam.
+    require_live_model(
         f"stage 7 repair of {candidate.candidate_id}",
-        need_key=(cfg["repair_backend"] == generate_task.MODEL_BACKEND))
+        need_key=(cfg["repair_backend"] == MODEL_BACKEND))
 
     import circt_util
 

@@ -1,6 +1,7 @@
 """`mutator_synth.py` (A7): `04-Test-Plan.md` §1.8, `T-U-msyn-01` to `-09`.
 
-The turn is mocked at the one call that reaches a model, `dispatch_turn`, and
+The turn is mocked at the one call that reaches a model, `llm.dispatch_turn`,
+and
 the three constructed transcripts of `fixtures/synth/` are what it returns; the
 refusal, the query, the six drop checks, the provenance and the write-once
 freeze are all the real code. No model runs, no GitHub request is made, and
@@ -18,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from circt_bug_loop import generate_task, mutator_synth, mutators
+from circt_bug_loop import llm, mutator_synth, mutators
 from circt_bug_loop.mutator_synth import (MutatorSynthError, synthesise_mutators)
 from circt_bug_loop.store import LoopStore
 from circt_bug_loop.tests.conftest import call_node
@@ -87,7 +88,7 @@ def turn(monkeypatch):
     """Return the one recorded turn text from the one call that reaches a model."""
     def install(text: str) -> dict:
         state = {"calls": []}
-        monkeypatch.setattr(generate_task, "build_llm",
+        monkeypatch.setattr(llm, "build_llm",
                             lambda system, timeout, model: {"model": model,
                                                             "timeout": timeout})
 
@@ -98,7 +99,7 @@ def turn(monkeypatch):
                     "usage": {"tokens_in": 900, "tokens_out": 300,
                               "num_turns": 1, "model": MODEL_ID}}
 
-        monkeypatch.setattr(generate_task, "dispatch_turn", _dispatch)
+        monkeypatch.setattr(llm, "dispatch_turn", _dispatch)
         return state
 
     return install
@@ -200,7 +201,7 @@ def test_T_U_msyn_04_a_malformed_footer_freezes_nothing(mirror, unregistered_rep
     """T-U-msyn-04 (FR-05.2): 7.1's parser raises and no file is written."""
     turn(transcript("mutator_synth_bad"))
 
-    with pytest.raises(generate_task.PromptContractError) as raised:
+    with pytest.raises(llm.PromptContractError) as raised:
         run(mirror, unregistered_repo, tmp_path)
     assert str(raised.value) == "no_block"
     assert not list((tmp_path / "sets").iterdir())

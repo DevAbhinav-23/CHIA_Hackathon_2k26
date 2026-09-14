@@ -34,11 +34,12 @@ TESTS = FLOW / "tests"
 SYNC = REPO / "upstream" / "sync-to-chia.sh"
 CHIA_STUB = TESTS / "fixtures" / "layout" / "chia_stub"
 
-#: §1.3's eighteen source modules that hold logic, each with its test module.
+#: §1.3's NINETEEN source modules that hold logic, each with its test
+#: module: eighteen, plus `llm.py`, the join's neutral module (LLD §16.2).
 SOURCE_MODULES = {
     "bug_loop.py": "test_bug_loop.py", "contract/schema.py": "test_schema.py",
     "corpus.py": "test_corpus.py", "pin_select.py": "test_pin_select.py",
-    "generate_task.py": "test_generate_task.py",
+    "generate_task.py": "test_generate_task.py", "llm.py": "test_llm.py",
     "mutator_synth.py": "test_mutator_synth.py",
     "mutators/__init__.py": "test_mutators.py", "probe_task.py": "test_probe_task.py",
     "ddmin.py": "test_ddmin.py", "triage_task.py": "test_triage_task.py",
@@ -85,7 +86,7 @@ APPARATUS = ("probe_task.py", "triage_task.py", "repair_adapter.py", "gate.py",
 ARM_EXEMPT = ("ledger.py", "results.py", "contract/schema.py")
 
 #: §3.2's node table: every node the flow ships, with the placement its row
-#: gives it. `generate_task.llm_turn` is §3.5.1's own node and its `{"llm": 1}`
+#: gives it. `llm.llm_turn` is §3.5.1's own node and its `{"llm": 1}`
 #: is a FOURTH placement that §3.2's table never gained (errata row 17);
 #: `gate.gate_validate` is the third gate node of the architect's decision 6.
 NODES = {
@@ -93,7 +94,7 @@ NODES = {
     "pin_select.select_release_pinned_main": None,
     "generate_task.generate_seeded": {"circt": 1},
     "generate_task.generate_mutation": {"circt": 1},
-    "generate_task.llm_turn": {"llm": 1.0},
+    "llm.llm_turn": {"llm": 1.0},
     "feedback.build_feedback": None, "budget.load_budget": None,
     "ledger.accrue": None, "mutator_synth.synthesise_mutators": None,
     "bug_loop.build_image": {"circt": 1},
@@ -191,10 +192,9 @@ def test_T_U_layout_01_exemptions():
 def test_T_U_layout_01_twenty_five():
     """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
 
-    Eighteen for the source modules that hold logic, two structural, six on the
-    exemption list and one the implementation added (errata row 16). It becomes
-    nineteen source modules when the join lands `llm.py` (LLD §16.2).
-    Fixture: none. Tier 0.
+    Nineteen for the source modules that hold logic, `llm.py` included, two
+    structural, six on the exemption list and one the implementation added
+    (errata row 16). Fixture: none. Tier 0.
     """
     present = {path.name for path in TESTS.glob("test_*.py")}
     expected = (set(SOURCE_MODULES.values()) | set(STRUCTURAL_TESTS)
@@ -520,7 +520,7 @@ def test_T_U_layout_08_one_construction_path():
     """T-U-layout-08 (NFR-06): two construction paths, both behind the same refusal.
 
     `VertexGeminiLLM` is named in exactly one function of the loop's own
-    modules, `generate_task.build_llm`; the second path is the `vertex` arm of
+    modules, `llm.build_llm`; the second path is the `vertex` arm of
     `upstream/issue_task-vertex-branch.patch`, which is CHIA's file and cannot
     carry the interlock, so `repair_adapter.repair_adapt` calls
     `require_live_model` before it invokes the chain. There is no third.
@@ -532,9 +532,9 @@ def test_T_U_layout_08_one_construction_path():
             if isinstance(node, (ast.Name, ast.Attribute)):
                 if getattr(node, "id", getattr(node, "attr", "")) == "VertexGeminiLLM":
                     owners.append(path.name)
-    assert owners == ["generate_task.py"] * len(owners) and owners
+    assert owners == ["llm.py"] * len(owners) and owners
 
-    source = (FLOW / "generate_task.py").read_text(encoding="utf-8")
+    source = (FLOW / "llm.py").read_text(encoding="utf-8")
     build_llm = source.split("def build_llm")[1].split("\ndef ")[0]
     assert "VertexGeminiLLM" in build_llm
     assert "require_live_model" in build_llm

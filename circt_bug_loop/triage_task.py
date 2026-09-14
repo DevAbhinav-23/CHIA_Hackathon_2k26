@@ -11,21 +11,16 @@ from the record (FR-11.4).
 Head placement for B6a and B6b (K5, 3.2): both walk the head's blobless clone
 and the head-pinned `loop.db`, and neither runs a CIRCT binary, so neither takes
 a `circt` slot. B7 keeps `{"circt": 1}` for the node and `{"llm": 1.0}` for the
-turn itself, which `generate_task.llm_turn` declares.
+turn itself, which `llm.llm_turn` declares.
 
-Three deviations from 03-LLD.md, each recorded in
+Two deviations from 03-LLD.md, each recorded in
 `design/reviews/implementation-errata-log.md` rather than absorbed:
 
-  * `generate_task` is imported INSIDE `triage_report` and not at module scope.
-    05-Work-Plan.md 2.3 forbids either half importing the other before the join
-    (W-17, 2026-09-19) and W-10 is 2026-09-17, so a module-scope import would be
-    a cross-half edge two days early, and `generate_task.py` does not exist yet.
-    The lazy import keeps 3.7.4's "imported rather than repeated" rule and adds
-    no module-scope edge.
-  * `parse_json_footer` and `PromptContractError` live here. 7.1 calls the parser
-    "one function, shared by all four" and names no module; `prompts/` is not a
-    package and `generate_task.py` is not written. W-13 imports these rather
-    than re-implementing them.
+  * `generate_task` is imported INSIDE `_run_turn` and not at module scope, for
+    the one name B7 still needs from the supply half: `SourceReadTool`, which
+    3.5 puts in that module. 3.5.1's backend, turn and parser moved to `llm.py`
+    at the join, which is neither half, so those three are imported at module
+    scope below and the parser is one function again (architect decision 3).
   * `dedup_and_screen`'s signature carries no `BuildResult`, so 3.7.1's
     `signal_name` is read from `build_result.signal` by `probe_id` through the
     store that the node already opens for the mirror screen.
@@ -45,6 +40,8 @@ from typing import Literal, Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract.schema import RunManifest, SeedRecord
+from circt_bug_loop.llm import (PromptContractError,  # noqa: F401
+                                build_llm, dispatch_turn, parse_json_footer)
 from circt_bug_loop.probe_task import _normalise_function, strip_prologue
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, LoopStore,
@@ -94,7 +91,6 @@ _SRC_ROOTS = ("lib/", "include/", "tools/", "test/", "frontends/",
 #: path on every worker (FR-17.9), so the write lands in the same place.
 _artefact_write = artefact_write._chia_original
 
-_JSON_BLOCK = re.compile(r"```json\s*\n(?P<body>.*?)\n```", re.DOTALL)
 _SENTENCE_END = re.compile(r"(?<=[.!?])(?:\s+|$)")
 _SSA = re.compile(r"%[A-Za-z0-9_$.\-]+")
 _SYMBOL = re.compile(r"@[A-Za-z0-9_$.\-]+")
@@ -111,50 +107,8 @@ _EVIDENCE_KEYS = ("matched_key", "matched_token", "issue_number", "issue_url",
                   "duplicate_of_candidate_id")
 
 
-class PromptContractError(Exception):
-    """A turn's output did not end in the fenced json block 7.1 demands."""
-
-
 class ReportIncomplete(Exception):
     """A substitution point the chosen template declares is absent (FR-11.3)."""
-
-
-# ---------------------------------------------------------------------------
-# 7.1 The output contract
-# ---------------------------------------------------------------------------
-
-
-def parse_json_footer(text: str, required: tuple) -> dict:
-    """Parse the LAST fenced json block of a turn's output (7.1).
-
-    The last block wins, which is CHIA's own rule for its DECISION footer
-    (`chia:examples/circt_issue_solver/issue_task.py:28-29`): a model that
-    reconsiders mid-answer leaves both blocks and the final one is the answer.
-    `_JSON_BLOCK` is non-greedy, so `finditer` yields every block in order and
-    the body is the LAST match's group; `re.search` would yield the first and
-    would be the opposite rule.
-
-    Returns:
-        dict, the decoded object, carrying every key in *required*.
-    Worker:
-        pure; it runs in whichever process read the turn's output.
-    Raises:
-        PromptContractError(reason) with reason one of "no_block", "not_json",
-        "not_object" or "missing:<key>". Nothing else.
-    """
-    blocks = list(_JSON_BLOCK.finditer(text or ""))
-    if not blocks:
-        raise PromptContractError("no_block")
-    try:
-        decoded = json.loads(blocks[-1].group("body"))
-    except (ValueError, TypeError):
-        raise PromptContractError("not_json") from None
-    if not isinstance(decoded, dict):
-        raise PromptContractError("not_object")
-    for key in required:
-        if key not in decoded:
-            raise PromptContractError(f"missing:{key}")
-    return decoded
 
 
 # ---------------------------------------------------------------------------
@@ -1335,18 +1289,22 @@ def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
 def _run_turn(prompt: str, cfg: dict) -> dict:
     """One 3.5.1 turn on the campaign backend, with `SourceReadTool` and nothing else.
 
-    `generate_task` is imported here and not at module scope: 05-Work-Plan.md
-    2.3 forbids either half importing the other before the join, and this is the
-    one call B7 makes across it.
+    The backend and the turn are `llm.py`'s, which is neither half, so they are
+    imported at module scope. `generate_task` is still imported HERE and not
+    there, for the one name 3.5 leaves in the supply half: `SourceReadTool`.
+
+    The turn goes through `dispatch_turn` and not through `llm_turn` itself: a
+    plain call to the decorated wrapper routes through `chia.trace.profiler`,
+    which starts a local Ray where none is running, which is what A3's own turn
+    avoids the same way (3.5.1, 04-Test-Plan.md 0.4).
     """
     from circt_bug_loop import generate_task
 
-    llm = generate_task.build_llm(TRIAGE_SYSTEM_MESSAGE,
-                                  int(cfg.get("timeout_seconds", 1200)),
-                                  cfg["model_id"])
+    backend = build_llm(TRIAGE_SYSTEM_MESSAGE,
+                        int(cfg.get("timeout_seconds", 1200)), cfg["model_id"])
     tool = generate_task.SourceReadTool(cfg["clone_path"], cfg["run_commit"])
     try:
-        return generate_task.llm_turn(llm, prompt, [tool])
+        return dispatch_turn(backend, prompt, [tool])
     finally:
         stop = getattr(tool, "stop", None)
         if callable(stop):
@@ -1377,8 +1335,8 @@ def _read_text(path: Optional[str]) -> str:
 
 __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "GOOD_FIRST_ISSUE", "BUILD_PREFIX", "NOT_APPLICABLE", "ARC_TESTS",
-           "PRIMARY_POINTS", "DIFFERENTIAL_POINTS", "PromptContractError",
-           "ReportIncomplete", "parse_json_footer",
+           "PRIMARY_POINTS", "DIFFERENTIAL_POINTS",
+           "ReportIncomplete",
            "normalise_expr", "normalise_site", "structural_hash",
            "compute_fingerprint", "is_duplicate", "partition", "rates",
            "mirror_tokens", "mirror_screen", "frame_paths", "frame_symbols",
