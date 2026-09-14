@@ -1,40 +1,4 @@
-"""B9a and B9b: the four mechanical questions, asked in order (`03-LLD.md` §3.9, F-13).
-
-Every one of the four is answered by a tool and none by a model (FR-13.1,
-NFR-03), and the triage classification is read by none of them (FR-13.4). The
-decision stage holds **no** `circt` resource, so it can never occupy a slot while
-waiting for one; the two questions that need a CIRCT binary are dispatched as
-tasks of their own, which is `02-HLD.md` §3's rule and K5's correction.
-
-Deviations from §3.9, each recorded in
-`design/reviews/implementation-errata-log.md` rather than absorbed:
-
-  * **Question 3 needs a third node.** §3.9 names two, and §4.8 gives question 3
-    three tool invocations run "under the same `prlimit` prefix as a probe" and
-    "against the source-tree binaries". `gate_decide` runs on the head and holds
-    no `circt` resource, so it can run neither. `gate_validate` is that node, and
-    it is dispatched exactly as `gate_rerun` is.
-  * **`image_spec` is a dict.** `RunManifest.image_spec` is §2.7's eight-key
-    dict and not the `ImageSpec` dataclass §3.9's signature names, and the four
-    keys these nodes read (`tool_hashes`, `flag_string`, `circt_sha`,
-    `image_digest`) are all in it.
-  * **A fourth question-2 stopping value.** FR-13.3's pass requires a fixpoint
-    and FR-18.6's table has three failing rows, none of them "a reducer ran, and
-    did not reach a fixpoint" - which §9.5's own `reduction_wall_seconds` note
-    says was the common case at 60 s. It is recorded as `not_fixpoint` and
-    buckets as `not_minimal` with the other three, so the taxonomy is unchanged.
-  * **A fifth question-2 value, and it is a PASS.** `already_minimal` is what a
-    fixpoint with no progress on a case at or below `minimal_case_lines`
-    records (W-18b, errata row 46). It never reaches `_q2_stopping_value`,
-    which is asked only of a question that said no, so the taxonomy is again
-    unchanged.
-  * **A null answer has no bucket.** FR-13.10 defaults the decision to `nothing`
-    and FR-18.6's table has no row for an unanswered question; `undecided` is
-    what such a candidate is recorded as, so the six values stay total.
-  * `gate_rerun`'s working directory is `mkdtemp(prefix="<candidate_id>-")`
-    inside `<artefact_root>/<run>/gate/`, which satisfies §3.9's `mkdtemp` and
-    §6.5's `gate/<candidate_id>/` at once.
-"""
+"""B9a and B9b: the four mechanical questions, asked in order (`03-LLD.md` §3.9)."""
 from __future__ import annotations
 
 import json
@@ -58,23 +22,16 @@ from circt_bug_loop.store import (BuildResult, CandidateRecord, DedupVerdict,
 from circt_bug_loop.triage_task import compute_fingerprint
 
 #: §4.8's three parse-and-verify commands, by the reduced case's own extension.
-#: No pass pipeline, so `circt-opt` parses and runs MLIR's verifier and nothing
-#: else; never `--allow-unregistered-dialect`, because an unregistered dialect
-#: means the input is not valid CIRCT IR; `-o /dev/null` so the check writes
-#: nothing; and `--import-only` rather than `--parse-only` for `.sv`, which stops
-#: before elaboration and would accept what elaboration rejects.
 VALIDITY_COMMANDS = {
     ".fir": ("firtool", ["--parse-only"]),
     ".sv": ("circt-verilog", ["--import-only"]),
 }
 DEFAULT_VALIDITY_COMMAND = ("circt-opt", ["-o", "/dev/null"])
 
-#: FR-13.15's second conjunct: the recorded failure occurred after parsing
-#: exactly when its fingerprint frame's file is not the parser's own.
+#: FR-13.15's second conjunct.
 PARSER_DIRS = ("lib/Parser/", "lib/AsmParser/", "tools/circt-translate/")
 
-#: FR-18.6's table, as the mapping it is. The key is the question that stopped
-#: the gate and the stopping value it wrote.
+#: FR-18.6's table, as the mapping it is.
 TAXONOMY = {
     (1, "did_not_reproduce"): "unreproducible",
     (2, "reduced_false"): "not_minimal",
@@ -90,8 +47,7 @@ TAXONOMY = {
     (4, "dedup_basis_insufficient"): "undecided",
 }
 
-#: The fifteen answer keys of `02-HLD.md` §2.11, which is what `gate_decision`'s
-#: `answers_json` column holds.
+#: The fifteen answer keys of `02-HLD.md` §2.11.
 ANSWER_KEYS = ("q1_reproduce", "q1_original_worker", "q1_rerun_worker",
                "q1_original_pid", "q1_rerun_pid", "q1_same_worker",
                "q2_minimal", "q2_reason", "q3_valid", "q3_validity_basis",
@@ -105,16 +61,7 @@ def answers(decision: GateDecision) -> dict:
 
 
 def validity_command(case_path: str) -> tuple:
-    """§4.8's command for one reduced case, chosen by its extension alone.
-
-    Returns:
-        (tool name, list of options). The case is appended by the caller, last.
-    Worker:
-        pure.
-    Raises:
-        nothing: an unknown extension takes the MLIR row, which is what every
-        reducer but the textual one produces.
-    """
+    """§4.8's command for one reduced case, chosen by its extension alone."""
     return VALIDITY_COMMANDS.get(os.path.splitext(case_path)[1].lower(),
                                  DEFAULT_VALIDITY_COMMAND)
 
@@ -127,19 +74,7 @@ def in_parser(path: str) -> bool:
 
 
 def live_circt_nodes() -> list:
-    """Every alive Ray node holding the `circt` resource, as CHIA enumerates them.
-
-    `chia:chia/base/dispatch_proxy.py:84-97` is the same walk. Outside a Ray
-    session there are no nodes and the list is empty, which makes the soft pin
-    of FR-13.2 a no-op rather than an error.
-
-    Returns:
-        list[str] of node ids.
-    Worker:
-        head.
-    Raises:
-        nothing; a Ray that is not up returns [].
-    """
+    """Every alive Ray node holding the `circt` resource, as CHIA enumerates them."""
     import ray
 
     if not ray.is_initialized():
@@ -149,23 +84,12 @@ def live_circt_nodes() -> list:
 
 
 def preferred_node(node_ids: list, original: Optional[str]) -> Optional[str]:
-    """The node FR-13.2 prefers for the re-run: any live `circt` node but *original*.
-
-    Returns None when the only live node is the original one, in which case the
-    re-run still happens, unpinned, and `q1_same_worker` records the truth.
-    """
+    """The node FR-13.2 prefers for the re-run: any live `circt` node but *original*."""
     return next((node for node in node_ids if node != original), None)
 
 
 def rerun_options(node_id: Optional[str]) -> dict:
-    """FR-13.2's **soft** node affinity, as the task options a dispatch takes.
-
-    Soft, never hard: expressed as a hard pin from a resource-holding decision
-    stage on the two-worker Must configuration, two candidates gating at once
-    each hold one slot and each wait on the other's, and CHIA's own stall
-    detector cannot see it (K5). Soft means the re-run happens wherever the
-    scheduler can put it and the truth is recorded either way.
-    """
+    """FR-13.2's **soft** node affinity, as the task options a dispatch takes."""
     if node_id is None:
         return {}
     from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
@@ -175,20 +99,11 @@ def rerun_options(node_id: Optional[str]) -> dict:
 
 
 def _dispatch(node, options: dict, *args, **kwargs):
-    """Run one `@ChiaFunction` as a task of its own, with *options*.
-
-    The single seam between `gate_decide` and the cluster: `gate_decide` holds no
-    worker resource and every question that needs one goes through here.
-    """
+    """Run one `@ChiaFunction` as a task of its own, with *options*."""
     from chia.base.ChiaFunction import get
 
     target = node.options(**options) if options else node
     return get(target.chia_remote(*args, **kwargs))
-
-
-# ---------------------------------------------------------------------------
-# B9b, the re-run and the validity check
-# ---------------------------------------------------------------------------
 
 
 def _work_dir(artefact_root: str, run_manifest_id: str, candidate_id: str,
@@ -201,12 +116,7 @@ def _work_dir(artefact_root: str, run_manifest_id: str, candidate_id: str,
 
 def _run_command(binary: str, args: list, image_spec: dict, limits: dict,
                  cwd: str) -> dict:
-    """Hash-check one tool binary, then run it bounded, exactly as a probe is.
-
-    Raises:
-        BinaryMismatch, for the reason `probe_execute` raises it: a tree that has
-        been mutated makes every verdict from the worker suspect (§5.2, FR-06.1).
-    """
+    """Hash-check one tool binary, then run it bounded, exactly as a probe is."""
     actual = _sha256(binary)
     expected = image_spec["tool_hashes"].get(os.path.basename(binary))
     if expected != actual:
@@ -228,20 +138,8 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
                symbolizer: str = "llvm-symbolizer") -> dict:
     """Re-run one reproducing command in a fresh process and a new directory.
 
-    The working directory is created per call and never reused, which with a
-    fresh process and, where the scheduler grants it, a different worker is what
-    the framework can deliver and what question 1 needs: no state carried over
-    from the run that produced the verdict (C-19, FR-13.2's own rationale).
-
-    The fingerprint is recomputed from **this** run's stderr by §3.7.1's rule,
-    which is what sets `Fingerprint.fingerprint_stable`. A difference does not
-    fail question 1, which asks only whether the recorded failure reproduces.
-
     Returns:
-        {"status": str, "oracle_class": str | None, "assertion_text": str | None,
-         "assertion_site": str | None, "fingerprint": str | None,
-         "worker": str, "node_id": str, "pid": int, "counters": CounterBlock},
-        the counters counting one re-run at stage "gate" (3.11).
+        {"status": str, "oracle_class": str | None, "assertion_text": str | None, "assertion_site": str | None, "fingerprint": str | None, "worker": str, "node_id": str, "pid": int, "counters": CounterBlock}, the counters counting one re-run at stage "gate" (3.11).
     Worker:
         {"circt": 1}.
     Raises:
@@ -275,9 +173,7 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
         stdout_bytes=len(out["stdout"].encode("utf-8")),
         stderr_bytes=len(out["stderr"].encode("utf-8")), truncated=out["truncated"])
 
-    # oracle_primary reads exactly one field off its image_spec, flag_string, and
-    # RunManifest.image_spec is a dict; the stand-in carries that one field and
-    # the rule stays B3's own rather than being restated here.
+    # oracle_primary reads exactly one field off its image_spec, flag_string, and RunManifest.image_spec is a dict.
     verdict = oracle_primary._chia_original(
         build, SimpleNamespace(flag_string=image_spec["flag_string"]), work,
         circt_roots=circt_roots, symbolizer=symbolizer)["verdict"]
@@ -300,18 +196,10 @@ def gate_validate(case_path: str, image_spec: dict, limits: dict,
                   bin_dir: str) -> dict:
     """Run §4.8's parse-and-verify command for one reduced case (FR-13.15).
 
-    Three outcomes and no fourth: exit 0 passes; the check itself firing the
-    primary oracle passes, because the component that would judge validity is
-    then the failing one; a clean non-zero exit with a diagnostic fails.
-
     Returns:
-        {"argv": list[str], "exit_status": int | None, "stderr_path": str,
-         "checker_fired": bool, "oracle_class": str | None,
-         "counters": CounterBlock}, the counters counting one validity check at
-        stage "gate" (3.11).
+        {"argv": list[str], "exit_status": int | None, "stderr_path": str, "checker_fired": bool, "oracle_class": str | None, "counters": CounterBlock}, the counters counting one validity check at stage "gate" (3.11).
     Worker:
-        {"circt": 1}; the binaries are the source tree's, at the candidate's own
-        commit (§4.8, K14).
+        {"circt": 1}; the binaries are the source tree's.
     Raises:
         BinaryMismatch, as probe_execute does.
     """
@@ -333,25 +221,8 @@ def gate_validate(case_path: str, image_spec: dict, limits: dict,
                 seconds=time.monotonic() - started_at)}
 
 
-# ---------------------------------------------------------------------------
-# B9a, the decision
-# ---------------------------------------------------------------------------
-
-
 def case_lines(reduced: Optional[ReducedCase]) -> Optional[int]:
-    """The lines of the reduced case on disk, or None when it cannot be read.
-
-    None is "no answer", not "zero lines": an unreadable case is a case question
-    2 cannot call minimal, which is the direction a gate must err in.
-
-    Returns:
-        int | None.
-    Worker:
-        the caller's; one file read of a path under the artefact root, which
-        FR-17.9 makes readable identically on the head and on every worker.
-    Raises:
-        nothing.
-    """
+    """The lines of the reduced case on disk, or None when it cannot be read."""
     try:
         return len(Path(reduced.path).read_text(errors="backslashreplace")
                    .splitlines())
@@ -360,21 +231,7 @@ def case_lines(reduced: Optional[ReducedCase]) -> Optional[int]:
 
 
 def _question_2(reduced: Optional[ReducedCase], minimal_case_lines: int) -> tuple:
-    """FR-13.3, total over every reducer record F-09 can produce.
-
-    **A fixpoint with no progress on a small case now PASSES** (W-18b, errata
-    row 46). `circt-reduce` reaching a fixpoint is evidence that the case cannot
-    be made smaller, and `reduced` is false exactly when it could not be: the
-    two together say "already minimal", and reading them as `not_minimal`
-    refused all three of the W-18 pilot's candidates over a six-line module the
-    reducer had proved irreducible in twenty interestingness calls. So
-    `reduced=false` fails only when the fixpoint was NOT reached - the reducer
-    ran out of wall clock, aborted, or changed the failure - or when the case is
-    LARGER than *minimal_case_lines*, which is the case worth refusing.
-
-    The re-check still gates both paths: a reduction that changed the failure is
-    not a reduction of THIS bug, whether or not it shrank anything.
-    """
+    """FR-13.3, total over every reducer record F-09 can produce."""
     if reduced is None or reduced.reducer == "none":
         return False, "no_reducer"
     if not reduced.recheck_matches:
@@ -400,12 +257,7 @@ def _question_4(candidate: CandidateRecord, dedup: DedupVerdict) -> tuple:
 
 
 def _q2_stopping_value(reason: Optional[str]) -> str:
-    """The reason question 2 recorded, mapped onto FR-18.6's own vocabulary.
-
-    FR-09.12 lets B5 write its own free text into `ReducedCase.reason`; the
-    taxonomy's middle column is a closed set, so a reason that is not one of its
-    values buckets as `reduced_false`, which is the row it came from.
-    """
+    """The reason question 2 recorded, mapped onto FR-18.6's own vocabulary."""
     return reason if (2, reason) in TAXONOMY else "reduced_false"
 
 
@@ -417,17 +269,11 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     """Ask the four mechanical questions in order and stop at the first no.
 
     Returns:
-        {"decision": GateDecision, "counters": CounterBlock}, the decision
-        defaulting to "nothing" for any unanswered question and the counters
-        counting one candidate at stage "gate" (3.11); a candidate the gate
-        decided nothing about is the failed one.
+        {"decision": GateDecision, "counters": CounterBlock}, the decision defaulting to "nothing" for any unanswered question and the counters counting one candidate at stage "gate" (3.11); a candidate the gate decided nothing about is the failed one.
     Worker:
-        head - and it holds NO circt resource, so it can never occupy a slot
-        while waiting for one (02-HLD.md 3).
+        head - and it holds NO circt resource.
     Raises:
-        nothing. Every refusal is a recorded answer, not an exception.
-        ValueError for a `differential` candidate, which FR-13.14 keeps out of
-        the gate entirely, so one arriving is a caller defect and not a verdict.
+        nothing.
     """
     started_at = time.monotonic()
     if candidate.oracle_class == "differential":
@@ -459,8 +305,7 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         rerun["oracle_class"] == candidate.oracle_class
         and rerun["assertion_text"] == candidate.assertion_text
         and rerun["assertion_site"] == candidate.assertion_site)
-    # FR-10.1: recorded, printed beside the headline, and never a merge key. It
-    # does not fail question 1, which asks only whether the failure reproduces.
+    # FR-10.1: recorded, printed beside the headline, and never a merge key.
     store.update("fingerprint", {"candidate_id": candidate.candidate_id},
                  {"fingerprint_stable": int(rerun["fingerprint"] == candidate.fingerprint)})
 
@@ -483,13 +328,7 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 fields["q3_valid"], fields["q3_validity_basis"] = True, "parsed"
             else:
                 fields["q3_valid"], fields["q3_validity_basis"] = False, "parsed"
-            # FR-13.15's second conjunct, and FR-13.10 for its third case. The
-            # conjunct is UNDECIDABLE when there is no in-scope frame with a
-            # line and no pass pipeline, which is the ordinary shape of a
-            # `fatal_error` candidate whose frames are empty; only an explicit
-            # False downgraded, so an undecidable conjunct PASSED question 3
-            # silently (W5). An unanswered question refuses, and `decide` turns
-            # a null answer into question 3 and the `undecided` bucket.
+            # FR-13.15's second conjunct, and FR-13.10 for its third case.
             if fields["q3_valid"] and fields["q3_after_parse"] is False:
                 fields["q3_valid"] = False
             elif fields["q3_valid"] and fields["q3_after_parse"] is None:
@@ -510,27 +349,13 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 seconds=time.monotonic() - started_at)}
 
 
-#: The four questions in the order FR-13.1 fixes, each with the answer field it
-#: writes and the stopping value it records when it says no.
+#: The four questions in the order FR-13.1 fixes.
 QUESTIONS = ((1, "q1_reproduce"), (2, "q2_minimal"), (3, "q3_valid"),
              (4, "q4_new"))
 
 
 def decide(fields: dict, repair: Optional[RepairResult]) -> tuple:
-    """Turn the fifteen answers into the decision, the stopping point and the bucket.
-
-    Pure, and separate from `gate_decide` for one reason: FR-13.10's default is
-    that **any** unanswered question refuses, and a null answer is not something
-    the four questions above can be made to produce on demand. Here it is one
-    argument (FR-13.6, FR-13.10, FR-18.6).
-
-    Returns:
-        (decision, stopped_at_question, taxonomy_bucket).
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Turn the fifteen answers into the decision, the stopping point and the bucket."""
     for number, key in QUESTIONS:
         answer = fields.get(key)
         if answer is None:
@@ -547,13 +372,7 @@ def decide(fields: dict, repair: Optional[RepairResult]) -> tuple:
 
 def _after_parse(store: LoopStore, candidate: CandidateRecord,
                  check: dict) -> Optional[bool]:
-    """FR-13.15's second conjunct, answered from the record and no fourth command.
-
-    The recorded failure occurred after parsing exactly when its fingerprint
-    frame's file is not the parser's own, **or** when the check's own exit was 0
-    while the probe's argv carried a pass pipeline, which puts the failure
-    downstream of the parse by construction. None where neither can be decided.
-    """
+    """FR-13.15's second conjunct, answered from the record and no fourth command."""
     frame_file = _fingerprint_frame_file(store, candidate.probe_id)
     if frame_file and not in_parser(frame_file):
         return True
@@ -566,12 +385,7 @@ def _after_parse(store: LoopStore, candidate: CandidateRecord,
 
 
 def _fingerprint_frame_file(store: LoopStore, probe_id: str) -> Optional[str]:
-    """The file of the frame §3.7.1 fingerprints on, full path, or None.
-
-    `OracleVerdict.fingerprint_frame` carries the basename only, which answers
-    the `*Parser*.cpp` half of FR-13.15 and not the three directory halves, so
-    the frame is read back out of the recorded `frames_json`.
-    """
+    """The file of the frame §3.7.1 fingerprints on, full path, or None."""
     row = store.query_one("SELECT frames_json FROM oracle_verdict WHERE probe_id = ?",
                           (probe_id,))
     if row is None:
