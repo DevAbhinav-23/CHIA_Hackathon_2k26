@@ -42,6 +42,32 @@
 # metadata, which is visible in `chia job` output and the dashboard. CHIA's own
 # all_models.yaml passes OPENAI_API_KEY the same way (chia/models/tests/cluster/
 # all_models.yaml:143-152). Section 11.2 is normative.
+#
+# THE ASSERTIONS IMAGE IS LOCAL AND IS NOT PULLED. 03-LLD.md 12.1 wrote
+# `ghcr.io/ucb-bar/chia-circt-assert:${BUGLOOP_IMAGE_TAG}` with
+# `pull_before_run: True`, and W-04 never published the image: `docker pull` of
+# that name answers `error from registry: denied`, and CHIA's DockerManager runs
+# the pull with check=True, so `chia up` dies before the first container. The
+# name it would then run is missing locally as well, and CHIA appends
+# `--pull=never` to every `docker run` (chia:chia/cluster/docker.py:34-61), so a
+# registry-qualified name cannot resolve on this head at all. Both circt-side
+# types therefore name the image the way W-04 built it and every artefact of
+# this project records it -- `chia-circt-assert:eade0de61bc5`, the tag in
+# `analysis/measurements/raw/image-manifest.json` -- and pull nothing. Only the
+# LOCATION changes; the tag still comes from ${BUGLOOP_IMAGE_TAG} and the
+# driver's own check is a suffix match against the manifest's tag
+# (`bug_loop.py` pre-flight, `image_spec.image_tag.endswith(args.image_tag)`),
+# which both spellings satisfy. `bugloop_llm` keeps ghcr and keeps its pull:
+# `ghcr.io/ucb-bar/chia:latest` is a published image. Restore the registry form
+# on the two circt types if and when the assertions image is pushed (W-19a).
+#
+# THE OPERATOR NEEDS A RUNNING SSH AGENT. `-v $SSH_AUTH_SOCK:/ssh-agent` below is
+# written unbraced on purpose: CHIA's loader expands only ${VAR}
+# (chia:chia/cluster/config.py:300-304), so this one expands in the remote
+# `bash --login` that CHIA opens with `ssh -A`, and the forwarded socket is the
+# value the container gets. With no agent in the operator's shell the option
+# becomes `-v :/ssh-agent` and `docker run` rejects it, so `eval $(ssh-agent -s)`
+# (or any live agent) belongs beside the exports above (W-19a).
 cluster_name: circt_bug_loop
 
 available_node_types:
@@ -84,7 +110,19 @@ available_node_types:
                 # the CLI: no ~/.claude mount, no .claude.json copy, no
                 # skipDangerousModePermissionPrompt write into the operator's
                 # real configuration directory.
-                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                #
+                # `|| true` HERE AND NOT ON THE OTHER TWO TYPES. The line exists
+                # to give the numeric uid a passwd entry, and it can only write
+                # when /etc/passwd is writable by that uid. In
+                # chia-circt-assert it is (`-rw-rw-rw-`), so bugloop_circt and
+                # bugloop_repair keep the bare form; in ghcr.io/ucb-bar/chia it
+                # is `-rw-r--r-- root root`, the append fails with
+                # `/etc/passwd: Permission denied`, `set -e` in CHIA's setup
+                # script aborts it, and both llm workers FAIL to set up. Nothing
+                # is lost by tolerating it: uid 1000 in that image is already
+                # the `ray` user and already has the entry this line would add
+                # (W-19a).
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd || true
                 - mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
         compatible_ips: ["${CHIA_HEAD}"]
 
@@ -94,9 +132,10 @@ available_node_types:
         min_workers: 2
         max_workers: 2
         docker:
-            image: "ghcr.io/ucb-bar/chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            # LOCAL NAME, NO REGISTRY, AND NO PULL. See the header note.
+            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
             container_name: "circt_bug_loop_circt_${USER}"
-            pull_before_run: True
+            pull_before_run: False
             run_options:
                 - --ulimit nofile=65536:65536
                 - --shm-size=10.24gb
@@ -139,9 +178,10 @@ available_node_types:
         min_workers: 1
         max_workers: 1
         docker:
-            image: "ghcr.io/ucb-bar/chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            # LOCAL NAME, NO REGISTRY, AND NO PULL. See the header note.
+            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
             container_name: "circt_bug_loop_repair_${USER}"
-            pull_before_run: True
+            pull_before_run: False
             run_options:
                 - --ulimit nofile=65536:65536
                 - --shm-size=10.24gb
