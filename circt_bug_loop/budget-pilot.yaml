@@ -3,8 +3,19 @@
 # A COPY of budget.yaml with eight values changed, listed below. It is a separate
 # file because FR-14.7 forbids editing a registered budget file, and because the
 # pilot and the campaign are two pre-registrations with two tags: this one is
-# `registration/pilot-6` and the campaign's is W-22's. `bug_loop.py --budget
+# `registration/pilot-7` and the campaign's is W-22's. `bug_loop.py --budget
 # circt_bug_loop/budget-pilot.yaml` selects it; the flag already existed.
+#
+# PILOT 7 (2026-09-15), registered as `registration/pilot-7`. NO VALUE CHANGES
+# from pilot 6, and for a reason the cap itself makes: pilot 6's stage-2 turn
+# was refused BEFORE DISPATCH by the pre-authorisation, not by the money. Stage
+# 1 was authorised 2.729162 and billed 0.605893, `SpendGuard` never reconciled
+# the two, and 2.729162 + stage 2's worst case of 4.384600 reached this cap of
+# 6.00 (D-5). This tag registers the guard that settles: an authorisation is
+# moved out of flight at the turn's observed bill, or at its whole
+# authorisation when no bill was observed, so the cap bounds money SPENT and
+# 0.605893 + 4.384600 fits inside 6.00. Raising the cap instead would have
+# registered the defect rather than the fix, which is why no value moves.
 #
 # PILOT 6 (2026-09-15), registered as `registration/pilot-6`. NO VALUE CHANGES
 # from pilot 5, for the same reason: this registration measures code. Pilot 5's
