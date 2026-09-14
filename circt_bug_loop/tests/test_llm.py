@@ -141,7 +141,8 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
 
     assert turn["usage"] == {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
                              "model": MODEL_ID, "thinking_tokens": 0,
-                             "tool_use_prompt_tokens": 0, "observed": True}
+                             "tool_use_prompt_tokens": 0, "cached_tokens": 0,
+                             "observed": True}
     assert turn["result"] == "PONG" and turn["success"] is True
     assert turn["stderr"] == "" and "generate_content" in turn["stream"]
 
@@ -529,3 +530,32 @@ def test_T_U_gen_28b_stage_two_is_priced_at_its_own_output_cap(monkeypatch):
     assert built.max_tokens == 32000
     assert build_llm("be terse", 60, MODEL_ID, env=dict(ALLOW_ENV)).max_tokens \
         == 16000, "CHIA's own default when no stage value is passed"
+
+
+@pytest.mark.t0
+def test_T_U_gen_26b_cached_prompt_tokens_travel_with_the_turn():
+    """W-23: `cached_tokens` is carried, is a subset of `tokens_in`, and is unpriced."""
+    usage = llm_module.turn_usage({"input_tokens": 1000, "output_tokens": 5,
+                                   "thinking_tokens": 7,
+                                   "tool_use_prompt_tokens": 3,
+                                   "cached_tokens": 800, "num_turns": 1,
+                                   "model": MODEL_ID})
+    assert usage["cached_tokens"] == 800
+    assert usage["tokens_in"] == 1003, "a subset of tokens_in, never a summand"
+
+    # An unobserved turn reports null, never zero, for this count too.
+    assert llm_module.turn_usage(None)["cached_tokens"] is None
+    assert llm_module.turn_usage({"input_tokens": 4, "output_tokens": 1}
+                                 )["cached_tokens"] == 0
+
+    # NOTHING prices it: the guard bills every input token at the list rate.
+    guard = llm_module.SpendGuard(
+        cap_usd=100.0, spend_usd=0.0, price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+    assert guard.billed_usd(usage) == round(1003 / 1e6 * 0.75 + 12 / 1e6 * 3.75, 6)
+    # The verified cached rate is recorded beside the list prices and used nowhere.
+    assert llm_module.CACHED_INPUT_RATE_USD_PER_M == 0.075
+    source = Path(llm_module.__file__).read_text(encoding="utf-8")
+    assert "ai.google.dev/gemini-api/docs/pricing" in source
+    assert source.count("CACHED_INPUT_RATE_USD_PER_M") == 1, \
+        "declared once and read by nothing"

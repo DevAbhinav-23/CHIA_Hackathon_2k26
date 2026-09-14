@@ -7,6 +7,7 @@
   "observed": {
     "authorised_usd": null,
     "billed_usd": null,
+    "cached_tokens": null,
     "calls": null,
     "ceiling_usd": null,
     "cost_usd": 0.01187,

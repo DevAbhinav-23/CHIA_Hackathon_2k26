@@ -119,6 +119,20 @@ def stage_max_output_tokens(stage: str) -> int:
 #: Characters per token, for the pre-authorisation only.
 CHARS_PER_TOKEN = 2.0
 
+#: USD per million CACHED input tokens for `gemini-3.8-flash`, VERIFIED
+#: 2026-09-15 on https://ai.google.dev/gemini-api/docs/pricing - "$0.075
+#: through December 31, 2026. $0.15 starting January 1, 2027." - which is the
+#: same page budget.yaml's two registered rates are verified against.
+#:
+#: NOTHING PRICES ANYTHING AT IT. `cloud.google.com/vertex-ai/generative-ai/
+#: pricing` could not be read (its table is not in the fetched document), and
+#: budget.yaml registers exactly TWO rates: a third one in the ledger's
+#: arithmetic would change a registered campaign parameter after registration
+#: (FR-14.7). `cached_tokens` is RECORDED and every input token is still priced
+#: at the list rate, so the ledger over-states and never under-states - the safe
+#: direction for a cap. `results.md` says so and says how many tokens were cached.
+CACHED_INPUT_RATE_USD_PER_M = 0.075
+
 #: The tokens ONE tool result may add to the conversation, which is the read
 #: cap of `generate_task.SOURCE_READ_CAP_BYTES` at `CHARS_PER_TOKEN`.
 TOOL_OUTPUT_TOKENS_CAP = 32768
@@ -262,13 +276,18 @@ def turn_usage(metadata) -> dict:
     # The patched backend publishes `input_tokens` on every path that ran at all.
     if "input_tokens" not in meta:
         return {"tokens_in": None, "tokens_out": None, "thinking_tokens": None,
-                "tool_use_prompt_tokens": None, "num_turns": meta.get("num_turns", 0),
+                "tool_use_prompt_tokens": None, "cached_tokens": None,
+                "num_turns": meta.get("num_turns", 0),
                 "model": meta.get("model"), "observed": False}
     thinking = int(meta.get("thinking_tokens") or 0)
     tool_use = int(meta.get("tool_use_prompt_tokens") or 0)
+    # A SUBSET of `tokens_in`, already counted in it at the list input rate:
+    # this loop prices no third rate, so the ledger is an UPPER BOUND by
+    # whatever the cached discount would have been (see CACHED_INPUT_RATE).
     return {"tokens_in": int(meta.get("input_tokens") or 0) + tool_use,
             "tokens_out": int(meta.get("output_tokens") or 0) + thinking,
             "thinking_tokens": thinking, "tool_use_prompt_tokens": tool_use,
+            "cached_tokens": int(meta.get("cached_tokens") or 0),
             "num_turns": meta.get("num_turns", 0), "model": meta.get("model"),
             "observed": True}
 

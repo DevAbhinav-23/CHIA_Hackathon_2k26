@@ -59,12 +59,13 @@ def patched_vertex(tmp_path_factory):
     return module
 
 
-def _usage(prompt=0, candidates=0, thoughts=0, tool_use=0):
+def _usage(prompt=0, candidates=0, thoughts=0, tool_use=0, cached=0):
     return types.GenerateContentResponseUsageMetadata(
         prompt_token_count=prompt,
         candidates_token_count=candidates,
         thoughts_token_count=thoughts,
         tool_use_prompt_token_count=tool_use,
+        cached_content_token_count=cached,
         total_token_count=prompt + candidates + thoughts + tool_use,
     )
 
@@ -732,3 +733,27 @@ def test_T_U_upstream_16_max_tokens_without_a_call_still_raises(monkeypatch,
     written = next(iter(tmp_path.glob("*.log"))).read_text(encoding="utf-8")
     assert "[Partial Response]\nhalf a probe\n" in written
     assert written.index("read budget exhausted") < written.index("[Partial Response]")
+
+
+@pytest.mark.t0
+def test_T_U_upstream_17_cached_prompt_tokens_are_counted(monkeypatch,
+                                                          patched_vertex):
+    """T-U-upstream-17 (W-23): `cached_content_token_count` reaches the metadata."""
+    calls = _install_fake_genai(monkeypatch, [_response(
+        types.Part(text="PONG"),
+        _usage(prompt=1000, candidates=5, cached=800))])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1")
+    assert llm._run_generate("ping", []).result == "PONG" and len(calls) == 1
+
+    # A SUBSET of prompt_token_count, never added to it.
+    assert llm._last_metadata == {
+        "input_tokens": 1000, "output_tokens": 5, "cached_tokens": 800,
+        "num_turns": 1}
+
+    # Zero is an observation and is dropped from the metadata like every other.
+    _install_fake_genai(monkeypatch, [_response(
+        types.Part(text="PONG"), _usage(prompt=10, candidates=5))])
+    llm._run_generate("ping", [])
+    assert "cached_tokens" not in llm._last_metadata

@@ -73,7 +73,7 @@ VERTEX_BRANCH_BOUNDS = ("max_tool_iterations=cfg[", "turn_budget_usd=cfg[")
 VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
                        "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS",
                        "tool_config", "final_tool_names", "rate_limit_retries",
-                       "executed and continued")
+                       "executed and continued", "cached_content_token_count")
 
 #: Defaults for 13.1's argument table.
 DEFAULT_BUDGET = str(FLOW_DIR / "budget.yaml")
@@ -1701,6 +1701,7 @@ class Campaign:
                 observed={"cpu_seconds": None,
                           "tokens_in": usage.get("tokens_in"),
                           "tokens_out": usage.get("tokens_out"),
+                          "cached_tokens": usage.get("cached_tokens"),
                           "cost_usd": None,
                           "authorised_usd": usage.get("authorised_usd"),
                           "ceiling_usd": usage.get("ceiling_usd"),
@@ -2113,8 +2114,9 @@ def accrue_offline(store: LoopStore, manifest: RunManifest, budget: BudgetFile, 
             run_manifest_id=manifest.run_manifest_id, arm="shared", scope="stage",
             stage=stage, unit="wall_clock_seconds", amount=amount, metered=False,
             observed={"cpu_seconds": None, "tokens_in": None, "tokens_out": None,
-                      "cost_usd": None, "authorised_usd": None,
-                      "ceiling_usd": None, "billed_usd": None, "calls": None},
+                      "cached_tokens": None, "cost_usd": None,
+                      "authorised_usd": None, "ceiling_usd": None,
+                      "billed_usd": None, "calls": None},
             timestamp_utc=when, stop_reason=None)
         if store.query_one("SELECT 1 FROM ledger_entry WHERE entry_id = ?",
                            (entry.entry_id,)) is not None:
@@ -2140,8 +2142,8 @@ def _accrue_arm_window(campaign: Campaign, arm: str, seconds: float,
         scope="arm_window", stage="stage_3", unit="wall_clock_seconds",
         amount=float(seconds), metered=True,
         observed={"cpu_seconds": None, "tokens_in": None, "tokens_out": None,
-                  "cost_usd": None, "authorised_usd": None, "ceiling_usd": None,
-                  "billed_usd": None, "calls": None},
+                  "cached_tokens": None, "cost_usd": None, "authorised_usd": None,
+                  "ceiling_usd": None, "billed_usd": None, "calls": None},
         timestamp_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         stop_reason=reason)
     campaign.recorder.record(entry)

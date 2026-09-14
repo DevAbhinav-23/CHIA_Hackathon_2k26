@@ -161,10 +161,12 @@ def _evidence(**over) -> str:
 def _ledger(store: LoopStore) -> None:
     """The ledger: both arm windows, per-stage occupancy, and two shared stages."""
     def observed(cpu=0.0, tokens_in=None, tokens_out=None, cost=None,
-                 authorised=None, ceiling=None, billed=None, calls=None) -> str:
-        """§2.7's eight keys (contract 2.2); the last four are the turn's money."""
+                 authorised=None, ceiling=None, billed=None, calls=None,
+                 cached=None) -> str:
+        """§2.7's nine keys (contract 2.3); four are money and one is the cache."""
         return json.dumps({"cpu_seconds": cpu, "tokens_in": tokens_in,
-                           "tokens_out": tokens_out, "cost_usd": cost,
+                           "tokens_out": tokens_out, "cached_tokens": cached,
+                           "cost_usd": cost,
                            "authorised_usd": authorised, "ceiling_usd": ceiling,
                            "billed_usd": billed, "calls": calls}, sort_keys=True)
 
@@ -176,9 +178,11 @@ def _ledger(store: LoopStore) -> None:
         ("l-0003", "seeded", "stage", "stage_1", 120.0, 1,
          observed(90.0, 41839, 6114, 0.054, authorised=0.36, ceiling=0.36,
                   billed=0.054, calls=4), "2026-09-19T01:00:00+00:00", None),
+        # `cached` is contract 2.3's: a SUBSET of this entry's own tokens_in.
         ("l-0004", "seeded", "stage", "stage_2", 180.0, 1,
          observed(150.0, 52310, 8820, 0.072, authorised=0.36, ceiling=0.36,
-                  billed=0.072, calls=6), "2026-09-19T01:05:00+00:00", None),
+                  billed=0.072, calls=6, cached=8192),
+         "2026-09-19T01:05:00+00:00", None),
         ("l-0005", "seeded", "stage", "stage_3", 12.0, 1,
          observed(9.0), "2026-09-19T01:10:00+00:00", None),
         ("l-0006", "seeded", "stage", "stage_3", 14.0, 1,

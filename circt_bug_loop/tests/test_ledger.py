@@ -20,8 +20,9 @@ LEDGER_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "ledger"
 
 _RUN = "run-01"
 _DAY = "2026-09-20"
-_OBSERVED_KEYS = ("cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
-                  "authorised_usd", "ceiling_usd", "billed_usd", "calls")
+_OBSERVED_KEYS = ("cpu_seconds", "tokens_in", "tokens_out", "cached_tokens",
+                  "cost_usd", "authorised_usd", "ceiling_usd", "billed_usd",
+                  "calls")
 
 
 def budget(**overrides) -> schema.BudgetFile:
@@ -34,9 +35,9 @@ def budget(**overrides) -> schema.BudgetFile:
 
 
 def observed(cpu_seconds=1.0, tokens_in=None, tokens_out=None, **money) -> dict:
-    """An `observed` block carrying exactly the eight keys §2.7 freezes."""
+    """An `observed` block carrying exactly the nine keys §2.7 freezes."""
     block = {"cpu_seconds": cpu_seconds, "tokens_in": tokens_in,
-             "tokens_out": tokens_out, "cost_usd": None,
+             "tokens_out": tokens_out, "cached_tokens": None, "cost_usd": None,
              "authorised_usd": None, "ceiling_usd": None,
              "billed_usd": None, "calls": None}
     block.update(money)

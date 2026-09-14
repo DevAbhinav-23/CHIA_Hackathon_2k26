@@ -680,7 +680,7 @@ def test_repair_23_stage_sevens_tokens_are_null_with_a_reason(tmp_path, monkeypa
     observed = stage7_observed(12.5)
     assert observed == {"cpu_seconds": 12.5, "authorised_usd": None,
                         "ceiling_usd": None, "billed_usd": None, "calls": None,
-                        "tokens_in": None,
+                        "tokens_in": None, "cached_tokens": None,
                         "tokens_out": None, "cost_usd": None}
     assert set(observed) == schema._DICT_KEYS[("LedgerEntry", "observed")]
     assert "token_capture" not in observed

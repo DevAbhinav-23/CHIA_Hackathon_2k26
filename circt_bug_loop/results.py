@@ -32,8 +32,9 @@ PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 MODEL_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
 
 #: `LedgerEntry.observed`'s declared keys (§2.7).
-OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
-                 "authorised_usd", "ceiling_usd", "billed_usd", "calls"}
+OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cached_tokens",
+                 "cost_usd", "authorised_usd", "ceiling_usd", "billed_usd",
+                 "calls"}
 
 #: The ledger stage the offline mutator synthesis is charged to.
 SYNTHESIS_STAGE = "synthesis"
@@ -412,8 +413,8 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
             f"and these blocks do not carry §2.7's four keys: {sorted(malformed)}")
         facts["observed"] = None
         return
-    totals = {arm: {"cpu_seconds": 0.0, "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
-                    "null_token_entries": 0}
+    totals = {arm: {"cpu_seconds": 0.0, "tokens_in": 0, "tokens_out": 0,
+                    "cached_tokens": 0, "cost_usd": 0.0, "null_token_entries": 0}
               for arm in ARMS + ("shared",)}
     unpriced = refused = 0
     for row in ledger_rows:
@@ -433,6 +434,8 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
         else:
             bucket["tokens_in"] += int(block["tokens_in"])
             bucket["tokens_out"] += int(block["tokens_out"])
+        # A SUBSET of tokens_in, priced at the list input rate like every other.
+        bucket["cached_tokens"] += int(block.get("cached_tokens") or 0)
     facts["observed"] = totals
     facts["unpriced_turns"] = unpriced
     facts["refused_turns"] = refused
@@ -884,14 +887,30 @@ def _render(facts: dict) -> str:
         lines += [f"REFUSED: {gaps['observed_heading']}", ""]
     else:
         _table(lines, "Tokens, money and CPU time: observations, NOT the budget",
-               ["arm", "prompt tokens", "output tokens", "USD", "CPU seconds",
-                "entries with null token counts"],
+               ["arm", "prompt tokens", "output tokens", "cached prompt tokens",
+                "USD", "CPU seconds", "entries with null token counts"],
                [[arm, facts["observed"][arm]["tokens_in"],
                  facts["observed"][arm]["tokens_out"],
+                 facts["observed"][arm]["cached_tokens"],
                  f"{facts['observed'][arm]['cost_usd']:.4f}",
                  f"{facts['observed'][arm]['cpu_seconds']:.0f}",
                  facts["observed"][arm]["null_token_entries"]]
                 for arm in ARMS + ("shared",)], qualifier)
+        cached = sum(facts["observed"][arm]["cached_tokens"]
+                     for arm in ARMS + ("shared",))
+        lines += [
+            f"**Cached prompt tokens: {cached}.** Those are prompt tokens the "
+            "backend served from its context cache, already counted inside the "
+            "prompt-token column and priced by this ledger at the registered list "
+            "input rate, because `budget.yaml` registers exactly two rates and a "
+            "third one added after the registration would not be the file the "
+            "campaign was registered against (FR-14.7). Google prices cached "
+            "input lower, so **the USD total above is an UPPER BOUND by that "
+            "difference on these tokens** - which is the safe direction for a cap, "
+            "and the count is here so the size of the overstatement can be "
+            "computed rather than guessed.",
+            "",
+        ]
         lines += [
             "None of these four is the budget. The budget is one elapsed wall-clock "
             "second of an arm's fixed window, and the table above is what the run was "

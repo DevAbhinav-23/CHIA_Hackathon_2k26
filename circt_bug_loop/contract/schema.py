@@ -349,10 +349,11 @@ _DICT_KEYS = {
     ("ProbeSpec", "differential"): {"stimulus_id", "reset_protocol", "sample_point",
                                     "cycles", "port_list_sha"},
     ("BudgetFile", "max_tool_iterations"): set(_TOOL_LOOP_STAGES),
-    # The four money fields are contract 2.2's (W-18b).
+    # The four money fields are contract 2.2's (W-18b); `cached_tokens` is
+    # contract 2.3's (W-23) and is a SUBSET of `tokens_in`, never a summand.
     ("LedgerEntry", "observed"): {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
                                   "authorised_usd", "ceiling_usd", "billed_usd",
-                                  "calls"},
+                                  "calls", "cached_tokens"},
     ("RunManifest", "image_spec"): {"circt_sha", "sdk_tag", "targets", "flag_string",
                                     "image_digest", "verilator_version", "slang_enabled",
                                     "tool_hashes"},

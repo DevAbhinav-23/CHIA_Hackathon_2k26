@@ -213,7 +213,7 @@ def stage7_observed(elapsed: float, ceiling_usd: Optional[float] = None) -> dict
     authorised = (None if ceiling_usd is None
                   else round(len(PHASE_TIMEOUTS) * float(ceiling_usd), 6))
     return {"cpu_seconds": elapsed, "tokens_in": None, "tokens_out": None,
-            "cost_usd": None, "authorised_usd": authorised,
+            "cached_tokens": None, "cost_usd": None, "authorised_usd": authorised,
             "ceiling_usd": ceiling_usd, "billed_usd": None, "calls": None}
 
 

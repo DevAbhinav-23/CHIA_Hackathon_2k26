@@ -1,5 +1,5 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..d301fbb 100644
+index d103349..cb9937e 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
 @@ -25,6 +25,8 @@ from __future__ import annotations
@@ -150,7 +150,7 @@ index d103349..d301fbb 100644
                  raise
  
              # -- Retry once: a shorter generation may fit --
-@@ -339,11 +450,187 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -339,11 +450,193 @@ class VertexGeminiLLM(LLMCallBase):
          return QueryResult(result="", returncode=-1, stderr="", stream_result="", success=False)
  
      def _get_node_id(self) -> str:
@@ -336,12 +336,18 @@ index d103349..d301fbb 100644
 +            meta["thinking_tokens"] += getattr(usage, "thoughts_token_count", 0) or 0
 +            meta["tool_use_prompt_tokens"] += getattr(
 +                usage, "tool_use_prompt_token_count", 0) or 0
++            # A SUBSET of prompt_token_count, not a separate scalar: the part of
++            # this call's input that was served from the context cache and is
++            # billed at the cached rate. Recorded so a caller pricing every
++            # input token at list price knows by how much it OVER-states.
++            meta["cached_tokens"] += getattr(
++                usage, "cached_content_token_count", 0) or 0
 +        return resp
 +
      # ------------------------------------------------------------------
      # generate_content implementation
      # ------------------------------------------------------------------
-@@ -360,7 +647,13 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -360,7 +653,13 @@ class VertexGeminiLLM(LLMCallBase):
          wrapped in an ``ExceptionGroup`` by MCP's anyio task group — without
          this, the wrapped error never matches ``prompt()``'s ``except`` clauses
          and every API error in the tools path is misfiled as "unexpected".
@@ -355,7 +361,7 @@ index d103349..d301fbb 100644
          try:
              return self._run_coroutine(self._run_generate_async(user_message, tools or []))
          except Exception as exc:
-@@ -368,6 +661,8 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -368,6 +667,8 @@ class VertexGeminiLLM(LLMCallBase):
              if translated is not None:
                  raise translated from exc
              raise
@@ -364,7 +370,7 @@ index d103349..d301fbb 100644
  
      def _run_coroutine(self, coro):
          """Run *coro* whether or not an event loop is already running."""
-@@ -419,170 +714,298 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -419,170 +720,299 @@ class VertexGeminiLLM(LLMCallBase):
          truncated = user_message[:500] + ("..." if len(user_message) > 500 else "")
          stream_parts.append(f"[User Message]\n{truncated}\n\n")
  
@@ -522,6 +528,7 @@ index d103349..d301fbb 100644
 +                meta = self._usage_meta = {"input_tokens": 0, "output_tokens": 0,
 +                                           "thinking_tokens": 0,
 +                                           "tool_use_prompt_tokens": 0,
++                                           "cached_tokens": 0,
 +                                           "num_turns": 0}
 +                final_text = ""
 +

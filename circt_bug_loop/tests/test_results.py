@@ -285,11 +285,14 @@ def test_T_U_results_12(tmp_path):
     store, manifest, pairs = campaign(tmp_path)
     text = render(store, manifest, pairs)
     observed = arm_tables(text)[-1]
-    assert observed["seeded"] == ["94149", "14934", "0.1260", "12880", "5"]
-    assert observed["mutation"] == ["0", "0", "0.0000", "8129", "4"]
-    assert observed["shared"] == ["188400", "9600", "0.1770", "29100", "1"]
+    assert observed["seeded"] == ["94149", "14934", "8192", "0.1260", "12880", "5"]
+    assert observed["mutation"] == ["0", "0", "0", "0.0000", "8129", "4"]
+    assert observed["shared"] == ["188400", "9600", "0", "0.1770", "29100", "1"]
     assert "NOT the budget" in text
     assert "lower bound excluding stage 7" in text
+    # W-23: the cached count, and the direction it moves the USD total in.
+    assert "**Cached prompt tokens: 8192.**" in text
+    assert "UPPER BOUND" in text and "registered list input rate" in text
 
     store.update("ledger_entry", {"entry_id": "l-0003"},
                  {"observed_json": json.dumps({"cpu_seconds": 90.0, "tokens_in": 1,

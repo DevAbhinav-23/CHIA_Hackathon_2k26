@@ -152,11 +152,13 @@ The campaign spent USD 2.10 in total, both arms and the shared stages together, 
 
 **Tokens, money and CPU time: observations, NOT the budget** (mode discovery, seed set 187)
 
-| arm | prompt tokens | output tokens | USD | CPU seconds | entries with null token counts |
-|---|---|---|---|---|---|
-| seeded | 94149 | 14934 | 0.1260 | 12880 | 5 |
-| mutation | 0 | 0 | 0.0000 | 8129 | 4 |
-| shared | 188400 | 9600 | 0.1770 | 29100 | 1 |
+| arm | prompt tokens | output tokens | cached prompt tokens | USD | CPU seconds | entries with null token counts |
+|---|---|---|---|---|---|---|
+| seeded | 94149 | 14934 | 8192 | 0.1260 | 12880 | 5 |
+| mutation | 0 | 0 | 0 | 0.0000 | 8129 | 4 |
+| shared | 188400 | 9600 | 0 | 0.1770 | 29100 | 1 |
+
+**Cached prompt tokens: 8192.** Those are prompt tokens the backend served from its context cache, already counted inside the prompt-token column and priced by this ledger at the registered list input rate, because `budget.yaml` registers exactly two rates and a third one added after the registration would not be the file the campaign was registered against (FR-14.7). Google prices cached input lower, so **the USD total above is an UPPER BOUND by that difference on these tokens** - which is the safe direction for a cap, and the count is here so the size of the overstatement can be computed rather than guessed.
 
 None of these four is the budget. The budget is one elapsed wall-clock second of an arm's fixed window, and the table above is what the run was observed to consume while spending it. The USD total is a **lower bound excluding stage 7**, whose per-turn token counts the repair chain does not return: its turns are dispatched remotely and the counting copy of the model object dies with the worker.
 
