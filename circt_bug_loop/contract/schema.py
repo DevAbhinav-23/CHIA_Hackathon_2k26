@@ -1,9 +1,4 @@
-"""The one versioned seam between the supply half and the apparatus half.
-
-Seven schemas and one interface (G-47). Standard library only: no serialisation
-library, no schema library, no validation library. Imported by both halves and
-by nothing outside them.
-"""
+"""The one versioned seam between the supply half and the apparatus half."""
 from __future__ import annotations
 
 import dataclasses
@@ -18,12 +13,7 @@ Arm = Literal["seeded", "mutation"]
 LedgerArm = Literal["seeded", "mutation", "shared"]
 Polarity = Literal["expect_zero", "expect_nonzero"]
 Shape = Literal["plain", "split_file", "unsupported"]
-#: FR-06.9's seven, plus `tool_unavailable` at contract 2.1 (W-20b, N9): a probe
-#: whose tool exited 127 never started, so it neither read the input nor
-#: rejected it, and `parse_error` was a claim about something that did not
-#: happen. A MINOR addition - `check_version` compares the MAJOR half, so every
-#: 2.0 fixture still validates and no reader in the tree breaks - and
-#: `contract/FROZEN.md` records what the freeze rule still owes for it.
+#: FR-06.9's seven, plus `tool_unavailable` at contract 2.1 (W-20b).
 BuildStatus = Literal["clean_exit", "parse_error", "assertion", "fatal_error",
                       "crash", "timeout", "oom", "tool_unavailable"]
 OracleClass = Literal["assertion", "fatal_error", "crash", "differential"]
@@ -34,23 +24,14 @@ SeedSet = Literal["187", "171"]
 Deployment = Literal["single_machine", "gcp"]
 Unit = Literal["wall_clock_seconds"]
 
-# The stage ids of 00-README.md, fixed there and not renameable. They are the
-# key set of RunManifest.stages_metered (FR-14.8) and the value set of
-# ProbeResult.stopping_stage from stage_3 onward.
+# The stage ids of 00-README.md, fixed there and not renameable.
 _STAGE_IDS = ("stage_1", "stage_2", "stage_3", "stage_4", "stage_5",
               "stage_6", "stage_7", "gate")
 
-#: The stages that run a MODEL turn, and therefore the key set of
-#: `BudgetFile.max_tool_iterations` (contract 2.2, W-18b). Stages 1 and 2 are
-#: A3's two turns, stage 6 is B7's, and stage 7 is CHIA's own repair chain,
-#: whose loop this file records rather than bounds. The three tool-free stages
-#: and the gate carry no entry: a turn with no tool makes exactly one
-#: `generate_content` call whatever the cap says.
+#: The stages that run a MODEL turn.
 _TOOL_LOOP_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
 
 # 03-LLD.md 2.1's table, as a tuple so a test can assert the set is closed.
-# E010 is owned by this table and raised by generate_task.emit_specs; validate
-# never raises it. E011 onwards belong to store.validate_candidate (2.9).
 ERROR_CODES = ("E001_MAJOR_MISMATCH", "E002_MISSING_FIELD", "E003_WRONG_TYPE",
                "E004_BAD_ENUM", "E005_CONDITIONAL_REQUIRED",
                "E006_CONDITIONAL_FORBIDDEN", "E007_BAD_DICT_KEYS",
@@ -58,7 +39,7 @@ ERROR_CODES = ("E001_MAJOR_MISMATCH", "E002_MISSING_FIELD", "E003_WRONG_TYPE",
 
 
 class ContractError(Exception):
-    """Raised by validate(). Carries a stable code so tests assert on the code."""
+    """Raised by validate()."""
 
     def __init__(self, code: str, message: str):
         self.code = code
@@ -71,12 +52,7 @@ def _major(version: str) -> str:
 
 
 def check_version(instance_version: str) -> None:
-    """Raise E001 unless *instance_version*'s MAJOR equals this package's.
-
-    The whole compatibility rule: MAJOR equal accepts, anything else rejects,
-    with both versions named. No negotiation, no shim, no tolerance window
-    (02-HLD.md 2.2).
-    """
+    """Raise E001 unless *instance_version*'s MAJOR equals this package's."""
     if _major(instance_version) != _major(CONTRACT_VERSION):
         raise ContractError(
             "E001_MAJOR_MISMATCH",
@@ -85,42 +61,18 @@ def check_version(instance_version: str) -> None:
 
 
 def canonical_json(document: Any) -> str:
-    """Serialise ANY json-able value in the canonical shape, and nothing else.
-
-    Canonical means: keys sorted, two-space indent, no ASCII escaping (so a
-    UTF-8 identifier survives as itself), one trailing newline. Two equal
-    documents therefore produce identical bytes.
-
-    It is here, in the module that DEFINES the shape, because three other
-    modules had spelled the same four options out for the values `to_json`
-    cannot take - `to_json` takes a dataclass, and `argv.json`, `frames.json`
-    and a frozen mutator set are a list and two plain dicts (N3).
-    """
+    """Serialise ANY json-able value in the canonical shape, and nothing else."""
     return json.dumps(document, sort_keys=True, indent=2, ensure_ascii=False,
                       separators=(",", ": ")) + "\n"
 
 
 def to_json(obj: Any) -> str:
-    """Serialise a contract instance to canonical JSON text.
-
-    Returns:
-        str, `canonical_json` of the instance's fields.
-    """
+    """Serialise a contract instance to canonical JSON text."""
     return canonical_json(dataclasses.asdict(obj))
 
 
 def from_json(text: str, cls: type) -> Any:
-    """Parse canonical JSON text into *cls*, then validate it.
-
-    A payload key the class does not declare is DROPPED, deliberately and
-    silently: that is what makes a MINOR-newer document readable by a
-    MINOR-older package, which is the whole content of 2.2's MINOR rule. A
-    MAJOR-newer document is rejected by check_version before any key is read,
-    so the drop can never lose a required field.
-
-    Raises E009 for a class outside the package, E002 for a payload missing a
-    field the class declares, and whatever validate() raises.
-    """
+    """Parse canonical JSON text into *cls*, then validate it."""
     if cls not in _MEMBERS:
         raise ContractError("E009_UNKNOWN_SCHEMA", f"{cls!r} is not a contract member")
     payload = json.loads(text)
@@ -136,23 +88,7 @@ def from_json(text: str, cls: type) -> Any:
 
 @dataclass(kw_only=True)
 class SeedRecord:
-    """One mined CIRCT fix commit and everything both arms need from it.
-
-    Produced by A1 (corpus.py) on the head. Read by A3, A4, B6b and B12. In the
-    package because FR-15.1's screen needs committed_date_utc and it lives
-    nowhere else.
-
-    `diff` and `test_files` arrived at contract 2.0 and are what make the record
-    self-contained: A3 substitutes them into 7.2's prompt and A4 mutates
-    test_files' values, so neither arm needs git, a clone, or the CIRCT tree at
-    all (K5, K6). Both are populated by A1 alone, on the head, where the clone
-    is. Both are REQUIRED fields, so neither goes through bound_text, which
-    returns None: A1 instead measures len(text.encode("utf-8")) against
-    budget.yaml's artefact_inline_cap_bytes and marks a seed whose diff or whose
-    test files exceed it ineligible for BOTH arms, with
-    exclusion_reason="seed_text_over_cap", counted and reported. A truncated
-    diff in a prompt would be worse than a missing seed.
-    """
+    """One mined CIRCT fix commit and everything both arms need from it."""
     contract_version: str = CONTRACT_VERSION
     seed_sha: str
     parent_sha: str
@@ -179,26 +115,7 @@ class SeedRecord:
 
 @dataclass(kw_only=True)
 class BudgetFile:
-    """The parsed, committed budget.yaml. Section 9 is its schema.
-
-    Produced by A6a (budget.py). Read by A6a, A6b, B9c and B12. Its keys are
-    exactly FR-14.1's list and no others, which is what makes the
-    pre-registration of FR-14.2 mean anything.
-
-    model_id, campaign_spend_cap_usd and the two prices are the four keys the
-    2026-09-14 backend decision added (01-FRD.md 1.8, 03-LLD.md 9.1). They are
-    campaign parameters and not implementation constants: the model is fixed
-    before the data exists, the money cap bounds damage exactly as the per-day
-    input cap does, and a price edited afterwards would put a free parameter
-    inside a reported number (NFR-08).
-
-    max_tool_iterations and minimal_case_lines are the two keys contract 2.2
-    adds (W-18b, errata rows 38 and 46). Both are campaign parameters and not
-    implementation constants for the same reason the prices are: the first is
-    the factor the per-turn money ceiling is computed from, and the second is
-    the size at which a case counts as minimal, which decides a gate answer and
-    therefore a reported number.
-    """
+    """The parsed, committed budget.yaml."""
     contract_version: str = CONTRACT_VERSION
     budget_file_sha: str                    # the commit that landed this file
     arm_window_seconds: float
@@ -234,12 +151,7 @@ class BudgetFile:
 
 @dataclass(kw_only=True)
 class ProbeSpec:
-    """One probing input plus the exact invocation that consumes it.
-
-    Produced by A3 and A4 (generate_task.py). Consumed by B2, B4 and B5. The
-    apparatus cannot tell the arms apart from it except by reading `arm`, which
-    FR-18.1 permits it to carry and forbids it to branch on.
-    """
+    """One probing input plus the exact invocation that consumes it."""
     contract_version: str = CONTRACT_VERSION
     probe_id: str
     run_manifest_id: str
@@ -263,12 +175,7 @@ class ProbeSpec:
 
 @dataclass(kw_only=True)
 class ProbeResult:
-    """One per probing input, always produced, whatever the outcome.
-
-    Produced by B2 and completed by the stage the probe stopped at. Consumed by
-    A5, A6b, B11 and B12. This is the only object that crosses the seam upward,
-    and it carries nothing the generator may not see (FR-16.4).
-    """
+    """One per probing input, always produced, whatever the outcome."""
     contract_version: str = CONTRACT_VERSION
     probe_id: str
     run_manifest_id: str
@@ -292,7 +199,7 @@ class ProbeResult:
 
 @dataclass(kw_only=True)
 class FeedbackEntry:
-    """One per ProbeResult of the previous iteration. Nested in FeedbackBundle."""
+    """One per ProbeResult of the previous iteration."""
     probe_id: str
     stopped_at_stage: str
     reason: str
@@ -305,12 +212,7 @@ class FeedbackEntry:
 
 @dataclass(kw_only=True)
 class FeedbackBundle:
-    """What the seeded arm reads at the start of its next iteration.
-
-    Produced by A5 (feedback.py) from the iteration's ProbeResults. Consumed by
-    A3 only: the mutation arm receives one whose entries list is empty and never
-    reads it (FR-16.2, 02-HLD.md 2.1).
-    """
+    """What the seeded arm reads at the start of its next iteration."""
     contract_version: str = CONTRACT_VERSION
     run_manifest_id: str
     seed_sha: str
@@ -328,13 +230,7 @@ class FeedbackBundle:
 
 @dataclass(kw_only=True)
 class LedgerEntry:
-    """One charge against the budget, or one observation of it.
-
-    Produced by every node in both halves. Consumed by A6b, B11 and B12. Exactly
-    one entry per arm per run carries scope="arm_window" and its amount is that
-    arm's spend on the primary unit; every other entry is per-stage occupancy
-    and is an observation (G-48, 02-HLD.md 2.9).
-    """
+    """One charge against the budget, or one observation of it."""
     contract_version: str = CONTRACT_VERSION
     entry_id: str
     run_manifest_id: str
@@ -351,19 +247,14 @@ class LedgerEntry:
 
 @dataclass(kw_only=True)
 class RunCommit:
-    """One run commit. Nested in RunManifest; FR-02.7 defines it per mode."""
+    """One run commit."""
     commit: str
     seed_sha: Optional[str] = None          # None in discovery, set per seed in calibration
 
 
 @dataclass(kw_only=True)
 class RunManifest:
-    """The identity of one run, stamped on every artefact of both halves.
-
-    Produced by B12 (bug_loop.py). Consumed by everything. FR-17.6 makes it the
-    key by which a row is traced to its image, its commit, its budget file and
-    its arm.
-    """
+    """The identity of one run, stamped on every artefact of both halves."""
     contract_version: str = CONTRACT_VERSION
     run_manifest_id: str
     mode: Mode
@@ -411,13 +302,7 @@ class RunManifest:
 
 @dataclass(kw_only=True)
 class LedgerSnapshot:
-    """What a generator may know about its own budget, and nothing else.
-
-    Four fields, unchanged by the 2026-09-14 backend decision: the money cap is
-    the driver's business, not a generator's, so spend_usd is deliberately NOT
-    exposed here. The generator cannot reach BudgetLedger, cannot read another
-    arm's spend, and cannot read any result field (FR-16.4).
-    """
+    """What a generator may know about its own budget, and nothing else."""
     arm: Arm
     unit: Unit
     spent: float
@@ -425,7 +310,7 @@ class LedgerSnapshot:
 
 
 class Generator(Protocol):
-    """The driver's call into a generator. A3 and A4 both implement it."""
+    """The driver's call into a generator."""
 
     def __call__(self, seed: SeedRecord, feedback: FeedbackBundle,
                  remaining: LedgerSnapshot) -> list[ProbeSpec]:
@@ -434,29 +319,13 @@ class Generator(Protocol):
 
 def generate(seed: SeedRecord, feedback: FeedbackBundle,
              remaining: LedgerSnapshot) -> list[ProbeSpec]:
-    """The interface's canonical signature, declared beside the schemas it uses.
-
-    Never called: it exists so that the signature has one written home in the
-    package, as G-47 requires, and so that a type checker binds A3 and A4 to it.
-    """
+    """The interface's canonical signature, declared beside the schemas it uses."""
     raise NotImplementedError
 
 
 @dataclass(kw_only=True)
 class CounterBlock:
-    """FR-17.4's per-stage counters, returned by every node and logged by B12.
-
-    Four counters and one name, fixed here and nowhere else, because a counter
-    set that each node chooses for itself cannot be summed across a run. Every
-    node of 3.2 returns exactly one of these, under the key "counters" of its
-    own return dict, and the driver logs it on the head (13.1).
-
-    It is NOT a contract member: it is not in _MEMBERS, validate() never sees
-    it, and adding it moves neither MAJOR nor MINOR under 2.2's rule, which
-    speaks of a member gaining or losing a required field. It lives in this
-    package rather than in store.py for one reason: both halves produce one,
-    and a supply-half module may not import store.py (FR-16.1, 14.5's walk).
-    """
+    """FR-17.4's per-stage counters, returned by every node and logged by B12."""
     stage: str          # one of _STAGE_IDS, or one of the ten shared names in
                         # _COUNTER_STAGES below
     started: int        # units of work this node began: probes, seeds, issues
@@ -465,12 +334,7 @@ class CounterBlock:
     seconds: float      # this node's own wall clock, start to return
 
 
-#: The eight stage ids, plus a name for every node of 3.2 that is not one of the
-#: eight. FIVE were added at the join (W-17): 3.11 requires a CounterBlock of
-#: EVERY node of 3.2 and this tuple named no stage for A5's feedback bundle
-#: (errata row 22's "real obstacle"), for A6a's budget load, for A6b's ledger
-#: append, for B10b's artefact write or for B11's results render. Adding a name
-#: moves neither MAJOR nor MINOR: CounterBlock is not a contract member.
+#: The eight stage ids, plus a name for every node of 3.2 that is not one of the eight.
 _COUNTER_STAGES = _STAGE_IDS + ("image", "corpus", "pin", "mirror", "synthesis",
                                 "feedback", "budget", "ledger", "artefact",
                                 "results")
@@ -484,11 +348,7 @@ _DICT_KEYS = {
     ("ProbeSpec", "differential"): {"stimulus_id", "reset_protocol", "sample_point",
                                     "cycles", "port_list_sha"},
     ("BudgetFile", "max_tool_iterations"): set(_TOOL_LOOP_STAGES),
-    # The four money fields are contract 2.2's (W-18b): what the guard
-    # authorised for the turn, what ceiling the backend was given, what the
-    # turn actually billed at the file's two prices, and how many
-    # `generate_content` calls it made. The pilot measured the first and the
-    # third differing by up to 64x with no row anywhere that said so.
+    # The four money fields are contract 2.2's (W-18b).
     ("LedgerEntry", "observed"): {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
                                   "authorised_usd", "ceiling_usd", "billed_usd",
                                   "calls"},
@@ -513,14 +373,7 @@ def _unwrap(annotation: Any) -> Any:
 
 
 def _check_field(cls_name: str, name: str, value: Any, annotation: Any) -> None:
-    """Raise E003 or E004 for one non-None field value.
-
-    Two deliberate deviations from bare isinstance, both measured rather than
-    assumed (W24). An int satisfies a float annotation, because every duration
-    the loop computes is a whole number of seconds and isinstance(5, float) is
-    False. A bool does NOT satisfy an int annotation, because isinstance(True,
-    int) is True and a bool where a count belongs is a defect, not a value.
-    """
+    """Raise E003 or E004 for one non-None field value."""
     ann = _unwrap(annotation)
     if typing.get_origin(ann) is Literal:
         if value not in typing.get_args(ann):
@@ -541,13 +394,7 @@ def _check_field(cls_name: str, name: str, value: Any, annotation: Any) -> None:
 
 
 def validate(obj: Any) -> None:
-    """Raise ContractError unless *obj* is a valid instance of its member class.
-
-    Checks, in this order: the MAJOR version; every required field non-None;
-    every non-None field's type and Literal membership; every declared dict's
-    key set; and the per-class conditional rules of 2.8. Returns None on
-    success; it never repairs, defaults or coerces anything.
-    """
+    """Raise ContractError unless *obj* is a valid instance of its member class."""
     cls = type(obj)
     if cls not in _MEMBERS:
         raise ContractError("E009_UNKNOWN_SCHEMA", f"{cls.__name__} is not a contract member")
@@ -613,13 +460,7 @@ def _probe_result_conditionals(o: ProbeResult) -> None:
 
 
 def _budget_conditionals(o: BudgetFile) -> None:
-    """The arm window, the model id and the three money figures (FR-14.1, NFR-08).
-
-    `0 < value < float("inf")` is the whole finiteness rule: it rejects zero, a
-    negative, both infinities and NaN (every comparison against which is False)
-    without importing math, which 03-LLD.md 0's dependency list does not carry.
-    An int is an acceptable value for any of them, as 2.3's float rule says.
-    """
+    """The arm window, the model id and the three money figures (FR-14.1)."""
     _require(o.arm_window_seconds > 0, "E003_WRONG_TYPE",
              "BudgetFile.arm_window_seconds must be positive")
     _require(bool(o.model_id.strip()), "E002_MISSING_FIELD",
@@ -628,9 +469,7 @@ def _budget_conditionals(o: BudgetFile) -> None:
                  "price_usd_per_m_output_tokens"):
         _require(0 < getattr(o, name) < float("inf"), "E003_WRONG_TYPE",
                  f"BudgetFile.{name} must be positive and finite")
-    # Contract 2.2. A zero or negative iteration cap would authorise nothing and
-    # send nothing, and a bool is not a count (2.3's own rule, spelled here
-    # because these are dict VALUES and `_check_field` never sees them).
+    # Contract 2.2.
     for stage, cap in sorted(o.max_tool_iterations.items()):
         _require(isinstance(cap, int) and not isinstance(cap, bool) and cap > 0,
                  "E003_WRONG_TYPE",
@@ -684,11 +523,7 @@ _CONDITIONALS = {
 
 
 def bound_text(text: Optional[str], path: Optional[str], cap: int) -> Optional[str]:
-    """Return *text* if it fits under *cap* bytes, else None (the path carries it).
-
-    Raises E008 when the text is over the cap and no path exists, which is the
-    one combination that would silently lose an artefact (FR-17.7).
-    """
+    """Return *text* if it fits under *cap* bytes, else None (the path carries it)."""
     if text is None:
         return None
     if len(text.encode("utf-8")) <= cap:
