@@ -41,15 +41,18 @@ def raw(path: Path) -> dict:
 
 @pytest.fixture
 def loader_env(monkeypatch, tmp_path):
-    """The operator's shell at `chia up`, minus the interlock (see the module docstring)."""
-    for name, value in (("CHIA_HEAD", "127.0.0.1"),
-                        ("BUGLOOP_ARTEFACTS", str(tmp_path)),
-                        ("BUGLOOP_IMAGE_TAG", "eade0de61bc5"),
-                        ("USER", "tester"),
-                        ("GEMINI_API_KEY", SYNTHETIC_KEY),
-                        ("BUGLOOP_GCP_HEAD_IP", "10.0.0.2"),
-                        ("BUGLOOP_GCP_PROJECT", "bugloop-project")):
-        monkeypatch.setenv(name, value)
+    """The operator's shell at `chia up`, minus the interlock (see the module docstring).
+
+    One literal name per line rather than a loop, so `T-U-layout-08`'s `ast`
+    walk can read every variable this file sets without resolving a loop.
+    """
+    monkeypatch.setenv("CHIA_HEAD", "127.0.0.1")
+    monkeypatch.setenv("BUGLOOP_ARTEFACTS", str(tmp_path))
+    monkeypatch.setenv("BUGLOOP_IMAGE_TAG", "eade0de61bc5")
+    monkeypatch.setenv("USER", "tester")
+    monkeypatch.setenv("GEMINI_API_KEY", SYNTHETIC_KEY)
+    monkeypatch.setenv("BUGLOOP_GCP_HEAD_IP", "10.0.0.2")
+    monkeypatch.setenv("BUGLOOP_GCP_PROJECT", "bugloop-project")
     monkeypatch.delenv(bug_loop.LIVE_MODEL_ENV, raising=False)
     return SYNTHETIC_KEY
 

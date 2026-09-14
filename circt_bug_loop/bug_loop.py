@@ -1348,7 +1348,16 @@ def empty_feedback(manifest: RunManifest, seed: SeedRecord, arm: str,
 
 def probe_dir(manifest: RunManifest, seed_sha: str, iteration: int,
               probe_id: str) -> str:
-    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>/probe_<id>` for one probe."""
+    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>/probe_<id>` for one probe.
+
+    Returns:
+        str, the absolute directory; it is not created here, every stage that
+        writes into it creating its own.
+    Worker:
+        pure; no resource, no process, no database handle.
+    Raises:
+        nothing.
+    """
     return str(Path(manifest.artefact_root) / manifest.run_manifest_id
                / f"seed_{seed_sha}" / f"iter_{iteration}" / f"probe_{probe_id}")
 

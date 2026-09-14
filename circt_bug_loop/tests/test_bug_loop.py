@@ -579,18 +579,20 @@ def test_T_U_driver_28d():
         bug_loop.run_commits(mode="calibration", pin=_PIN, seeds=[])
 
 
-def test_T_U_driver_29(tmp_path: Path):
+def test_T_U_driver_29(tmp_path: Path, monkeypatch):
     """T-U-driver-29 (12.1, ADR-D-04): the cluster YAML produces four manifest fields.
 
     `cluster_yaml_sha` is the file's own SHA-256, so an edited YAML is a
-    different run. Fixture: the committed `cluster_single.yaml`. Tier 0.
+    different run. The four variables are set one literal at a time, and by
+    `monkeypatch` rather than by `os.environ`, so that `T-U-layout-08`'s `ast`
+    walk can read every name this file puts in the environment and so that none
+    of them outlives the test. Fixture: the committed `cluster_single.yaml`.
+    Tier 0.
     """
-    import os
-
-    for name, value in (("CHIA_HEAD", "127.0.0.1"),
-                        ("BUGLOOP_ARTEFACTS", str(tmp_path)),
-                        ("BUGLOOP_IMAGE_TAG", "deadbeefcafe"), ("USER", "tester")):
-        os.environ.setdefault(name, value)
+    monkeypatch.setenv("CHIA_HEAD", "127.0.0.1")
+    monkeypatch.setenv("BUGLOOP_ARTEFACTS", str(tmp_path))
+    monkeypatch.setenv("BUGLOOP_IMAGE_TAG", "deadbeefcafe")
+    monkeypatch.setenv("USER", "tester")
     summary = bug_loop.cluster_summary(str(bug_loop.FLOW_DIR / "cluster_single.yaml"))
     assert summary["worker_type"] == "bugloop_circt"
     assert summary["apparatus_concurrency"] == 2 and summary["llm_concurrency"] == 2
