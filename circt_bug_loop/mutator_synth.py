@@ -1,24 +1,4 @@
-"""A7: the offline, once, pre-registration mutator synthesis and freeze (8.3).
-
-Not imported by the campaign, and it refuses to run at all once the
-pre-registration TAG exists (8.1 rule 3), so a running campaign cannot
-synthesise a mutator even by accident. Its input is the issue mirror B6a built
-in `loop.db` and nothing else: no GitHub request is made here, for the same
-reason 3.7.3's screen makes none (FR-10.3, NFR-04).
-
-Three deviations from 03-LLD.md, each recorded in
-`design/reviews/implementation-errata-log.md`:
-
-  * The mirror is read through a read-only `sqlite3` connection and not through
-    `store.LoopStore`. 1.3's layout rule (2) forbids a supply-half module to
-    import a `store.py` name, and A7 only ever reads one table.
-  * 8.3 step 2's column is `number`; the table's column is `issue_number`
-    (6.2), and the query here uses the column that exists.
-  * 8.3 step 1 asks whether a `budget.yaml` commit exists. It is an annotated
-    `registration/*` tag that is asked for instead (W-12 architect decision,
-    errata row 30): the file's first landing commit is not the registration, and
-    reading it as one refused A7 - which runs BEFORE the registration - forever.
-"""
+"""A7: the offline, once, pre-registration mutator synthesis and freeze (8.3)."""
 from __future__ import annotations
 
 import hashlib
@@ -38,15 +18,13 @@ from circt_bug_loop.contract.schema import CounterBlock, canonical_json
 #: 8.3's prompt, beside this module (1.1). `cfg["mutator_synth"]` overrides it.
 PROMPTS = Path(__file__).resolve().parent / "prompts"
 
-#: A7's system message; 8.3 fixes the prompt, the turn and the timeout and does
-#: not name one, and this turn is given no tool at all.
+#: A7's system message; 8.3 fixes the prompt.
 SYNTH_SYSTEM_MESSAGE = (
     "You design small mechanical input mutators for a compiler fuzzing "
     "baseline. You never write a diagnosis, and you end with one fenced json "
     "block.")
 
-#: The five checks of step 4, each of which DROPS an entry rather than repairing
-#: it, plus the duplicate-id check that needs the whole set to decide.
+#: The five checks of step 4.
 _REQUIRED = ("id", "language", "kind", "mutates_argv", "pattern", "replacement")
 
 
@@ -60,65 +38,18 @@ class MutatorSynthError(Exception):
 
 
 def registration_commit(repo_root: str) -> str:
-    """Return the commit the newest `registration/*` tag names, or "".
-
-    That tag IS the pre-registration (FR-14.3 as amended by W-12), so its
-    existence is the one fact step 1 needs, and its absence is what makes this
-    synthesis legal at all: A7 runs once, before the campaign is registered.
-
-    Resolved by `budget.registration` and not by a second `git` read of this
-    module's own, so the rule the synthesis refuses on and the rule the campaign
-    is checked against cannot drift apart (N3). It also drops the two-pathspec
-    problem the old reading had, a tag name being the same in both of 1.4's
-    trees.
-
-    Returns:
-        str, a 40-character commit SHA, or "" when the repository holds no tag.
-    Worker:
-        head; two `git` reads and no write.
-    Raises:
-        budget.BudgetError when `git` itself fails.
-    """
+    """Return the commit the newest `registration/*` tag names, or ""."""
     return budget.registration(repo_root)[1]
 
 
 def prompt_path(set_version: str) -> Path:
-    """The prompt file that synthesises *set_version*: versioned, or 8.3's own.
-
-    A frozen set is WRITE-ONCE and the repository must hold the text that
-    produced its bytes, so a prompt may not be edited once a set has been frozen
-    from it: `mutator_synth.md` is the text `set_v1.json` came from and stays
-    exactly as it was. A later version brings its own file beside it, named for
-    the set it produces, and the set's `set_version` is what selects it - so the
-    pairing is a fact about the two file names and not a flag someone remembered
-    to pass (W-12c; errata rows 33 and 36).
-
-    Returns:
-        Path, `prompts/mutator_synth_<set_version>.md` where that exists and
-        `prompts/mutator_synth.md` otherwise.
-    Worker:
-        pure; one `exists` and no read.
-    Raises:
-        nothing. A missing file raises at the caller's `read_text`, which names
-        the path it could not read.
-    """
+    """The prompt file that synthesises *set_version*: versioned, or 8.3's own."""
     versioned = PROMPTS / f"mutator_synth_{set_version}.md"
     return versioned if versioned.exists() else PROMPTS / "mutator_synth.md"
 
 
 def read_mirror(db_path: str) -> list:
-    """Return every closed `label:bug` issue of the mirror, ordered by number.
-
-    Step 2's input and the only one: the mirror is a table B6a filled, and this
-    function makes no request of its own.
-
-    Returns:
-        list[dict], each carrying issue_number, title and body.
-    Worker:
-        head; `loop.db` is head-pinned (6.1) and this connection is read-only.
-    Raises:
-        sqlite3.Error when the database cannot be read.
-    """
+    """Return every closed `label:bug` issue of the mirror, ordered by number."""
     connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     connection.row_factory = sqlite3.Row
     try:
@@ -147,21 +78,13 @@ def render_issues(issues: list) -> str:
 
 
 def issue_digest(issues: list) -> str:
-    """SHA-256 over the sorted issue numbers, newline joined (8.1, 8.3 step 5)."""
+    """SHA-256 over the sorted issue numbers, newline joined (8.1)."""
     numbers = sorted(int(issue["issue_number"]) for issue in issues)
     return hashlib.sha256("\n".join(str(n) for n in numbers).encode("utf-8")).hexdigest()
 
 
 def check_entry(entry: dict, seen: set) -> Optional[str]:
-    """Return the name of the step-4 check *entry* fails, or None if it passes.
-
-    Six checks, each of which DROPS the entry: a missing field, an id that is
-    not 8.1's dotted form or that repeats, a language or a kind outside its
-    set, a `mutates_argv` that disagrees with `kind == "argv"` (FR-05.5), a
-    pattern that will not compile, and a replacement that is neither a literal,
-    a back-reference template, nor one of the seven named operations. Nothing
-    is repaired and nothing failing is kept.
-    """
+    """Return the name of the step-4 check *entry* fails, or None if it passes."""
     if not isinstance(entry, dict) or any(key not in entry for key in _REQUIRED):
         return "missing_field"
     identifier = entry.get("id")
@@ -190,17 +113,7 @@ def check_entry(entry: dict, seen: set) -> Optional[str]:
 
 
 def parse_mutators(answer: dict) -> tuple:
-    """Apply step 4's checks to the turn's mutators array.
-
-    Returns:
-        (kept, dropped), where kept is the surviving entries in the model's own
-        order with 8.1's eight fields and nothing else, and dropped maps a
-        failing check's name to the list of ids it dropped.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Apply step 4's checks to the turn's mutators array."""
     kept: list = []
     dropped: dict = {}
     seen: set = set()
@@ -221,8 +134,7 @@ def parse_mutators(answer: dict) -> tuple:
     return kept, dropped
 
 
-#: 2.3's canonical JSON, from the module that defines it: a frozen mutator set
-#: is a plain dict and not a contract record, so `to_json` cannot take it (N3).
+#: 2.3's canonical JSON, from the module that defines it.
 _canonical = canonical_json
 
 
@@ -232,26 +144,12 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
                         timeout_seconds: int = 3600) -> dict:
     """Synthesise the frozen mutator set once, offline, before registration.
 
-    Five steps, in this order and no other: refuse if the campaign is already
-    registered, so that no model turn is spent discovering it; read the closed
-    `label:bug` issues from the mirror; run ONE turn over 8.3's prompt with no
-    tool at all; parse the footer and DROP every entry failing one of step 4's
-    checks; and freeze the set write-once, with the three provenance fields
-    filled from the run and never from the model.
-
     Returns:
-        {"path": str, "set_sha256": str, "mutators_written": int,
-         "dropped": dict, "issues_used": int, "counters": CounterBlock}, where
-        dropped maps a failing check's name to the list of ids it dropped.
+        {"path": str, "set_sha256": str, "mutators_written": int, "dropped": dict, "issues_used": int, "counters": CounterBlock}, where dropped maps a failing check's name to the list of ids it dropped.
     Worker:
-        head; the mirror is a table in the head-pinned `loop.db` (6.1) and the
-        turn is dispatched from here at {"llm": 1.0}.
+        head; the mirror is a table in the head-pinned `loop.db` (6.1) and the turn is dispatched from here at {"llm": 1.0}.
     Raises:
-        MutatorSynthError("already_registered", sha) when step 1 finds a
-            `registration/*` tag; MutatorSynthError("empty_mirror") when step 2
-            returns no row; MutatorSynthError("set_exists", path) when step 5
-            finds the file; PromptContractError from 7.1's parser, which
-            freezes nothing.
+        MutatorSynthError("already_registered", sha) when step 1 finds a `registration/*` tag.
     """
     started = time.monotonic()
     registered = registration_commit(repo_root)
@@ -284,12 +182,7 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
     document = {
         "format_version": 1,
         "set_version": set_version,
-        # 8.1's field, and the one this step exists to set (W-12). It was
-        # missing: `load_set` refuses a set whose `frozen` is FALSE, and a set
-        # with no such field at all slipped through that guard by accident
-        # rather than by being frozen. The freeze is write-once, so a set
-        # written without it could only be corrected by bumping `set_version`
-        # and running the synthesis - and the model turn - a second time.
+        # 8.1's field, and the one this step exists to set (W-12).
         "frozen": True,
         "synthesised_utc": cfg.get("synthesised_utc") or time.strftime(
             "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
@@ -302,9 +195,7 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
         "synthesis_model": cfg["model_id"],
         "mutators": kept}
     rendered = _canonical(document)
-    # WRITE-ONCE, checked again at the write itself: "x" fails on an existing
-    # file, so a second call cannot change the digest a manifest already names
-    # even if it raced past the check above.
+    # WRITE-ONCE, checked again at the write itself.
     try:
         with open(target, "x", encoding="utf-8") as handle:
             handle.write(rendered)
