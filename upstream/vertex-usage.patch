@@ -1,5 +1,5 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..76eafd9 100644
+index d103349..b3d3fd5 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
 @@ -168,6 +168,54 @@ class ContentBlockedError(VertexError):
@@ -84,7 +84,7 @@ index d103349..76eafd9 100644
                  raise
  
              # -- Retry once: a shorter generation may fit --
-@@ -339,11 +391,117 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -339,11 +391,158 @@ class VertexGeminiLLM(LLMCallBase):
          return QueryResult(result="", returncode=-1, stderr="", stream_result="", success=False)
  
      def _get_node_id(self) -> str:
@@ -202,10 +202,51 @@ index d103349..76eafd9 100644
 +                    f"{estimate:.6f} would pass turn_budget_usd "
 +                    f"{float(self.turn_budget_usd):.6f}"))
 +
++    async def _one_call(self, client, contents, config, meta: dict):
++        """Send ONE ``generate_content``, translate its errors, count its tokens.
++
++        Two call sites consume a response now — the tool loop and the final
++        answer an exhausted loop asks for — and a call whose usage is not
++        accumulated is a turn the ledger prices short, so the accumulation
++        lives with the call rather than beside it. The four counts are the four
++        billed scalars: ``thoughts_token_count`` and
++        ``tool_use_prompt_token_count`` are separate from
++        ``candidates_token_count`` and ``prompt_token_count``.
++
++        Raises:
++            whatever ``_translate_error`` makes of the SDK's exception, or the
++            SDK's own when it has no translation.
++        """
++        import asyncio
++
++        try:
++            resp = await asyncio.to_thread(
++                client.models.generate_content,
++                model=self.model,
++                contents=contents,
++                config=config,
++            )
++        except Exception as exc:
++            translated = self._translate_error(exc)
++            if translated is not None:
++                raise translated from exc
++            raise
++
++        meta["num_turns"] += 1
++        usage = getattr(resp, "usage_metadata", None)
++        if usage is not None:
++            meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
++            meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0
++            # Billed separately from candidates_token_count / prompt_token_count.
++            meta["thinking_tokens"] += getattr(usage, "thoughts_token_count", 0) or 0
++            meta["tool_use_prompt_tokens"] += getattr(
++                usage, "tool_use_prompt_token_count", 0) or 0
++        return resp
++
      # ------------------------------------------------------------------
      # generate_content implementation
      # ------------------------------------------------------------------
-@@ -360,7 +518,13 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -360,7 +559,13 @@ class VertexGeminiLLM(LLMCallBase):
          wrapped in an ``ExceptionGroup`` by MCP's anyio task group — without
          this, the wrapped error never matches ``prompt()``'s ``except`` clauses
          and every API error in the tools path is misfiled as "unexpected".
@@ -219,7 +260,7 @@ index d103349..76eafd9 100644
          try:
              return self._run_coroutine(self._run_generate_async(user_message, tools or []))
          except Exception as exc:
-@@ -368,6 +532,8 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -368,6 +573,8 @@ class VertexGeminiLLM(LLMCallBase):
              if translated is not None:
                  raise translated from exc
              raise
@@ -228,7 +269,7 @@ index d103349..76eafd9 100644
  
      def _run_coroutine(self, coro):
          """Run *coro* whether or not an event loop is already running."""
-@@ -458,10 +624,17 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -458,28 +665,18 @@ class VertexGeminiLLM(LLMCallBase):
              contents = [types.Content(
                  role="user", parts=[types.Part.from_text(text=user_message)]
              )]
@@ -242,19 +283,74 @@ index d103349..76eafd9 100644
              final_text = ""
  
              for _ in range(self.max_tool_iterations):
+-                try:
+-                    resp = await asyncio.to_thread(
+-                        client.models.generate_content,
+-                        model=self.model,
+-                        contents=contents,
+-                        config=config,
+-                    )
+-                except Exception as exc:
+-                    translated = self._translate_error(exc)
+-                    if translated is not None:
+-                        raise translated from exc
+-                    raise
+-
+-                meta["num_turns"] += 1
+-                usage = getattr(resp, "usage_metadata", None)
+-                if usage is not None:
+-                    meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
+-                    meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0
 +                # BEFORE the call, so the money it would have cost is not spent.
 +                self._check_turn_budget(meta, contents)
-                 try:
-                     resp = await asyncio.to_thread(
-                         client.models.generate_content,
-@@ -480,6 +653,10 @@ class VertexGeminiLLM(LLMCallBase):
-                 if usage is not None:
-                     meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
-                     meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0
-+                    # Billed separately from candidates_token_count / prompt_token_count.
-+                    meta["thinking_tokens"] += getattr(usage, "thoughts_token_count", 0) or 0
-+                    meta["tool_use_prompt_tokens"] += getattr(
-+                        usage, "tool_use_prompt_token_count", 0) or 0
++                resp = await self._one_call(client, contents, config, meta)
  
                  candidate = (resp.candidates or [None])[0]
                  if candidate is None or candidate.content is None:
+@@ -571,9 +768,45 @@ class VertexGeminiLLM(LLMCallBase):
+ 
+                 contents.append(types.Content(role="user", parts=response_parts))
+             else:
++                # The loop ran out of iterations without ever getting a
++                # tool-free response, so ASK for one: exactly one more call,
++                # the same system instruction and the whole conversation, and
++                # NO tools declared, so the model has nothing to answer with
++                # but what it has already read. Without it the turn's entire
++                # spend buys nothing — MEASURED, pilot 2 (W-18b): both stage-1
++                # turns spent all six of their iterations on source reads,
++                # returned an EMPTY result, failed their caller's output
++                # contract and wrote no probe at all. This call is bounded like
++                # every other: ``turn_budget_usd`` is checked before it is
++                # sent, and its tokens are accumulated when it returns.
+                 stream_parts.append(
+-                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}\n"
++                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}"
++                    f"; final answer requested\n"
+                 )
++                self._check_turn_budget(meta, contents)
++                resp = await self._one_call(
++                    client, contents,
++                    types.GenerateContentConfig(
++                        **{k: v for k, v in config_kwargs.items() if k != "tools"}),
++                    meta)
++                candidate = (resp.candidates or [None])[0]
++                parts = getattr(getattr(candidate, "content", None), "parts", None)
++                final_parts = []
++                for part in parts or []:
++                    if getattr(part, "thought", False) and part.text:
++                        stream_parts.append(f"[Thinking]\n{part.text}\n\n")
++                    elif getattr(part, "text", None):
++                        final_parts.append(part.text)
++                        stream_parts.append(f"[Response]\n{part.text}\n\n")
++                # Nothing is raised for an empty or blocked final answer: this
++                # call exists to salvage a turn that was already going to
++                # return nothing, and an exception here would take the
++                # accumulated counts and the whole stream with it.
++                if final_parts:
++                    final_text = "".join(final_parts)
++                else:
++                    stream_parts.append(
++                        "[DEBUG] the final answer was empty\n")
+ 
+         # --- Metadata + log file ---
+         self._last_metadata = {k: v for k, v in meta.items() if v}

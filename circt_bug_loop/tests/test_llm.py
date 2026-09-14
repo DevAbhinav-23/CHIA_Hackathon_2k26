@@ -330,13 +330,13 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
         1500 / 1e6 * 0.75 + llm_module.MAX_OUTPUT_TOKENS / 1e6 * 3.75, 6)
     assert llm_module.MAX_OUTPUT_TOKENS == 16000, "CHIA's own max_tokens default"
 
-    # W-18b, errata row 38.
+    # W-18b, errata row 38, plus the forced final answer's own call.
     with_tool = {**one_call, "tools": [object()]}
-    assert guard.iterations(with_tool) == 6
+    assert guard.iterations(with_tool) == 7, "max_tool_iterations plus the final answer"
     cap = llm_module.TOOL_OUTPUT_TOKENS_CAP
-    expected_in = sum(1500 + i * cap for i in range(6))
+    expected_in = sum(1500 + i * cap for i in range(7))
     assert guard.worst_case_usd(with_tool) == round(
-        expected_in / 1e6 * 0.75 + 6 * 16000 / 1e6 * 3.75, 6)
+        expected_in / 1e6 * 0.75 + 7 * 16000 / 1e6 * 3.75, 6)
     # It is the thing W-18 measured missing.
     assert guard.worst_case_usd(with_tool) > 10 * guard.worst_case_usd(one_call)
     # The system message is re-sent on every call and counts.

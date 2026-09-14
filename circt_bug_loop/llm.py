@@ -124,7 +124,8 @@ class SpendGuard:
         """The `generate_content` calls *request* may make: `n` in the formula."""
         if not request.get("tools"):
             return _NO_TOOL_ITERATIONS
-        return max(1, int(request.get("max_tool_iterations") or 1))
+        # The exhausted tool loop asks for a final answer: one call more.
+        return max(1, int(request.get("max_tool_iterations") or 1)) + 1
 
     def worst_case_usd(self, request: Mapping) -> float:
         """The most the whole turn *request* can cost, at the two prices."""

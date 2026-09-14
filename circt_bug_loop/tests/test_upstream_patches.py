@@ -3,6 +3,7 @@ import ast
 import importlib.util
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -86,7 +87,8 @@ def _install_fake_genai(monkeypatch, replies):
 
     class _FakeModels:
         def generate_content(self, *, model, contents, config):
-            calls.append(model)
+            calls.append({"model": model, "contents": list(contents),
+                          "config": config})
             reply = replies.pop(0)
             if isinstance(reply, BaseException):
                 raise reply
@@ -267,3 +269,79 @@ def test_T_U_upstream_06_get_node_id_is_bounded(monkeypatch, patched_vertex):
     # The committed bound is ten seconds, which is the patch's own constant.
     patch = (UPSTREAM / "vertex-usage.patch").read_text(encoding="utf-8")
     assert "+NODE_ID_TIMEOUT_SECONDS = 10.0" in patch
+
+
+def _install_fake_mcp(monkeypatch):
+    """One MCP tool server that always answers, so the loop declares a tool."""
+    import mcp
+    import mcp.client.streamable_http as http
+
+    class _Transport:
+        async def __aenter__(self):
+            return (None, None, None)
+
+        async def __aexit__(self, *exception):
+            return False
+
+    class _Session:
+        def __init__(self, read, write):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exception):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            return SimpleNamespace(tools=[SimpleNamespace(
+                name="read_file", description="read one file",
+                inputSchema={"type": "object",
+                             "properties": {"path": {"type": "string"}}})])
+
+        async def call_tool(self, name, arguments):
+            return SimpleNamespace(isError=False,
+                                   content=[SimpleNamespace(text="SOURCE")])
+
+    monkeypatch.setattr(http, "streamable_http_client", lambda url: _Transport())
+    monkeypatch.setattr(mcp, "ClientSession", _Session)
+    return SimpleNamespace(name="source", hostname="127.0.0.1", port=8000)
+
+
+@pytest.mark.t0
+def test_T_U_upstream_07_an_exhausted_tool_loop_asks_for_an_answer(monkeypatch,
+                                                                   patched_vertex):
+    """T-U-upstream-07 (W-18d): the exhausted loop makes one more, tool-free, call."""
+    tool = _install_fake_mcp(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="source__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    calls = _install_fake_genai(monkeypatch, [
+        reading, reading,
+        _response(types.Part(text="FINAL ANSWER"), _usage(prompt=40, candidates=9)),
+    ])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        system_message="be terse", max_tool_iterations=2)
+    result = llm._run_generate("ping", [tool])
+
+    # Exactly one call more than the loop's own iterations, and it is the last.
+    assert len(calls) == llm.max_tool_iterations + 1 == 3
+    assert calls[0]["config"].tools and calls[1]["config"].tools
+    assert not calls[2]["config"].tools, "the final answer declares no tool"
+    # Same system instruction, same conversation, grown by what the tools returned.
+    assert calls[2]["config"].system_instruction == "be terse"
+    assert len(calls[2]["contents"]) > len(calls[0]["contents"])
+
+    # The turn is no longer empty, and it says why it asked.
+    assert result.result == "FINAL ANSWER"
+    assert "Reached max_tool_iterations=2; final answer requested" in result.stream_result
+    # The extra call is metered like every other.
+    assert llm._last_metadata["num_turns"] == 3
+    assert llm._last_metadata["input_tokens"] == 60
+    assert llm._last_metadata["output_tokens"] == 19
