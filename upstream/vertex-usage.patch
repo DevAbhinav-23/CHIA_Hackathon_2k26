@@ -1,0 +1,52 @@
+diff --git a/chia/models/vertex.py b/chia/models/vertex.py
+index d103349..0ddfcfc 100644
+--- a/chia/models/vertex.py
++++ b/chia/models/vertex.py
+@@ -360,7 +360,13 @@ class VertexGeminiLLM(LLMCallBase):
+         wrapped in an ``ExceptionGroup`` by MCP's anyio task group — without
+         this, the wrapped error never matches ``prompt()``'s ``except`` clauses
+         and every API error in the tools path is misfiled as "unexpected".
++
++        ``_last_metadata`` is finalised in a ``finally`` so a turn that raises
++        still reports the tokens it consumed before raising (an empty dict is
++        indistinguishable from a free turn, and a caller defaulting to 0 then
++        prices a failed multi-call turn at zero).
+         """
++        self._usage_meta = {}
+         try:
+             return self._run_coroutine(self._run_generate_async(user_message, tools or []))
+         except Exception as exc:
+@@ -368,6 +374,8 @@ class VertexGeminiLLM(LLMCallBase):
+             if translated is not None:
+                 raise translated from exc
+             raise
++        finally:
++            self._last_metadata = {k: v for k, v in self._usage_meta.items() if v}
+ 
+     def _run_coroutine(self, coro):
+         """Run *coro* whether or not an event loop is already running."""
+@@ -458,7 +466,12 @@ class VertexGeminiLLM(LLMCallBase):
+             contents = [types.Content(
+                 role="user", parts=[types.Part.from_text(text=user_message)]
+             )]
+-            meta = {"input_tokens": 0, "output_tokens": 0, "num_turns": 0}
++            # Bound to ``self`` so ``_run_generate``'s ``finally`` can publish
++            # whatever was accumulated when this coroutine raises.
++            meta = self._usage_meta = {"input_tokens": 0, "output_tokens": 0,
++                                       "thinking_tokens": 0,
++                                       "tool_use_prompt_tokens": 0,
++                                       "num_turns": 0}
+             final_text = ""
+ 
+             for _ in range(self.max_tool_iterations):
+@@ -480,6 +493,10 @@ class VertexGeminiLLM(LLMCallBase):
+                 if usage is not None:
+                     meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
+                     meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0
++                    # Billed separately from candidates_token_count / prompt_token_count.
++                    meta["thinking_tokens"] += getattr(usage, "thoughts_token_count", 0) or 0
++                    meta["tool_use_prompt_tokens"] += getattr(
++                        usage, "tool_use_prompt_token_count", 0) or 0
+ 
+                 candidate = (resp.candidates or [None])[0]
+                 if candidate is None or candidate.content is None:
