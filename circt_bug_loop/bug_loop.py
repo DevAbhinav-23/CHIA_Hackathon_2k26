@@ -3064,6 +3064,7 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
                                  limits=campaign.limits,
                                  top_n=campaign.budget.fingerprint_top_n,
                                  bin_dir=campaign.bin_dir,
+                                 minimal_case_lines=campaign.budget.minimal_case_lines,
                                  _arm=spec.arm, _key=spec.probe_id)["decision"]
     except Exception as error:
         out["stages"].append("gate")

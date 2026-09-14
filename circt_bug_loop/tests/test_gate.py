@@ -60,6 +60,11 @@ LIMITS = {"probe_wall_seconds": 60, "probe_address_space_bytes": 4 << 30,
           "probe_cpu_seconds": 45, "probe_output_byte_cap": 1_000_000}
 TOP_N = 3
 
+#: `budget.yaml`'s own `minimal_case_lines` (W-18b, errata row 46). The gate
+#: fixture's `case.mlir` is three lines, which is BELOW it, so a reducer that
+#: reached a fixpoint without shrinking it has proved it minimal.
+MINIMAL_CASE_LINES = 12
+
 #: The eight keys `DedupVerdict.evidence` is closed at (§2.9).
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
@@ -266,7 +271,8 @@ _UNSET = object()
 
 def _decide(tmp_path, monkeypatch, *, candidate=None, reduced=_UNSET, dedup=None,
             repair=None, entry="assertion.sh", check="clean.sh", argv=None,
-            frame_file=FRAME_FILE, store=None):
+            frame_file=FRAME_FILE, store=None,
+            minimal_case_lines=MINIMAL_CASE_LINES):
     bin_dir = _tools(tmp_path, entry=entry, check=check)
     candidate = candidate or _candidate(tmp_path, bin_dir)
     store = store or _store(tmp_path, candidate, argv=argv, frame_file=frame_file)
@@ -278,7 +284,8 @@ def _decide(tmp_path, monkeypatch, *, candidate=None, reduced=_UNSET, dedup=None
         gate_decide, candidate,
         _reduced(candidate.reduced_path) if reduced is _UNSET else reduced,
         dedup or _dedup(), repair, _manifest(tmp_path, bin_dir),
-        str(tmp_path / "loop.db"), limits=LIMITS, top_n=TOP_N, bin_dir=bin_dir)
+        str(tmp_path / "loop.db"), limits=LIMITS, top_n=TOP_N, bin_dir=bin_dir,
+        minimal_case_lines=minimal_case_lines)
     assert out["counters"].stage == "gate"
     return out["decision"], store, seen
 
@@ -422,28 +429,80 @@ def test_gate_24_the_rerun_sets_fingerprint_stable(tmp_path, monkeypatch):
 # ===========================================================================
 
 
-@pytest.mark.parametrize("over,reason", [
-    ({}, None),
-    ({"reduced": False, "reason": "already_minimal"}, "already_minimal"),
-    ({"recheck_matches": False}, "reduction_changed_failure"),
-    ({"reducer": "none", "reduced": False}, "no_reducer"),
-    ({"fixpoint": False}, "not_fixpoint"),
+@pytest.mark.parametrize("over,passes,reason", [
+    ({}, True, None),
+    # W-18b: a fixpoint with NO progress on a case at or below the threshold
+    # is the reducer proving the case minimal, and passes.
+    ({"reduced": False, "reason": "no_progress"}, True, "already_minimal"),
+    ({"recheck_matches": False}, False, "reduction_changed_failure"),
+    ({"reducer": "none", "reduced": False}, False, "no_reducer"),
+    ({"fixpoint": False}, False, "not_fixpoint"),
+    # No fixpoint AND no progress keeps the reducer's own free text (FR-09.12),
+    # because the reducer did not finish and proved nothing.
+    ({"reduced": False, "fixpoint": False, "reason": "budget_truncated"},
+     False, "budget_truncated"),
 ])
-def test_gate_06_to_09_question_two_is_total(tmp_path, monkeypatch, over, reason):
+def test_gate_06_to_09_question_two_is_total(tmp_path, monkeypatch, over, passes,
+                                             reason):
     """T-U-gate-06 to -09 (FR-09.7, FR-09.12, FR-13.3): a fixpoint with a
-    preserved re-check passes; `reduced=false`, `reduction_changed_failure`, no
-    reducer at all and no fixpoint each fail as `not_minimal` with the reason
-    recorded, and no input to this question is ever null."""
+    preserved re-check passes, and so does a fixpoint that removed nothing from
+    a case already at or below `minimal_case_lines` (W-18b, errata row 46);
+    `reduction_changed_failure`, no reducer at all, no fixpoint and a
+    truncated reduction each fail as `not_minimal` with the reason recorded,
+    and no input to this question is ever null."""
     bin_dir = _tools(tmp_path)
     candidate = _candidate(tmp_path, bin_dir)
     decision, _, _ = _decide(tmp_path, monkeypatch, candidate=candidate,
                              reduced=_reduced(candidate.reduced_path, **over))
-    assert decision.q2_minimal is (reason is None)
+    assert decision.q2_minimal is passes
     assert decision.q2_reason == reason
-    if reason is not None:
+    if not passes:
         assert decision.stopped_at_question == 2
         assert decision.taxonomy_bucket == "not_minimal"
         assert decision.q3_valid is None and decision.q4_new is None
+
+
+def test_gate_09c_the_threshold_is_what_decides_an_unshrunk_case(tmp_path,
+                                                                 monkeypatch):
+    """W-18b, errata row 46: the pilot's own case passes, and a big one does not.
+
+    The pilot's `circt-reduce` made 20 interestingness calls on a six-line
+    `moore.net` module, removed nothing, reported `no_progress` with
+    `fixpoint=1`, and question 2 answered `not_minimal` for all three of its
+    candidates. Here the same record over a case BELOW `minimal_case_lines`
+    passes and over one ABOVE it fails, so the threshold is what decides and
+    not the flag. Fixture: the pilot's own reduced case, written here. Tier 0.
+    """
+    # Two roots, because each `_decide` builds a `loop.db` with its own run row.
+    small, large = tmp_path / "small", tmp_path / "large"
+    small.mkdir(), large.mkdir()
+    unshrunk = dict(reduced=False, reason="no_progress", fixpoint=True,
+                    interestingness_calls=20, size_before_ops=3, size_after_ops=3)
+
+    pilot = small / "pilot.mlir"
+    pilot.write_text("module {\n"
+                     "  moore.module private @net_open_uarray() {\n"
+                     "    %0 = moore.net wire : <open_uarray<i32>>\n"
+                     "    moore.output\n"
+                     "  }\n"
+                     "}\n")
+    assert len(pilot.read_text().splitlines()) == 6 <= MINIMAL_CASE_LINES
+    candidate = _candidate(small, _tools(small), case=pilot)
+    decision, _, _ = _decide(small, monkeypatch, candidate=candidate,
+                             reduced=_reduced(pilot, **unshrunk))
+    assert (decision.q2_minimal, decision.q2_reason) == (True, "already_minimal")
+
+    big = large / "big.mlir"
+    big.write_text("".join(f"// line {n}\n" for n in range(40)))
+    assert len(big.read_text().splitlines()) > MINIMAL_CASE_LINES
+    other = _candidate(large, _tools(large), case=big)
+    decision, _, _ = _decide(large, monkeypatch, candidate=other,
+                             reduced=_reduced(big, **unshrunk))
+    assert (decision.q2_minimal, decision.q2_reason) == (False, "no_progress")
+    assert decision.taxonomy_bucket == "not_minimal"
+
+    # A case that cannot be READ is not a case the gate calls minimal.
+    assert gate.case_lines(_reduced(tmp_path / "absent.mlir")) is None
 
 
 def test_gate_09b_no_reduced_case_at_all_is_still_an_answer(tmp_path, monkeypatch):
@@ -725,7 +784,8 @@ def test_gate_19_a_differential_candidate_never_enters_the_gate(tmp_path,
     with pytest.raises(ValueError, match="FR-13.14"):
         call_node(gate_decide, differential, None, _dedup(), None,
                   _manifest(tmp_path, bin_dir), str(tmp_path / "loop.db"),
-                  limits=LIMITS, top_n=TOP_N, bin_dir=bin_dir)
+                  limits=LIMITS, top_n=TOP_N, bin_dir=bin_dir,
+                  minimal_case_lines=MINIMAL_CASE_LINES)
 
 
 def test_gate_20_every_stopping_value_lands_in_its_stated_bucket():

@@ -23,6 +23,11 @@ Deviations from §3.9, each recorded in
     did not reach a fixpoint" - which §9.5's own `reduction_wall_seconds` note
     says was the common case at 60 s. It is recorded as `not_fixpoint` and
     buckets as `not_minimal` with the other three, so the taxonomy is unchanged.
+  * **A fifth question-2 value, and it is a PASS.** `already_minimal` is what a
+    fixpoint with no progress on a case at or below `minimal_case_lines`
+    records (W-18b, errata row 46). It never reaches `_q2_stopping_value`,
+    which is asked only of a question that said no, so the taxonomy is again
+    unchanged.
   * **A null answer has no bucket.** FR-13.10 defaults the decision to `nothing`
     and FR-18.6's table has no row for an unanswered question; `undecided` is
     what such a candidate is recorded as, so the six values stay total.
@@ -333,16 +338,55 @@ def gate_validate(case_path: str, image_spec: dict, limits: dict,
 # ---------------------------------------------------------------------------
 
 
-def _question_2(reduced: Optional[ReducedCase]) -> tuple:
-    """FR-13.3, total over every reducer record F-09 can produce."""
+def case_lines(reduced: Optional[ReducedCase]) -> Optional[int]:
+    """The lines of the reduced case on disk, or None when it cannot be read.
+
+    None is "no answer", not "zero lines": an unreadable case is a case question
+    2 cannot call minimal, which is the direction a gate must err in.
+
+    Returns:
+        int | None.
+    Worker:
+        the caller's; one file read of a path under the artefact root, which
+        FR-17.9 makes readable identically on the head and on every worker.
+    Raises:
+        nothing.
+    """
+    try:
+        return len(Path(reduced.path).read_text(errors="backslashreplace")
+                   .splitlines())
+    except (OSError, AttributeError, TypeError):
+        return None
+
+
+def _question_2(reduced: Optional[ReducedCase], minimal_case_lines: int) -> tuple:
+    """FR-13.3, total over every reducer record F-09 can produce.
+
+    **A fixpoint with no progress on a small case now PASSES** (W-18b, errata
+    row 46). `circt-reduce` reaching a fixpoint is evidence that the case cannot
+    be made smaller, and `reduced` is false exactly when it could not be: the
+    two together say "already minimal", and reading them as `not_minimal`
+    refused all three of the W-18 pilot's candidates over a six-line module the
+    reducer had proved irreducible in twenty interestingness calls. So
+    `reduced=false` fails only when the fixpoint was NOT reached - the reducer
+    ran out of wall clock, aborted, or changed the failure - or when the case is
+    LARGER than *minimal_case_lines*, which is the case worth refusing.
+
+    The re-check still gates both paths: a reduction that changed the failure is
+    not a reduction of THIS bug, whether or not it shrank anything.
+    """
     if reduced is None or reduced.reducer == "none":
         return False, "no_reducer"
-    if not reduced.reduced:
-        return False, reduced.reason or "reduced_false"
     if not reduced.recheck_matches:
         return False, "reduction_changed_failure"
     if not reduced.fixpoint:
-        return False, "not_fixpoint"
+        return False, ("not_fixpoint" if reduced.reduced
+                       else (reduced.reason or "reduced_false"))
+    if not reduced.reduced:
+        lines = case_lines(reduced)
+        if lines is None or lines > minimal_case_lines:
+            return False, reduced.reason or "reduced_false"
+        return True, "already_minimal"
     return True, None
 
 
@@ -369,7 +413,7 @@ def _q2_stopping_value(reason: Optional[str]) -> str:
 def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 dedup: DedupVerdict, repair: Optional[RepairResult],
                 manifest: RunManifest, db_path: str, *, limits: dict,
-                top_n: int, bin_dir: str) -> dict:
+                top_n: int, bin_dir: str, minimal_case_lines: int) -> dict:
     """Ask the four mechanical questions in order and stop at the first no.
 
     Returns:
@@ -422,7 +466,8 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
 
     if fields["q1_reproduce"]:
         # --- 2. is the case minimal? ---------------------------------------
-        fields["q2_minimal"], fields["q2_reason"] = _question_2(reduced)
+        fields["q2_minimal"], fields["q2_reason"] = _question_2(
+            reduced, minimal_case_lines)
         if fields["q2_minimal"]:
             # --- 3. is the input valid? ------------------------------------
             check = _dispatch(
