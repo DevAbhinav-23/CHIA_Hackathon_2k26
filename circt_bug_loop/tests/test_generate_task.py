@@ -247,6 +247,22 @@ def test_T_U_gen_06_a_failed_turn_is_recorded_charged_and_survived(replay, confi
 
 
 @pytest.mark.t0
+def test_a_raising_turn_leaves_its_type_message_and_traceback(replay, config):
+    """D-1 (pilot 4): what raised is on disk and in the result, not lost with the turn."""
+    replay([{"text": transcript("seed_read_ok")},
+            {"text": "", "raises": RuntimeError("backend said no")}])
+    result = run_seeded(config)
+
+    assert result["failure_detail"] == "RuntimeError: backend said no"
+    recorded = (Path(config["artefact_dir"]) / generate_task.TURN_FAILED_FILE
+                ).read_text(encoding="utf-8").splitlines()
+    assert recorded[:2] == ["RuntimeError", "backend said no"]
+    assert any('raise turn["raises"]' in line for line in recorded[2:]), (
+        "the traceback names the frame that raised")
+    assert len(recorded[2:]) <= generate_task.FAILURE_TRACEBACK_LINES
+
+
+@pytest.mark.t0
 def test_T_U_gen_07_a_malformed_footer_emits_nothing_at_all(replay, config):
     """T-U-gen-07 (FR-04.8): zero specs even though the files were written."""
     replay([{"text": transcript("seed_read_ok")},

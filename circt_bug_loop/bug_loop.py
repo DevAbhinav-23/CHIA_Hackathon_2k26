@@ -1960,7 +1960,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                deadline: Optional[float] = None) -> dict:
     """Run one seed's iterations on one arm: generate, then every probe it wrote."""
     out = {"seed_sha": seed.seed_sha, "arm": arm, "iterations": 0, "probes": [],
-           "terminating_condition": "iteration_cap"}
+           "verdicts": {}, "terminating_condition": "iteration_cap"}
     bundle = empty_feedback(campaign.manifest, seed, arm, 1)
     snapshot = None
     for iteration in range(1, campaign.budget.per_seed_iteration_cap + 1):
@@ -1979,6 +1979,10 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
         except Exception as error:
             out["terminating_condition"] = f"generator_failed:{type(error).__name__}"
             return out
+        if generated.get("failure"):
+            out["verdicts"][_failed_stage(generated.get("logs"))] = {
+                "failure": generated["failure"],
+                "failure_detail": generated.get("failure_detail")}
         if _spend_refused(generated.get("failure")):
             out["terminating_condition"] = "campaign_spend_cap"
             return out
@@ -2006,6 +2010,12 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             out["terminating_condition"] = "abandoned"
             return out
     return out
+
+
+def _failed_stage(logs) -> str:
+    """The stage of the LAST turn a failed generator started; `logs` keeps its order."""
+    turns = list(((logs or {}).get("wall_seconds") or {}))
+    return _TURN_OF.get(turns[-1] if turns else "", "stage_2")
 
 
 def _spend_refused(failure: Optional[str]) -> bool:

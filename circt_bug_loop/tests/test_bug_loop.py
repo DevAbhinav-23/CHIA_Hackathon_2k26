@@ -1241,6 +1241,29 @@ def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path
     assert guard.authorised_usd == 0.0
 
 
+def test_a_failed_generator_turn_is_kept_on_the_seed_record(tmp_path: Path):
+    """D-1 (pilot 4): the driver keeps what the generator caught, under the stage that raised."""
+    def generate(seed, feedback, remaining, cfg):
+        return {"specs": [], "logs": {"wall_seconds": {"seed_read": 71.5,
+                                                       "probe_write": 0.2}},
+                "counters": schema.CounterBlock(stage="stage_2", started=1,
+                                                completed=0, failed=1, seconds=0.3),
+                "failure": "turn_failed:MaxOutputTokensError",
+                "failure_detail": "MaxOutputTokensError: response truncated"}
+
+    stages = dataclasses.replace(fake_stages(), generate_seeded=generate,
+                                 generate_mutation=generate)
+    run = mini_campaign(tmp_path, stages=stages)
+
+    record = run["outcome"]["seeds"][0]
+    assert record["verdicts"] == {"stage_2": {
+        "failure": "turn_failed:MaxOutputTokensError",
+        "failure_detail": "MaxOutputTokensError: response truncated"}}
+    assert record["terminating_condition"] == "no_probe_written"
+    # A turn that raised before stage 2 started is filed under stage 1.
+    assert bug_loop._failed_stage({"wall_seconds": {"seed_read": 71.5}}) == "stage_1"
+
+
 def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
     """T-U-driver-37 (W10): each iteration reads its own `LedgerSnapshot`."""
     handed = []

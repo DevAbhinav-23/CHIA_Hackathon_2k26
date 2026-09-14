@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import time
+import traceback
 from pathlib import Path
 from string import Template
 from typing import Optional
@@ -466,6 +467,26 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
             logs[f"{name}{suffix}"] = _write(directory, f"{name}{suffix}", data)
 
 
+#: What `turn_failed.txt` keeps of a raising turn: the message, then the tail of the traceback.
+FAILURE_MESSAGE_CAP = 2000
+FAILURE_TRACEBACK_LINES = 30
+
+#: What the result dict carries home, which is all the driver has room for.
+FAILURE_DETAIL_CAP = 200
+
+#: Where a raising turn's exception is written, under the iteration directory.
+TURN_FAILED_FILE = "turn_failed.txt"
+
+
+def _failure_detail(error: Exception, directory: str) -> str:
+    """Write a raising turn's exception to `turn_failed.txt` and name it for the driver."""
+    name, message = type(error).__name__, str(error)
+    _write(directory, TURN_FAILED_FILE, "\n".join(
+        [name, message[:FAILURE_MESSAGE_CAP],
+         *traceback.format_exc().splitlines()[-FAILURE_TRACEBACK_LINES:]]) + "\n")
+    return f"{name}: {message[:FAILURE_DETAIL_CAP]}"
+
+
 def _resolve_sites(sites: list, cfg: dict) -> dict:
     """Resolve stage 1's sibling sites against the head's clone (FR-04.1)."""
     args = (cfg["clone_path"], cfg["run_commit"], list(sites))
@@ -497,7 +518,7 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
     """Run stages 1 and 2 for one seed and emit the probing inputs they wrote.
 
     Returns:
-        {"specs": list[ProbeSpec], "root_cause_class": str, "sibling_sites": list[dict], "rejected_sites": list[dict], "truncated": int, "rejections": dict, "logs": dict, "failure": str | None, "counters": CounterBlock}.
+        {"specs": list[ProbeSpec], "root_cause_class": str, "sibling_sites": list[dict], "rejected_sites": list[dict], "truncated": int, "rejections": dict, "logs": dict, "failure": str | None, "failure_detail": str | None, "counters": CounterBlock}.
     Worker:
         {"circt": 1} for the node; each turn is dispatched at {"llm": 1.0}.
     Raises:
@@ -510,7 +531,7 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
     directory = iteration_dir(cfg, seed.seed_sha, iteration)
     probe_dir = str(Path(directory) / "probes")
     logs: dict = {"usage": {}, "wall_seconds": {}}
-    failure = None
+    failure = detail = None
     root_cause_class = ""
     sites: list = []
     rejected: list = []
@@ -551,8 +572,10 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
             _turn_cost("probe_write", logs, cfg), cap_bytes)
     except PromptContractError as error:
         failure = f"prompt_contract:{error}"
+        detail = _failure_detail(error, directory)
     except Exception as error:                      # noqa: BLE001 - FR-04.8
         failure = f"turn_failed:{type(error).__name__}"
+        detail = _failure_detail(error, directory)
     finally:
         # CHIA's own chain stops its tools in a finally (chia:examples/circt_issue_solver/issue_task.py:282-289) and A3 does the same: without it, 187 seeds at up to 3 iterations is up to 561 orphaned actors on a fixed-size cluster (W11).
         for tool in (probe_write, source_read):
@@ -565,7 +588,7 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
     return {"specs": specs, "root_cause_class": root_cause_class,
             "sibling_sites": sites, "rejected_sites": rejected,
             "truncated": truncated, "rejections": rejections, "logs": logs,
-            "failure": failure,
+            "failure": failure, "failure_detail": detail,
             "counters": CounterBlock(stage="stage_2", started=1,
                                      completed=0 if failure else 1,
                                      failed=1 if failure else 0,
@@ -621,7 +644,7 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
 
 
 __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
-           "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS",
+           "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS", "TURN_FAILED_FILE",
            "ProbeWriteTool", "SourceReadTool", "check_tool", "emit_specs",
            "generate_mutation", "generate_seeded",
            "iteration_dir",
