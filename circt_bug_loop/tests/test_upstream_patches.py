@@ -314,7 +314,7 @@ def _install_fake_mcp(monkeypatch):
 @pytest.mark.t0
 def test_T_U_upstream_07_an_exhausted_tool_loop_asks_for_an_answer(monkeypatch,
                                                                    patched_vertex):
-    """T-U-upstream-07 (W-18d): the exhausted loop makes one more, tool-free, call."""
+    """T-U-upstream-07 (W-18e): the exhausted loop is told to answer, and cannot call."""
     tool = _install_fake_mcp(monkeypatch)
     reading = _response(
         types.Part(function_call=types.FunctionCall(name="source__read_file",
@@ -333,15 +333,59 @@ def test_T_U_upstream_07_an_exhausted_tool_loop_asks_for_an_answer(monkeypatch,
     # Exactly one call more than the loop's own iterations, and it is the last.
     assert len(calls) == llm.max_tool_iterations + 1 == 3
     assert calls[0]["config"].tools and calls[1]["config"].tools
-    assert not calls[2]["config"].tools, "the final answer declares no tool"
-    # Same system instruction, same conversation, grown by what the tools returned.
+    # The declarations STAY, so the history's function parts stay valid, and a
+    # call is forbidden by the mode instead (W-18e D-1 hypothesis a).
+    assert calls[2]["config"].tools, "the final answer keeps the declarations"
+    assert (calls[2]["config"].tool_config.function_calling_config.mode
+            == types.FunctionCallingConfigMode.NONE)
+    assert calls[0]["config"].tool_config is None
+    # Same system instruction, same conversation, grown by what the tools
+    # returned and by the instruction to answer now.
     assert calls[2]["config"].system_instruction == "be terse"
     assert len(calls[2]["contents"]) > len(calls[0]["contents"])
+    last = calls[2]["contents"][-1]
+    assert last.role == "user"
+    assert last.parts[0].text == (
+        "Your tool calls for this turn are exhausted. Answer now, in exactly "
+        "the format the instructions require, from what you have already read.")
 
-    # The turn is no longer empty, and it says why it asked.
+    # The turn is no longer empty, and it says why it asked and what came back.
     assert result.result == "FINAL ANSWER"
     assert "Reached max_tool_iterations=2; final answer requested" in result.stream_result
+    assert ("[DEBUG] final answer: finish=STOP, parts=['text']\n"
+            in result.stream_result)
+    assert "the final answer was empty" not in result.stream_result
     # The extra call is metered like every other.
     assert llm._last_metadata["num_turns"] == 3
     assert llm._last_metadata["input_tokens"] == 60
     assert llm._last_metadata["output_tokens"] == 19
+
+
+@pytest.mark.t0
+def test_T_U_upstream_08_a_truncated_final_answer_says_so(monkeypatch,
+                                                          patched_vertex):
+    """T-U-upstream-08 (W-18e): an empty final answer names its finish reason."""
+    tool = _install_fake_mcp(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="source__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    truncated = types.GenerateContentResponse(
+        candidates=[types.Candidate(
+            content=types.Content(role="model",
+                                  parts=[types.Part(text="hmm", thought=True)]),
+            finish_reason=types.FinishReason.MAX_TOKENS,
+        )],
+        usage_metadata=_usage(prompt=40, thoughts=9),
+    )
+    _install_fake_genai(monkeypatch, [reading, truncated])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        system_message="be terse", max_tool_iterations=1)
+    result = llm._run_generate("ping", [tool])
+
+    assert result.result == ""
+    assert ("[DEBUG] final answer: finish=MAX_TOKENS, parts=['thought'] "
+            "(truncated at max_output_tokens)\n" in result.stream_result)
+    assert "[DEBUG] the final answer was empty" in result.stream_result

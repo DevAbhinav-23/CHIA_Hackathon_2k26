@@ -1,5 +1,5 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..b3d3fd5 100644
+index d103349..4317a1e 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
 @@ -168,6 +168,54 @@ class ContentBlockedError(VertexError):
@@ -307,41 +307,73 @@ index d103349..b3d3fd5 100644
  
                  candidate = (resp.candidates or [None])[0]
                  if candidate is None or candidate.content is None:
-@@ -571,9 +768,45 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -571,9 +768,77 @@ class VertexGeminiLLM(LLMCallBase):
  
                  contents.append(types.Content(role="user", parts=response_parts))
              else:
 +                # The loop ran out of iterations without ever getting a
 +                # tool-free response, so ASK for one: exactly one more call,
 +                # the same system instruction and the whole conversation, and
-+                # NO tools declared, so the model has nothing to answer with
-+                # but what it has already read. Without it the turn's entire
-+                # spend buys nothing — MEASURED, pilot 2 (W-18b): both stage-1
-+                # turns spent all six of their iterations on source reads,
-+                # returned an EMPTY result, failed their caller's output
-+                # contract and wrote no probe at all. This call is bounded like
-+                # every other: ``turn_budget_usd`` is checked before it is
-+                # sent, and its tokens are accumulated when it returns.
++                # a last user message telling the model to answer from what it
++                # has already read. Without it the turn's entire spend buys
++                # nothing — MEASURED, pilot 2 (W-18b): both stage-1 turns spent
++                # all six of their iterations on source reads, returned an
++                # EMPTY result, failed their caller's output contract and wrote
++                # no probe at all. This call is bounded like every other:
++                # ``turn_budget_usd`` is checked before it is sent, and its
++                # tokens are accumulated when it returns.
++                #
++                # The tool DECLARATIONS stay in the config and the function
++                # calling mode is set to NONE instead — MEASURED, pilot 3
++                # (W-18e): dropping ``tools`` from a conversation whose history
++                # carries ``function_call`` and ``function_response`` parts left
++                # the request inconsistent and the model answered it with no
++                # part at all. Mode NONE forbids a call without invalidating
++                # the history, so the model can only write.
                  stream_parts.append(
 -                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}\n"
 +                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}"
 +                    f"; final answer requested\n"
                  )
++                contents.append(types.Content(role="user", parts=[
++                    types.Part.from_text(text=(
++                        "Your tool calls for this turn are exhausted. Answer "
++                        "now, in exactly the format the instructions require, "
++                        "from what you have already read."))]))
++                final_kwargs = dict(config_kwargs)
++                if "tools" in final_kwargs:
++                    final_kwargs["tool_config"] = types.ToolConfig(
++                        function_calling_config=types.FunctionCallingConfig(
++                            mode="NONE"))
 +                self._check_turn_budget(meta, contents)
 +                resp = await self._one_call(
 +                    client, contents,
-+                    types.GenerateContentConfig(
-+                        **{k: v for k, v in config_kwargs.items() if k != "tools"}),
-+                    meta)
++                    types.GenerateContentConfig(**final_kwargs), meta)
 +                candidate = (resp.candidates or [None])[0]
 +                parts = getattr(getattr(candidate, "content", None), "parts", None)
 +                final_parts = []
++                kinds = []
 +                for part in parts or []:
-+                    if getattr(part, "thought", False) and part.text:
-+                        stream_parts.append(f"[Thinking]\n{part.text}\n\n")
++                    if getattr(part, "thought", False):
++                        kinds.append("thought")
++                        if part.text:
++                            stream_parts.append(f"[Thinking]\n{part.text}\n\n")
 +                    elif getattr(part, "text", None):
++                        kinds.append("text")
 +                        final_parts.append(part.text)
 +                        stream_parts.append(f"[Response]\n{part.text}\n\n")
++                    elif getattr(part, "function_call", None) is not None:
++                        kinds.append("function_call")
++                    else:
++                        kinds.append("other")
++                # Why an empty answer was empty: a blocked or stopped candidate
++                # and a truncated one are the same "" to the caller otherwise.
++                finish = getattr(candidate, "finish_reason", None)
++                finish_name = getattr(finish, "name", str(finish) if finish else "")
++                stream_parts.append(
++                    f"[DEBUG] final answer: finish={finish_name}, parts={kinds}"
++                    + (" (truncated at max_output_tokens)"
++                       if finish_name == "MAX_TOKENS" else "") + "\n")
 +                # Nothing is raised for an empty or blocked final answer: this
 +                # call exists to salvage a turn that was already going to
 +                # return nothing, and an exception here would take the

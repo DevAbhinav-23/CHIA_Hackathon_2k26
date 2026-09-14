@@ -60,9 +60,12 @@ _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
 VERTEX_BRANCH = 'elif backend == "vertex":'
 #: The two bounds that branch hands the backend, which a stale staged copy lacks.
 VERTEX_BRANCH_BOUNDS = ("max_tool_iterations=cfg[", "turn_budget_usd=cfg[")
-#: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38).
+#: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38) and
+#: `tool_config` is W-18e's: a staged copy without it forces its final answer
+#: the way pilot 3 measured returning nothing.
 VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
-                       "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS")
+                       "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS",
+                       "tool_config")
 
 #: Defaults for 13.1's argument table.
 DEFAULT_BUDGET = str(FLOW_DIR / "budget.yaml")
