@@ -1,15 +1,4 @@
-"""The four apparatus nodes that touch a probe: execute, judge, differential, reduce.
-
-Worker-side (`03-LLD.md` §3.6). It imports `contract`, `ddmin`, the three generic
-CIRCT functions, and **from `store` the record dataclasses only**: never
-`LoopStore`, which it could not use anyway, the store being a `SQLiteNode`
-pinned to the head. Every node here returns its records and the head writes the
-rows (FR-16.1, FR-17.3).
-
-`circt_core` stands in for `chia.chipyard.circt` until CHIA carries the three
-additions of §3.10; `upstream/chia-chipyard-circt-additions.py` is the block the
-pull request appends, and the import moves with no other change.
-"""
+"""The four apparatus nodes that touch a probe: execute, judge, differential, reduce."""
 from __future__ import annotations
 
 import hashlib
@@ -37,49 +26,26 @@ from circt_bug_loop.store import (BuildResult, DifferentialVerdict, Frame,
                                   ImageSpec, OracleVerdict, ReducedCase,
                                   sha256_file)
 
-#: `03-LLD.md` §9.4's implementation constant that belongs to this module. The
-#: two imported above are defined once, in the function that builds the argv
-#: they parameterise, and re-exported here because §9.4 names this module.
-#: `PROBE_WALL_MARGIN_SECONDS` was a third and is gone: it was exported in
-#: `__all__` and read by nothing, and a margin nothing applies is a claim about
-#: the apparatus that is not true of it (N2). What bounds a probe is
-#: `budget.yaml`'s `probe_wall_seconds`, enforced by `circt_exec_probe`'s own
-#: wall-clock killer, and the reduction's separate `reduction_wall_seconds`.
+#: `03-LLD.md` §9.4's implementation constant that belongs to this module.
 PROBE_NOFILE = 1024
 
 #: §3.6's three allocation-failure literals, under the name §3.6 gives them.
-#: Their RECOGNITION is `circt_core.allocation_evidence`, which since W-20b
-#: requires a literal to begin a line rather than to occur anywhere in the
-#: stream (K9); the names are re-exported here because §3.6 names this module.
 _ALLOC_LITERALS = ALLOCATION_FAILURE_LITERALS
 
-#: The three §3.10 helpers are called IN PROCESS and never dispatched: a nested
-#: `chia_remote` would ask for a second {"circt": 1} slot for the same probe and
-#: deadlock a cluster whose apparatus concurrency is the slot count (§12.1).
-#: CHIA stores the undecorated function on the wrapper
-#: (`chia:chia/base/ChiaFunction.py:129`), and calling it is also what keeps the
-#: profiler, and the local Ray session it starts, out of a unit test.
+#: The three §3.10 helpers are called IN PROCESS and never dispatched.
 _exec_probe = circt_exec_probe._chia_original
 _symbolize = circt_symbolize._chia_original
 _reduce = circt_reduce_run._chia_original
 
-#: The diagnostic that separates FR-06.6's two `parse_error` reasons: a pass the
-#: seed's RUN: line named and CIRCT has since renamed exits non-zero exactly as
-#: a rejected input does, and only the text tells them apart (§3.6, measured).
+#: The diagnostic that separates FR-06.6's two `parse_error` reasons.
 _ARGV_REJECTED = "does not refer to a registered pass or pass pipeline"
 
-#: The exit status of a tool that never started: the dynamic loader's own, and
-#: `circt_core`'s `os._exit(127)` when `execvp` fails. It is a probe that
-#: decided NOTHING, not a rejected input (N9).
+#: The exit status of a tool that never started.
 LOADER_FAILED_STATUS = 127
 
 
 class BinaryMismatch(Exception):
-    """A tool binary's SHA-256 differs from `ImageSpec.tool_hashes` (FR-06.1).
-
-    The caller, B12, stops the run and names the worker: the tree has been
-    mutated and every verdict from that worker is suspect (§5.2).
-    """
+    """A tool binary's SHA-256 differs from `ImageSpec.tool_hashes` (FR-06.1)."""
 
     def __init__(self, tool: str, expected_sha: Optional[str], actual_sha: str) -> None:
         super().__init__(f"{tool}: expected {expected_sha}, ran {actual_sha}")
@@ -95,11 +61,7 @@ _ASSERT_UNREACHABLE = re.compile(
     r"^UNREACHABLE executed(?: at (?P<file>[^\s:]+):(?P<line>\d+))?!$")
 _FATAL_ERROR = re.compile(r"^LLVM ERROR: (?P<message>.*)$")
 
-# `func` is `.+?` and not `[^:]+`, and that one character is the difference
-# between classifying a CIRCT assertion and never classifying one (K1): glibc
-# prints __PRETTY_FUNCTION__, which for every C++ member or namespaced function
-# contains `::`, and CIRCT is C++. The lazy group is bounded on the right by the
-# literal ": Assertion `", which is the one place the line can end.
+# `func` is `.+?` and not `[^:]+`.
 
 
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
@@ -107,26 +69,12 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
                   artefact_dir: str, *, bin_dir: str = CIRCT_BIN_DIR) -> dict:
     """Run one probing input through its tool, bounded, and classify it seven ways.
 
-    The body does four things and nothing else: hash the binaries the argv will
-    invoke and refuse on a mismatch; execute through `circt_exec_probe`, which
-    is a direct execve under the `prlimit` prefix in its own process group;
-    classify into exactly one of FR-06.9's seven statuses by `classify_build`
-    alone; and persist both streams, truncated at `probe_output_byte_cap`.
-
-    *bin_dir* is §5.1's directory and defaults to the image's. It is a keyword
-    because every recorded fixture and every tier-1 measurement runs a build
-    outside the image, and a hard-coded path would make the node untestable
-    anywhere the image is not (erratum candidate against §3.6's signature).
-
     Returns:
-        {"build_result": BuildResult, "probe_result": ProbeResult, "counters":
-        CounterBlock}, the counters counting one probe at stage_3, as 3.11
-        requires of every node; an `internal_error` status is the failed one.
+        {"build_result": BuildResult, "probe_result": ProbeResult, "counters": CounterBlock}, the counters counting one probe at stage_3, as 3.11 requires of every node; an `internal_error` status is the failed one.
     Worker:
         {"circt": 1} - it runs the image's own CIRCT binaries.
     Raises:
-        BinaryMismatch(tool, expected_sha, actual_sha) when a tool binary's
-            SHA-256 differs from image_spec.tool_hashes.
+        BinaryMismatch(tool, expected_sha, actual_sha) when a tool binary's SHA-256 differs from image_spec.tool_hashes.
     """
     started_at = time.monotonic()
     binary = os.path.join(bin_dir, spec.tool)
@@ -145,8 +93,7 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
 
     status, reason = classify_build(out["exit_status"], out["signal"],
                                     out["stderr"], out["limit_hit"])
-    # FR-06.4: a probe the stage itself killed carries a NULL signal, so a
-    # timeout can never be read back as a crash.
+    # FR-06.4: a probe the stage itself killed carries a NULL signal.
     signal_name = None if status == "timeout" else out["signal"]
 
     directory = Path(artefact_dir)
@@ -187,38 +134,7 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
 
 def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
                    limit_hit: Optional[str]) -> tuple:
-    """Return (status, reason) for one finished probe, by §3.6's table alone.
-
-    The order is the table's and is not negotiable: a limit kill is never a
-    crash (FR-06.4), allocation evidence outranks every firing class (FR-06.7,
-    FR-07.2), and the `oom` row by evidence needs death by signal as well,
-    because an ordinary diagnostic carrying the phrase "out of memory" is a
-    rejected input and not an exhausted machine. The `limit_hit` row above it
-    carries the same requirement since W-20b (K9): `circt_core._limit_hit`
-    returned `address_space` for ANY stderr holding one of the three literals,
-    so a diagnostic that quoted the phrase - MLIR echoes the offending source
-    line, and the input is written by a model - was recorded as an exhausted
-    machine, and a genuine SIGABRT assertion whose expression text contained it
-    was too, which dropped a real firing. The guarded row below is reachable
-    from `probe_execute` for the first time.
-
-    EXIT 127 IS NOT A REJECTED INPUT (N9). It is the dynamic loader failing
-    before the tool's first instruction - measured under a tight `--as`, the
-    real `circt-opt` exits 127 with `error while loading shared libraries:
-    libMLIRLinalgDialect.so: failed to map segment from shared object` - and it
-    is also what `circt_core`'s own `execvp` failure path exits with. Recording
-    that as `parse_error:tool_rejected_input` asserts the tool read the input
-    and refused it, which it did not: `tool_unavailable` decides nothing about
-    the probe, does not reach stage 4, and is counted as its own row.
-
-    Returns:
-        status is one of FR-06.9's seven plus `tool_unavailable`; reason is the
-        stopping_reason the ProbeResult carries, and is "" for clean_exit.
-    Worker:
-        pure; it reads four values and runs nothing.
-    Raises:
-        nothing.
-    """
+    """Return (status, reason) for one finished probe, by §3.6's table alone."""
     if limit_hit == "wall":
         return "timeout", "wall_limit"
     if limit_hit == "cpu":
@@ -251,21 +167,15 @@ _FRAME = re.compile(
     r"(?:\((?P<module>[^()]+)\+(?P<offset>0x[0-9a-f]+)\)"
     r"|(?P<file>[^\s()]+):(?P<line>\d+):(?P<col>\d+))$")
 
-#: §3.7.1's crash-handler prologue. Every LLVM crash begins with these, so a
-#: fingerprint taken from the raw trace is mostly boilerplate: measured on the
-#: recorded 466-frame trace, three of the top five raw slots were constant
-#: across every crash the campaign can produce.
+#: §3.7.1's crash-handler prologue.
 _PROLOGUE = ("llvm::sys::PrintStackTrace", "llvm::sys::RunSignalHandlers", "SignalHandler",
              "__restore_rt", "pthread_kill", "raise", "abort", "__assert_fail",
              "llvm::report_fatal_error", "llvm::llvm_unreachable_internal")
 
-#: What a lambda's demangled name reduces to under `_normalise_function`; never
-#: a fingerprint frame, because it names no function a reader could look up.
+#: What a lambda's demangled name reduces to under `_normalise_function`.
 _DEGENERATE = ("", "operator")
 
-#: Clang's spelling of an internal-linkage qualifier. Every CIRCT pass and every
-#: conversion pattern is declared in one, so a normalisation that cut at this
-#: opening parenthesis threw the whole name away (W-09 finding 1).
+#: Clang's spelling of an internal-linkage qualifier.
 _ANONYMOUS = "(anonymous namespace)::"
 
 _FIRING = ("crash", "assertion", "fatal_error")
@@ -277,25 +187,12 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
                    symbolizer: str = "llvm-symbolizer") -> dict:
     """Decide whether the probe found a defect, and say which kind.
 
-    A pure function of the stored `BuildResult` plus `llvm-symbolizer` on fixed
-    objects, so it is fully idempotent. Four steps: fire or not; extract the
-    assertion or the fatal message; symbolise every frame against the module it
-    actually lies in; and decide scope, **after** the prologue strip, because
-    unstripped the first frame is `llvm::sys::PrintStackTrace` for every crash
-    in the campaign and every candidate would be out of scope.
-
-    *circt_roots* and *symbolizer* are keywords for the reason `probe_execute`'s
-    *bin_dir* is: §3.6.2 spells the predicate against the image's own paths, and
-    every recorded fixture carries a different prefix (erratum candidate).
-
     Returns:
-        {"verdict": OracleVerdict, "counters": CounterBlock}, the verdict with
-        fired False and oracle_class None when the oracle did not fire; the
-        counters count one probe at stage_4, as 3.11 requires of every node.
+        {"verdict": OracleVerdict, "counters": CounterBlock}, the verdict with fired False and oracle_class None when the oracle did not fire; the counters count one probe at stage_4, as 3.11 requires of every node.
     Worker:
         {"circt": 1} - it runs llvm-symbolizer against the image's own binary.
     Raises:
-        nothing. An unsymbolisable frame is recorded unresolved, not raised.
+        nothing.
     """
     started_at = time.monotonic()
     stderr = _read(build.stderr_path)
@@ -345,21 +242,7 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
 
 
 def strip_prologue(frames: list) -> list:
-    """Drop the crash-handler prologue and return what is left (§3.7.1).
-
-    A leading frame goes when its normalised function name is one of the ten of
-    `_PROLOGUE`, or when it has no resolved function and its module is libc. The
-    strip stops at the first survivor, so a frame deeper in the trace that
-    happens to be named `abort` is kept.
-
-    Returns:
-        the surviving frames, in trace order; the caller takes the count it
-        dropped from the two lengths, which is `prologue_dropped`.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Drop the crash-handler prologue and return what is left (§3.7.1)."""
     index = 0
     while index < len(frames):
         frame = frames[index]
@@ -372,14 +255,7 @@ def strip_prologue(frames: list) -> list:
 
 
 def _extract_assertion(stderr: str) -> tuple:
-    """(assertion_text, assertion_site) for whichever assertion pattern fired.
-
-    For `_ASSERT_GLIBC` both are verbatim from stderr, character for character
-    (FR-07.3). For `_ASSERT_UNREACHABLE` the text is the PRECEDING stderr line,
-    a newline and the matched line with its trailing `!` removed, because LLVM
-    writes the message and the phrase in two separate writes with a newline
-    between them, so the message is never on the same line (K16).
-    """
+    """(assertion_text, assertion_site) for whichever assertion pattern fired."""
     found = _first_match(_ASSERT_GLIBC, stderr)
     if found:
         match = found[1]
@@ -415,22 +291,7 @@ def _parse_frames(stderr: str) -> list:
 
 
 def _address_groups(frames: list) -> list:
-    """Consecutive frames sharing one address: LLVM's inlined chain, as one group.
-
-    LLVM prints one `#n` line per **inlined** frame and gives them all the same
-    runtime address, innermost first, the last being the function that actually
-    owns the address. Reading only the first line of such a run is what W-09
-    measured wrong (finding 2, architect's decision 2026-09-14): in three of the
-    four mined assertions the first line lands in an SDK header that was inlined
-    into a CIRCT function one or two lines below it.
-
-    Returns:
-        a list of groups, each a non-empty list of frames, in trace order.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Consecutive frames sharing one address: LLVM's inlined chain, as one group."""
     groups: list = []
     for frame in frames:
         if groups and groups[-1][0].address == frame.address:
@@ -441,39 +302,14 @@ def _address_groups(frames: list) -> list:
 
 
 def root_in_scope(stripped: list) -> bool:
-    """Whether the ROOT inlined group holds a CIRCT frame (§3.6.2 step 4).
-
-    `out_of_scope_root` is its negation. The group and not the single first
-    line, because an inlined SDK header at the top of the chain is not where the
-    crash roots: the CIRCT function it was inlined into is, and that function is
-    a line or two below at the same address.
-
-    Returns:
-        False for an empty trace, which is what keeps a firing with no frames
-        out of scope exactly as before.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Whether the ROOT inlined group holds a CIRCT frame (§3.6.2 step 4)."""
     if not stripped:
         return False
     return any(frame.in_circt_object for frame in _address_groups(stripped)[0])
 
 
 def _fingerprint_frame(stripped: list) -> Optional[str]:
-    """"<function> <basename(file)>", from the first stripped CIRCT inlined group.
-
-    The first group holding a usable CIRCT frame decides, and within it the
-    **last-listed** such frame is taken, because that is the function that owns
-    the address: the lines above it were inlined into it and a compiler's
-    inlining decisions are not a property of the bug. A usable frame is in a
-    CIRCT object, carries a resolved line and has a non-degenerate name, so the
-    name in a fingerprint is always a function a reader can look up.
-
-    No line number: a one-line edit inside the same function must not split one
-    bug into two across runs (§3.7.1).
-    """
+    """"<function> <basename(file)>", from the first stripped CIRCT inlined group."""
     for group in _address_groups(stripped):
         usable = [frame for frame in group
                   if frame.in_circt_object and frame.line > 0
@@ -486,25 +322,7 @@ def _fingerprint_frame(stripped: list) -> Optional[str]:
 
 
 def _normalise_function(name: str) -> str:
-    """§3.7.1's steps: drop `(anonymous namespace)::`, cut the parameter list,
-    drop ` const`, collapse space.
-
-    The cut is at the first `(` at bracket depth zero, so a `(` inside a
-    template argument is kept. `--functions=short` would do the cut for us and
-    is not used: measured on the assertions-on build it returns `??` under
-    `-gline-tables-only`, a short name needing debug information the flag does
-    not emit.
-
-    **Every `(anonymous namespace)::` segment goes first** (W-09 finding 1,
-    architect's decision 2026-09-14). Clang spells an internal-linkage qualifier
-    with a literal parenthesis, so the depth-zero cut landed at index 0 and
-    `(anonymous namespace)::VariableOpConversion::matchAndRewrite(...)`
-    normalised to the empty string: the frame was then degenerate, skipped by
-    the fingerprint rule and blank in the evidence tuple. Since every CIRCT pass
-    and every conversion pattern is declared in an anonymous namespace, the two
-    real `fatal_error` fingerprints in the recorded set both collapsed to `main`.
-    Stripping the segment keeps the qualified name the reader can look up.
-    """
+    """§3.7.1's steps: drop `(anonymous namespace)::`, cut the parameter list, drop ` const`, collapse space."""
     name = name.replace(_ANONYMOUS, "")
     depth, cut = 0, len(name)
     for index, char in enumerate(name):
@@ -528,11 +346,7 @@ def _is_libc(module: str) -> bool:
 
 
 def _probe_argv(argv: list) -> list:
-    """The probe's own argv, the `prlimit` prefix and the tool path removed.
-
-    FR-07.6's line is for a maintainer to paste: the limits are the loop's
-    concern and not the report's.
-    """
+    """The probe's own argv, the `prlimit` prefix and the tool path removed."""
     if "--" in argv:
         argv = argv[argv.index("--") + 1:]
     return list(argv[1:])
@@ -549,9 +363,7 @@ def _as_dict(frame: Frame, *, resolved: bool = False) -> dict:
 
 # --- 3.6.3 B4's three harness helpers ---------------------------------------
 
-#: `03-LLD.md` §9.4's differential constants. None is a campaign parameter: each
-#: sizes a comparison rather than a budget, and each is equal for both arms by
-#: construction because the apparatus cannot tell the arms apart.
+#: `03-LLD.md` §9.4's differential constants.
 X_POLICY = "x-assign=unique,x-initial=unique"
 ARC_JIT_ENTRY = "bugloop_main"
 VERILATOR_TOP = "bugloop_tb"
@@ -568,10 +380,7 @@ _RESET_NAMES = ("rst", "reset", "rst_n", "resetn", "areset", "rst_i", "i_rst")
 #: An active-low reset asserts at 0; every other reset port asserts at 1.
 _ACTIVE_LOW_RESETS = ("rst_n", "resetn")
 
-#: The feedback word of the 32-bit maximal-length Galois LFSR §3.6.3 names but
-#: does not choose a polynomial for. Taps 32, 30, 26 and 25, which is the
-#: textbook maximal-length quadruple; fixed HERE so that one definition reaches
-#: both generators and a second definition would be a second `stimulus_id`.
+#: The feedback word of the 32-bit maximal-length Galois LFSR of §3.6.3.
 _LFSR_TAPS = 0xA3000000
 _GOLDEN_RATIO = 0x9E3779B1
 
@@ -583,11 +392,7 @@ _HW_MODULE = re.compile(r'"hw\.module"\(\) <\{(?P<attrs>.*)\}> \(\{')
 
 
 class HarnessError(Exception):
-    """A design the differential oracle cannot drive (FR-08.8).
-
-    Every one of these is `harness_failure` with its reason carried into
-    `DifferentialVerdict.reason`, and never `diverge`.
-    """
+    """A design the differential oracle cannot drive (FR-08.8)."""
 
     def __init__(self, reason: str, detail: str = "") -> None:
         super().__init__(f"{reason}: {detail}" if detail else reason)
@@ -609,53 +414,14 @@ class Port:
 def extract_port_list(lifted_hw_path: str,
                       timeout_seconds: int = PORT_LIST_TIMEOUT_SECONDS,
                       *, bin_dir: str = CIRCT_BIN_DIR) -> list:
-    """Read the design under test's port signature out of its lifted HW IR.
-
-    Runs ONE command on the lifted HW-dialect file the probe's own tool produced:
-
-        <bin_dir>/circt-opt <lifted_hw_path> -o - --mlir-print-op-generic
-
-    and reads the `module_type` attribute of the one `hw.module` that carries no
-    `sym_visibility = "private"`. The GENERIC form is used and the pretty form
-    is not, because the generic form spells every port as
-    `!hw.modty<input <name> : <type>, output <name> : <type>, ...>`, with the
-    direction as a word and the order as written, where the pretty form spells
-    the same thing as `in %name : type` / `out name : type` and drops the `%` on
-    outputs. Verified 2026-09-14 against the measured build.
-
-    Ports come back in signature order, inputs and outputs interleaved exactly
-    as the signature declares them, because that order is what the port_list
-    digest is taken over and what both harnesses index.
-
-    Returns:
-        list[Port], one per declared port, in signature order.
-    Worker:
-        {"circt": 1} - it runs the image's own circt-opt. Called inside B4, so
-        it takes no slot of its own.
-    Raises:
-        HarnessError("no_top"), ("bad_port_type"), ("no_clock"),
-        ("circt_opt_failed"), each of which is `harness_failure`.
-    """
+    """Read the design under test's port signature out of its lifted HW IR."""
     return _ports(_top_module(_generic(lifted_hw_path, timeout_seconds, bin_dir))[1])
 
 
 def top_module_name(lifted_hw_path: str,
                     timeout_seconds: int = PORT_LIST_TIMEOUT_SECONDS,
                     *, bin_dir: str = CIRCT_BIN_DIR) -> str:
-    """The symbol name of the one public `hw.module`, which both harnesses name.
-
-    §3.6.3 gives the generators no way to learn it and §4.6 passes arcilator ONE
-    file, so the instantiate has to name a symbol the generator was told about
-    (erratum candidate). This is that one line, over the same generic form
-    `extract_port_list` reads.
-
-    Returns:
-        the symbol name.
-    Worker:
-        {"circt": 1}; called beside extract_port_list, on the same file.
-    Raises:
-        HarnessError, exactly as extract_port_list does.
-    """
+    """The symbol name of the one public `hw.module`, which both harnesses name."""
     return _top_module(_generic(lifted_hw_path, timeout_seconds, bin_dir))[0]
 
 
@@ -666,12 +432,7 @@ def stimulus_seed(probe_id: str) -> int:
 
 
 def lfsr_value(seed: int, port_index: int, cycle: int, width: int) -> int:
-    """The low *width* bits of the shared stimulus for one (cycle, port) pair.
-
-    One Galois step from `seed ^ (port_index * 0x9E3779B1) ^ cycle`, as a plain
-    Python integer. A zero state is forced to one, which a Galois LFSR requires:
-    zero is its absorbing state and would drive a constant.
-    """
+    """The low *width* bits of the shared stimulus for one (cycle, port) pair."""
     state = (seed ^ (port_index * _GOLDEN_RATIO) ^ cycle) & 0xFFFFFFFF
     state = state or 1
     lsb = state & 1
@@ -682,40 +443,7 @@ def lfsr_value(seed: int, port_index: int, cycle: int, width: int) -> int:
 
 
 def gen_arc_harness(port_list: list, seed: int, *, top: str, design: str) -> str:
-    """Build the arcilator harness MLIR that drives one design from the stimulus.
-
-    Emits the design and one `func.func @bugloop_main` around its `arc.sim.*`
-    operations: `arc.sim.instantiate`, `arc.sim.set_input` per driven input per
-    cycle by the LFSR rule, `arc.sim.step` per edge, `arc.sim.get_port` per
-    output at the sample point and `arc.sim.emit` per sampled value. The entry
-    name is `ARC_JIT_ENTRY` and not a parameter, because §4.6 passes
-    `--jit-entry=bugloop_main` and a name per probe would be a second knob.
-
-    *top* and *design* are keywords §3.6.3's signature does not have and §4.6
-    forces: arcilator is passed ONE file, so the harness must carry the design,
-    and `arc.sim.instantiate` must name its symbol (erratum candidate).
-
-    The loop is fully unrolled because each cycle drives different values and
-    emits a different label, neither of which an `scf.for` can carry.
-
-    **The acceptance shape is arcilator's, not this document's.** Measured
-    2026-09-14 on the assertions-on build, `arc.sim.emit "BUGLOOP 0 o", %v : i8`
-    prints `BUGLOOP 0 o = 07`: one sampled value per line, the value zero-padded
-    to ceil(width / 4) hexadecimal digits. §3.6.3 asks for every port of a cycle
-    on ONE line and for `<port>=<value>` with no spaces, and `arc.sim.emit` is
-    arcilator's only output operation and cannot produce either. The padding
-    rule §3.6.3 fixes is exactly what the tool already does. `gen_verilator_tb`
-    emits the same measured shape, so the differ still compares two identical
-    line sequences positionally (erratum candidate).
-
-    Returns:
-        the harness as MLIR text, one trailing newline, UTF-8.
-    Worker:
-        pure; it builds a string, runs no process and reads no file.
-    Raises:
-        HarnessError("empty_port_list") for a port list with no driven input or
-            no sampled output, which has nothing to compare.
-    """
+    """Build the arcilator harness MLIR that drives one design from the stimulus."""
     driven, sampled, clocks, resets = _roles(port_list)
     body = ["module {", design.rstrip("\n"),
             f"  func.func @{ARC_JIT_ENTRY}() {{",
@@ -756,27 +484,7 @@ def gen_arc_harness(port_list: list, seed: int, *, top: str, design: str) -> str
 
 
 def gen_verilator_tb(port_list: list, seed: int, *, top: str) -> str:
-    """Build the SystemVerilog testbench that drives the same design identically.
-
-    Emits `module bugloop_tb`, which is the literal §4.10's `--top-module`
-    names: one `reg` per input, one `wire` per output, an instance of the design
-    bound by port NAME and never by position, the same reset protocol, the same
-    LFSR values in the same order, and one `$display` per sampled value in the
-    measured acceptance shape `gen_arc_harness` documents. `%h` pads to the
-    declared width, which is `ceil(width / 4)` hexadecimal digits, so the two
-    sides agree digit for digit without either being told the width twice.
-
-    *top* is a keyword §3.6.3's signature does not have: a testbench must name
-    the module it instantiates (erratum candidate).
-
-    Returns:
-        the testbench as SystemVerilog text, one trailing newline, UTF-8.
-    Worker:
-        pure; as above.
-    Raises:
-        HarnessError("empty_port_list"), exactly as gen_arc_harness does and for
-        the same reason, so a port list that fails one fails both.
-    """
+    """Build the SystemVerilog testbench that drives the same design identically."""
     driven, sampled, clocks, resets = _roles(port_list)
     lines = ["`timescale 1ns/1ps", f"module {VERILATOR_TOP};"]
     for port in port_list:
@@ -807,12 +515,7 @@ def gen_verilator_tb(port_list: list, seed: int, *, top: str) -> str:
 
 
 def _roles(port_list: list) -> tuple:
-    """(driven inputs, sampled outputs, clocks, resets), and the one refusal.
-
-    Clock and reset ports are excluded from the stimulus: the harness drives the
-    clock and the reset protocol drives the resets (§3.6.3). An `inout` port is
-    neither driven nor sampled, there being no two-state protocol for one.
-    """
+    """(driven inputs, sampled outputs, clocks, resets), and the one refusal."""
     clocks = [p for p in port_list if p.is_clock]
     resets = [p for p in port_list if p.is_reset and not p.is_clock]
     driven = [p for p in port_list
@@ -916,12 +619,7 @@ def _split_top_level(modty: str) -> list:
 
 
 def _width(mlir_type: str) -> int:
-    """`iN`, `!seq.clock` and `!seq.immutable<iN>`; everything else is refused.
-
-    Every aggregate (`!hw.array`, `!hw.struct`, `!hw.inout`) and every
-    parameterised width lands here, which is `bad_port_type` and
-    `harness_failure` and never `diverge`.
-    """
+    """`iN`, `!seq.clock` and `!seq.immutable<iN>`; everything else is refused."""
     if mlir_type == "!seq.clock":
         return 1
     for pattern in (_IN_WIDTH, _IMMUTABLE):
@@ -936,67 +634,33 @@ def _width(mlir_type: str) -> int:
 
 # --- 3.6.3 B4, the differential ---------------------------------------------
 
-#: FR-08.1's rule, as two closed sets and nothing else. A `firtool` probe is
-#: applicable when its argv requests one of these three output modes.
+#: FR-08.1's rule, as two closed sets and nothing else.
 _FIRTOOL_HW_MODES = ("ir-hw", "verilog", "split-verilog")
 
-#: A `circt-opt` probe is applicable when its pipeline **ends** in one of these,
-#: which are the `--lower-*-to-hw` conversions the measured source build
-#: registers (`circt-opt --help`, 2026-09-14, assertions-on build). The Moore
-#: conversion is deliberately absent: it is spelled `--convert-moore-to-core`
-#: and FR-08.1's acceptance criterion puts a `MooreToCore` probe out of scope.
+#: A `circt-opt` probe is applicable when its pipeline **ends** in one of these.
 _HW_TERMINAL_PASSES = ("lower-firrtl-to-hw", "lower-hwarith-to-hw",
                        "lower-calyx-to-hw", "lower-dc-to-hw",
                        "lower-esi-to-hw", "lower-handshake-to-hw",
                        "lower-pipeline-to-hw")
 
-#: `circt-opt` options that are not passes, so that "the last pass" is not read
-#: off a trailing `-o` or a probe-only option. Both dash spellings reach here
-#: already stripped, which is W-09 finding 3's lesson applied to this rule.
+#: `circt-opt` options that are not passes.
 _NOT_A_PASS = ("o", "verify-diagnostics", "split-input-file", "split-file",
                "mlir-print-op-generic", "allow-unregistered-dialect")
 
-#: FR-08.11's recorded deviation. `circt/arc-tests` is neither on this machine
-#: nor reusable as it stands, and the obstacle is named rather than implied.
+#: FR-08.11's recorded deviation.
 DIFFERENTIAL_DRIVER = (
     "deviation: circt/arc-tests' lockstep driver runs two FIXED designs "
     "(Rocket Chip, BOOM) from checked-in harnesses, and neither the repository "
     "nor a clone is on the implementation machine; the harnesses here are "
     "generated per probe from the extracted port list (FR-08.11)")
 
-#: The acceptance line both harnesses print, in the shape `gen_arc_harness`
-#: documents: one sampled value per line, so a line carries exactly one port.
+#: The acceptance line both harnesses print, in the shape `gen_arc_harness` documents.
 _BUGLOOP = re.compile(r"^BUGLOOP (?P<cycle>\d+) (?P<signal>\S+) = "
                       r"(?P<value>[0-9a-fA-F]+)$")
 
 
 def differential_applicable(spec) -> tuple:
-    """FR-08.1's applicability rule, decided from the argv and nothing else.
-
-    Pure, and called **before** either simulator runs, so that a design a
-    simulator later rejects is `harness_failure` and never `not_applicable`
-    (FR-08.1). Admitted: a `firtool` probe requesting `--ir-hw`, `--verilog` or
-    `--split-verilog`, and a `circt-opt` probe whose pipeline ends in one of
-    `_HW_TERMINAL_PASSES`. Nothing else, which is what puts every
-    `circt-verilog`, `circt-translate` and `ImportVerilog`/`MooreToCore` probe
-    out of scope.
-
-    Both dash spellings are accepted, because CIRCT's own tests write single-
-    dash options and LLVM's command-line parser takes either (W-09 finding 3).
-    A `--pass-pipeline=` probe is **not** admitted: no corpus RUN line combines
-    that spelling with an HW-terminal lowering (measured: 50 pipeline lines in
-    `raw/m1-per-runline.csv`, none of them HW-terminal), so reading the last
-    pass out of a nested pipeline string would be code for no case.
-
-    Returns:
-        (applicable, reason). *reason* is "" when applicable and otherwise one
-        of `entry_tool_not_hw_capable`, `firtool_output_mode_not_hw`,
-        `pipeline_not_hw_terminal`, which is what the verdict carries.
-    Worker:
-        pure; it reads the spec and runs nothing.
-    Raises:
-        nothing.
-    """
+    """FR-08.1's applicability rule, decided from the argv and nothing else."""
     if spec.tool == "firtool":
         modes = [_option_name(token) for token in spec.argv]
         if any(mode in _FIRTOOL_HW_MODES for mode in modes):
@@ -1026,41 +690,7 @@ def _last_pass(argv: list) -> str:
 
 
 def compare_traces(arcilator_out: str, verilator_out: str) -> dict:
-    """Compare the two `BUGLOOP` line sequences positionally (§3.6.3).
-
-    The VCD files of §4.6 and §4.10 are evidence and are **not** read: a text
-    comparison needs no VCD reader and cannot disagree with one. Any line either
-    harness prints that is not a `BUGLOOP` line is ignored here and kept in the
-    artefact.
-
-    The two sequences are generated from ONE port list and ONE cycle count, so
-    unequal lengths or a signal mismatch at one index mean a SIMULATOR stopped
-    early or ran a different design: that is `harness_failure` under FR-08.8 and
-    never a divergence, and the caller is told which side was short.
-
-    **The X bucket (FR-08.9), made computable.** §3.6.3 declares a divergence
-    "confined to cycles before the first write of the divergent output signal"
-    to be `diverge_x_policy`, and gives no test a differ can run. The test used
-    here is the observable form of that sentence: every signal that diverges at
-    all does so over a contiguous PREFIX of the cycles it is sampled at, and
-    agrees from some cycle onward. A register the design never writes stays
-    undefined for the whole run under `--x-initial unique` and diverges to the
-    last cycle, so it is a plain `diverge`; one written at cycle k differs only
-    while it is uninitialised, which is exactly the bucket FR-08.9 excludes.
-
-    Returns:
-        {"verdict": "agree" | "diverge" | "diverge_x_policy" |
-                    "harness_failure",
-         "reason": str, "index": int | None, "cycle": int | None,
-         "signal": str | None, "arcilator_value": str | None,
-         "verilator_value": str | None, "lines": int}
-        `index` is the position of the first differing line in the two
-        sequences, from 0; `cycle` and `signal` are read off that line.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """Compare the two `BUGLOOP` line sequences positionally (§3.6.3)."""
     left, right = _bugloop_lines(arcilator_out), _bugloop_lines(verilator_out)
     empty = {"verdict": "harness_failure", "index": None, "cycle": None,
              "signal": None, "arcilator_value": None, "verilator_value": None,
@@ -1118,17 +748,8 @@ def oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
                         verilator: str = "verilator") -> dict:
     """Run one design through arcilator and Verilator, and count the run (3.11).
 
-    A four-line wrapper around `_oracle_differential`, which is 3.6.3's body
-    unchanged. The split exists because 3.11 requires every node of 3.2 to
-    return `{"counters": CounterBlock}` and this body has five return
-    statements; wrapping it is one place to add the block, and editing five is
-    five places to lose one (W-17, errata row 22).
-
     Returns:
-        {"verdict": DifferentialVerdict, "counters": CounterBlock}, always,
-        including the `not_applicable` verdict with its reason. `completed` is
-        1 where the two arms were compared and 0 where the verdict is
-        `harness_failure`.
+        {"verdict": DifferentialVerdict, "counters": CounterBlock}, always, including the `not_applicable` verdict with its reason.
     Worker:
         {"circt": 1} - it runs arcilator, firtool and Verilator.
     Raises:
@@ -1149,42 +770,14 @@ def _oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
                          artefact_dir: str, *, limits: dict,
                          bin_dir: str = CIRCT_BIN_DIR,
                          verilator: str = "verilator") -> DifferentialVerdict:
-    """Run one design through arcilator and Verilator from one stimulus.
-
-    Five steps and nothing else: decide applicability from the argv alone
-    (FR-08.1); lift the design to HW-dialect IR with the probe's own entry tool
-    and extract its port list; generate both harnesses from that one list and
-    one seed; run §4.6's arcilator invocation and §4.10's Verilator build and
-    binary under the probe's own limits; and compare the two `BUGLOOP`
-    sequences line by line.
-
-    **This node is not on `probe_execute`'s path.** The driver calls it for the
-    seeds FR-08.1 admits and for no others (§3.6.3), and FR-08.10 keeps what it
-    produces out of the reducer, out of repair and out of the gate: it is
-    report-only, and the report-only flag lives on the `CandidateRecord` the
-    head writes, `DifferentialVerdict` having no such column.
-
-    *limits*, *bin_dir* and *verilator* are keywords §3.6.3's signature does not
-    have (erratum candidates): the two simulator runs are bounded by the probe
-    limits rather than by B4's 1800 s node timeout, and every fixture and
-    tier-1 measurement runs a build outside the image.
-
-    Returns:
-        DifferentialVerdict, always, including not_applicable with its reason.
-    Worker:
-        {"circt": 1} - both simulators live on the CIRCT image (ADR-D-09).
-    Raises:
-        nothing. A harness that will not build is harness_failure, never
-        diverge.
-    """
+    """Run one design through arcilator and Verilator from one stimulus."""
     applicable, reason = differential_applicable(spec)
     if not applicable:
         return _differential_verdict(spec, image_spec, "not_applicable", reason)
 
     directory = Path(artefact_dir)
     directory.mkdir(parents=True, exist_ok=True)
-    # Every refusal below carries '' for port_list_sha, which is what §6.2's
-    # DDL comment asks of a harness_failure.
+    # Every refusal below carries '' for port_list_sha.
     try:
         lifted = _lift_to_hw(spec, directory, bin_dir, limits)
         ports = extract_port_list(str(lifted), bin_dir=bin_dir)
@@ -1215,10 +808,7 @@ def _oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
                     "stimulus_id": STIMULUS_ID, "port_list_sha": port_list_sha}),
         encoding="utf-8")
 
-    # `side` and not `arm`: the two SIMULATORS are not the campaign's two arms,
-    # and §14.5's walk reads the name and not the meaning, so the collision made
-    # `T-U-layout-02` fire on a module that branches on no arm at all (errata
-    # row 19, W-17 fix 7).
+    # `side` and not `arm`.
     for side, name in ((arc, "arcilator"), (ver, "verilator")):
         if side["exit_status"] != 0:
             return _differential_verdict(
@@ -1243,12 +833,7 @@ def _oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
 
 def _differential_verdict(spec, image_spec: ImageSpec, verdict: str,
                           reason: str, **over) -> DifferentialVerdict:
-    """One `DifferentialVerdict`, with the five stimulus fields always filled.
-
-    FR-08.3 asks for one shared stimulus declaration per comparison, so the
-    constants are written on every verdict including `not_applicable`, where
-    they say what the comparison would have been.
-    """
+    """One `DifferentialVerdict`, with the five stimulus fields always filled."""
     fields = dict(
         probe_id=spec.probe_id, verdict=verdict, reason=reason,
         verilator_version=image_spec.verilator_version, x_policy=X_POLICY,
@@ -1261,14 +846,7 @@ def _differential_verdict(spec, image_spec: ImageSpec, verdict: str,
 
 
 def _lift_to_hw(spec, directory: Path, bin_dir: str, limits: dict) -> Path:
-    """`<probe dir>/lifted.mlir`: the design in the HW dialect, from the probe's
-    own entry tool in the mode FR-08.1 admitted.
-
-    A `firtool` probe is re-run with `--ir-hw` whatever of the three modes its
-    own argv asked for, because arcilator needs the IR and not the Verilog; a
-    `circt-opt` probe is re-run with its own pipeline, whose last pass is an
-    HW-terminal lowering by construction.
-    """
+    """`<probe dir>/lifted.mlir`: the design in the HW dialect, from the probe's own entry tool in the mode FR-08.1 admitted."""
     lifted = directory / "lifted.mlir"
     if spec.tool == "firtool":
         argv = [spec.input_path, "--ir-hw", "-o", str(lifted)]
@@ -1281,13 +859,7 @@ def _lift_to_hw(spec, directory: Path, bin_dir: str, limits: dict) -> Path:
 
 
 def _without_output_option(argv: list) -> list:
-    """*argv* with `-o` and whatever follows it removed, in one pass.
-
-    Both dash spellings and both value forms: `-o out`, `--o=out`. The probe's
-    own output destination is replaced by the lift's, and dropping the option
-    without its value would leave the value as a second positional argument,
-    which `circt-opt` refuses ("Too many positional arguments specified").
-    """
+    """*argv* with `-o` and whatever follows it removed, in one pass."""
     kept, skip = [], False
     for token in argv:
         if skip:
@@ -1301,14 +873,7 @@ def _without_output_option(argv: list) -> list:
 
 
 def _module_body(text: str) -> str:
-    """The operations inside a single outer `module { ... }`, if that is all
-    the text is; otherwise the text unchanged.
-
-    `circt-opt` and `firtool` both print the implicit top-level module
-    explicitly, and `gen_arc_harness` wraps what it is handed in a module of its
-    own, so a design that arrives already wrapped would be nested one level
-    deep and `arc.sim.instantiate` would not resolve its symbol.
-    """
+    """The operations inside a single outer `module { ... }`, if that is all the text is; otherwise the text unchanged."""
     stripped = text.strip()
     opening = "module {"
     if not stripped.startswith(opening):
@@ -1326,13 +891,7 @@ def _module_body(text: str) -> str:
 
 
 def _emit_verilog(lifted: Path, target: Path, bin_dir: str, limits: dict) -> None:
-    """`<probe dir>/dut.sv`, by `firtool --verilog` on the lifted HW IR (§3.6.3).
-
-    Verified 2026-09-14 on the measured build: `firtool --verilog` reads an
-    HW-dialect file and emits synthesisable SystemVerilog, so the design under
-    test comes from the same file the arcilator harness carries and the two arms
-    cannot drift.
-    """
+    """`<probe dir>/dut.sv`, by `firtool --verilog` on the lifted HW IR (§3.6.3)."""
     done = _run_bounded(os.path.join(bin_dir, "firtool"),
                         [str(lifted), "--verilog", "-o", str(target)],
                         target.parent, limits)
@@ -1350,12 +909,7 @@ def _arcilator_arm(directory: Path, bin_dir: str, limits: dict) -> dict:
 
 
 def _verilator_arm(directory: Path, verilator: str, limits: dict) -> dict:
-    """§4.10's `--binary` build and then the binary it built.
-
-    `--x-assign unique --x-initial unique` is FR-08.4's declared policy and is
-    the reason `X_POLICY` reads as it does; `-Wno-fatal` is required rather than
-    convenient, a generated design routinely tripping a style warning.
-    """
+    """§4.10's `--binary` build and then the binary it built."""
     binary = _which(verilator)
     build = _run_bounded(
         binary,
@@ -1391,25 +945,13 @@ def _which(name: str) -> str:
 
 
 def _side_evidence(side: dict) -> dict:
-    """One SIMULATOR side's recorded argv, output digest and limit outcome.
-
-    "side" and not "arm": a differential probe has two simulators and the
-    campaign has two arms, and they are different things. §14.5's walk reads the
-    NAME, so the collision made `T-U-layout-02` report `probe_task.py` for a
-    branch on the campaign's arm that this module never makes (errata row 19).
-
-    FR-08.4's acceptance criterion reads the **recorded** Verilator argument
-    vector for the two X flags and §6.5 names no file that holds one, so this is
-    that file's content (erratum candidate against §6.5).
-    """
+    """One SIMULATOR side's recorded argv, output digest and limit outcome."""
     return {"argv": side["argv"], "build_argv": side.get("build_argv"),
             "stdout_sha256": hashlib.sha256(
                 side["stdout"].encode("utf-8")).hexdigest(),
             "stdout_bytes": len(side["stdout"].encode("utf-8")),
             "exit_status": side["exit_status"], "signal": side["signal"],
-            # Keyed "limit" and not by the field's own name: T-U-probe-41
-            # asserts that no module but circt_core.py writes that key, and this
-            # is a copy of the field for the record, never a derivation of it.
+            # Keyed "limit" and not by the field's own name.
             "limit": side["limit_hit"]}
 
 
@@ -1418,10 +960,7 @@ def _side_evidence(side: dict) -> dict:
 #: §4.7's first row: the tools whose input is MLIR text whatever its extension.
 _MLIR_TOOLS = ("circt-opt", "circt-translate", "arcilator")
 
-#: One printed MLIR operation per line: an optional result list, then a
-#: dotted `dialect.op` name. `03-LLD.md` and `01-FRD.md` require an operation
-#: count (FR-09.5) and neither defines one; this is that definition, fixed here.
-#: For a language with no operations the count is the non-blank line count.
+#: One printed MLIR operation per line.
 _OP_LINE = re.compile(r"\s*(?:%[\w$.\-]+(?:\s*,\s*%[\w$.\-]+)*\s*=\s*)?"
                       r"[a-zA-Z_]\w*\.[a-zA-Z_][\w.]*")
 
@@ -1431,40 +970,15 @@ class _BudgetExpired(Exception):
 
 
 def select_reducer(spec) -> dict:
-    """§4.7's reducer-selection table, by the probe's input language and no other.
-
-    Returns the reducer, the lift if any, and the tool and arguments the
-    interestingness test runs, with the candidate appended last because that is
-    the calling convention `circt-reduce` fixes (`circt:lib/Reduce/Tester.cpp:
-    42-46`) and §10.2's template follows.
-
-    The `.sv` rows are decided by the EXTENSION before the tool, which is the one
-    ambiguity §4.7 leaves: its first row claims "every `circt-translate` probe"
-    and its fourth claims "`.sv` entered through `circt-translate
-    --import-verilog`", and a `.sv` probe entering through `circt-translate`
-    satisfies both. The fourth row is the specific one and wins (erratum
-    candidate).
-
-    Returns:
-        {"reducer", "lift", "test_tool", "test_args"}.
-    Worker:
-        pure; it reads a `ProbeSpec` and runs nothing.
-    Raises:
-        nothing.
-    """
+    """§4.7's reducer-selection table, by the probe's input language and no other."""
     extension = os.path.splitext(spec.input_filename)[1].lower()
     args = _test_args(spec)
     if extension == ".sv" and spec.tool == "circt-verilog":
-        # circt-verilog READS MLIR, through --format=mlir, so the branch's test
-        # is its own tool on its own lift (§4.4, run end to end on both the SDK
-        # binary and the source-built slang one). Every other token of the
-        # probe's argv, the seed's own output-mode flag included, is kept.
+        # circt-verilog READS MLIR.
         return {"reducer": "circt-reduce", "lift": "circt-verilog --ir-moore",
                 "test_tool": "circt-verilog", "test_args": ["--format=mlir", *args]}
     if extension == ".sv" and spec.tool == "circt-translate":
-        # circt-translate has no --format= at all, so it cannot be re-fed its own
-        # lift; circt-opt on the Moore IR is the post-parse pipeline that entry
-        # point implies, which for --import-verilog is MLIR's own verifier.
+        # circt-translate has no --format= at all, so it cannot be re-fed its own lift.
         return {"reducer": "circt-reduce", "lift": "circt-verilog --ir-moore",
                 "test_tool": "circt-opt", "test_args": ["-o", "/dev/null"]}
     if extension == ".fir":
@@ -1482,14 +996,8 @@ def reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
                 *, bin_dir: str = CIRCT_BIN_DIR) -> dict:
     """Shrink a firing input, and count the reduction (3.11).
 
-    A four-line wrapper around `_reduce_case`, which is 3.6.4's body unchanged,
-    for the reason `oracle_differential`'s wrapper exists: the body has two
-    return statements and the block belongs in one place (W-17, errata row 22).
-
     Returns:
-        {"reduced": ReducedCase, "counters": CounterBlock}. `completed` is 1
-        where the case shrank and 0 where it did not, which is what
-        `ReducedCase.reduced` says.
+        {"reduced": ReducedCase, "counters": CounterBlock}.
     Worker:
         {"circt": 1} - it runs the image's own source-built circt-reduce.
     Raises:
@@ -1506,25 +1014,7 @@ def reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
 
 def _reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
                  *, bin_dir: str = CIRCT_BIN_DIR) -> ReducedCase:
-    """Shrink a firing input under a firing-specific interestingness test.
-
-    The reducer is chosen by input language, by FR-09.9's rule and no other, and
-    the binary is the SOURCE-BUILT `circt-reduce`, because the reduced case must
-    be parsed by the build that fired. The cost is that its own assertions are
-    on and it can die on the candidate: measured 2026-09-14, the reducer itself
-    took rc 139 on a parser stack overflow, because it parses the candidate with
-    the same parser the candidate overflows. That is `reducer_aborted`, and it
-    routes to the textual reducer on the same run, before the budget is spent.
-
-    Returns:
-        ReducedCase, naming the reducer that ran and whether it reached a
-        fixpoint; reduced=False with a reason where nothing could run.
-    Worker:
-        {"circt": 1} - it runs the image's own source-built circt-reduce.
-    Raises:
-        nothing. A reducer that aborts on its own assertion is recorded
-        reducer_aborted and the last valid --keep-best output is kept.
-    """
+    """Shrink a firing input under a firing-specific interestingness test."""
     started = time.monotonic()
     directory = Path(artefact_dir)
     directory.mkdir(parents=True, exist_ok=True)
@@ -1549,8 +1039,7 @@ def _reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
     _write_script(script, verdict, choice, bin_dir, limits, counter)
 
     if choice["reducer"] == "circt-reduce" and lift and not _interesting(script, target):
-        # §4.7's fifth trigger: the lift ran and the recorded failure is not on
-        # it, so the lift changed the failure. One call buys that answer.
+        # §4.7's fifth trigger.
         choice, reason, target, lift = _textual(spec), "lift_changed_failure", source, None
         _write_script(script, verdict, choice, bin_dir, limits, counter)
 
@@ -1562,8 +1051,7 @@ def _reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
         fixpoint = run["success"] and not truncated
         kept = _valid_output(out_path, script, bin_dir, limits)
         if not run["success"] and not truncated:
-            # reducer_aborted: keep whatever --keep-best left that still
-            # validates, and hand THAT to the textual reducer on the same run.
+            # reducer_aborted: keep whatever --keep-best left that still validates.
             reason = f"reducer_aborted:{run['returncode']}"
             target = out_path if kept else target
             choice = {**choice, "reducer": "textual-ddmin"}
@@ -1619,12 +1107,7 @@ def _write_script(script: Path, verdict, choice: dict, bin_dir: str,
 
 def _lift(lift: str, source: Path, directory: Path, bin_dir: str,
           limits: dict) -> tuple:
-    """Run one of §4.7's lifts, retrying `--ir-fir` with `--parse-only`.
-
-    FR-09.9 branch 2: where the recorded failure lies inside the pipeline the
-    lift reproduces the failure instead of emitting IR, and `--parse-only` stops
-    before the pipeline. Returns (path, the lift that worked) or (None, None).
-    """
+    """Run one of §4.7's lifts, retrying `--ir-fir` with `--parse-only`."""
     attempts = [lift] + (["firtool --parse-only"] if lift == "firtool --ir-fir" else [])
     out = directory / "lifted.mlir"
     for attempt in attempts:
@@ -1664,12 +1147,7 @@ def _interesting(script: Path, candidate: Path) -> bool:
 
 
 def _valid_output(out_path: Path, script: Path, bin_dir: str, limits: dict) -> bool:
-    """§10.2's post-exit validation, AFTER the reducer process has exited.
-
-    Non-empty, parses where the language has a parser, and still satisfies the
-    same script. A file a kill truncated mid-write fails one of the three and
-    the previous good output is kept (FR-09.13).
-    """
+    """§10.2's post-exit validation, AFTER the reducer process has exited."""
     if not out_path.is_file() or out_path.stat().st_size == 0:
         return False
     if out_path.suffix == ".mlir":
@@ -1689,12 +1167,7 @@ def _valid_output(out_path: Path, script: Path, bin_dir: str, limits: dict) -> b
 
 
 def _textual_reduce(target: Path, script: Path, limits: dict) -> tuple:
-    """ddmin over the input's lines, bounded by `reduction_wall_seconds`.
-
-    On expiry the BEST interesting subsequence seen so far is kept rather than
-    the work discarded (FR-09.4), which is what `circt-reduce`'s own
-    `--keep-best` does for the other branch.
-    """
+    """ddmin over the input's lines, bounded by `reduction_wall_seconds`."""
     lines = target.read_text(errors="backslashreplace").splitlines(keepends=True)
     deadline = time.monotonic() + limits["reduction_wall_seconds"]
     best = [lines]
@@ -1723,12 +1196,7 @@ def _textual_reduce(target: Path, script: Path, limits: dict) -> tuple:
 
 def _recheck(choice: dict, verdict: OracleVerdict, case: Path, bin_dir: str,
              limits: dict) -> dict:
-    """FR-09.3: re-run the primary oracle's rules on the reduced input.
-
-    Equality of class, assertion text and `file:line` sets `recheck_matches`; a
-    mismatch is FR-09.7's `reduction_changed_failure` and the caller carries the
-    original input forward.
-    """
+    """FR-09.3: re-run the primary oracle's rules on the reduced input."""
     blank = {"recheck_class": None, "recheck_assertion_text": None,
              "recheck_assertion_site": None, "recheck_matches": False}
     try:
@@ -1782,11 +1250,7 @@ def _calls(counter: Path) -> int:
 
 # --- 10.2 The interestingness script ----------------------------------------
 
-#: `03-LLD.md` §10.2, with ONE addition: the counter line. `ReducedCase`
-#: requires `interestingness_calls` and `circt-reduce` does not report it -
-#: measured 2026-09-14, its own progress lines came to 60 for 53 actual calls -
-#: so the script counts itself, one byte per call. That is a twelfth
-#: placeholder, `@COUNTER@`, and an erratum candidate against §10.2's eleven.
+#: `03-LLD.md` §10.2, with ONE addition: the counter line.
 _INTERESTING_TEMPLATE = """#!/bin/sh
 # Interestingness test for one recorded CIRCT failure.
 # Contract: exit 0 IFF the recorded failure still reproduces on "$1".
@@ -1839,8 +1303,7 @@ grep -qF @TOP_FRAME@ "$WORK/err" || exit 1
 exit 0""",
 }
 
-#: Every placeholder §10.2 declares. A written script carries none of them:
-#: `T-U-probe-45` asserts that no `@NAME@` survives anywhere in the file.
+#: Every placeholder §10.2 declares.
 _PLACEHOLDERS = ("@TOOL@", "@ARGS@", "@WALL@", "@GRACE@", "@AS_BYTES@",
                  "@CPU_SECONDS@", "@NOFILE@", "@ASSERT_EXPR@", "@ASSERT_SITE@",
                  "@FATAL_MESSAGE@", "@TOP_FRAME@")
@@ -1848,27 +1311,7 @@ _PLACEHOLDERS = ("@TOOL@", "@ARGS@", "@WALL@", "@GRACE@", "@AS_BYTES@",
 
 def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
                           args: list, limits: dict, counter_path: str) -> str:
-    """Write §10.2's script for ONE recorded firing and return its text.
-
-    Exactly one class block is substituted for `@CLASS_BLOCK@`, and it is the
-    block for the firing's own class: the earlier three-in-sequence version left
-    two of them dead code below an `exit 0`, and `sh -n` passed on it (K15).
-    Every value a `grep` compares is `shlex.quote`d, and every `grep` is `-F`,
-    fixed strings: an assertion expression carries `&&`, quotation marks,
-    parentheses and sometimes `*`, all regular-expression metacharacters.
-
-    `@TOP_FRAME@` is the function-name half of the FINGERPRINT frame and not
-    "the first resolved frame", which is `llvm::sys::PrintStackTrace` for every
-    crash in the campaign and would match any crash at all (K3).
-
-    Returns:
-        the script text, which is also on disk at *path*, mode 0755.
-    Worker:
-        pure but for the one write; called inside B5, so it takes no slot.
-    Raises:
-        KeyError when the verdict's class has no block, which is a caller
-        defect: a non-firing verdict has no interestingness test.
-    """
+    """Write §10.2's script for ONE recorded firing and return its text."""
     frame = verdict.fingerprint_frame
     cpu = limits["probe_cpu_seconds"]
     values = {
@@ -1880,11 +1323,7 @@ def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
         "@CPU_SECONDS@": f"{cpu}:{cpu + CPU_HARD_MARGIN_SECONDS}",
         "@NOFILE@": str(PROBE_NOFILE),
         "@COUNTER@": shlex.quote(counter_path),
-        # A None below is a recorded absence and not a defect: an UNREACHABLE
-        # with no location has no site, and a trace with no CIRCT frame has no
-        # fingerprint frame. The empty string makes that one `grep` vacuous
-        # rather than making it compare the four letters of "None"; such a
-        # candidate fails the gate's fingerprint question anyway (FR-10.8).
+        # A None below is a recorded absence and not a defect.
         "@ASSERT_EXPR@": shlex.quote(verdict.assertion_text or ""),
         "@ASSERT_SITE@": shlex.quote(verdict.assertion_site or ""),
         "@FATAL_MESSAGE@": shlex.quote(verdict.fatal_message or ""),
@@ -1900,10 +1339,7 @@ def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
     return text
 
 
-#: `contract.to_json`'s canonical shape for the values that are not records:
-#: `to_json` takes a dataclass and `argv.json` and `frames.json` are a list of
-#: strings and a list of dicts. ONE implementation, in the module that defines
-#: the shape (N3).
+#: `contract.to_json`'s canonical shape for the values that are not records.
 _canonical = schema.canonical_json
 
 
@@ -1934,13 +1370,7 @@ def _first_match(pattern, stderr: str):
 
 
 def _sha256(path: str) -> str:
-    """The SHA-256 of one file, hex, or "" when it is not there (FR-06.1).
-
-    The empty string is a POLICY and not an implementation (N3): a missing tool
-    binary is an answer here - it is what `BinaryMismatch` reports - and the
-    hashing itself is `store.sha256_file`, which every other caller uses and
-    which raises.
-    """
+    """The SHA-256 of one file, hex, or "" when it is not there (FR-06.1)."""
     try:
         return sha256_file(path)
     except OSError:
