@@ -12,14 +12,20 @@ import typing
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Protocol
 
-CONTRACT_VERSION = "2.0"          # MAJOR.MINOR; the single source of the string
+CONTRACT_VERSION = "2.1"          # MAJOR.MINOR; the single source of the string
 
 Arm = Literal["seeded", "mutation"]
 LedgerArm = Literal["seeded", "mutation", "shared"]
 Polarity = Literal["expect_zero", "expect_nonzero"]
 Shape = Literal["plain", "split_file", "unsupported"]
+#: FR-06.9's seven, plus `tool_unavailable` at contract 2.1 (W-20b, N9): a probe
+#: whose tool exited 127 never started, so it neither read the input nor
+#: rejected it, and `parse_error` was a claim about something that did not
+#: happen. A MINOR addition - `check_version` compares the MAJOR half, so every
+#: 2.0 fixture still validates and no reader in the tree breaks - and
+#: `contract/FROZEN.md` records what the freeze rule still owes for it.
 BuildStatus = Literal["clean_exit", "parse_error", "assertion", "fatal_error",
-                      "crash", "timeout", "oom"]
+                      "crash", "timeout", "oom", "tool_unavailable"]
 OracleClass = Literal["assertion", "fatal_error", "crash", "differential"]
 LimitHit = Literal["wall", "cpu", "address_space"]
 Scope = Literal["arm_window", "stage"]

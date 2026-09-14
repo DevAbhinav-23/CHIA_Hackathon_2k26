@@ -4,7 +4,7 @@
     "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000002/probe_0002.mlir"
   ],
   "arm": "mutation",
-  "contract_version": "2.0",
+  "contract_version": "2.1",
   "differential": null,
   "expected_outcome": "clean_exit",
   "input_filename": "probe_0002.mlir",

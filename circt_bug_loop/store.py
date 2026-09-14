@@ -440,7 +440,7 @@ class BuildResult:
     run_commit: str
     image_digest: str
     status: Literal["clean_exit", "parse_error", "assertion", "fatal_error",
-                    "crash", "timeout", "oom"]
+                    "crash", "timeout", "oom", "tool_unavailable"]
     binary_path: str                  # always under /workspace/circt/build/bin
     binary_sha256: str                # checked against ImageSpec.tool_hashes before the run
     argv: list[str]                   # the full argv, prlimit prefix included

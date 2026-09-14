@@ -45,10 +45,11 @@ from chia.base.ChiaFunction import ChiaFunction
 CPU_HARD_MARGIN_SECONDS = 5
 
 #: The three allocation-failure literals FR-06.7 names and `03-LLD.md` §3.6
-#: fixes verbatim, matched case-sensitively as substrings of any stderr line.
-#: The third is a prefix-extension of the second and is listed because it is a
-#: real literal in the SDK's libLLVMSupport.so and can arrive without the bare
-#: phrase ever appearing on its own line.
+#: fixes verbatim. The third is a prefix-extension of the second and is listed
+#: because it is a real literal in the SDK's libLLVMSupport.so and can arrive
+#: without the bare phrase ever appearing on its own line. They are the NAMES of
+#: the failure; `ALLOCATION_FAILURE_LINES` below is how one is recognised, and
+#: since W-20b a bare substring of the stream is not (K9).
 ALLOCATION_FAILURE_LITERALS = ("std::bad_alloc", "out of memory",
                                "LLVM ERROR: out of memory")
 
@@ -56,6 +57,21 @@ ALLOCATION_FAILURE_LITERALS = ("std::bad_alloc", "out of memory",
 #: as this word (measured: `prlimit --as=104857600 -- python3 -c
 #: 'b=bytearray(500*1024*1024)'` exits 1 with it on stderr and no signal).
 _MEMORY_ERROR_LINE = "MemoryError"
+
+#: The same failures as the LINE OPENINGS a failing runtime actually prints,
+#: which is what `allocation_evidence` tests (K9). `std::bad_alloc` never
+#: appears on its own: glibc reports an uncaught one as a `terminate called ...`
+#: line followed by a `what():` line, and LLVM's own handler prints
+#: `LLVM ERROR: out of memory`. A quoted source line or an appended note may
+#: contain any of the three and can begin with none of them, which is exactly
+#: the difference between an exhausted machine and a diagnostic about one.
+ALLOCATION_FAILURE_LINES = (
+    "terminate called after throwing an instance of 'std::bad_alloc'",
+    "what():  std::bad_alloc",
+    "LLVM ERROR: out of memory",
+    "out of memory",
+    _MEMORY_ERROR_LINE,
+)
 
 #: Where the image puts the source-built binaries (`03-LLD.md` §5.1).
 CIRCT_BIN_DIR = "/workspace/circt/build/bin"
@@ -146,11 +162,14 @@ def circt_exec_probe(tool: str, argv: list, *, cwd: str,
     exit_status = returncode if returncode >= 0 else None
     stderr_text = streams[2]
     cpu_used = rusage.ru_utime + rusage.ru_stime
+    peak_rss = rusage.ru_maxrss * 1024              # ru_maxrss is kB on Linux
     return {"exit_status": exit_status,
             "signal": sig,
-            "limit_hit": _limit_hit(killed, sig, cpu_used, cpu_seconds, stderr_text),
+            "limit_hit": _limit_hit(killed, sig, cpu_used, cpu_seconds, stderr_text,
+                                    peak_rss_bytes=peak_rss,
+                                    address_space_bytes=address_space_bytes),
             "cpu_seconds": cpu_used,
-            "peak_rss_bytes": rusage.ru_maxrss * 1024,   # ru_maxrss is kB on Linux
+            "peak_rss_bytes": peak_rss,
             "wall_seconds": wall,
             "stdout": streams[1],
             "stderr": stderr_text,
@@ -313,16 +332,73 @@ def _in_circt_object(frame: dict, tool_path: str, circt_roots: tuple) -> bool:
     return bool(path) and any(path.startswith(root) for root in circt_roots)
 
 
+def allocation_evidence(stderr: str) -> bool:
+    """Whether *stderr* REPORTS an allocation failure, rather than mentioning one.
+
+    FR-06.7's three literals were matched as substrings of the whole stream
+    until W-20b, and that is not a test for exhaustion at all (K9): MLIR echoes
+    the offending source line in every diagnostic and the probing input is
+    written by a model, so `{tag = "out of memory"}` put the literal on stderr
+    with nothing exhausted (measured against the real `circt-opt`), and an
+    assertion whose expression text contained it was thrown away as an `oom`.
+
+    The refinement is the smallest one that separates the two: a literal is
+    evidence when it BEGINS a line, which is what a runtime that has failed to
+    allocate prints and what neither a quoted source line nor an appended note
+    can do. The literals themselves are FR-06.7's, unchanged, with the two
+    runtime prefixes that actually carry `std::bad_alloc` spelled out, glibc
+    reporting an uncaught one as `terminate called ...` / `  what():  ...`.
+
+    Returns:
+        bool.
+    Worker:
+        pure; it reads one string.
+    Raises:
+        nothing.
+    """
+    return any(line.strip().startswith(ALLOCATION_FAILURE_LINES)
+               for line in stderr.splitlines())
+
+
 def _limit_hit(killed: bool, sig: Optional[str], cpu_used: float,
-               cpu_seconds: int, stderr: str) -> Optional[str]:
-    """§3.10's three rules, tested in this order, and the only place they live."""
+               cpu_seconds: int, stderr: str, *, peak_rss_bytes: int = 0,
+               address_space_bytes: int = 0) -> Optional[str]:
+    """§3.10's three rules, tested in this order, and the only place they live.
+
+    `address_space` needs EVIDENCE THAT SOMETHING RAN OUT, which until W-20b it
+    did not: any stderr containing one of the three literals returned it, so an
+    ordinary diagnostic quoting the phrase was recorded as an exhausted machine
+    and - the worse half - a genuine SIGABRT assertion whose expression text
+    contained it was classified `oom`, which is not one of the statuses that
+    reach stage 4. Both directions were wrong numbers in the results artefact's
+    probe-outcome table, and one of them dropped a real firing (K9).
+
+    The two admissible kinds of evidence, and no third:
+
+      * a runtime REPORTED the failure, which is `allocation_evidence` above:
+        an allocation literal that BEGINS a line, as a failing allocator prints
+        it and as neither a quoted source line nor a diagnostic about one can;
+        and
+      * peak RSS reached the address-space limit `prlimit --as` set. RSS is
+        bounded by the address space by construction, so reaching it is the
+        rusage observation that `RLIMIT_AS` bound, and it is the arm that
+        catches a failure whose message the loop does not recognise at all.
+
+    Death by signal is deliberately NOT one of them. K9's disposition names it
+    as the first conjunct, but the measured `RLIMIT_AS` case exits 1 with
+    `MemoryError` and NO signal (T-U-core-15), so requiring one would lose the
+    only case the address-space limit actually produces; and requiring it does
+    not help with the case K9 is about, a `SIGSEGV` whose stderr merely mentions
+    the phrase. The line rule is what separates those, and it separates them
+    whether the child died by signal or not.
+    """
     if killed:
         return "wall"
     if sig == "SIGXCPU" or cpu_used >= cpu_seconds:
         return "cpu"
-    if any(literal in stderr for literal in ALLOCATION_FAILURE_LITERALS):
+    if allocation_evidence(stderr):
         return "address_space"
-    if any(line.strip() == _MEMORY_ERROR_LINE for line in stderr.splitlines()):
+    if address_space_bytes and peak_rss_bytes >= address_space_bytes:
         return "address_space"
     return None
 
@@ -419,5 +495,6 @@ def _node_id() -> str:
 
 
 __all__ = ["circt_exec_probe", "circt_reduce_run", "circt_symbolize",
-           "CPU_HARD_MARGIN_SECONDS", "ALLOCATION_FAILURE_LITERALS",
+           "allocation_evidence", "CPU_HARD_MARGIN_SECONDS",
+           "ALLOCATION_FAILURE_LITERALS", "ALLOCATION_FAILURE_LINES",
            "CIRCT_BIN_DIR", "CIRCT_ROOTS"]

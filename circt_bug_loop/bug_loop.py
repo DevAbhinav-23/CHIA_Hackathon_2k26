@@ -136,6 +136,13 @@ PIN_CHECK_LINE = "PIN CHECK PASSED"
 #: The statuses at which a probe carries on to stage 4 (FR-06.9, 3.6).
 _FIRING_STATUSES = ("assertion", "fatal_error", "crash")
 
+#: The status at which a probe stops WITHOUT the differential being asked
+#: (N9). `tool_unavailable` means the binary never started, so there is no
+#: design to simulate and no verdict to take; dispatching B4 would spend a
+#: `circt` slot to record a harness failure that is the loader's and not the
+#: probe's.
+_UNDECIDED_STATUS = "tool_unavailable"
+
 #: Which stage id each dispatched callable's counters belong to (3.11).
 _STAGE_OF = {"generate_seeded": "stage_2", "generate_mutation": "stage_2",
              "probe_execute": "stage_3", "oracle_primary": "stage_4",
@@ -2655,6 +2662,8 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
     out["probe_result"] = result
     campaign.recorder.record(result)
     write_build_result(campaign.store, build)
+    if build.status == _UNDECIDED_STATUS:
+        return stop("stage_3", result.stopping_reason)
     if build.status not in _FIRING_STATUSES:
         return _drive_differential(campaign, spec, build, result, out,
                                    artefact_dir, stop)

@@ -1,7 +1,7 @@
 {
   "amount": 42.7,
   "arm": "seeded",
-  "contract_version": "2.0",
+  "contract_version": "2.1",
   "entry_id": "v-stage2-01",
   "metered": true,
   "observed": {

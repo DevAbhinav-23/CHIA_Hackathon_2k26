@@ -167,9 +167,10 @@ def test_T_U_schema_05():
     ]
     for obj, one_edit in cases:
         raises("E004_BAD_ENUM", schema.validate, edit(obj, **one_edit))
-    # every member of each Literal is accepted
+    # every member of each Literal is accepted, `tool_unavailable` being
+    # contract 2.1's own (W-20b, N9).
     for status in ("clean_exit", "parse_error", "assertion", "fatal_error",
-                   "crash", "timeout", "oom"):
+                   "crash", "timeout", "oom", "tool_unavailable"):
         candidate = edit(result(), build_status=status, signal=None, limit_hit=None)
         schema.validate(candidate)
     for arm in ("seeded", "mutation", "shared"):
@@ -507,7 +508,7 @@ def test_T_U_schema_20():
     raises `E002` listing both sorted. A `1.0` payload is rejected by
     `check_version`, so the MINOR drop rule can never lose them.
     """
-    assert schema.CONTRACT_VERSION == "2.0"
+    assert schema.CONTRACT_VERSION == "2.1"
     for name in ("diff", "test_files"):
         error = raises("E002_MISSING_FIELD", schema.validate, edit(seed(), **{name: None}))
         assert f"SeedRecord.{name} is None" in str(error)
@@ -565,7 +566,7 @@ def test_T_U_schema_22():
         # Five added at the join (W-17, errata row 22): 3.11 requires a block of
         # EVERY node of 3.2 and none of these five had a stage to name.
         "feedback", "budget", "ledger", "artefact", "results"}
-    assert schema.CONTRACT_VERSION == "2.0"
+    assert schema.CONTRACT_VERSION == "2.1"
 
 
 def test_T_U_schema_23():

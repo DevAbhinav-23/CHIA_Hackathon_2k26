@@ -96,6 +96,7 @@ Sum check: 2 = 2 repair attempts.
 | crash | 1 | 0 |
 | timeout | 0 | 0 |
 | oom | 0 | 0 |
+| tool_unavailable | 0 | 0 |
 
 `parse_error` is printed as two rows: `tool_rejected_input` is the tool refusing the probing input, and `tool_rejected_argv` is the tool refusing the argument vector the loop built, which is an apparatus defect and not a property of the input. They sum to the `parse_error` total.
 

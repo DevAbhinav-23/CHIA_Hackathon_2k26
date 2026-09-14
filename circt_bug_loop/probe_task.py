@@ -29,8 +29,8 @@ from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.circt_core import (ALLOCATION_FAILURE_LITERALS, CIRCT_BIN_DIR,
                                        CIRCT_ROOTS, CPU_HARD_MARGIN_SECONDS,
-                                       circt_exec_probe, circt_reduce_run,
-                                       circt_symbolize)
+                                       allocation_evidence, circt_exec_probe,
+                                       circt_reduce_run, circt_symbolize)
 from circt_bug_loop.contract import schema
 from circt_bug_loop.ddmin import ddmin
 from circt_bug_loop.store import (BuildResult, DifferentialVerdict, Frame,
@@ -43,6 +43,9 @@ PROBE_NOFILE = 1024
 PROBE_WALL_MARGIN_SECONDS = 60
 
 #: §3.6's three allocation-failure literals, under the name §3.6 gives them.
+#: Their RECOGNITION is `circt_core.allocation_evidence`, which since W-20b
+#: requires a literal to begin a line rather than to occur anywhere in the
+#: stream (K9); the names are re-exported here because §3.6 names this module.
 _ALLOC_LITERALS = ALLOCATION_FAILURE_LITERALS
 
 #: The three §3.10 helpers are called IN PROCESS and never dispatched: a nested
@@ -59,6 +62,11 @@ _reduce = circt_reduce_run._chia_original
 #: seed's RUN: line named and CIRCT has since renamed exits non-zero exactly as
 #: a rejected input does, and only the text tells them apart (§3.6, measured).
 _ARGV_REJECTED = "does not refer to a registered pass or pass pipeline"
+
+#: The exit status of a tool that never started: the dynamic loader's own, and
+#: `circt_core`'s `os._exit(127)` when `execvp` fails. It is a probe that
+#: decided NOTHING, not a rejected input (N9).
+LOADER_FAILED_STATUS = 127
 
 
 class BinaryMismatch(Exception):
@@ -180,11 +188,27 @@ def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
     crash (FR-06.4), allocation evidence outranks every firing class (FR-06.7,
     FR-07.2), and the `oom` row by evidence needs death by signal as well,
     because an ordinary diagnostic carrying the phrase "out of memory" is a
-    rejected input and not an exhausted machine.
+    rejected input and not an exhausted machine. The `limit_hit` row above it
+    carries the same requirement since W-20b (K9): `circt_core._limit_hit`
+    returned `address_space` for ANY stderr holding one of the three literals,
+    so a diagnostic that quoted the phrase - MLIR echoes the offending source
+    line, and the input is written by a model - was recorded as an exhausted
+    machine, and a genuine SIGABRT assertion whose expression text contained it
+    was too, which dropped a real firing. The guarded row below is reachable
+    from `probe_execute` for the first time.
+
+    EXIT 127 IS NOT A REJECTED INPUT (N9). It is the dynamic loader failing
+    before the tool's first instruction - measured under a tight `--as`, the
+    real `circt-opt` exits 127 with `error while loading shared libraries:
+    libMLIRLinalgDialect.so: failed to map segment from shared object` - and it
+    is also what `circt_core`'s own `execvp` failure path exits with. Recording
+    that as `parse_error:tool_rejected_input` asserts the tool read the input
+    and refused it, which it did not: `tool_unavailable` decides nothing about
+    the probe, does not reach stage 4, and is counted as its own row.
 
     Returns:
-        status is one of FR-06.9's seven; reason is the stopping_reason the
-        ProbeResult carries, and is "" for clean_exit.
+        status is one of FR-06.9's seven plus `tool_unavailable`; reason is the
+        stopping_reason the ProbeResult carries, and is "" for clean_exit.
     Worker:
         pure; it reads four values and runs nothing.
     Raises:
@@ -194,7 +218,7 @@ def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
         return "timeout", "wall_limit"
     if limit_hit == "cpu":
         return "timeout", "cpu_limit"
-    allocation = any(literal in stderr for literal in _ALLOC_LITERALS)
+    allocation = allocation_evidence(stderr)
     if limit_hit == "address_space":
         return "oom", "address_space_limit"
     if signal is not None and allocation:
@@ -205,6 +229,8 @@ def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
         return "fatal_error", "llvm_error"
     if signal is not None:
         return "crash", "died_by_signal"
+    if rc == LOADER_FAILED_STATUS:
+        return "tool_unavailable", "loader_failed"
     if rc != 0:
         return ("parse_error",
                 "tool_rejected_argv" if _ARGV_REJECTED in stderr

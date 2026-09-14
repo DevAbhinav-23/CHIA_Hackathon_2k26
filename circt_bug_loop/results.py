@@ -49,11 +49,13 @@ BUCKETS = ("unreproducible", "not_minimal", "invalid_input", "duplicate",
            "undecided", "new_bug")
 
 #: FR-06.9's seven build statuses, in the order the probe-outcome table prints
-#: them. `parse_error` is printed as two rows keyed by `stopping_reason`, so the
-#: row is never read as "the tool rejected the input" when it means "the loop
-#: built an argv the tool would not take" (§3.6, NIT 2).
+#: them, plus contract 2.1's `tool_unavailable`. `parse_error` is printed as two
+#: rows keyed by `stopping_reason`, so the row is never read as "the tool
+#: rejected the input" when it means "the loop built an argv the tool would not
+#: take" (§3.6, NIT 2); `tool_unavailable` is last because it is the one row
+#: that says the probe decided nothing at all (N9).
 BUILD_STATUSES = ("clean_exit", "parse_error", "assertion", "fatal_error",
-                  "crash", "timeout", "oom")
+                  "crash", "timeout", "oom", "tool_unavailable")
 PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 
 #: `LedgerEntry.observed`'s four declared keys (§2.7). An entry whose block has

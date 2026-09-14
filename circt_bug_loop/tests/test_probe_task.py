@@ -207,7 +207,12 @@ def test_u_probe_01_the_hash_check_runs_first(tmp_path) -> None:
     (None, "SIGABRT", "bad_alloc.txt", "oom", "allocation_failure"),
     (None, "SIGABRT", "oom_bare.txt", "oom", "allocation_failure"),
     (None, "SIGABRT", "oom_llvm.txt", "oom", "allocation_failure"),
+    # K9: the same phrase INSIDE a message is not a report of exhaustion, so
+    # the probe is whatever it would have been without it.
+    (None, "SIGABRT", "oom_quoted.txt", "crash", "died_by_signal"),
+    (1, None, "oom_quoted.txt", "parse_error", "tool_rejected_input"),
     (1, None, "parse_error_argv.txt", "parse_error", "tool_rejected_argv"),
+    (127, None, "loader_failed.txt", "tool_unavailable", "loader_failed"),
 ])
 def test_u_probe_02_to_06_and_10_11_40_the_status_table(
         rc, signal, fixture, status, reason) -> None:
@@ -217,7 +222,9 @@ def test_u_probe_02_to_06_and_10_11_40_the_status_table(
     `stopping_reason` §3.6's table gives it. `LLVM ERROR: out of memory`
     classifies `oom` and not `fatal_error`, allocation evidence being tested
     first; a rejected argv and a rejected input share the `parse_error` status
-    and differ only in the reason, FR-06.9's seven being closed.
+    and differ only in the reason; an allocation phrase that does not BEGIN a
+    line is not evidence at all (K9); and exit 127 is `tool_unavailable`,
+    because the tool never started (N9).
     """
     assert classify_build(rc, signal, _stderr(fixture), None) == (status, reason)
 
@@ -1669,3 +1676,105 @@ def test_u_probe_56_the_node_end_to_end_and_a_constructed_divergent_pair(
     assert crossed["signal"] == "p"
     assert (crossed["arcilator_value"], crossed["verilator_value"]) == ("1", "0")
     assert crossed["lines"] == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2
+
+
+# ---------------------------------------------------------------------------
+# T-U-probe-57, -58: K9's evidence rule and N9's loader status
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.t0
+@pytest.mark.parametrize("crash", CRASHES, ids=[d.name for d in CRASHES])
+def test_u_probe_57_an_appended_phrase_does_not_change_a_class(crash) -> None:
+    """T-U-probe-57 (K9, FR-06.7): the six real failures keep their class.
+
+    New id, W-20b. `circt_core._limit_hit` returned `address_space` for ANY
+    stderr containing one of the three allocation literals, so appending the
+    phrase to a recorded failure flipped it to `oom` - which is not one of the
+    statuses that reach stage 4, so the firing was thrown away. It is not a
+    synthetic worry: MLIR echoes the offending source line in every diagnostic
+    and the probing input is written by a model, so `{tag = "out of memory"}`
+    puts the literal on stderr with nothing exhausted (measured against the real
+    `circt-opt`, K9 case C).
+
+    Pass criterion: for every recorded fixture, with each of the three literals
+    appended to its stderr, the class is still the one `expected.json` records.
+
+    Fixture: `tests/fixtures/crashes/*`. Tier 0.
+    """
+    from circt_bug_loop.circt_core import ALLOCATION_FAILURE_LITERALS, _limit_hit
+
+    expected = json.loads((crash / "expected.json").read_text())
+    stderr = (crash / "stderr.txt").read_text()
+    for literal in ALLOCATION_FAILURE_LITERALS:
+        contaminated = stderr + f"\nnote: see current operation: {literal}\n"
+        limit_hit = _limit_hit(False, expected["signal"], 0.0, 600, contaminated,
+                               peak_rss_bytes=1 << 20,
+                               address_space_bytes=8 << 30)
+        status, _reason = classify_build(expected["exit_status"],
+                                         expected["signal"], contaminated,
+                                         limit_hit)
+        assert status == expected["class"], (crash.name, literal, limit_hit)
+
+
+@pytest.mark.t0
+def test_u_probe_58_limit_hit_needs_evidence_and_127_is_not_a_rejection() -> None:
+    """T-U-probe-58 (K9, N9): the two admissible evidences, and exit 127.
+
+    New id, W-20b. K9's four measured cases, end to end through
+    `_limit_hit` + `classify_build`, plus the two directions that must still
+    work: a real allocation failure that killed the process, and the rusage
+    observation that `RLIMIT_AS` bound. Fixture: none. Tier 0.
+    """
+    from circt_bug_loop.circt_core import _limit_hit
+
+    def classify(*, exit_status, signal, stderr, peak=1 << 20, limit=8 << 30,
+                 killed=False, cpu=0.0):
+        hit = _limit_hit(killed, signal, cpu, 600, stderr,
+                         peak_rss_bytes=peak, address_space_bytes=limit)
+        return (hit,) + classify_build(exit_status, signal, stderr, hit)
+
+    diagnostic = ('t4.mlir:2:17: error: use of value \'%a\' expects different '
+                  'type\n  %x = comb.add %a, %a {tag = "out of memory"} : i9\n')
+    # K9 case C: a diagnostic quoting the phrase, exit 1, no signal.
+    assert classify(exit_status=1, signal=None, stderr=diagnostic) == (
+        None, "parse_error", "tool_rejected_input")
+    # K9 case C2: a real SIGABRT assertion whose expression text contains it.
+    aborted = ('circt-opt: HWOps.cpp:412: void f(): Assertion `op && '
+               '"out of memory"\' failed.\n')
+    assert classify(exit_status=None, signal="SIGABRT", stderr=aborted) == (
+        None, "assertion", "assertion_fired")
+
+    # And the positive direction still works: a runtime that REPORTS the
+    # failure begins a line with it, and that is `oom` whether or not the
+    # child died by signal.
+    assert classify(exit_status=1, signal=None,
+                    stderr="LLVM ERROR: out of memory\nAllocation failed\n") == (
+        "address_space", "oom", "address_space_limit")
+    assert classify(
+        exit_status=None, signal="SIGABRT",
+        stderr="terminate called after throwing an instance of "
+               "'std::bad_alloc'\n  what():  std::bad_alloc\n")[1] == "oom"
+
+    # The second evidence: peak RSS reached the address-space limit.
+    assert classify(exit_status=1, signal=None, stderr="", peak=1 << 30,
+                    limit=1 << 30) == (
+        "address_space", "oom", "address_space_limit")
+    # The two kills still outrank everything.
+    assert classify(exit_status=None, signal="SIGKILL", stderr="", killed=True)[:2] \
+        == ("wall", "timeout")
+    assert classify(exit_status=None, signal="SIGXCPU", stderr="")[:2] \
+        == ("cpu", "timeout")
+
+    # N9 / K9 case B: the dynamic loader dying before the tool starts.
+    loader = ("circt-opt: error while loading shared libraries: "
+              "libMLIRLinalgDialect.so: failed to map segment from shared object\n")
+    assert classify(exit_status=127, signal=None, stderr=loader) == (
+        None, "tool_unavailable", "loader_failed")
+    assert probe_task.LOADER_FAILED_STATUS == 127
+    assert "tool_unavailable" in schema.BuildStatus.__args__
+    # And it is neither a firing status nor one the differential is asked of.
+    from circt_bug_loop import bug_loop
+
+    assert "tool_unavailable" not in bug_loop._FIRING_STATUSES
+    assert bug_loop._UNDECIDED_STATUS == "tool_unavailable"

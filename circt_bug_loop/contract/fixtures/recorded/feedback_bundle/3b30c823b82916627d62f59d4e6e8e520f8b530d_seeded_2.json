@@ -2,7 +2,7 @@
   "abandon_reason": null,
   "abandoned": false,
   "arm": "seeded",
-  "contract_version": "2.0",
+  "contract_version": "2.1",
   "entries": [
     {
       "oracle_class": null,
