@@ -401,10 +401,10 @@ We release the loop as CHIA nodes and tools, the framework's own units of
 composition, so swapping the generator for the mutation arm is one node
 substituted. Its two halves, the one that proposes work and the one that
 measures it, meet at a single frozen contract of seven record types and one
-function call, version 2.0, and are tested separately against recorded examples
-of it; % contract 2.0, seven schemas plus one interface, tag contract-2.0: design/00-README.md, seam rule
-the suite is 529 tests, of which 490 need no cluster, no
-network and no model. % pytest -m t0 --co at HEAD: 490/529 collected, 39 deselected
+function call, version 2.1, and are tested separately against recorded examples
+of it; % contract 2.1, seven schemas plus one interface, tag contract-2.1: design/00-README.md, seam rule; circt_bug_loop/contract/FROZEN.md "Contract 2.1" (adds BuildStatus tool_unavailable, MINOR)
+the suite is 644 tests, of which 594 need no cluster, no
+network and no model. % 2026-09-14, at HEAD: pytest circt_bug_loop/tests -q --co = 644 collected; -m t0 = 594, -m "t0 or t1" = 627, -m t2 = 9, -m t3 = 7
 Four
 things go upstream to CHIA: the Dockerfile for the assertions-on image, its
 build workflow, three helpers for CHIA's own CIRCT module, and the nineteen-line
@@ -419,9 +419,10 @@ they emit a CIRCT simulation harness and a Verilator testbench printing
 identical 112-line sequences, and one changed constant makes them disagree at a
 named cycle and signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
 
-\textbf{What is not built.} Nothing has run end to end with a live model: beyond
-three one-word calls that verified the credential, no model call has been made,
-the interlock staying closed until the pilot. % three one-word probes, about 24 tokens: docs/HANDOFF.md, Gemini credential; ADR-D-03 rule (1)
+\textbf{What is not built.} The pre-registered campaign has not run; the live
+model calls so far are the mutator synthesis and a pilot. % the interlock is now opened deliberately per run: ADR-D-03 rule (1); docs/HANDOFF.md W-12b and W-18
+The first live model turn, the one that synthesised the mutator set, billed
+625{,}478 tokens, 2{,}975 of them thinking, for USD 0.49. % analysis/measurements/2026-09-16-mutator-synthesis.md 9.3: 619,603 in + 2,900 out + 2,975 thinking = 625,478; cost_usd 0.486733
 The 187 seeds rest on a
 subject-keyword filter, no diffs read to confirm each is a bug fix; of seven
 mining attempts, one seed did not fail at its parent. % 6 confirmed of 7 attempted, the discard recorded: analysis/measurements/2026-09-14-crash-fixtures.md 1
