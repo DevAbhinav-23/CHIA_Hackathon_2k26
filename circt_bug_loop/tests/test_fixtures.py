@@ -27,14 +27,28 @@ _MEMBER_DIRS = {
 }
 
 
+#: The one directory that is not a member's. W-17's recording run writes the
+#: whole seam under it (`fixtures/recorded/make_recorded.py`), keeping the
+#: `<schema>/<id>.json` layout one level down, so the constructed set and the
+#: recorded one sit side by side and `T-U-fixt-01` validates both.
+_RECORDED = "recorded"
+
+
 def walk(root: Path) -> list[tuple[Path, type]]:
     """Every fixture document under *root*, paired with the class it records."""
     found = []
     for path in sorted(root.rglob("*.json")):
-        member = path.relative_to(root).parts[0]
+        parts = path.relative_to(root).parts
+        member = parts[1] if parts[0] == _RECORDED else parts[0]
         assert member in _MEMBER_DIRS, f"{path} is in no member directory"
         found.append((path, _MEMBER_DIRS[member]))
     return found
+
+
+def recorded(root: Path) -> list[tuple[Path, type]]:
+    """Every document of the RECORDED set, which is W-17's own run's output."""
+    return [(path, cls) for path, cls in walk(root)
+            if path.relative_to(root).parts[0] == _RECORDED]
 
 
 def test_T_U_fixt_01():
@@ -61,10 +75,19 @@ def test_T_U_fixt_02():
     A half that never exercises a schema cannot discover that it broke it, so a
     missing member fails, naming it.
     """
-    covered = {path.relative_to(FIXTURES).parts[0] for path, _ in walk(FIXTURES)}
-    missing = sorted(set(_MEMBER_DIRS) - covered)
+    def members(entries):
+        return {path.relative_to(FIXTURES).parts[-2] for path, _ in entries}
+
+    missing = sorted(set(_MEMBER_DIRS) - members(walk(FIXTURES)))
     assert not missing, f"no fixture for {missing}"
     assert set(_MEMBER_DIRS.values()) == set(schema._MEMBERS)
+
+    # And the RECORDED set covers all seven on its own, which is the half
+    # `04-Test-Plan.md` §0.6 rule 2 asks for: a half that never exercised a
+    # schema cannot discover that it broke it, and a recorded set that covered
+    # six would leave the seventh's only evidence hand-constructed.
+    short = sorted(set(_MEMBER_DIRS) - members(recorded(FIXTURES)))
+    assert not short, f"the recorded set covers no {short}"
 
 
 def test_T_U_fixt_03(tmp_path: Path):

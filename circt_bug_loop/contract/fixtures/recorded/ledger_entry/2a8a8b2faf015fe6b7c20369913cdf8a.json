@@ -1,0 +1,19 @@
+{
+  "amount": 14400.0,
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "entry_id": "2a8a8b2faf015fe6b7c20369913cdf8a",
+  "metered": true,
+  "observed": {
+    "cost_usd": 0.004992,
+    "cpu_seconds": 0.3115,
+    "tokens_in": 4096,
+    "tokens_out": 512
+  },
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "scope": "arm_window",
+  "stage": "stage_3",
+  "stop_reason": "arm_window",
+  "timestamp_utc": "2026-09-14T00:00:00+00:00",
+  "unit": "wall_clock_seconds"
+}

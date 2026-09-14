@@ -1,0 +1,31 @@
+{
+  "argv": [
+    "-lower-handshake-to-hw",
+    "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-f4540aa95429/input.mlir"
+  ],
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "differential": null,
+  "expected_outcome": "the element-type assertion in parseHWArray fires",
+  "input_filename": "input.mlir",
+  "input_path": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-f4540aa95429/input.mlir",
+  "input_text": "hw.module @Top() {}\n",
+  "iteration": 1,
+  "mutator_id": null,
+  "mutator_seed_int": null,
+  "polarity": "expect_zero",
+  "probe_id": "p-f4540aa95429",
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "seed_sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
+  "shape": "plain",
+  "source_test_path": null,
+  "tool": "circt-opt",
+  "turn_cost": {
+    "cost_usd": null,
+    "metered": true,
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "turn": "probe_write",
+    "wall_seconds": 9.64700011536479e-05
+  }
+}

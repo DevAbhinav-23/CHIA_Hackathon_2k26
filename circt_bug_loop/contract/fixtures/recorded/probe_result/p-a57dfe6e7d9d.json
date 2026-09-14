@@ -1,0 +1,21 @@
+{
+  "arm": "seeded",
+  "artefact_dir": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-a57dfe6e7d9d",
+  "assertion_site": null,
+  "assertion_text": null,
+  "build_status": "assertion",
+  "contract_version": "2.0",
+  "exit_status": null,
+  "iteration": 1,
+  "limit_hit": null,
+  "oracle_class": null,
+  "oracle_fired": false,
+  "probe_id": "p-a57dfe6e7d9d",
+  "reduced_path": null,
+  "reduced_text": null,
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "seed_sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
+  "signal": "SIGABRT",
+  "stopping_reason": "assertion_fired",
+  "stopping_stage": "stage_3"
+}

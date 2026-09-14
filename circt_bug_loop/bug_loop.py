@@ -1248,7 +1248,12 @@ class FixtureRecorder:
         schema.validate(instance)
         name = type(instance).__name__
         if name == "FeedbackBundle":
-            ident = f"{instance.seed_sha}_{instance.iteration}"
+            # The ARM is part of the identity and W-16 left it out: FR-16.2
+            # makes the two arms' bundles for one seed and one iteration
+            # DIFFERENT documents, the mutation arm's carrying no entries, and
+            # without the arm the second one recorded overwrote the first
+            # (found by W-17's recording run).
+            ident = f"{instance.seed_sha}_{instance.arm}_{instance.iteration}"
         else:
             ident = getattr(instance, _FIXTURE_ID[name])
         folder = Path(self.directory) / _snake(name)

@@ -1,0 +1,95 @@
+{
+  "apparatus_concurrency": 2,
+  "arm_order": [
+    "seeded",
+    "mutation"
+  ],
+  "arm_window_seconds": 14400.0,
+  "artefact_root": "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts",
+  "assertion_baseline_count": 0,
+  "backend": "vertex",
+  "budget_file_sha": "8ddfd409624f36e24f0ff6d079313d72627f064d",
+  "budget_unit": "wall_clock_seconds",
+  "calibration_sample": null,
+  "cluster_yaml_sha": "1486baed9c9342891089669534b201b87bf8c4c9cd6599480afbf82e1df580ab",
+  "confirmation_cutoff_date": "2026-09-24",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "current_window_has_release": false,
+  "deployment": "single_machine",
+  "differential_driver": {
+    "commit": "",
+    "deviation": "the harnesses here are generated per probe from the extracted port list (FR-08.11)",
+    "obstacle": "circt/arc-tests' lockstep driver runs two FIXED designs (Rocket Chip, BOOM) from checked-in harnesses, and neither the repository nor a clone is on the implementation machine",
+    "source": "probe_task.gen_arc_harness and probe_task.gen_verilator_tb, generated per probe from the extracted port list"
+  },
+  "ended_utc": null,
+  "forum_post_date": "2026-09-14",
+  "forum_post_url": "https://llvm.discourse.group/t/circt-bug-loop/0",
+  "image_spec": {
+    "circt_sha": "88d9a5ad7",
+    "flag_string": "-O3 -UNDEBUG -gline-tables-only",
+    "image_digest": "local-build:sha256:966b447fdc7334961d8dbc26a98fd49e2ef0bfa6e4483c9216125af621b9c228",
+    "sdk_tag": "",
+    "slang_enabled": false,
+    "targets": [
+      "circt-opt"
+    ],
+    "tool_hashes": {
+      "circt-opt": "de26328c070dee6fe208565ed87665af2119be53584740c42e64f64eeb6b3e0d"
+    },
+    "verilator_version": ""
+  },
+  "issue_mirror": {
+    "cap_bound": false,
+    "comments_mirrored": false,
+    "issue_cap": 600,
+    "issues_mirrored": 50,
+    "refreshed_utc": "2026-09-14T05:57:39+00:00",
+    "state": "all"
+  },
+  "lag_commits": 8,
+  "lag_days": 4.807094907407407,
+  "llm_concurrency": 2,
+  "local_id_range": [
+    900000000,
+    999999999
+  ],
+  "mode": "discovery",
+  "model_ids": {
+    "generate_seeded": "vertex:gemini-3.8-flash",
+    "mutator_synthesis": "vertex:gemini-3.8-flash",
+    "repair_adapt": "vertex:gemini-3.8-flash",
+    "triage_report": "vertex:gemini-3.8-flash"
+  },
+  "mutator_set_sha": "ff9dff62e59935017ca77876c77f3b1aaf7a2654f3c17d9c8bda383906c9e127",
+  "pin_sha": "6279700538792da0c5a08e17babfe9b6e824c69f",
+  "pin_tag": "firtool-1.159.0",
+  "run_commit": [
+    {
+      "commit": "eade0de61bc5a0d2ba1b9da951b69efcab19f8ce",
+      "seed_sha": null
+    }
+  ],
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "seed_set": "187",
+  "stages_metered": {
+    "gate": true,
+    "stage_1": true,
+    "stage_2": true,
+    "stage_3": true,
+    "stage_4": true,
+    "stage_5": true,
+    "stage_6": true,
+    "stage_7": true
+  },
+  "started_utc": "2026-09-14T00:00:00+00:00",
+  "sv_seeds_excluded": null,
+  "tags_sharing_pin": [
+    "firtool-1.159.0",
+    "firtool-1.158.0",
+    "firtool-1.157.0"
+  ],
+  "worker_type": "bugloop_circt",
+  "x_policy": "x-assign=unique,x-initial=unique"
+}

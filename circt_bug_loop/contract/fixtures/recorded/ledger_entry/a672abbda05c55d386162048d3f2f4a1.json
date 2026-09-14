@@ -1,0 +1,19 @@
+{
+  "amount": 0.3115,
+  "arm": "shared",
+  "contract_version": "2.0",
+  "entry_id": "a672abbda05c55d386162048d3f2f4a1",
+  "metered": false,
+  "observed": {
+    "cost_usd": null,
+    "cpu_seconds": 0.3115,
+    "tokens_in": null,
+    "tokens_out": null
+  },
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "scope": "stage",
+  "stage": "corpus",
+  "stop_reason": null,
+  "timestamp_utc": "2026-09-14T00:00:00+00:00",
+  "unit": "wall_clock_seconds"
+}

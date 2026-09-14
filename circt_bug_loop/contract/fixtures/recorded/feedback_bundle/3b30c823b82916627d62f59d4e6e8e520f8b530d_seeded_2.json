@@ -1,0 +1,32 @@
+{
+  "abandon_reason": null,
+  "abandoned": false,
+  "arm": "seeded",
+  "contract_version": "2.0",
+  "entries": [
+    {
+      "oracle_class": null,
+      "oracle_summary": null,
+      "probe_id": "p-f4540aa95429",
+      "reason": "assertion:assertion_fired",
+      "reduced_from_bytes": null,
+      "reduced_text": null,
+      "reduced_to_bytes": null,
+      "stopped_at_stage": "stage_3"
+    },
+    {
+      "oracle_class": null,
+      "oracle_summary": null,
+      "probe_id": "p-a57dfe6e7d9d",
+      "reason": "assertion:assertion_fired",
+      "reduced_from_bytes": null,
+      "reduced_text": null,
+      "reduced_to_bytes": null,
+      "stopped_at_stage": "stage_3"
+    }
+  ],
+  "iteration": 2,
+  "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",
+  "seed_sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
+  "terminating_condition": null
+}
