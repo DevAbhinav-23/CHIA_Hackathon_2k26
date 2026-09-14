@@ -42,6 +42,21 @@ set -euo pipefail
 
 ADDR="${RAY_JOB_ADDR:-http://localhost:8265}"
 FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# THE FLOW DIRECTORY'S PARENT, ON THE JOB'S PYTHONPATH. `python <flow
+# dir>/bug_loop.py` puts the FLOW directory on sys.path and not its parent. In a
+# CHIA checkout the flow's modules are loose files importing each other by bare
+# name and that is enough; in the team repository they are a PACKAGE and every
+# import in bug_loop.py is `circt_bug_loop.<module>`, so the submitted job died
+# with `ModuleNotFoundError: No module named 'circt_bug_loop'` before its first
+# line of work (measured through a real `chia job submit`, W-19b 2026-09-15).
+#
+# It is computed HERE and not in bug_loop.py because FR-19.2 forbids a flow
+# module to walk past its own directory - the flow lives at two different depths
+# in the two trees and `T-U-layout-09` enforces it by AST - and a shell wrapper
+# that already knows `FLOW_DIR` is not a flow module. It is passed on the
+# ENTRYPOINT and NOT as a fourth `runtime_env` key: §11.2 fixes that set at
+# exactly the three below and `T-S-submit-01` asserts its size.
+FLOW_PARENT="$(dirname "$FLOW_DIR")"
 export BUGLOOP_HEAD_ENV="${BUGLOOP_HEAD_ENV:-$HOME/.cache/chia-venv/bin/activate}"
 PYBIN="${BUGLOOP_PY:-$(dirname "$BUGLOOP_HEAD_ENV")/python}"
 CHIABIN="${BUGLOOP_CHIA:-chia}"
@@ -67,4 +82,5 @@ exec "$CHIABIN" job submit \
   --address "$ADDR" \
   --runtime-env-json "$ENV_JSON" \
   "${WAIT_FLAG[@]}" \
-  -- "$PYBIN" "$FLOW_DIR/bug_loop.py" "$@"
+  -- env "PYTHONPATH=$FLOW_PARENT${PYTHONPATH:+:$PYTHONPATH}" \
+     "$PYBIN" "$FLOW_DIR/bug_loop.py" "$@"

@@ -58,6 +58,7 @@ import shutil
 import subprocess
 import time
 import uuid
+import warnings
 from pathlib import Path
 
 import pytest
@@ -137,11 +138,17 @@ def image_spec() -> ImageSpec:
 
 
 def manifest_for(mode: str, run_id: str, artefact_root: str, *,
-                 budget: BudgetFile, seeds: list, arms=("seeded", "mutation"),
-                 spec: ImageSpec = None) -> RunManifest:
-    """The recorded `RunManifest`, re-stamped for one tier-3 run."""
+                 budget: BudgetFile, seeds: list, spec: ImageSpec = None) -> RunManifest:
+    """The recorded `RunManifest`, re-stamped for one tier-3 run.
+
+    `arm_order` is ALWAYS both arms and is never narrowed here: 2.8 requires the
+    manifest to name both exactly once, because the order is a property of the
+    campaign's design and not of one invocation. Running one arm is
+    `campaign_drive(..., arms=[...])`, which is what `--arm` reaches.
+    """
     spec = spec or image_spec()
     recorded = _recorded("run_manifest")
+    arms = ("seeded", "mutation")
     calibration = list(budget.calibration_sample_shas or [])
     manifest = dataclasses.replace(
         recorded, run_manifest_id=run_id, mode=mode, artefact_root=artefact_root,
@@ -173,13 +180,21 @@ def drive(manifest: RunManifest, budget: BudgetFile, seeds: list, *,
     root = Path(manifest.artefact_root) / manifest.run_manifest_id
     (root / "results").mkdir(parents=True, exist_ok=True)
     store = LoopStore(str(Path(manifest.artefact_root) / "loop.db"))
+    dispatch = bug_loop.Dispatch(remote=remote)
+    # §6.4's first four tables, as `run_campaign` writes them: the run, the
+    # image, the seed rows the seeded-bug validation table is taken over, and
+    # the two `shared` occupancies - one of which carries the synthesis date
+    # FR-05.8's declaration is rendered off.
     bug_loop.write_run_rows(store, manifest, image_spec=image_spec(),
-                            mined=None, mirror=None)
+                            mined={"seeds": seeds, "exclusions": {},
+                                   "sv_seeds": [], "sdk_map": {}},
+                            mirror=None)
+    bug_loop.accrue_offline(store, manifest, budget, dispatch=dispatch)
     counters = bug_loop.CounterLog(manifest.run_manifest_id, str(root / "results"),
                                    MetricsLogger.from_config(None))
     campaign = bug_loop.Campaign(
         manifest=manifest, budget=budget, store=store,
-        stages=bug_loop.recorded_stages(), dispatch=bug_loop.Dispatch(remote=remote),
+        stages=bug_loop.recorded_stages(), dispatch=dispatch,
         counters=counters, clone_path=clone_path, image_spec=image_spec(),
         repair_enabled=False)
     outcome = bug_loop.campaign_drive(campaign, seeds, arms=arms)
@@ -228,8 +243,18 @@ def cluster():
         pytest.skip("no Ray GCS is listening at the bootstrap address; bring a "
                     "cluster up with `chia up circt_bug_loop/cluster_single.yaml`")
     try:
-        ray.init(address="auto", runtime_env=bug_loop.runtime_env(),
-                 ignore_reinit_error=True)
+        # Ray 2.54 raises one FutureWarning of its own on every `ray.init` with
+        # num_gpus unset, and `-W error` turns it into the exception that
+        # "skips" the whole tier. It is suppressed HERE and nowhere wider, and
+        # the alternative Ray offers - RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0 -
+        # is deliberately not taken: it opts the cluster into the future
+        # behaviour rather than silencing the notice about it.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning,
+                                    module=r"ray\..*")
+            warnings.filterwarnings("ignore", message=".*accelerator visible devices.*")
+            ray.init(address="auto", runtime_env=bug_loop.runtime_env(),
+                     ignore_reinit_error=True)
     except Exception as error:                      # noqa: BLE001 - any Ray refusal
         pytest.skip(f"no cluster at {address} ({type(error).__name__}: "
                     f"{str(error).splitlines()[0]})")
@@ -555,28 +580,31 @@ def test_disc_01_one_discovery_iteration_over_the_eight_seeds(cluster, artefact_
     # Every stage that ran returned its own CounterBlock and none was synthesised.
     counters = json.loads((Path(artefact_root) / run_id / "results"
                            / "counters.json").read_text(encoding="utf-8"))
-    print(f"\nT-S-disc-01: {len(probes)} probes, {wall:.1f} s, "
-          f"arms {json.dumps(outcome['arms'], sort_keys=True)}")
-    print(f"  counters: {json.dumps(counters, sort_keys=True)[:600]}")
+    print(f"\nT-S-disc-01: {len(probes)} probes, {wall:.1f} s")
+    print(f"  arms:     {json.dumps(outcome['arms'], sort_keys=True)}")
+    for key, block in sorted(counters["totals"].items()):
+        print(f"  counter   {key:22} {json.dumps(block, sort_keys=True)}")
+    for line in _stop_reasons(outcome):
+        print(f"  probes    {line}")
     print(f"  violations: {run['counters'].violations}")
     assert run["counters"].violations == [], run["counters"].violations
-    assert {"stage_2", "stage_3"} <= _stages_seen(counters)
+    # `CounterLog` keys a block `<arm>/<stage>`; both arms reached the generator
+    # and the probe, which is stage 2 and stage 3 dispatched onto the cluster.
+    assert {"seeded/stage_2", "seeded/stage_3",
+            "mutation/stage_2", "mutation/stage_3"} <= set(counters["totals"])
+    for key, block in counters["totals"].items():
+        assert block["started"] == block["completed"] + block["failed"], key
 
 
-def _stages_seen(counters) -> set:
-    """Every stage id a counters.json mentions, whatever its nesting."""
-    seen = set()
-    stack = [counters]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, dict):
-            if isinstance(node.get("stage"), str):
-                seen.add(node["stage"])
-            seen |= {k for k in node if k.startswith(("stage_", "gate", "results"))}
-            stack += list(node.values())
-        elif isinstance(node, list):
-            stack += node
-    return seen
+def _stop_reasons(outcome: dict) -> list:
+    """`(arm, stopping stage, reason) x n` over every probe the campaign drove."""
+    counts: dict = {}
+    for seed in outcome["seeds"]:
+        for probe in seed["probes"]:
+            key = (seed["arm"], probe["stopping_stage"], probe["stopping_reason"])
+            counts[key] = counts.get(key, 0) + 1
+    return [f"{arm:9} {stage:8} {reason[:64]:64} n={n}"
+            for (arm, stage, reason), n in sorted(counts.items())]
 
 
 @pytest.mark.t3
@@ -598,7 +626,7 @@ def test_calib_01_calibration_mode_over_three_sampled_seeds(cluster, artefact_ro
                          calibration_sample_size=3)
     run_id = uuid.uuid4().hex
     manifest = manifest_for("calibration", run_id, artefact_root, budget=budget,
-                            seeds=seeds, arms=("seeded",))
+                            seeds=seeds)
     assert len(manifest.run_commit) == len(seeds)
     assert all(commit.seed_sha is not None for commit in manifest.run_commit)
     assert {c.seed_sha for c in manifest.run_commit} == {s.seed_sha for s in seeds}
@@ -701,13 +729,26 @@ def _worker_hashes(expected: dict):
 
 @pytest.mark.t3
 @pytest.mark.needs_cluster
-def test_regen_01_every_row_regenerates_or_is_marked(cluster, artefact_root):
-    """T-S-regen-01 (FR-18.11) and the render's zero refusals, over one run.
+def test_regen_01_the_render_refuses_for_exactly_one_reason(cluster, artefact_root):
+    """T-S-regen-01 (FR-18.11) and §14.4's fourteen refusals, over one real run.
 
-    `results.render_results` re-derives every candidate row from its recorded
-    artefacts and marks what it cannot, and it REFUSES to render at all when the
-    store cannot support one of §14.4's fourteen elements. Both halves are the
-    assertion: the render returns, and its regeneration section names every row.
+    `render_results` refuses to render at all when the store cannot support one
+    of §14.4's fourteen elements, and it names every element it cannot support
+    rather than the first. THIRTEEN of the fourteen are satisfied by a run this
+    mode produced. The fourteenth is NOT the store's fault and NOT this mode's:
+    FR-10.2's collision and false-merge rates are measured over a HAND-LABELLED
+    duplicate-pair set, `render_results` takes it as a parameter because it is a
+    measurement of the project and not a row of the campaign - and
+    `run_campaign` calls the node with no such parameter and no way to pass one.
+    `ResultsIncomplete` is a bare `Exception`, and `main` catches only
+    `(ImageBuildError, BuildTimeout, OSError, ValueError)`, so a real campaign
+    runs both arm windows to the end and then dies with a traceback instead of
+    writing its results artefact.
+
+    THIS TEST IS A PIN, not an approval. It asserts the refusal set is EXACTLY
+    that one element today; the day the driver gains a way to supply the
+    labelled set, this test fails and should be rewritten to assert a render.
+    Errata row W-19b-4.
     """
     from circt_bug_loop import results as results_module
 
@@ -719,21 +760,28 @@ def test_regen_01_every_row_regenerates_or_is_marked(cluster, artefact_root):
     run = drive(manifest, budget, seeds, remote=True)
     store = run["store"]
 
-    rendered = call_node(results_module.render_results, store, manifest)["rendered"]
-    (Path(artefact_root) / run_id / "results" / "results.md").write_text(
-        rendered, encoding="utf-8")
-    headline = [line for line in rendered.splitlines()
-                if line.startswith("**") or "Distinct confirmed bugs" in line]
-    print("\nT-S-regen-01 render headline lines:")
-    for line in headline[:12]:
-        print("  " + line)
-    assert "regenerated from its recorded artefacts" in rendered
-    assert "Both arm windows" in rendered
+    with pytest.raises(results_module.ResultsIncomplete) as raised:
+        call_node(results_module.render_results, store, manifest)
+    print("\nT-S-regen-01: the render's refusals over a real run's store:")
+    for complaint in raised.value.missing:
+        print(f"  REFUSED  {complaint}")
+    assert len(raised.value.missing) == 1, raised.value.missing
+    assert "labelled duplicate-pair set" in raised.value.missing[0]
+
+    # FR-18.11 itself: the regeneration check RAN over every candidate row and
+    # recorded a mark or a pass for each. A run whose probes never fired the
+    # oracle has no candidate, and the zero is the answer, not a gap - which is
+    # what `_regeneration` leaving no entry in `facts["gaps"]` says.
+    facts = results_module._facts(store, manifest, None)
+    assert "regeneration_marks" not in facts["gaps"], facts["gaps"]
+    rows = facts["regeneration"]
     candidates = store.query(
         "SELECT candidate_id FROM candidate WHERE run_manifest_id = ?", (run_id,))
-    for row in candidates:
-        assert row["candidate_id"] in rendered, (
-            f"{row['candidate_id']} is neither regenerated nor marked")
+    print(f"  regeneration: {len(rows)} row(s) over {len(candidates)} candidate(s); "
+          f"{sum(1 for r in rows if r['regenerated'])} regenerated")
+    assert len(rows) == len(candidates)
+    assert {row["candidate_id"] for row in rows} == {
+        row["candidate_id"] for row in candidates}
 
 
 @pytest.mark.t3

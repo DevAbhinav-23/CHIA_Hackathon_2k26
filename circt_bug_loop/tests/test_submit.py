@@ -83,9 +83,17 @@ def test_T_U_submit_03(tmp_path: Path):
     assert argv[2] == "--address" and argv[3].startswith("http")
     assert argv[4] == "--runtime-env-json"
     assert argv[6] == "--"
-    assert argv[7] == sys.executable
-    assert argv[8].endswith("bug_loop.py")
-    assert argv[9:] == ["--mode", "discovery", "--arm", "seeded"]
+    # `env PYTHONPATH=<flow dir's parent>` precedes the interpreter since W-19b:
+    # `python <flow dir>/bug_loop.py` puts the FLOW directory on sys.path and not
+    # its parent, and in this tree every import in bug_loop.py is
+    # `circt_bug_loop.<module>`, so the job died with ModuleNotFoundError before
+    # its first line of work. On the ENTRYPOINT and not in --runtime-env-json,
+    # whose key set T-U-submit-04 fixes at three.
+    assert argv[7] == "env"
+    assert argv[8] == f"PYTHONPATH={SUBMIT.resolve().parent.parent}"
+    assert argv[9] == sys.executable
+    assert argv[10].endswith("bug_loop.py")
+    assert argv[11:] == ["--mode", "discovery", "--arm", "seeded"]
     assert "--no-wait" not in argv
 
     waited = run_submit(tmp_path, {"BUGLOOP_ARTEFACTS": str(tmp_path),

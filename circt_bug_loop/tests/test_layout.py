@@ -66,11 +66,14 @@ STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py", "test_integration.py",
 
 #: §1.3's exemption list, compared for EQUALITY so neither document can grow
 #: one the other does not: the five artefact test modules, with
-#: `test_image_spec.py` renamed `test_image.py` (errata row 15), and
+#: `test_image_spec.py` renamed `test_image.py` (errata row 15),
 #: `test_tools.py` for the two `ChiaTool`s, which are not a source module
-#: (LLD §16.2, 2026-09-15).
+#: (LLD §16.2, 2026-09-15), and `test_upstream_patches.py` for `upstream/*.patch`,
+#: whose artefacts are patches against CHIA and not a module of this tree
+#: (W-20b K10/K11 hand-off row 4, landed by W-19b).
 EXEMPT_TESTS = ("test_image.py", "test_prompts.py", "test_cluster_yaml.py",
-                "test_submit.py", "test_budget_yaml.py", "test_tools.py")
+                "test_submit.py", "test_budget_yaml.py", "test_tools.py",
+                "test_upstream_patches.py")
 
 #: The one test module neither §1.3 nor its exemption list names (errata row
 #: 16): the three functions proposed for `chia/chipyard/circt.py` are developed
@@ -183,13 +186,15 @@ def test_T_U_layout_01_exemptions():
     """
     assert set(EXEMPT_TESTS) == {
         "test_image.py", "test_prompts.py", "test_cluster_yaml.py",
-        "test_submit.py", "test_budget_yaml.py", "test_tools.py"}
+        "test_submit.py", "test_budget_yaml.py", "test_tools.py",
+        "test_upstream_patches.py"}
     for artefact, test in (
             (REPO / "upstream" / "dockerfiles" / "ChiaCirctAssertDockerfile", "test_image.py"),
             (FLOW / "prompts", "test_prompts.py"),
             (FLOW / "cluster_single.yaml", "test_cluster_yaml.py"),
             (FLOW / "bug_loop_submit.sh", "test_submit.py"),
-            (FLOW / "budget.yaml", "test_budget_yaml.py")):
+            (FLOW / "budget.yaml", "test_budget_yaml.py"),
+            (REPO / "upstream" / "vertex-usage.patch", "test_upstream_patches.py")):
         assert artefact.exists(), str(artefact)
         assert test in EXEMPT_TESTS
 

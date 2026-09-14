@@ -235,6 +235,21 @@ class Dispatch:
     runs here, which is `04-Test-Plan.md` 0.4's plain call and is what makes one
     whole iteration runnable at T0. The decorator stays on every node either
     way, so 3.2's placement table is unchanged.
+
+    A NODE IS RECOGNISED BY `chia_remote` AND NOT BY ITS TYPE (W-19b). This test
+    read `isinstance(fn, ChiaFunction)` until 2026-09-15, and that is FALSE for
+    every node in the flow: `ChiaFunction.__call__` returns a `functools.wraps`
+    closure carrying `_chia_original`, `_chia_options` and `chia_remote` as
+    attributes and merely CAST to the `ChiaWrapped` protocol
+    (`chia:chia/base/ChiaFunction.py:108-129`), so `type(probe_execute)` is
+    `function`. The remote branch was therefore dead: every stage ran in the
+    driver process on the head, at `remote=True`, on a cluster whose five
+    workers never received a task. It was invisible because the head can run
+    most nodes - the head is where the clone, the store and the artefact root
+    are - and it failed only where a node needs the IMAGE: `probe_execute`
+    hashed a `/workspace/circt/build/bin/circt-opt` that does not exist on the
+    head, got "" and raised `BinaryMismatch` for every probe. The predicate is
+    now the duck test CHIA's own contract offers.
     """
 
     def __init__(self, *, remote: bool = True, options: Optional[dict] = None):
@@ -253,7 +268,7 @@ class Dispatch:
         Raises:
             whatever *fn* raises, and whatever Ray re-raises from the worker.
         """
-        if self.remote and isinstance(fn, ChiaFunction):
+        if self.remote and hasattr(fn, "chia_remote"):
             handle = fn.options(**self.options) if self.options else fn
             return get(handle.chia_remote(*args, **kwargs))
         return getattr(fn, "_chia_original", fn)(*args, **kwargs)
@@ -1728,6 +1743,30 @@ def recorded_inputs(seed: SeedRecord, cap: int) -> list:
     return out[:max(0, cap)]
 
 
+#: SQLite's INTEGER is SIGNED 64-bit, so `probe.mutator_seed_int` holds at most
+#: 2**63 - 1 and `sqlite3` raises `OverflowError` - not a constraint error, an
+#: overflow - on anything larger.
+SQLITE_MAX_INT = (1 << 63) - 1
+
+
+def _seed_int(text: str) -> int:
+    """A deterministic RNG seed for a replayed input, inside SQLite's range.
+
+    Sixty-three bits and not sixty-four, which is the W-19b finding this mode
+    tripped over first. `mutators.mutant_seed_int` returns
+    `int.from_bytes(digest[:8], "big")`, an UNSIGNED 64-bit integer, so half of
+    A4's mutants carry a `mutator_seed_int` above `SQLITE_MAX_INT`; `write_probe`
+    then raises `OverflowError` from inside `SQLiteNode.execute`, outside
+    `drive_probe`'s try, and the whole campaign stops. Both committed mutation
+    `ProbeSpec` fixtures are already over the limit. That defect is A4's and the
+    store's and is NOT fixed here - the fix changes every mutant the arm
+    produces and so belongs before A7 freezes the set - but this mode must not
+    reproduce it, so its own seed is masked.
+    """
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8],
+                          "big") & SQLITE_MAX_INT
+
+
 def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
     """Build one seed's recorded `ProbeSpec`s for one arm, through A3/A4's builder.
 
@@ -1766,8 +1805,7 @@ def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
                            "cost_usd": None},
                 key=f"recorded:{index}", cap_bytes=cap_bytes,
                 mutator_id=RECORDED_MUTATOR_ID if mutation else None,
-                mutator_seed_int=(int(hashlib.sha256(text.encode("utf-8"))
-                                      .hexdigest()[:16], 16) if mutation else None),
+                mutator_seed_int=_seed_int(text) if mutation else None,
                 source_test_path=(source or seed.test_paths[0]) if mutation else None))
     except Exception as error:                      # noqa: BLE001 - FR-04.8
         failure = f"recorded_generator_failed:{type(error).__name__}:{error}"
