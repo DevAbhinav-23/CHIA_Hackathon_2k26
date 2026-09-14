@@ -1,0 +1,46 @@
+{
+  "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c13a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::fold SimOps.cpp",
+    "frame_names": [
+      "getAbstractAttribute",
+      "getTypeID",
+      "classof<mlir::Attribute>",
+      "isPossible",
+      "isa<mlir::StringAttr, mlir::Attribute>"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+  },
+  "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c13b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::sim::StringConcatOp::verify SimOps.cpp",
+    "frame_names": [
+      "getAbstractAttribute",
+      "getTypeID",
+      "classof<mlir::Attribute>",
+      "isPossible",
+      "circt::sim::StringConcatOp::verify"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGSEGV",
+    "source": "tests/fixtures/crashes/crash_01"
+  },
+  "justification": "Two SIGSEGVs in SimOps.cpp whose first CIRCT frame is a different member of the same op: fold against verify.",
+  "label": "distinct",
+  "labelled_by": "architect, before any fingerprint was computed",
+  "labelled_utc": "2026-09-14",
+  "pair_id": "13",
+  "rule": "R3"
+}

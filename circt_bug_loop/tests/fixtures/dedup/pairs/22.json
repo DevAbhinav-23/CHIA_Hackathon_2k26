@@ -1,0 +1,46 @@
+{
+  "a": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c22a",
+    "fatal_message": null,
+    "fingerprint_frame": "parseHWArray HWTypes.cpp",
+    "frame_names": [
+      "parseHWArray",
+      "circt::hw::ArrayType::parse",
+      "generatedTypeParser",
+      "mlir::detail::Parser::parseToken",
+      "mlir::Lexer::lexToken"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "03-LLD.md 3.7.1's ten-run measurement"
+  },
+  "b": {
+    "arm": "seeded",
+    "assertion_site": null,
+    "assertion_text": null,
+    "candidate_id": "c22b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::hw::ArrayType::parse HWTypes.cpp.inc",
+    "frame_names": [
+      "circt::hw::ArrayType::parse",
+      "generatedTypeParser",
+      "mlir::detail::Parser::parseToken",
+      "mlir::Lexer::lexToken",
+      "mlir::detail::Parser::parseType"
+    ],
+    "oracle_class": "crash",
+    "reduced": "hw.module @top(in %a : i8, out o : i8) {\n  %0 = comb.add %a, %a : i8\n  hw.output %0 : i8\n}\n",
+    "signal": "SIGSEGV",
+    "source": "03-LLD.md 3.7.1's ten-run measurement"
+  },
+  "justification": "One !hw.array stack overflow, run twice. 03-LLD.md 3.7.1 measured the fingerprint frame taking three values over ten runs of this input, because the guard page is hit at a different point in the recursion each time. It is one bug and the rule splits it.",
+  "label": "duplicate",
+  "labelled_by": "architect, before any fingerprint was computed",
+  "labelled_utc": "2026-09-14",
+  "pair_id": "22",
+  "rule": "R1"
+}

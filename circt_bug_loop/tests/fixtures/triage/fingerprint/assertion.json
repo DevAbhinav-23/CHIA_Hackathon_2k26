@@ -1,0 +1,57 @@
+[
+  {
+    "assertion_site": "/workspace/circt/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "frame_names": [
+      "circt::chooseName"
+    ],
+    "id": "tail_kept_a",
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT"
+  },
+  {
+    "assertion_site": "/workspace/circt/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of a type that is not there!\"",
+    "frame_names": [
+      "circt::chooseName"
+    ],
+    "id": "tail_kept_b",
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT"
+  },
+  {
+    "assertion_site": "/workspace/circt/include/llvm/Support/Casting.h:566",
+    "assertion_text": "  isa<To>(Val)   &&\n\t\"cast<Ty>() argument of incompatible type!\"  ",
+    "frame_names": [
+      "circt::chooseName"
+    ],
+    "id": "whitespace_collapsed",
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT"
+  },
+  {
+    "assertion_site": "/srv/ci/build-7/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "frame_names": [
+      "circt::chooseName"
+    ],
+    "id": "other_build_dir",
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT"
+  },
+  {
+    "assertion_site": "/home/other/checkout/include/llvm/Support/Casting.h:566",
+    "assertion_text": "isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"",
+    "frame_names": [
+      "circt::chooseName"
+    ],
+    "id": "second_build_dir",
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT"
+  }
+]

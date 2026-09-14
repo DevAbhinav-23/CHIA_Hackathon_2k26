@@ -1,0 +1,5 @@
+{
+  "after": "hw.module @Foo(in %v0 : i32, out o : i32) {\n  hw.output %v0 : i32 loc(\"reduced.mlir\":1:1)\n}\n",
+  "before": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32 loc(\"in.mlir\":3:5)\n}\n",
+  "note": "circt-reduce renames modules during reduction: the LLD review observed `hw.module @top` becoming `hw.module private @Foo`, so without the @symbol clause one reduced case hashed differently depending on how far the reducer got (NIT 9)."
+}

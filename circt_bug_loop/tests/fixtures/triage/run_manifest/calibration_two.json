@@ -1,0 +1,108 @@
+{
+  "apparatus_concurrency": 2,
+  "arm_order": [
+    "seeded",
+    "mutation"
+  ],
+  "arm_window_seconds": 14400.0,
+  "artefact_root": "/home/adi/circt_bug_loop_artefacts",
+  "assertion_baseline_count": 0,
+  "backend": "vertex",
+  "budget_file_sha": "4a8e0c17b39d652f8c04e1a7b596d3f820c74e18",
+  "budget_unit": "wall_clock_seconds",
+  "calibration_sample": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  ],
+  "cluster_yaml_sha": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "confirmation_cutoff_date": "2026-09-23",
+  "contract_version": "2.0",
+  "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
+  "current_window_has_release": true,
+  "deployment": "single_machine",
+  "differential_driver": {
+    "commit": "e1d47b09c3a6f582041b9e7d63c085a4f27b1d09",
+    "deviation": null,
+    "obstacle": null,
+    "source": "circt/arc-tests"
+  },
+  "ended_utc": null,
+  "forum_post_date": "2026-09-18",
+  "forum_post_url": "https://llvm.discourse.group/t/circt-bug-loop-method/00000",
+  "image_spec": {
+    "circt_sha": "e1d47b09c3a6f582041b9e7d63c085a4f27b1d09",
+    "flag_string": "-O3 -UNDEBUG -gline-tables-only",
+    "image_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "sdk_tag": "firtool-1.86.0",
+    "slang_enabled": true,
+    "targets": [
+      "circt-opt",
+      "firtool",
+      "circt-verilog",
+      "circt-translate",
+      "arcilator"
+    ],
+    "tool_hashes": {
+      "arcilator": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "circt-opt": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "circt-translate": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "circt-verilog": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "firtool": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "verilator_version": "5.028"
+  },
+  "issue_mirror": {
+    "cap_bound": false,
+    "comments_mirrored": false,
+    "issue_cap": 600,
+    "issues_mirrored": 588,
+    "refreshed_utc": "2026-09-19T00:00:00+00:00",
+    "state": "all"
+  },
+  "lag_commits": 41,
+  "lag_days": 6.0,
+  "llm_concurrency": 2,
+  "local_id_range": [
+    900000000,
+    999999999
+  ],
+  "mode": "calibration",
+  "model_ids": {
+    "generate_seeded": "vertex:gemini-3.8-flash",
+    "mutator_synthesis": "vertex:gemini-3.8-flash",
+    "repair_adapt": "vertex:gemini-3.8-flash",
+    "triage_report": "vertex:gemini-3.8-flash"
+  },
+  "mutator_set_sha": "1111111111111111111111111111111111111111111111111111111111111111",
+  "pin_sha": "9c4e17a0b3d85f2619e07c4a8b3d5f1902e6a7c4",
+  "pin_tag": "firtool-1.86.0",
+  "run_commit": [
+    {
+      "commit": "1111111111111111111111111111111111111111",
+      "seed_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "commit": "2222222222222222222222222222222222222222",
+      "seed_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "run_manifest_id": "3b9d51e07f2c4a86b1d0e93f75c2a184",
+  "seed_set": "171",
+  "stages_metered": {
+    "gate": true,
+    "stage_1": true,
+    "stage_2": true,
+    "stage_3": true,
+    "stage_4": true,
+    "stage_5": true,
+    "stage_6": true,
+    "stage_7": true
+  },
+  "started_utc": "2026-09-19T00:00:00+00:00",
+  "sv_seeds_excluded": [],
+  "tags_sharing_pin": [
+    "firtool-1.86.0"
+  ],
+  "worker_type": "bugloop_circt",
+  "x_policy": "x-assign=unique,x-initial=unique"
+}

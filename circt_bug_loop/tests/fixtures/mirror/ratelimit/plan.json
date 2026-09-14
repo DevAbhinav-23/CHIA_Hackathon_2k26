@@ -1,0 +1,4 @@
+{
+  "fail_after_pages": 0,
+  "note": "the recording transport serves this many pages and then raises GithubRateLimitError, which is FR-10.7's detection point. Zero fails the first request, which is what a spent rate limit does."
+}

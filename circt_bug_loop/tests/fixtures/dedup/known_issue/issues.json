@@ -1,0 +1,52 @@
+[
+  {
+    "body": "circt-opt fires `widthMatches(lhs, rhs) && \"operand widths must match\"` on a folded extract.",
+    "issue_number": 9001,
+    "labels": [
+      "bug",
+      "Comb"
+    ],
+    "state": "open",
+    "title": "[Comb] assertion in foldExtract",
+    "url": "https://github.com/llvm/circt/issues/9001"
+  },
+  {
+    "body": "Fixed in #9100. The assertion was `detail::isPresent(Val) && \"dyn_cast on a non-existent value\"`.",
+    "issue_number": 9002,
+    "labels": [
+      "bug"
+    ],
+    "state": "closed",
+    "title": "[Sim] elaboration crash",
+    "url": "https://github.com/llvm/circt/issues/9002"
+  },
+  {
+    "body": "circt::sim::StringConcatOp::fold segfaults on a non-string operand.",
+    "issue_number": 9003,
+    "labels": [
+      "good first issue",
+      "Sim"
+    ],
+    "state": "open",
+    "title": "[Sim] StringConcatOp folding",
+    "url": "https://github.com/llvm/circt/issues/9003"
+  },
+  {
+    "body": "fold is wrong here.",
+    "issue_number": 9004,
+    "labels": [],
+    "state": "closed",
+    "title": "[Comb] fold",
+    "url": "https://github.com/llvm/circt/issues/9004"
+  },
+  {
+    "body": "Still reproducing at main: `detail::isPresent(Val) && \"dyn_cast on a non-existent value\"`.",
+    "issue_number": 9005,
+    "labels": [
+      "bug"
+    ],
+    "state": "open",
+    "title": "[Sim] elaboration assertion, still reproducing",
+    "url": "https://github.com/llvm/circt/issues/9005"
+  }
+]

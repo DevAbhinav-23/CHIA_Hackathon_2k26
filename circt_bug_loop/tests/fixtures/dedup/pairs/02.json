@@ -1,0 +1,46 @@
+{
+  "a": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c02a",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+      "append<const char (&)[68]>",
+      "operator<<<const char (&)[68]>",
+      "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+      "SVTraceIVerilogPass::runOnOperation",
+      "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @top(in %arg0 : i32, out o : i32) {\n  hw.output %arg0 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+  },
+  "b": {
+    "arm": "seeded",
+    "assertion_site": "/home/adi/.cache/chia-pin-smoke/w09/wt143/lib/Support/InstanceGraph.cpp:230",
+    "assertion_text": "!candidateTopLevels.empty() && \"if non-cyclic, there should be at least 1 candidate top level\"",
+    "candidate_id": "c02b",
+    "fatal_message": null,
+    "fingerprint_frame": "circt::igraph::InstanceGraph::getInferredTopLevelNodes InstanceGraph.cpp",
+    "frame_names": [
+      "append<const char (&)[68]>",
+      "operator<<<const char (&)[68]>",
+      "circt::igraph::InstanceGraph::getInferredTopLevelNodes",
+      "SVTraceIVerilogPass::runOnOperation",
+      "mlir::detail::OpToOpPassAdaptor::run"
+    ],
+    "oracle_class": "assertion",
+    "reduced": "hw.module @Foo(in %v1 : i32, out o : i32) {\n  hw.output %v1 : i32\n}\n",
+    "signal": "SIGABRT",
+    "source": "tests/fixtures/crashes/assertion_02"
+  },
+  "justification": "assertion_02's failure re-derived byte-differently; the assertion text and its file:line are unchanged, so it is one bug.",
+  "label": "duplicate",
+  "labelled_by": "architect, before any fingerprint was computed",
+  "labelled_utc": "2026-09-14",
+  "pair_id": "02",
+  "rule": "R1"
+}
