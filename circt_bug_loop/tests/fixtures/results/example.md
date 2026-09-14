@@ -100,6 +100,15 @@ Sum check: 2 = 2 repair attempts.
 
 `parse_error` is printed as two rows: `tool_rejected_input` is the tool refusing the probing input, and `tool_rejected_argv` is the tool refusing the argument vector the loop built, which is an apparatus defect and not a property of the input. They sum to the `parse_error` total.
 
+**Turns that produced nothing** (mode discovery, seed set 187)
+
+| arm | stage | kind | turns | first detail |
+|---|---|---|---|---|
+| mutation | stage_2 | `stale_at_build` | 1 | firtool rejects this seed's own test/Dialect/FIRRTL/errors.mlir at e1d47b09c3a6f582041b9e7d63c085a4f27b1d09 |
+| seeded | stage_2 | `prompt_contract:no_block` | 2 | PromptContractError: no_block |
+
+3 turns produced no probing input at all and so appear in no other table: a turn that raised, a turn whose output the footer contract refused, or a seed whose own test its entry tool no longer accepts at the run commit. The detail is the first 120 characters of the first such turn's own record.
+
 ## 4. Seeded-bug validation, reported separately
 
 **Seeded-bug validation, which contributes nothing to the headline** (mode discovery, seed set 187)

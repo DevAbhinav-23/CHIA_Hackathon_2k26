@@ -33,7 +33,7 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
                                   Report, utc_now, validate_candidate,
-                                  write_artefact)
+                                  write_artefact, write_turn_failure)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -1985,9 +1985,14 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             out["terminating_condition"] = f"generator_failed:{type(error).__name__}"
             return out
         if generated.get("failure"):
-            out["verdicts"][_failed_stage(generated.get("logs"))] = {
+            stage = _failed_stage(generated.get("logs"))
+            out["verdicts"][stage] = {
                 "failure": generated["failure"],
                 "failure_detail": generated.get("failure_detail")}
+            write_turn_failure(
+                campaign.store, campaign.manifest.run_manifest_id, seed.seed_sha,
+                arm, iteration, stage, generated["failure"],
+                generated.get("failure_detail"))
         if _spend_refused(generated.get("failure")):
             out["terminating_condition"] = "campaign_spend_cap"
             return out

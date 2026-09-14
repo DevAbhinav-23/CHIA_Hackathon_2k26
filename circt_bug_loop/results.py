@@ -45,6 +45,9 @@ IMAGE_UNAVAILABLE = "image_unavailable"
 #: What the windows table reads for an arm whose window never opened.
 NOT_STARTED = "not started"
 
+#: How much of a failed turn's detail the turn-failure table prints.
+TURN_FAILURE_DETAIL_CAP = 120
+
 
 #: FR-10.2's hand-labelled duplicate-pair set, as package DATA.
 LABELLED_PAIRS = Path(__file__).resolve().parent / "data" / "labelled_pairs.json"
@@ -135,6 +138,9 @@ def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs,
     ledger_rows = store.query(
         "SELECT * FROM ledger_entry WHERE run_manifest_id = ? "
         "ORDER BY timestamp_utc, entry_id", (run_id,))
+    turn_failures = store.query(
+        "SELECT * FROM turn_failure WHERE run_manifest_id = ? "
+        "ORDER BY arm, stage, kind, seed_sha, iteration", (run_id,))
 
     primary = [c for c in candidates if c["oracle_class"] != "differential"]
     facts["candidates"] = candidates
@@ -158,6 +164,7 @@ def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs,
     _observed(facts, ledger_rows, gaps)
     _windows(facts, store, manifest, ledger_rows, gaps)
     _taxonomy(facts, primary, gates, repairs, probe_results)
+    _turn_failures(facts, turn_failures)
     _regeneration(facts, store, candidates, gaps)
     return facts
 
@@ -502,6 +509,23 @@ def _taxonomy(facts: dict, primary: list, gates: dict, repairs: list,
     facts["outcomes"] = outcomes
 
 
+def _turn_failures(facts: dict, rows: list) -> None:
+    """Group the turns that produced nothing by arm, stage and kind (D-3, pilot 5).
+
+    A turn that raised, one whose footer the contract refused and a seed whose
+    own test no longer builds all leave the loop with no probe, and none of
+    them reaches any other table: nothing downstream of stage 2 ever runs.
+    """
+    counted: dict = {}
+    for row in rows:
+        key = (row["arm"], row["stage"], row["kind"])
+        entry = counted.setdefault(key, {"turns": 0, "detail": ""})
+        entry["turns"] += 1
+        if not entry["detail"]:
+            entry["detail"] = (row["detail"] or "")[:TURN_FAILURE_DETAIL_CAP]
+    facts["turn_failures"] = counted
+
+
 def _repair_view(row: Optional[dict]):
     """The two fields `gate.decide` reads off a repair, from its stored row."""
     return None if row is None else SimpleNamespace(fixed=row["fixed"],
@@ -756,6 +780,21 @@ def _render(facts: dict) -> str:
         "refusing the probing input, and `tool_rejected_argv` is the tool refusing "
         "the argument vector the loop built, which is an apparatus defect and not a "
         "property of the input. They sum to the `parse_error` total.",
+        "",
+    ]
+    failures = facts["turn_failures"]
+    _table(lines, "Turns that produced nothing",
+           ["arm", "stage", "kind", "turns", "first detail"],
+           [[arm, stage, f"`{kind}`", entry["turns"], entry["detail"]]
+            for (arm, stage, kind), entry in sorted(failures.items())]
+           or [["none", "", "", 0, ""]], qualifier)
+    lines += [
+        f"{_count(sum(e['turns'] for e in failures.values()), 'turn')} produced "
+        "no probing input at all and so appear in no other table: a turn that "
+        "raised, a turn whose output the footer contract refused, or a seed whose "
+        "own test its entry tool no longer accepts at the run commit. The detail "
+        f"is the first {TURN_FAILURE_DETAIL_CAP} characters of the first such "
+        "turn's own record.",
         "",
         "## 4. Seeded-bug validation, reported separately",
         "",

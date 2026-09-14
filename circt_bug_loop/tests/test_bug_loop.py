@@ -1263,6 +1263,16 @@ def test_a_failed_generator_turn_is_kept_on_the_seed_record(tmp_path: Path):
     # A turn that raised before stage 2 started is filed under stage 1.
     assert bug_loop._failed_stage({"wall_seconds": {"seed_read": 71.5}}) == "stage_1"
 
+    # D-3 (pilot 5): and the store keeps it, so `results.md` can count it.
+    rows = run["store"].query("SELECT * FROM turn_failure ORDER BY arm")
+    assert [r["arm"] for r in rows] == ["mutation", "seeded"]
+    for row in rows:
+        assert row["run_manifest_id"] == run["manifest"].run_manifest_id
+        assert row["seed_sha"] == run["seed"].seed_sha
+        assert row["iteration"] == 1 and row["stage"] == "stage_2"
+        assert row["kind"] == "turn_failed:MaxOutputTokensError"
+        assert row["detail"] == "MaxOutputTokensError: response truncated"
+
 
 def test_a_stale_seed_names_itself_and_takes_no_probe(tmp_path: Path):
     """Pilot 4 D-2: the arm stops on the seed, under its own terminating condition."""
@@ -1284,6 +1294,13 @@ def test_a_stale_seed_names_itself_and_takes_no_probe(tmp_path: Path):
     # The seeded arm is untouched by its sibling's staleness.
     seeded, = [s for s in run["outcome"]["seeds"] if s["arm"] == "seeded"]
     assert seeded["terminating_condition"] == "iteration_cap"
+
+    # D-3 (pilot 5): the stale seed is a row of its own, and the arm that ran
+    # writes none - `results.md` is built from the store and not from `outcome`.
+    rows = run["store"].query("SELECT * FROM turn_failure")
+    assert [(r["arm"], r["kind"]) for r in rows] == [
+        ("mutation", bug_loop.STALE_AT_BUILD)]
+    assert rows[0]["detail"] == "circt-opt rejects this seed's own test"
 
 
 def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):

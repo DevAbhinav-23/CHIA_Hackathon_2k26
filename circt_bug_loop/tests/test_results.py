@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 from circt_bug_loop.gate import TAXONOMY
-from circt_bug_loop.results import (ARMS, BUCKETS, _facts, _REFUSALS,
-                                    _require_qualifiers, ResultsIncomplete,
-                                    render_results)
+from circt_bug_loop.results import (ARMS, BUCKETS, TURN_FAILURE_DETAIL_CAP,
+                                    _facts, _REFUSALS, _require_qualifiers,
+                                    ResultsIncomplete, render_results)
 from circt_bug_loop.tests.conftest import call_node
 from circt_bug_loop.tests.fixtures.results import make_store
 
@@ -398,7 +398,7 @@ def test_T_U_results_17(tmp_path):
     text = render(store, manifest, pairs)
     taxonomy = section(text, "3. Failure taxonomy")
 
-    mapping, buckets, phases, outcomes = tables(taxonomy)
+    mapping, buckets, phases, outcomes, failures = tables(taxonomy)
     # The mapping printed is `gate.TAXONOMY` itself.
     printed = {(row[0], row[1]): row[2] for row in mapping["rows"]}
     assert printed.pop(("none", "passed all four")) == "new_bug"
@@ -424,6 +424,30 @@ def test_T_U_results_17(tmp_path):
     assert (sum(split["parse_error:tool_rejected_input"])
             + sum(split["parse_error:tool_rejected_argv"])) == len(stored)
 
+    # D-3 (pilot 5): the turns that produced nothing, counted by kind.
+    assert failures["header"] == ["arm", "stage", "kind", "turns",
+                                  "first detail"]
+    counted = {(row[0], row[2]): int(row[3]) for row in failures["rows"]}
+    assert counted == {("mutation", "`stale_at_build`"): 1,
+                       ("seeded", "`prompt_contract:no_block`"): 2}
+    assert sum(counted.values()) == len(store.query("SELECT 1 FROM turn_failure"))
+    assert "3 turns produced no probing input at all" in taxonomy
+    # The detail is the stored one, cut at the cap and never beyond it.
+    for row in failures["rows"]:
+        assert len(row[4]) <= TURN_FAILURE_DETAIL_CAP
+    assert "PromptContractError: no_block" in taxonomy
+
+
+def test_the_turn_failure_table_renders_for_a_store_with_no_rows(tmp_path):
+    """D-3 (pilot 5): a run in which every turn answered still renders section 3."""
+    store, manifest, pairs = campaign(tmp_path)
+    store.transaction([("DELETE FROM turn_failure", ())])
+    taxonomy = section(render(store, manifest, pairs), "3. Failure taxonomy")
+
+    failures = tables(taxonomy)[-1]
+    assert failures["rows"] == [["none", "", "", "0", ""]]
+    assert "0 turns produced no probing input at all" in taxonomy
+
 
 def test_T_U_results_18(tmp_path):
     """T-U-results-18 (FR-18.1): `arm` picks the row and never the computation."""
@@ -434,10 +458,10 @@ def test_T_U_results_18(tmp_path):
             "WHEN 'mutation' THEN 'seeded' ELSE arm END")
     store.transaction([(swap.format(table), ())
                        for table in ("probe", "probe_result", "candidate",
-                                     "ledger_entry")])
+                                     "ledger_entry", "turn_failure")])
     after = arm_tables(render(store, manifest, pairs))
 
-    assert len(before) == len(after) == 5
+    assert len(before) == len(after) == 6
     for original, swapped in zip(before, after):
         assert swapped["seeded"] == original["mutation"]
         assert swapped["mutation"] == original["seeded"]

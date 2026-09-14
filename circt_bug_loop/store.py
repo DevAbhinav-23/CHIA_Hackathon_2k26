@@ -371,7 +371,7 @@ CREATE INDEX IF NOT EXISTS ix_mirror_state          ON issue_mirror(state);
 CREATE INDEX IF NOT EXISTS ix_filing_confirmed      ON filing(confirmed);
 """
 
-#: The one table 6.2 does NOT declare.
+#: The two tables 6.2 does NOT declare.
 _DDL_REGISTRATION = """\
 CREATE TABLE IF NOT EXISTS registration (
     run_manifest_id     TEXT PRIMARY KEY REFERENCES run(run_manifest_id),
@@ -380,8 +380,24 @@ CREATE TABLE IF NOT EXISTS registration (
 );
 """
 
+#: D-3 (pilot 5): a turn that produced nothing reaches no other table, because
+#: nothing downstream of stage 2 runs for it. Appended to, never keyed: one row
+#: per failure and not one per seed.
+_DDL_TURN_FAILURE = """\
+CREATE TABLE IF NOT EXISTS turn_failure (
+    run_manifest_id     TEXT NOT NULL REFERENCES run(run_manifest_id),
+    seed_sha            TEXT NOT NULL,
+    arm                 TEXT NOT NULL,
+    iteration           INTEGER NOT NULL,
+    stage               TEXT NOT NULL,
+    kind                TEXT NOT NULL,
+    detail              TEXT
+);
+"""
+
 #: What init_schema runs. executescript takes the whole text at once.
-_SCHEMA = _DDL_TABLES + "\n" + _DDL_INDEXES + "\n" + _DDL_REGISTRATION
+_SCHEMA = (_DDL_TABLES + "\n" + _DDL_INDEXES + "\n" + _DDL_REGISTRATION
+           + "\n" + _DDL_TURN_FAILURE)
 
 #: The zero-byte marker of FR-17.8, named once.
 PARTIAL = "PARTIAL"
@@ -858,6 +874,16 @@ class LoopStore:
     def query_one(self, sql: str, params: tuple = ()) -> Optional[dict]:
         """Return the first row *sql* selects, or None."""
         return self._get("query_one", sql, params)
+
+
+def write_turn_failure(store: "LoopStore", run_manifest_id: str, seed_sha: str,
+                       arm: str, iteration: int, stage: str, kind: str,
+                       detail: Optional[str] = None) -> None:
+    """Append the row for a turn that produced nothing, so `results.md` can count it."""
+    store.insert("turn_failure",
+                 {"run_manifest_id": run_manifest_id, "seed_sha": seed_sha,
+                  "arm": arm, "iteration": int(iteration), "stage": stage,
+                  "kind": kind, "detail": detail})
 
 
 def _insert_sql(table: str, row: dict) -> tuple:

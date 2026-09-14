@@ -353,6 +353,19 @@ def build(root: Path) -> tuple:
          "prefill_url_length": 2400, "prefill_fallback_reason": None, "confirmed": 0,
          "confirmed_at_utc": None, "confirmation_url": None}])
 
+    store.insert_many("turn_failure", [
+        {"run_manifest_id": RUN, "seed_sha": seed_sha, "arm": arm,
+         "iteration": iteration, "stage": "stage_2", "kind": kind,
+         "detail": detail}
+        for seed_sha, arm, iteration, kind, detail in (
+            (SEED_A, "seeded", 1, "prompt_contract:no_block",
+             "PromptContractError: no_block"),
+            (SEED_B, "seeded", 1, "prompt_contract:no_block",
+             "PromptContractError: no_block"),
+            (SEED_A, "mutation", 1, "stale_at_build",
+             "firtool rejects this seed's own test/Dialect/FIRRTL/errors.mlir "
+             f"at {RUN_COMMIT}"))])
+
     _ledger(store)
     return store, run_manifest, labelled_pairs()
 

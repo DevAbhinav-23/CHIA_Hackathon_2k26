@@ -118,10 +118,11 @@ def test_T_U_store_01(tmp_path: Path):
                       "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
     tables = [r["name"] for r in rows if r["type"] == "table"]
     indexes = [r["name"] for r in rows if r["type"] == "index"]
-    # §6.2's twenty-one, plus `registration`, which §6.2 does NOT declare.
-    assert len(tables) == 22 and "candidate" in tables and "registration" in tables
+    # §6.2's twenty-one, plus the two §6.2 does NOT declare.
+    assert len(tables) == 23 and "candidate" in tables and "registration" in tables
     assert len(indexes) == 9 and "ix_ledger_day" in indexes
-    assert "registration" not in store._DDL_TABLES
+    for late in ("registration", "turn_failure"):
+        assert late in tables and late not in store._DDL_TABLES
 
     conn = sqlite3.connect(str(tmp_path / "loop.db"))
     try:
@@ -246,12 +247,35 @@ def test_T_U_store_06(tmp_path: Path):
         else:
             campaign_wide.append(table)
     assert campaign_wide == ["image", "issue_mirror"]
-    assert len(traced) == 20                 # 19 of §6.2, plus W-12's `registration`
+    # 19 of §6.2, plus W-12's `registration` and D-3's `turn_failure`.
+    assert len(traced) == 21
 
     seed_rows(loop)
     row = loop.query_one("SELECT artefact_dir, run_manifest_id FROM candidate")
     assert row["run_manifest_id"] == "run-01"
     assert row["artefact_dir"].startswith("/artefacts/run-01/")
+
+
+def test_a_turn_that_produced_nothing_is_written_and_kept(tmp_path: Path):
+    """D-3 (pilot 5): the failure log is appended to, and one seed can fill it twice."""
+    loop = open_store(tmp_path)
+    seed_rows(loop)
+
+    for iteration, kind, detail in (
+            (1, "prompt_contract:no_block", "PromptContractError: no_block"),
+            (2, "turn_failed:TurnBudgetExceeded", "refusing call 13 of this turn"),
+            (2, "stale_at_build", None)):
+        store.write_turn_failure(loop, "run-01", "a" * 40, "seeded", iteration,
+                                 "stage_2", kind, detail)
+
+    rows = loop.query("SELECT * FROM turn_failure ORDER BY iteration, kind")
+    assert [r["kind"] for r in rows] == [
+        "prompt_contract:no_block", "stale_at_build",
+        "turn_failed:TurnBudgetExceeded"]
+    assert rows[1]["detail"] is None, "a failure with no detail is still a row"
+    assert {r["run_manifest_id"] for r in rows} == {"run-01"}
+    assert rows[0]["seed_sha"] == "a" * 40 and rows[0]["arm"] == "seeded"
+    assert rows[0]["stage"] == "stage_2" and rows[0]["iteration"] == 1
 
 
 def test_T_U_store_07(tmp_path: Path):
