@@ -163,7 +163,7 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
 def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
                                                             fake_vertex,
                                                             allow_worker_env):
-    """K2/W7: the request is seven fields, none of them an LLM and none a key."""
+    """K2/W7: the request is nine fields, none of them an LLM and none a key."""
     install, capture = fake_vertex
     install([vertex_response([vertex_text_part("PONG")], in_tok=2, out_tok=3)])
 
@@ -180,7 +180,8 @@ def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
 
     assert turn["result"] == "PONG"
     assert set(seen) == {"system_message", "prompt", "tools", "stage",
-                         "timeout_seconds", "model_id", "max_tool_iterations"}
+                         "timeout_seconds", "model_id", "max_tool_iterations",
+                         "final_tool_names", "final_tool_iterations"}
     # No guard, so no ceiling is sent either: the key is absent, not null.
     assert "turn_budget_usd" not in seen
     assert seen["tools"] == [] and seen["stage"] == "synthesis"
@@ -339,6 +340,16 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
         expected_in / 1e6 * 0.75 + 7 * 16000 / 1e6 * 3.75, 6)
     # It is the thing W-18 measured missing.
     assert guard.worst_case_usd(with_tool) > 10 * guard.worst_case_usd(one_call)
+
+    # D-3 (pilot 5): stage 2's write phase is a SECOND budget of calls, and the
+    # pre-authorisation counts it, the reading phase and the final answer.
+    writing = {**with_tool, "final_tool_names": ["write_probe"],
+               "final_tool_iterations": 4}
+    assert guard.iterations(writing) == 6 + 4 + 1
+    assert guard.worst_case_usd(writing) > guard.worst_case_usd(with_tool)
+    # Neither half of the pair authorises anything on its own.
+    assert guard.iterations({**with_tool, "final_tool_iterations": 4}) == 7
+    assert guard.iterations({**writing, "final_tool_iterations": 0}) == 7
     # The system message is re-sent on every call and counts.
     assert (guard.worst_case_usd({**one_call, "system_message": "y" * 1000})
             > guard.worst_case_usd(one_call))

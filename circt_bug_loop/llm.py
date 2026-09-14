@@ -51,7 +51,9 @@ def require_live_model(purpose: str, *, need_key: bool = True,
 def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
               env: Optional[Mapping[str, str]] = None,
               max_tool_iterations: Optional[int] = None,
-              turn_budget_usd: Optional[float] = None):
+              turn_budget_usd: Optional[float] = None,
+              final_tool_names: Optional[list] = None,
+              final_tool_iterations: Optional[int] = None):
     """Build the campaign backend, refusing to reach the network unbidden."""
     from chia.models.vertex import VertexGeminiLLM
 
@@ -61,6 +63,9 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
         extra["max_tool_iterations"] = int(max_tool_iterations)
     if turn_budget_usd is not None:
         extra["turn_budget_usd"] = float(turn_budget_usd)
+    if final_tool_names:
+        extra["final_tool_names"] = list(final_tool_names)
+        extra["final_tool_iterations"] = int(final_tool_iterations or 0)
     llm = VertexGeminiLLM(
         model=model_id,
         system_message=system_message,
@@ -136,8 +141,11 @@ class SpendGuard:
         """The `generate_content` calls *request* may make: `n` in the formula."""
         if not request.get("tools"):
             return _NO_TOOL_ITERATIONS
-        # The exhausted tool loop asks for a final answer: one call more.
-        return max(1, int(request.get("max_tool_iterations") or 1)) + 1
+        # The reading phase, then the write phase a turn whose deliverable is a
+        # tool call asks for, then the final answer: one call more than both.
+        write = (int(request.get("final_tool_iterations") or 0)
+                 if request.get("final_tool_names") else 0)
+        return max(1, int(request.get("max_tool_iterations") or 1)) + write + 1
 
     def worst_case_usd(self, request: Mapping) -> float:
         """The most the whole turn *request* can cost, at the two prices."""
@@ -195,7 +203,9 @@ def llm_turn(request: dict) -> dict:
     llm = build_llm(request["system_message"], int(request["timeout_seconds"]),
                     request["model_id"], env=worker_env(),
                     max_tool_iterations=request.get("max_tool_iterations"),
-                    turn_budget_usd=request.get("turn_budget_usd"))
+                    turn_budget_usd=request.get("turn_budget_usd"),
+                    final_tool_names=request.get("final_tool_names"),
+                    final_tool_iterations=request.get("final_tool_iterations"))
     cli = llm.prompt(request["prompt"], list(request.get("tools") or []))
     success = bool(getattr(cli, "success", False))
     return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
@@ -227,12 +237,16 @@ def turn_usage(metadata) -> dict:
 def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
                   timeout_seconds: int, model_id: str,
                   guard: Optional[SpendGuard] = None,
-                  max_tool_iterations: Optional[int] = None) -> dict:
+                  max_tool_iterations: Optional[int] = None,
+                  final_tool_names: Optional[list] = None,
+                  final_tool_iterations: int = 0) -> dict:
     """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn."""
     request = {"system_message": system_message, "prompt": prompt,
                "tools": tool_endpoints(tools), "stage": stage,
                "timeout_seconds": int(timeout_seconds), "model_id": model_id,
-               "max_tool_iterations": max_tool_iterations}
+               "max_tool_iterations": max_tool_iterations,
+               "final_tool_names": list(final_tool_names or []),
+               "final_tool_iterations": int(final_tool_iterations)}
     authorised = ceiling = None
     if guard is not None:
         authorised = ceiling = guard.authorise(request)

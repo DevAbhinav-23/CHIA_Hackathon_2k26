@@ -361,6 +361,160 @@ def test_T_U_upstream_07_an_exhausted_tool_loop_asks_for_an_answer(monkeypatch,
     assert llm._last_metadata["output_tokens"] == 19
 
 
+def _write_tool(monkeypatch):
+    """An MCP server declaring one read tool and one WRITE tool, both answering."""
+    import mcp
+    import mcp.client.streamable_http as http
+
+    served = []
+
+    class _Transport:
+        async def __aenter__(self):
+            return (None, None, None)
+
+        async def __aexit__(self, *exception):
+            return False
+
+    class _Session:
+        def __init__(self, read, write):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exception):
+            return False
+
+        async def initialize(self):
+            return None
+
+        async def list_tools(self):
+            return SimpleNamespace(tools=[
+                SimpleNamespace(name="read_file", description="read one file",
+                                inputSchema={"type": "object", "properties": {}}),
+                SimpleNamespace(name="probe_abc_write_probe",
+                                description="write one probe",
+                                inputSchema={"type": "object", "properties": {}}),
+            ])
+
+        async def call_tool(self, name, arguments):
+            served.append(name)
+            return SimpleNamespace(isError=False,
+                                   content=[SimpleNamespace(text="/probes/a.mlir")])
+
+    monkeypatch.setattr(http, "streamable_http_client", lambda url: _Transport())
+    monkeypatch.setattr(mcp, "ClientSession", _Session)
+    return SimpleNamespace(name="probe", hostname="127.0.0.1", port=8000), served
+
+
+@pytest.mark.t0
+def test_T_U_upstream_09_the_write_phase_runs_between_the_two(monkeypatch,
+                                                              patched_vertex):
+    """T-U-upstream-09 (D-3, pilot 5): A reads, B may only write, C answers."""
+    tool, served = _write_tool(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="probe__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    writing = _response(
+        types.Part(function_call=types.FunctionCall(
+            name="probe__probe_abc_write_probe",
+            args={"filename": "a.mlir", "content": "x"})),
+        _usage(prompt=20, candidates=5))
+    calls = _install_fake_genai(monkeypatch, [
+        reading, reading, writing, writing,
+        _response(types.Part(text="```json\n{}\n```"), _usage(prompt=40, candidates=9)),
+    ])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        system_message="be terse", max_tool_iterations=2,
+        final_tool_names=["write_probe"], final_tool_iterations=2)
+    result = llm._run_generate("ping", [tool])
+
+    # Two reading calls, two writing calls, one answer.
+    assert len(calls) == 5
+    assert calls[0]["config"].tool_config is None
+    assert calls[1]["config"].tool_config is None
+
+    # Phase B: mode ANY, and the read tool is not in the allowed list.
+    for index in (2, 3):
+        config = calls[index]["config"].tool_config.function_calling_config
+        assert config.mode == types.FunctionCallingConfigMode.ANY
+        assert config.allowed_function_names == ["probe__probe_abc_write_probe"]
+        assert calls[index]["config"].tools, "the declarations stay in phase B"
+
+    # Phase B's calls are EXECUTED, which is the whole point of the phase.
+    assert served == ["read_file", "read_file",
+                      "probe_abc_write_probe", "probe_abc_write_probe"]
+
+    # Phase C: mode NONE, and it follows phase B.
+    last = calls[4]["config"].tool_config.function_calling_config
+    assert last.mode == types.FunctionCallingConfigMode.NONE
+    assert result.result == "```json\n{}\n```"
+
+    # Both nudges, in order, and the debug line that names the restriction.
+    assert ("[DEBUG] read budget exhausted; 2 calls restricted to "
+            "probe__probe_abc_write_probe\n" in result.stream_result)
+    assert result.stream_result.index("read budget exhausted") < \
+        result.stream_result.index("final answer requested")
+    nudge = calls[2]["contents"][-1]
+    assert nudge.role == "user"
+    assert nudge.parts[0].text == (
+        "Your reading calls are exhausted. Only probe__probe_abc_write_probe "
+        "may be called now, once per input; then answer in the required format.")
+
+
+@pytest.mark.t0
+def test_T_U_upstream_10_no_write_phase_without_the_names(monkeypatch,
+                                                          patched_vertex):
+    """T-U-upstream-10 (D-3): stage 1 and stage 6 keep the two-call shape they had."""
+    tool, _served = _write_tool(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="probe__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    calls = _install_fake_genai(monkeypatch, [
+        reading, _response(types.Part(text="ANSWER"), _usage(prompt=40))])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        max_tool_iterations=1)
+    assert llm.final_tool_names == [] and llm.final_tool_iterations == 0
+    result = llm._run_generate("ping", [tool])
+
+    assert len(calls) == 2
+    assert "read budget exhausted" not in result.stream_result
+    assert (calls[1]["config"].tool_config.function_calling_config.mode
+            == types.FunctionCallingConfigMode.NONE)
+
+
+@pytest.mark.t0
+def test_T_U_upstream_11_a_function_call_under_none_is_named(monkeypatch,
+                                                             patched_vertex):
+    """T-U-upstream-11 (D-3, pilot 5): the part mode NONE let through is logged."""
+    tool, _served = _write_tool(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="probe__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    _install_fake_genai(monkeypatch, [
+        reading,
+        _response(types.Part(function_call=types.FunctionCall(
+            name="probe__read_file", args={"path": "b.cpp"})), _usage(prompt=40)),
+    ])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        max_tool_iterations=1)
+    result = llm._run_generate("ping", [tool])
+
+    assert result.result == ""
+    assert ("[DEBUG] function_call under NONE ignored: probe__read_file\n"
+            in result.stream_result)
+    assert "[DEBUG] the final answer was empty" in result.stream_result
+
+
 @pytest.mark.t0
 def test_T_U_upstream_08_a_truncated_final_answer_says_so(monkeypatch,
                                                           patched_vertex):
