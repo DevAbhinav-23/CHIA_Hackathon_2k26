@@ -5,10 +5,13 @@ and with the imported modules; none of them runs a stage, a tool or a model, so
 every one is tier 0 but `T-U-layout-10`, which runs `upstream/sync-to-chia.sh`
 into a throwaway clone of a real CHIA checkout.
 
-**Three rules fail on modules this task does not own, and each failing assertion
-is `xfail`ed with the row of `design/reviews/implementation-errata-log.md` that
-records why.** The rules themselves are not weakened: the assertion stays as the
-design states it, and the row says what has to change for it to pass.
+**Every rule here passes, since W-17's join.** Four assertions were `xfail`ed
+against a row of `design/reviews/implementation-errata-log.md` that said what
+had to change; all four rows are closed and no assertion was weakened to close
+one: `llm.py` is the nineteenth source module, the two owed test modules are
+written, every node of §3.2 returns a `CounterBlock`, `probe_task`'s two
+simulator sides are `side` rather than `arm`, and no test puts the interlock's
+name into a process environment.
 """
 import ast
 import importlib
