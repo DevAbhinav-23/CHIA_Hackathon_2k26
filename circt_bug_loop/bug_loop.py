@@ -68,30 +68,34 @@ _CHIA_PKG = Path(chia.__path__[0]).resolve()
 _CHIA_ROOT = _CHIA_PKG.parent
 _ISSUE_SOLVER = _CHIA_ROOT / "examples" / "circt_issue_solver"
 
-#: 13.1's `py_modules` entries, in its order, shipped by the driver's own
-#: `ray.init`. Fifteen and not the table's fourteen: `llm.py` is the join's own
-#: module (3.5.1, architect decision 3) and every stage that reaches a model
-#: imports it, so a CHIA checkout that shipped the other fourteen would ship no
-#: backend at all. See `runtime_env` below for the one substitution this tree
-#: forces on the list.
-_PY_MODULES = [
-    str(FLOW_DIR / "probe_task.py"),
-    str(FLOW_DIR / "generate_task.py"),
-    str(FLOW_DIR / "llm.py"),
-    str(FLOW_DIR / "triage_task.py"),
-    str(FLOW_DIR / "repair_adapter.py"),
-    str(FLOW_DIR / "gate.py"),
-    str(FLOW_DIR / "store.py"),
-    str(FLOW_DIR / "corpus.py"),
-    str(FLOW_DIR / "pin_select.py"),
-    str(FLOW_DIR / "ddmin.py"),
-    str(FLOW_DIR / "mutators"),
-    str(FLOW_DIR / "contract"),
-    str(_CHIA_PKG),
-    str(_ISSUE_SOLVER / "issue_task.py"),
-    str(_ISSUE_SOLVER / "circt_util.py"),
-]
+#: The staged package the workers run, and the ONLY thing `runtime_env` ships
+#: (W6, K7). It is rebuilt at every start-up by `stage_shipped` and is not
+#: committed: it holds a PATCHED copy of CHIA, and a patched copy in the tree
+#: would be a second source of truth for a file this repository does not own.
+SHIPPED_DIR = FLOW_DIR / "_shipped"
+
+#: The four `py_modules` entries `stage_shipped` writes, in Ray's own order.
+#: Each becomes its own directory on a worker's `sys.path`, so the flow is
+#: importable as `circt_bug_loop.<module>`, CHIA as `chia.<module>`, and the
+#: example's two files by their bare names, which is how `repair_adapter`
+#: imports them (FR-12.1 forbids copying them into this package).
+SHIPPED_MODULES = ("circt_bug_loop", "chia", "issue_task.py", "circt_util.py")
+
+#: What is left behind when the flow package is staged. `tests/` is 3.8 MB of
+#: the 5.8, and it carries `fixtures/repair/issues.db` and the synthetic
+#: `fixtures/secrets/known_values.txt`; `loop.db` at 6.1's path is the mirrored
+#: issue corpus, which `sync-to-chia.sh` has always excluded and `runtime_env`
+#: did not (W6).
+_STAGE_EXCLUDES = ("tests", "_shipped", "__pycache__", "*.pyc",
+                   "loop.db", "loop.db-shm", "loop.db-wal")
 _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
+
+#: The two upstream patches the staged copy carries, and the text that proves
+#: each one is in it. Pre-flight checks 13 and 14 grep the STAGED file, which is
+#: the file a worker actually imports; the operator's own checkout is never
+#: modified (K7, K11, W-20b errata 3).
+VERTEX_BRANCH = 'elif backend == "vertex":'
+VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count")
 
 #: Defaults for 13.1's argument table.
 DEFAULT_BUDGET = str(FLOW_DIR / "budget.yaml")
@@ -258,28 +262,139 @@ def node_key(fn: Callable) -> str:
     return f"{getattr(fn, '__module__', '')}.{getattr(fn, '__name__', '')}"
 
 
+def _stage_ignore(directory: str, names: list) -> set:
+    """`shutil.copytree`'s ignore callback for `_STAGE_EXCLUDES`."""
+    import fnmatch
+
+    return {name for name in names
+            if any(fnmatch.fnmatch(name, pattern) for pattern in _STAGE_EXCLUDES)}
+
+
+def _apply_patch(patch: Path, cwd: Path, strip: int) -> None:
+    """Apply *patch* under *cwd*, which is the staging directory and not a checkout.
+
+    `git apply` is one of the commands that runs outside a work tree, which is
+    what makes this possible at all. `GIT_CEILING_DIRECTORIES` is what keeps it
+    outside one: the staging directory sits INSIDE this repository, and git
+    inside a work tree resolves a patch's paths against the repository ROOT and
+    silently SKIPS every path outside the current directory - measured, `git
+    apply -p1` printed "Skipped patch 'chia/models/vertex.py'." and exited 0,
+    which is the worst possible answer. The ceiling stops the upward search at
+    the staging directory, so git finds no repository and resolves against the
+    cwd, and the same call then behaves identically under a `tmp_path` that is
+    in no repository at all.
+
+    A patch that will not apply stops the run here, because the alternative is
+    a worker importing CHIA's unpatched file and a manifest that records a
+    backend which never ran (K7).
+
+    Returns:
+        None.
+    Worker:
+        head; one `git apply` subprocess, no shell.
+    Raises:
+        PreflightFailed("shipped_package", detail) carrying git's own stderr.
+    """
+    proc = subprocess.run(
+        ["git", "apply", f"-p{strip}", str(patch)], cwd=str(cwd),
+        env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cwd.resolve().parent)},
+        capture_output=True, timeout=120)
+    if proc.returncode != 0:
+        raise PreflightFailed(
+            "shipped_package",
+            f"{patch.name} did not apply to the staged copy: "
+            f"{proc.stderr.decode('utf-8', errors='backslashreplace').strip()}")
+
+
+def stage_shipped(*, upstream: Optional[str] = None,
+                  target: Optional[str] = None) -> dict:
+    """Build the staged package the workers import, patched, at every start-up.
+
+    K3, K6, K7 and W6, in one directory. Four things go in and nothing else:
+
+      * the flow package, without `tests/`, `loop.db*` and `__pycache__`;
+      * a COPY of CHIA's package with `__init__.py` added, so it shadows the
+        container's pip-installed `chia` deterministically rather than merging
+        with it as an implicit namespace package would (W6), and with
+        `upstream/vertex-usage.patch` applied so a turn's thinking tokens are
+        counted (K11);
+      * `issue_task.py` with `upstream/issue_task-vertex-branch.patch` applied,
+        so stage 7 runs the backend the manifest names (K7);
+      * `circt_util.py`, unchanged.
+
+    The operator's own CHIA checkout is never touched: the patches are applied
+    to the copy, so `~/.cache/chia-src` stays exactly what `git status` says it
+    is, and a checkout that has merged either patch upstream is detected by its
+    marker and left alone.
+
+    Returns:
+        {"root", "py_modules", "issue_task", "vertex", "applied"}.
+    Worker:
+        head; it copies about 4 MB and runs `git apply` twice.
+    Raises:
+        PreflightFailed("shipped_package", detail) when a source is missing or
+        a patch will not apply.
+    """
+    root = Path(target or SHIPPED_DIR)
+    patches = Path(upstream or (FLOW_DIR.parent / "upstream"))
+    if not _ISSUE_SOLVER.is_dir():
+        raise PreflightFailed(
+            "shipped_package",
+            f"{_ISSUE_SOLVER} does not exist: CHIA's example directory ships "
+            "beside the package in a checkout and not in a wheel (13.1)")
+
+    if root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True)
+    shutil.copytree(FLOW_DIR, root / "circt_bug_loop", ignore=_stage_ignore)
+    shutil.copytree(_CHIA_PKG, root / "chia", ignore=_stage_ignore)
+    # CHIA is an implicit namespace package upstream (`chia/__init__.py` does
+    # not exist), and a namespace directory uploaded as a py_module MERGES with
+    # the container's installed `chia` rather than shadowing it, so which
+    # `vertex.py` runs on a worker would not be decided by this repository (W6).
+    (root / "chia" / "__init__.py").touch()
+    for name in ("issue_task.py", "circt_util.py"):
+        shutil.copyfile(_ISSUE_SOLVER / name, root / name)
+
+    applied = []
+    vertex = root / "chia" / "models" / "vertex.py"
+    issue_task = root / "issue_task.py"
+    if not all(field in vertex.read_text(encoding="utf-8")
+               for field in VERTEX_USAGE_FIELDS):
+        _apply_patch(patches / "vertex-usage.patch", root, 1)
+        applied.append("vertex-usage.patch")
+    if VERTEX_BRANCH not in issue_task.read_text(encoding="utf-8"):
+        _apply_patch(patches / "issue_task-vertex-branch.patch", root, 3)
+        applied.append("issue_task-vertex-branch.patch")
+
+    return {"root": str(root), "issue_task": str(issue_task), "vertex": str(vertex),
+            "applied": applied,
+            "py_modules": [str(root / name) for name in SHIPPED_MODULES]}
+
+
 def runtime_env() -> dict:
     """Return the `runtime_env` the driver's own `ray.init` ships (13.1).
 
-    13.1's `_PY_MODULES` names nine loose files under the flow directory, which
-    is right in a CHIA checkout where the example's modules import each other by
-    bare name. In the team repository the same modules are a package and import
-    each other as `circt_bug_loop.<module>`, which a loose file cannot satisfy,
-    so where `__init__.py` is present the flow's own nine entries are replaced by
-    the package DIRECTORY and the other five travel unchanged. Both forms ship
-    the same code; only the import path differs.
+    The STAGED package and nothing else (W6). 13.1's `py_modules` named the
+    flow's loose modules, the installed `chia` directory and two of CHIA's
+    example files; three of those are wrong on a worker. The flow's modules are
+    a package here and import each other as `circt_bug_loop.<module>`, which a
+    loose file cannot satisfy; uploading the whole flow directory shipped
+    `tests/` (3.8 of its 5.8 MB), `tests/fixtures/repair/issues.db` and, at
+    6.1's path, `loop.db` with the mirrored issue corpus in it; and the
+    installed `chia` is a namespace package and an unpatched one.
 
     Returns:
         {"py_modules": list[str], "excludes": list[str]}.
     Worker:
         the driver's; it reads the filesystem and dispatches nothing.
     Raises:
-        nothing.
+        PreflightFailed("shipped_package", detail) from `stage_shipped` when the
+        staged directory is not there and cannot be built.
     """
-    if not (FLOW_DIR / "__init__.py").exists():
-        return {"py_modules": list(_PY_MODULES), "excludes": list(_RUNTIME_ENV_EXCLUDES)}
-    outside = [m for m in _PY_MODULES if not m.startswith(str(FLOW_DIR) + os.sep)]
-    return {"py_modules": [str(FLOW_DIR)] + outside,
+    if not SHIPPED_DIR.is_dir():
+        stage_shipped()
+    return {"py_modules": [str(SHIPPED_DIR / name) for name in SHIPPED_MODULES],
             "excludes": list(_RUNTIME_ENV_EXCLUDES)}
 
 
@@ -1091,12 +1206,76 @@ def check_12_live_model(*, head: dict, workers: dict) -> None:
                 "live_model", f"{where}: {API_KEY_ENV} is empty or unexpanded")
 
 
-#: The twelve checks in 13.1's order, cheapest first, named for the log.
+def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
+                           repair_enabled: bool) -> str:
+    """Check 13 (K7): the backend the SHIPPED `issue_task.py` can actually run.
+
+    The `vertex` arm of `upstream/issue_task-vertex-branch.patch` was applied
+    only by `sync-to-chia.sh`, into a TARGET checkout the driver never runs, so
+    the file `_PY_MODULES` shipped carried CHIA's unpatched `_turn`: handed
+    `cfg["backend"] = "vertex"` it fell through to `else: ClaudeCodeLLM(...)`,
+    and the manifest recorded `vertex:gemini-3.8-flash` with
+    `stages_metered["stage_7"] = True` anyway. That is a false statement in the
+    registration artefact, which is worse than the failed turn beside it.
+
+    The check greps the STAGED copy, which is the file a worker imports, and
+    `RunManifest.model_ids["repair_adapt"]` takes the backend this returns.
+
+    Returns:
+        str, the backend id the manifest may record.
+    Worker:
+        head; one file read of the staged copy.
+    Raises:
+        PreflightFailed("vertex_branch", detail) when repair is enabled on the
+        `vertex` backend and the staged file does not carry the branch.
+    """
+    present = VERTEX_BRANCH in Path(issue_task_path).read_text(encoding="utf-8")
+    if repair_enabled and repair_backend == _METERED_REPAIR_BACKEND and not present:
+        raise PreflightFailed(
+            "vertex_branch",
+            f"{issue_task_path} carries no {VERTEX_BRANCH!r}: stage 7 would run "
+            f"CHIA's else-branch backend while the manifest recorded "
+            f"{_METERED_REPAIR_BACKEND!r} (K7). Re-stage the package, or run "
+            "with --no-repair")
+    return repair_backend
+
+
+def check_14_vertex_usage_patch(*, vertex_path: str, metered: bool) -> None:
+    """Check 14 (K11): the shipped `vertex.py` counts the two billed fields.
+
+    `thoughts_token_count` and `tool_use_prompt_token_count` are separate
+    scalars from `candidates_token_count` and `prompt_token_count` - the SDK's
+    own description of `total_token_count` is the sum of all four - and CHIA
+    sums neither. Without `upstream/vertex-usage.patch` in the file a worker
+    imports, every priced turn and therefore `campaign_spend_cap_usd` are
+    understated by whatever the model thinks, which is unbounded and unknown.
+
+    Returns:
+        None.
+    Worker:
+        head; one file read of the staged copy.
+    Raises:
+        PreflightFailed("vertex_usage_patch", detail) naming the missing field.
+    """
+    if not metered:
+        return
+    text = Path(vertex_path).read_text(encoding="utf-8")
+    missing = [field for field in VERTEX_USAGE_FIELDS if field not in text]
+    if missing:
+        raise PreflightFailed(
+            "vertex_usage_patch",
+            f"{vertex_path} sums {sorted(missing)} nowhere: every priced turn "
+            "and the USD cap would be understated by the tokens the model "
+            "thinks (K11). Re-stage the package")
+
+
+#: The pre-flight checks in 13.1's order, cheapest first, named for the log.
+#: Twelve until W-20b; K7 and K11 add two that read the STAGED package.
 PREFLIGHT_CHECKS = (
     "budget_registered", "mutator_set_earlier", "clone_head",
     "artefact_root_head", "artefact_root_unmounted", "image_lit_discovery",
     "tool_hashes", "verilator_version", "pin_stamped", "issue_mirror",
-    "forum_post", "live_model")
+    "forum_post", "live_model", "vertex_branch", "vertex_usage_patch")
 
 
 # ---------------------------------------------------------------------------
@@ -1246,6 +1425,7 @@ def run_commits(*, mode: str, pin: dict, seeds=()) -> list:
 def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec,
                    mirror: dict, cluster: dict, mutator_set_sha: str,
                    run_manifest_id: str, started_utc: str,
+                   repair_backend: Optional[str] = None,
                    calibration_seeds=(), assertion_baseline_count: int = 0,
                    sv_seeds_excluded=None) -> RunManifest:
     """Build the run's one `RunManifest`, every field from its named producer.
@@ -1254,6 +1434,12 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
     YAML, 9.4's constants, 3.6.3's differential rule, the image's own acceptance
     run, and the operator. A field with no value stops the run here rather than
     at the first stage that reads it.
+
+    *repair_backend* is what pre-flight check 13 verified against the STAGED
+    `issue_task.py` and not what `--repair-backend` asked for (K7): the flag
+    alone made `model_ids["repair_adapt"]` a claim about a file nothing had
+    read. It defaults to the flag for a caller that has no staged package -
+    every driver-less test - and the driver always passes the checked value.
 
     Returns:
         RunManifest, already through `contract.validate`.
@@ -1266,6 +1452,7 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
     from circt_bug_loop import probe_task, repair_adapter
 
     arms = tuple(budget.arm_order) if args.arm == "both" else (args.arm,)
+    backend = repair_backend or args.repair_backend
     manifest = RunManifest(
         run_manifest_id=run_manifest_id,
         mode=args.mode,
@@ -1290,10 +1477,9 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         artefact_root=args.artefact_root,
         backend=_model_backend(),
         model_ids=model_ids(model_id=budget.model_id,
-                            repair_backend=args.repair_backend,
+                            repair_backend=backend,
                             repair_model=args.repair_model),
-        stages_metered=stages_metered(arms=arms,
-                                      repair_backend=args.repair_backend,
+        stages_metered=stages_metered(arms=arms, repair_backend=backend,
                                       repair_enabled=repair_enabled(args)),
         mutator_set_sha=mutator_set_sha,
         x_policy=probe_task.X_POLICY,
@@ -2292,9 +2478,11 @@ class Campaign:
                  clone_path: str = "", image_spec=None, repair_enabled: bool = True,
                  seed_map: Optional[dict] = None, now: Optional[Callable] = None,
                  bin_dir: str = CIRCT_BIN_DIR,
-                 head_options: Optional[dict] = None):
+                 head_options: Optional[dict] = None,
+                 repair_backend: str = _METERED_REPAIR_BACKEND):
         """Take everything a stage call needs, and compute nothing else."""
         self.head_options = head_options
+        self.repair_backend = repair_backend
         self.manifest = manifest
         self.budget = budget
         self.store = store
@@ -2570,6 +2758,14 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
     `RepairResult` that comes back; an attempt that never came back leaves the
     row at `dispatched`, which is what the reconciliation then reads.
 
+    THE CHAIN'S CFG IS ASSEMBLED HERE (K3, K6). `repair_adapt` used to be handed
+    the GENERATOR's cfg, which carries no `repair_backend`, so stage 7 raised
+    `KeyError` on every candidate and `_drive_repair`'s own `except Exception`
+    recorded it as `refused:KeyError` and nothing else; and `build_cfg` used to
+    run on the repair worker, where `chia.__path__[0]`'s parent holds no
+    `examples/` and the six prompt bodies cannot be read. The head has CHIA's
+    checkout, so it builds all sixteen keys and passes them complete.
+
     Returns:
         RepairResult, or None when repair is disabled or the attempt refused.
     Worker:
@@ -2579,7 +2775,8 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
     """
     if not campaign.repair_enabled:
         return None
-    from circt_bug_loop.repair_adapter import mint_local_id
+    from circt_bug_loop.repair_adapter import (build_cfg, issue_solver_dir,
+                                               mint_local_id)
 
     repair = None
     try:
@@ -2592,11 +2789,20 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
                           / campaign.manifest.run_manifest_id / "repair"
                           / str(local_id)),
             backend=campaign.manifest.model_ids["repair_adapt"].partition(":")[0])
+        solver = issue_solver_dir()
+        cfg = {**build_cfg(candidate, campaign.manifest, local_id=local_id,
+                           issue_solver=solver),
+               # The two keys the LOOP reads, which are not CHIA's cfg and are
+               # filtered out before `run_issue_remote` sees it. The backend
+               # here is the driver's flag and the one inside is the manifest's,
+               # so B8's comparison still has two independent sources.
+               "repair_enabled": campaign.repair_enabled,
+               "repair_backend": campaign.repair_backend}
         repair = campaign.call(
             "repair_adapt", campaign.stages.repair_adapt, report["report"],
-            candidate, reduced, verdict, campaign.manifest,
-            campaign.cfg(iteration=spec.iteration),
+            candidate, reduced, verdict, campaign.manifest, cfg,
             local_id=local_id, input_path=reduced.path or spec.input_path,
+            chia_artifact_dir=str(solver / "issue_logs" / f"issue_{local_id}"),
             _arm=spec.arm, _key=spec.probe_id)["result"]
         out["verdicts"]["stage_7"] = repair.status
         write_repair_result(campaign.store, repair)
@@ -3126,6 +3332,9 @@ def run_campaign(args, out) -> int:
     repo_root = str(FLOW_DIR.parent)
 
     check_issue_solver(args.chia_root)
+    # Before anything is dispatched: the staged package is what every worker
+    # imports, and checks 13 and 14 read it (K3, K6, K7, K11, W6).
+    shipped = stage_shipped()
     budget = check_01_budget_registered(budget_path=args.budget,
                                         repo_root=repo_root,
                                         run_start_utc=started_utc)
@@ -3179,6 +3388,15 @@ def run_campaign(args, out) -> int:
                        or ("repair" in resource and repair_enabled(args))}
     check_12_live_model(head=interlock_probe(),
                         workers=interlock_probes(dispatch, model_resources))
+    repair_backend = check_13_vertex_branch(
+        issue_task_path=shipped["issue_task"],
+        repair_backend=args.repair_backend,
+        repair_enabled=repair_enabled(args))
+    check_14_vertex_usage_patch(vertex_path=shipped["vertex"],
+                                metered=args.generator != "recorded")
+    print(f"shipped package at {shipped['root']}; patches applied: "
+          + (", ".join(shipped["applied"]) or "none, both already upstream"),
+          file=out)
 
     mined = dispatch.call(corpus.build_corpus, args.clone, budget.corpus_head_sha,
                           budget.campaign_start_utc[:10],
@@ -3187,6 +3405,7 @@ def run_campaign(args, out) -> int:
     manifest = build_manifest(
         args=args, budget=budget, pin=pin, image_spec=image_spec, mirror=mirror,
         cluster=cluster, mutator_set_sha=mutators.set_sha256(),
+        repair_backend=repair_backend,
         run_manifest_id=args.resume or uuid.uuid4().hex, started_utc=started_utc,
         calibration_seeds=[s for s in seeds
                            if s.seed_sha in (budget.calibration_sample_shas or [])],
@@ -3229,6 +3448,7 @@ def run_campaign(args, out) -> int:
                         counters=counters, recorder=recorder,
                         clone_path=args.clone, image_spec=image_spec,
                         repair_enabled=repair_enabled(args),
+                        repair_backend=repair_backend,
                         head_options=dispatch.head_options())
     arms = None if args.arm == "both" else [args.arm]
     outcome = campaign_drive(campaign, seeds, arms=arms)

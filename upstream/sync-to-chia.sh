@@ -145,15 +145,31 @@ PY
     printf 'appended the three functions to %s\n' "$CIRCT_PY"
 fi
 
-# --- step 4: the one additive branch in CHIA's own issue_task.py -------------
-# Guarded by the branch itself, so a checkout synced twice is not patched twice
-# and a checkout tracking a CHIA that has merged it is left alone (1.4).
-PATCH="$UPSTREAM/issue_task-vertex-branch.patch"
+# --- step 4: the TWO additive patches against CHIA's own files ----------------
+# Each is guarded by its own marker, so a checkout synced twice is not patched
+# twice and a checkout tracking a CHIA that has merged one is left alone (1.4).
+#
+# The pair belongs together. `issue_task-vertex-branch.patch` is what lets
+# stage 7 run the backend the manifest names (K7); `vertex-usage.patch` is what
+# makes a turn's thinking tokens countable at all (K11), and a campaign whose
+# sync applied only the first would price every turn low by an unknown factor.
+# The driver's own `stage_shipped` applies both to the copy it ships and
+# pre-flight checks 13 and 14 read that copy; this script is the other half,
+# for an operator running the flow from a CHIA checkout.
 ISSUE_TASK="$TARGET/examples/circt_issue_solver/issue_task.py"
 if grep -qF 'elif backend == "vertex":' "$ISSUE_TASK"; then
     note "leave $ISSUE_TASK alone: the vertex branch is already present"
 else
-    run git -C "$TARGET" apply --3way "$PATCH"
+    run git -C "$TARGET" apply --3way "$UPSTREAM/issue_task-vertex-branch.patch"
+fi
+
+VERTEX_PY="$TARGET/chia/models/vertex.py"
+if [ ! -f "$VERTEX_PY" ]; then
+    note "no $VERTEX_PY: this target ships no Vertex backend, nothing to patch"
+elif grep -qF 'thoughts_token_count' "$VERTEX_PY"; then
+    note "leave $VERTEX_PY alone: the two billed usage fields are already summed"
+else
+    run git -C "$TARGET" apply --3way "$UPSTREAM/vertex-usage.patch"
 fi
 
 if [ "$DRY_RUN" = "1" ]; then

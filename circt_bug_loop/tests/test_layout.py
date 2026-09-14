@@ -699,11 +699,17 @@ def test_T_U_layout_10_sync_into_a_real_checkout(tmp_path: Path):
     assert clone.returncode == 0, clone.stderr
 
     issue_task = target / "examples" / "circt_issue_solver" / "issue_task.py"
+    vertex = target / "chia" / "models" / "vertex.py"
     assert 'elif backend == "vertex":' not in issue_task.read_text(encoding="utf-8")
+    assert "thoughts_token_count" not in vertex.read_text(encoding="utf-8")
 
     first = sync(target)
     assert first.returncode == 0, first.stderr
     assert 'elif backend == "vertex":' in issue_task.read_text(encoding="utf-8")
+    # BOTH patches, since W-20b: a sync that applied only the first would leave
+    # a checkout whose stage 7 runs the backend the manifest names and whose
+    # every priced turn is low by the tokens the model thinks (K7, K11).
+    assert "thoughts_token_count" in vertex.read_text(encoding="utf-8")
     assert (target / "examples" / "circt_bug_loop" / "bug_loop.py").is_file()
     assert (target / "dockerfiles" / "ChiaCirctAssertDockerfile").is_file()
     circt_py = (target / "chia" / "chipyard" / "circt.py").read_text(encoding="utf-8")

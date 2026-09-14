@@ -461,6 +461,11 @@ def test_T_U_schema_18():
 
     offenders = []
     for source in sorted(_FLOW_DIR.rglob("*.py")):
+        # `_shipped/` is the staged package the workers import (W-20b): a copy
+        # of CHIA patched at start-up, not this repository's code, and not
+        # always even parseable by this interpreter.
+        if "_shipped" in source.parts:
+            continue
         tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):

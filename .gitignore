@@ -18,3 +18,5 @@ loop.db
 loop.db-*
 issues.db*
 artefacts/
+# the staged package the workers run, rebuilt at every start-up (W6, K7)
+circt_bug_loop/_shipped/

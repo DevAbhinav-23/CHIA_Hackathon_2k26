@@ -231,13 +231,23 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
     monkeypatch.setitem(sys.modules, "circt_util", util)
     case = tmp_path / "reduced.mlir"
     shutil.copyfile(REPAIR / "case.mlir", case)
+    # The COMPLETE cfg the head assembles since K3/K6: `build_cfg`'s sixteen
+    # keys, which `repair_adapt` no longer builds for itself because a repair
+    # worker's `chia.__path__[0]` has no `examples/` sibling to read them from,
+    # plus the two keys the loop itself reads. `cfg=` overrides only the latter.
+    local_id = LOCAL_ID_BASE + 7
+    chain_cfg = {**build_cfg(candidate, manifest, local_id=local_id),
+                 "repair_enabled": True,
+                 **dict(cfg or {"repair_backend": "vertex"})}
     # `{"result", "counters"}` since the join (W-17, errata row 22); every test
     # below reads the RepairResult, so it is unwrapped here.
     out = call_node(
         repair_adapt, _report(), candidate, _reduced(case), _verdict(), manifest,
-        dict(cfg or {"repair_backend": "vertex"}),
-        local_id=LOCAL_ID_BASE + 7, input_path="/art/probe/input.mlir",
+        chain_cfg,
+        local_id=local_id, input_path="/art/probe/input.mlir",
         created_utc="2026-09-14T00:00:00+00:00", bin_dir=bin_dir,
+        chia_artifact_dir=str(issue_solver_dir() / "issue_logs"
+                              / f"issue_{local_id}"),
         env=dict(ALLOW_ENV if env is None else env))
     assert out["counters"].stage == "stage_7"
     return types.SimpleNamespace(result=out["result"], counters=out["counters"],
@@ -560,6 +570,53 @@ def test_repair_20b_a_backend_disagreement_is_refused(tmp_path, monkeypatch):
     flag; a run in which the two disagree would make the ledger false."""
     with pytest.raises(ValueError, match="stage_7"):
         _attempt(tmp_path, monkeypatch, cfg={"repair_backend": "claude"})
+
+
+def test_repair_20c_the_generators_cfg_is_refused_by_name(tmp_path, monkeypatch):
+    """K3, K6: an incomplete cfg refuses loudly, and `build_cfg` is the head's.
+
+    New id, W-20b. `_drive_repair` handed `repair_adapt` the GENERATOR's cfg,
+    which carries thirteen keys and not one of the sixteen: `repair_backend` was
+    read first and raised `KeyError`, `_drive_repair`'s own `except Exception`
+    recorded `refused:KeyError`, the `repair` row stayed at `dispatched` for the
+    life of the campaign, and F-12 was dead end to end with no symptom but a
+    verdict string. The node now names every missing key, and the driver builds
+    the cfg on the head where CHIA's `examples/prompts/` actually is.
+
+    Fixture: `repair/case.mlir` and CHIA's own prompt files. Tier 0.
+    """
+    from circt_bug_loop import bug_loop
+    from circt_bug_loop.tests.test_bug_loop import budget_file
+
+    manifest = _manifest(tmp_path)
+    generator_cfg = bug_loop.generator_cfg(
+        manifest, budget_file(), clone_path=str(tmp_path), iteration=1)
+    assert "repair_backend" not in generator_cfg
+    assert not (set(CFG_KEYS) & set(generator_cfg))
+
+    _recording_interlock(monkeypatch)
+    monkeypatch.setitem(sys.modules, "circt_util", _CirctUtil())
+    case = tmp_path / "reduced.mlir"
+    shutil.copyfile(REPAIR / "case.mlir", case)
+    with pytest.raises(ValueError) as raised:
+        call_node(repair_adapt, _report(), _candidate(tmp_path), _reduced(case),
+                  _verdict(), manifest,
+                  {"repair_backend": "vertex", **generator_cfg},
+                  local_id=LOCAL_ID_BASE + 7, input_path="/art/probe/input.mlir",
+                  env=dict(ALLOW_ENV))
+    message = str(raised.value)
+    assert "build_cfg" in message
+    # Every one of CHIA's sixteen is named as missing, none of them silently.
+    for key in CFG_KEYS:
+        assert key in message, key
+
+    # And `build_cfg` reads the six prompt bodies from a directory only the head
+    # has: a `chia` installed as a wheel ships no `examples/` sibling at all.
+    solver = issue_solver_dir()
+    assert (solver / "prompts").is_dir()
+    assert solver.parent.name == "examples"
+    node = inspect.getsource(repair_adapt._chia_original)
+    assert "build_cfg(" not in node, "B8 must not assemble its own cfg (K6)"
 
 
 # ===========================================================================

@@ -327,13 +327,21 @@ def test_T_U_driver_27():
 
 
 def test_T_U_driver_28a():
-    """T-U-driver-28 (13.1): the twelve checks are twelve named functions, in order.
+    """T-U-driver-28 (13.1, K7, K11): the checks are named functions, in order.
 
+    Twelve until W-20b, fourteen since: check 13 greps the STAGED
+    `issue_task.py` for the vertex branch, because `model_ids["repair_adapt"]`
+    was a claim about a file nothing had read, and check 14 greps the staged
+    `vertex.py` for the two billed usage fields, because without them every
+    priced turn and the USD cap are low by whatever the model thinks.
     Fixture: none. Tier 0.
     """
-    assert len(bug_loop.PREFLIGHT_CHECKS) == 12
+    assert len(bug_loop.PREFLIGHT_CHECKS) == 14
+    assert bug_loop.PREFLIGHT_CHECKS[-2:] == ("vertex_branch", "vertex_usage_patch")
     names = [n for n in dir(bug_loop) if n.startswith("check_")]
-    assert len([n for n in names if n[6:8].isdigit()]) == 12
+    numbered = sorted(n for n in names if n[6:8].isdigit())
+    assert len(numbered) == 14
+    assert [int(n[6:8]) for n in numbered] == list(range(1, 15))
 
 
 # ---------------------------------------------------------------------------
@@ -371,29 +379,100 @@ def test_T_U_driver_13():
     assert budget_file().arm_order == ["seeded", "mutation"]
 
 
-def test_T_U_driver_17():
-    """T-U-driver-17 (FR-12.1): `_PY_MODULES` is 13.1's entries, in its order.
+def test_T_U_driver_17(tmp_path):
+    """T-U-driver-17 (FR-12.1, K6, K7, W6): `runtime_env` ships the STAGED package.
 
-    Fifteen and not the table's fourteen: `llm.py` is the join's own module
-    (3.5.1, architect decision 3), and a CHIA checkout that shipped the other
-    fourteen would ship no backend at all. The shipped list is `runtime_env()`'s,
-    which substitutes the package directory for the flow's own ten wherever
-    `__init__.py` makes them a package; CHIA's `issue_task.py` and
-    `circt_util.py` travel in both forms, which is FR-12.1's point. Fixture:
-    none. Tier 0.
+    13.1's `py_modules` named the flow's loose modules, the installed `chia`
+    directory and two of CHIA's example files, and three of those were wrong on
+    a worker: the flow's modules are a package here and import each other as
+    `circt_bug_loop.<module>`; uploading the flow directory shipped `tests/`
+    (3.8 of its 5.8 MB), `fixtures/repair/issues.db` and, at 6.1's path,
+    `loop.db` with the mirrored issue corpus in it; and the installed `chia` is
+    an implicit namespace package, which MERGES with a container's own install
+    rather than shadowing it, and is unpatched.
+
+    Staged into a `tmp_path` here, so the assertions are about what the function
+    produces and not about whatever an earlier run left in the tree. Fixture:
+    the installed CHIA checkout. Tier 0.
     """
-    assert len(bug_loop._PY_MODULES) == 15
-    assert str(bug_loop.FLOW_DIR / "llm.py") in bug_loop._PY_MODULES
-    assert bug_loop._PY_MODULES[-2:] == [
-        str(bug_loop._ISSUE_SOLVER / "issue_task.py"),
-        str(bug_loop._ISSUE_SOLVER / "circt_util.py")]
-    assert str(bug_loop.FLOW_DIR / "contract") in bug_loop._PY_MODULES
-    assert str(bug_loop.FLOW_DIR / "mutators") in bug_loop._PY_MODULES
+    staged = bug_loop.stage_shipped(target=str(tmp_path / "_shipped"))
+    root = Path(staged["root"])
+    assert [Path(p).name for p in staged["py_modules"]] == [
+        "circt_bug_loop", "chia", "issue_task.py", "circt_util.py"]
+    assert all(Path(p).exists() for p in staged["py_modules"])
+
+    # The flow travels as a package, so `circt_bug_loop.llm` is importable.
+    for module in ("llm.py", "probe_task.py", "repair_adapter.py"):
+        assert (root / "circt_bug_loop" / module).is_file(), module
+    for directory in ("contract", "mutators", "prompts"):
+        assert (root / "circt_bug_loop" / directory).is_dir(), directory
+
+    # And what is left behind (W6).
+    assert not (root / "circt_bug_loop" / "tests").exists()
+    assert not list(root.rglob("loop.db*"))
+    assert not list(root.rglob("__pycache__"))
+
+    # CHIA shadows rather than merges, and both patches are in the copy.
+    assert (root / "chia" / "__init__.py").is_file()
+    assert not (Path(bug_loop._CHIA_PKG) / "__init__.py").exists(), (
+        "upstream CHIA is a namespace package; that is the reason for the file")
+    vertex = (root / "chia" / "models" / "vertex.py").read_text(encoding="utf-8")
+    assert all(field in vertex for field in bug_loop.VERTEX_USAGE_FIELDS)
+    assert bug_loop.VERTEX_BRANCH in (root / "issue_task.py").read_text(
+        encoding="utf-8")
+    # The operator's own checkout is untouched by the staging.
+    assert bug_loop.VERTEX_BRANCH not in (
+        bug_loop._ISSUE_SOLVER / "issue_task.py").read_text(encoding="utf-8")
 
     shipped = bug_loop.runtime_env()
     assert shipped["excludes"] == ["**/__pycache__", "**/*.pyc"]
-    assert str(bug_loop.FLOW_DIR) in shipped["py_modules"]
-    assert bug_loop._PY_MODULES[-1] in shipped["py_modules"]
+    assert shipped["py_modules"] == [
+        str(bug_loop.SHIPPED_DIR / name) for name in bug_loop.SHIPPED_MODULES]
+    assert not any(p == str(bug_loop.FLOW_DIR) for p in shipped["py_modules"])
+
+
+def test_T_U_driver_17b(tmp_path):
+    """T-U-driver-17 (K7, K11): checks 13 and 14 read the staged files.
+
+    New half, W-20b. Both refusals are exercised against a staged copy with the
+    marker removed, which is exactly the state the tree was in before the
+    staging existed: `sync-to-chia.sh` applied the branch into a TARGET checkout
+    the driver never ran. Fixture: none. Tier 0.
+    """
+    unpatched = tmp_path / "issue_task.py"
+    unpatched.write_text("def _turn():\n    pass\n", encoding="utf-8")
+    patched = tmp_path / "patched.py"
+    patched.write_text(f"    {bug_loop.VERTEX_BRANCH}\n", encoding="utf-8")
+
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_13_vertex_branch(issue_task_path=str(unpatched),
+                                        repair_backend="vertex",
+                                        repair_enabled=True)
+    assert raised.value.check == "vertex_branch"
+    # --no-repair and a non-vertex backend both pass: nothing would run it.
+    assert bug_loop.check_13_vertex_branch(
+        issue_task_path=str(unpatched), repair_backend="vertex",
+        repair_enabled=False) == "vertex"
+    assert bug_loop.check_13_vertex_branch(
+        issue_task_path=str(unpatched), repair_backend="claude",
+        repair_enabled=True) == "claude"
+    assert bug_loop.check_13_vertex_branch(
+        issue_task_path=str(patched), repair_backend="vertex",
+        repair_enabled=True) == "vertex"
+
+    thin = tmp_path / "vertex.py"
+    thin.write_text('meta["output_tokens"] += 0\n', encoding="utf-8")
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_14_vertex_usage_patch(vertex_path=str(thin), metered=True)
+    assert raised.value.check == "vertex_usage_patch"
+    assert "thoughts_token_count" in str(raised.value)
+    # `--generator recorded` makes no turn at all, so the patch cannot matter.
+    assert bug_loop.check_14_vertex_usage_patch(
+        vertex_path=str(thin), metered=False) is None
+    fat = tmp_path / "fat.py"
+    fat.write_text("\n".join(bug_loop.VERTEX_USAGE_FIELDS), encoding="utf-8")
+    assert bug_loop.check_14_vertex_usage_patch(
+        vertex_path=str(fat), metered=True) is None
 
 
 def test_T_U_driver_23(capsys):

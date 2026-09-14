@@ -362,10 +362,23 @@ def _sha256(path: str) -> str:
 def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCase,
                  verdict: OracleVerdict, manifest: RunManifest, cfg: dict, *,
                  local_id: int, input_path: str, created_utc: Optional[str] = None,
-                 issue_solver: Optional[Path] = None,
+                 chia_artifact_dir: str = "",
                  bin_dir: str = CIRCT_BUILD_BIN,
                  env: Optional[Mapping[str, str]] = None) -> dict:
     """Present one local report to CHIA's chain, then restore the worker.
+
+    *cfg* is COMPLETE and is assembled on the head (K3, K6): `build_cfg`'s
+    sixteen keys - the six prompt bodies included - plus the two keys the loop
+    itself reads, `repair_enabled` and `repair_backend`. It used to be the
+    GENERATOR's cfg, which carries neither, so `cfg["repair_backend"]` raised
+    `KeyError` on every candidate before any other line could run; and
+    `build_cfg` used to run HERE, where `chia.__path__[0]`'s parent holds no
+    `examples/` at all, so the six prompts could not have been read even after
+    that. The head has both.
+
+    *chia_artifact_dir* is the head's too, for the same reason: it is where
+    CHIA's own head driver persists an attempt (`circt_issue_loop.py:81`), a
+    path derived from a directory this worker cannot see.
 
     Returns:
         {"result": RepairResult, "counters": CounterBlock}, the RepairResult for
@@ -379,6 +392,8 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
         RepairRefused(reason) for a candidate refused by class or scope, and for
         a run started with --no-repair, before the chain is invoked at all. The
         caller records the reason and counts it.
+        ValueError when *cfg* is missing a key `run_issue_remote` reads, or when
+        its backend disagrees with the manifest's.
         LiveModelRefused when the interlock of 3.5.1 is not set, or when the
         repair backend is vertex and GEMINI_API_KEY is unusable. Checked here
         because CHIA's _turn builds its own backend and cannot carry the loop's
@@ -395,21 +410,25 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     if candidate.out_of_scope_root:
         raise RepairRefused("out_of_scope_root")
 
-    # The interlock, unconditionally and BEFORE the cfg is built: CHIA's _turn
-    # builds its own backend inside CHIA's file, which cannot carry the loop's
-    # refusal, so stage 7 would otherwise be the one path to a model that the
-    # gate of 3.5.1 does not cover (3.8, T-U-layout-08). It is `llm.py`'s and is
-    # imported at module scope: that module is neither half (architect decision
-    # 3), so reaching it crosses no seam.
+    # The interlock, unconditionally and BEFORE the chain is reached: CHIA's
+    # _turn builds its own backend inside CHIA's file, which cannot carry the
+    # loop's refusal, so stage 7 would otherwise be the one path to a model that
+    # the gate of 3.5.1 does not cover (3.8, T-U-layout-08). It is `llm.py`'s
+    # and is imported at module scope: that module is neither half (architect
+    # decision 3), so reaching it crosses no seam.
     require_live_model(
         f"stage 7 repair of {candidate.candidate_id}",
         need_key=(cfg["repair_backend"] == MODEL_BACKEND), env=env)
 
     import circt_util
 
-    solver = issue_solver or issue_solver_dir()
-    chain_cfg = build_cfg(candidate, manifest, local_id=local_id,
-                          issue_solver=solver)
+    chain_cfg = {key: value for key, value in cfg.items() if key in CFG_KEYS}
+    missing = CFG_KEYS - set(chain_cfg)
+    if missing:
+        raise ValueError(
+            f"cfg is missing {sorted(missing)}: `run_issue_remote` reads all "
+            f"{len(CFG_KEYS)} keys and `repair_adapter.build_cfg` on the head "
+            f"is what assembles them (K3, K6)")
     if chain_cfg["backend"] != cfg["repair_backend"]:
         raise ValueError(
             f"RunManifest.model_ids['repair_adapt'] names backend "
@@ -447,7 +466,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
 
     attempt = _as_repair_result(result, candidate, local_id, repro_dir,
                                 chain_cfg["backend"], before != after, restore,
-                                solver)
+                                chia_artifact_dir)
     fixed = int(attempt.status == "fixed")
     return {"result": attempt,
             "counters": CounterBlock(
@@ -494,7 +513,7 @@ def _restore(candidate: CandidateRecord, manifest: RunManifest, chain_cfg: dict,
 
 def _as_repair_result(result: dict, candidate: CandidateRecord, local_id: int,
                       repro_dir: str, backend: str, overwritten: bool,
-                      restore: dict, solver: Path) -> RepairResult:
+                      restore: dict, chia_artifact_dir: str) -> RepairResult:
     """Map CHIA's own result dict onto `RepairResult`, unchanged in shape (FR-12.7).
 
     FR-12.8's erratum is applied here and nowhere else: a `lit` run reporting
@@ -526,7 +545,7 @@ def _as_repair_result(result: dict, candidate: CandidateRecord, local_id: int,
         diff_path=diff_path,
         diff_added=result.get("added"),
         diff_removed=result.get("removed"),
-        chia_artifact_dir=str(solver / "issue_logs" / f"issue_{local_id}"),
+        chia_artifact_dir=chia_artifact_dir,
         repro_dir=repro_dir,
         repro_overwritten=overwritten,
         restore_ok=bool(restore["reset_ok"] and restore["build_ok"]
