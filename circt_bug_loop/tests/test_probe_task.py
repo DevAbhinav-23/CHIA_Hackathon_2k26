@@ -990,3 +990,184 @@ def test_u_probe_35_reducer_aborted_routes_to_the_textual_reducer(
     assert case.interestingness_calls > 1
     assert "!hw.array" in Path(case.path).read_text()
     assert case.recheck_class == "crash" and case.recheck_matches is True
+
+
+# --- 3.6.3: the three harness helpers ---------------------------------------
+
+DUT = """hw.module @Top(in %clock : !seq.clock, in %rst : i1, in %a : i8, \
+in %b : i4, out o : i8, out p : i1) {
+  %acc = seq.firreg %0 clock %clock : i8
+  %0 = comb.add bin %a, %acc : i8
+  %c = hw.constant 1 : i1
+  hw.output %acc, %c : i8, i1
+}
+"""
+
+PORTS = [
+    probe_task.Port(index=0, name="clock", direction="input", width=1,
+                    mlir_type="!seq.clock", is_clock=True, is_reset=False),
+    probe_task.Port(index=1, name="rst", direction="input", width=1,
+                    mlir_type="i1", is_clock=False, is_reset=True),
+    probe_task.Port(index=2, name="a", direction="input", width=8,
+                    mlir_type="i8", is_clock=False, is_reset=False),
+    probe_task.Port(index=3, name="b", direction="input", width=4,
+                    mlir_type="i4", is_clock=False, is_reset=False),
+    probe_task.Port(index=4, name="o", direction="output", width=8,
+                    mlir_type="i8", is_clock=False, is_reset=False),
+    probe_task.Port(index=5, name="p", direction="output", width=1,
+                    mlir_type="i1", is_clock=False, is_reset=False),
+]
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_47_extract_port_list_and_its_four_refusals(tmp_path, sdk_env) -> None:
+    """T-U-probe-47 (FR-08.2, FR-08.8): the signature, and every way it refuses.
+
+    Pass criterion: one `circt-opt --mlir-print-op-generic` run reads
+    `module_type = !hw.modty<...>` off the one `hw.module` carrying no
+    `sym_visibility = "private"`, and returns `Port`s in signature order with
+    direction, width, MLIR type and the clock and reset predicates. The four
+    refusals each fire once: `no_top` on two public modules, `bad_port_type` on
+    an aggregate, `no_clock` on a combinational design, `circt_opt_failed` on a
+    non-zero exit. Each is `harness_failure` and never `diverge`.
+    """
+    _needs_sdk()
+    source = tmp_path / "lifted.mlir"
+    source.write_text("hw.module private @Sub(in %x : i2, out q : i2) {\n"
+                      "  hw.output %x : i2\n}\n" + DUT)
+    ports = probe_task.extract_port_list(str(source), bin_dir=str(BASSERT_G))
+    assert ports == PORTS
+    assert probe_task.top_module_name(str(source), bin_dir=str(BASSERT_G)) == "Top"
+
+    def _refuses(text: str, reason: str, name: str = "bad.mlir") -> None:
+        path = tmp_path / name
+        path.write_text(text)
+        with pytest.raises(probe_task.HarnessError) as raised:
+            probe_task.extract_port_list(str(path), bin_dir=str(BASSERT_G))
+        assert raised.value.reason == reason, raised.value
+
+    _refuses(DUT + DUT.replace("@Top", "@Other"), "no_top", "two.mlir")
+    _refuses("hw.module @T(in %clk : !seq.clock, in %a : !hw.array<2xi8>, "
+             "out o : i8) {\n  %c = hw.constant 0 : i8\n  hw.output %c : i8\n}\n",
+             "bad_port_type", "agg.mlir")
+    _refuses("hw.module @T(in %a : i8, out o : i8) {\n  hw.output %a : i8\n}\n",
+             "no_clock", "comb.mlir")
+    _refuses("this is not mlir\n", "circt_opt_failed", "junk.mlir")
+
+
+@pytest.mark.t0
+def test_u_probe_48_the_two_generators_agree_and_are_deterministic() -> None:
+    """T-U-probe-48 (FR-08.2, FR-08.3): one stimulus, two texts, ten calls.
+
+    Pass criterion: both generators are byte-identical across ten calls on one
+    `(port_list, stimulus_seed)` pair; both drive the same input ports with the
+    same LFSR values in the same cycle order, asserted by extracting the driven
+    sequence from each text and comparing; both exclude clock and reset ports
+    from the stimulus and drive the reset by the `hold-8-then-release`
+    protocol; both emit the acceptance shape with the outputs in signature
+    order; and the entry names are the two constants §4.6's and §4.10's argv
+    expect. Neither compiles anything, so this test is tier 0.
+    """
+    seed = probe_task.stimulus_seed("p-0000000001")
+    assert seed == probe_task.stimulus_seed("p-0000000001")
+    arc = probe_task.gen_arc_harness(PORTS, seed, top="Top", design=DUT)
+    tb = probe_task.gen_verilator_tb(PORTS, seed, top="Top")
+    for _ in range(9):
+        assert probe_task.gen_arc_harness(PORTS, seed, top="Top", design=DUT) == arc
+        assert probe_task.gen_verilator_tb(PORTS, seed, top="Top") == tb
+
+    assert f"func.func @{probe_task.ARC_JIT_ENTRY}()" in arc
+    assert f"module {probe_task.VERILATOR_TOP};" in tb
+    assert probe_task.ARC_JIT_ENTRY == "bugloop_main"
+    assert probe_task.VERILATOR_TOP == "bugloop_tb"
+    assert probe_task.STIMULUS_ID == "lfsr32-v1"
+    assert probe_task.RESET_PROTOCOL == "hold-8-then-release"
+    assert probe_task.SAMPLE_POINT == "pre-posedge"
+    assert probe_task.DIFFERENTIAL_CYCLES == 64
+    assert probe_task.X_POLICY == "x-assign=unique,x-initial=unique"
+
+    # The same driven values, in the same order, on both sides.
+    arc_driven = [int(m, 10) for m in
+                  re.findall(r"%bl_c\d+_\d+ = arith\.constant (\d+) : i\d+", arc)]
+    tb_driven = [int(m, 16) for m in re.findall(r"= \d+'h([0-9a-f]+);", tb)]
+    assert arc_driven == tb_driven
+    assert len(arc_driven) == probe_task.DIFFERENTIAL_CYCLES * 2   # ports a and b
+    assert arc_driven == [probe_task.lfsr_value(seed, port.index, cycle, port.width)
+                          for cycle in range(probe_task.DIFFERENTIAL_CYCLES)
+                          for port in PORTS if port.name in ("a", "b")]
+
+    # The clock and the reset are driven by their protocols, never by the LFSR.
+    assert "%bl_c0_0 = arith.constant" not in arc and "%bl_c0_1 =" not in arc
+    assert tb.count("rst = 1'b1;") == 8 and tb.count("rst = 1'b0;") == 56
+    assert "clock = 1'b0;" in tb and "clock = 1'b1;" in tb
+
+    # The acceptance shape, outputs in signature order, nothing before cycle 8.
+    arc_lines = re.findall(r'arc\.sim\.emit "BUGLOOP (\d+) (\w+)"', arc)
+    tb_lines = re.findall(r'\$display\("BUGLOOP (\d+) (\w+) = %h"', tb)
+    assert arc_lines == tb_lines
+    assert arc_lines[:4] == [("8", "o"), ("8", "p"), ("9", "o"), ("9", "p")]
+    assert len(arc_lines) == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2
+
+    with pytest.raises(probe_task.HarnessError) as raised:
+        probe_task.gen_arc_harness([PORTS[0]], seed, top="Top", design=DUT)
+    assert raised.value.reason == "empty_port_list"
+    with pytest.raises(probe_task.HarnessError):
+        probe_task.gen_verilator_tb([PORTS[0]], seed, top="Top")
+
+
+@pytest.mark.t1
+@pytest.mark.needs_sdk
+def test_u_probe_50_both_harnesses_build_and_run_and_agree(tmp_path, sdk_env) -> None:
+    """T-U-probe-50 (FR-08.2, FR-08.5): A-08's acceptance, no longer [UNVERIFIED].
+
+    Pass criterion: the generated arcilator harness runs under §4.6's argv and
+    the generated testbench compiles and runs under §4.10's, both print the
+    acceptance lines, and the two line sequences are IDENTICAL on a clocked
+    design with a register, which is what makes the differ a text comparison.
+
+    `03-LLD.md` §3.6.3 marks this `[UNVERIFIED]` because no generator existed;
+    it is now run, on the host build and on the host's Verilator 5.052.
+    """
+    _needs_sdk()
+    import shutil
+    import subprocess as sp
+    if not shutil.which("verilator"):
+        pytest.skip("verilator absent")
+    lifted = tmp_path / "lifted.mlir"
+    lifted.write_text(DUT)
+    ports = probe_task.extract_port_list(str(lifted), bin_dir=str(BASSERT_G))
+    seed = probe_task.stimulus_seed("p-0000000001")
+    (tmp_path / "harness.mlir").write_text(
+        probe_task.gen_arc_harness(ports, seed, top="Top", design=DUT))
+    (tmp_path / "tb.sv").write_text(
+        probe_task.gen_verilator_tb(ports, seed, top="Top"))
+
+    arc = sp.run([str(BASSERT_G / "arcilator"), "--run",
+                  f"--jit-entry={probe_task.ARC_JIT_ENTRY}", "--observe-ports",
+                  f"--jit-vcd-file={tmp_path / 'arcilator.vcd'}",
+                  str(tmp_path / "harness.mlir")], capture_output=True, text=True)
+    assert arc.returncode == 0, arc.stderr[:600]
+
+    export = sp.run([str(BASSERT_G / "circt-opt"), str(lifted), "--lower-seq-to-sv",
+                     "--export-verilog", "-o", os.devnull],
+                    capture_output=True, text=True)
+    assert export.returncode == 0, export.stderr[:600]
+    (tmp_path / "dut.sv").write_text(export.stdout)
+
+    build = sp.run(["verilator", "--binary", "-j", "0", "-Wno-fatal", "--timing",
+                    "--x-assign", "unique", "--x-initial", "unique",
+                    "--top-module", probe_task.VERILATOR_TOP,
+                    "--Mdir", str(tmp_path / "obj_dir"), "-o", "Vbugloop",
+                    "--trace-vcd", str(tmp_path / "tb.sv"), str(tmp_path / "dut.sv")],
+                   capture_output=True, text=True)
+    assert build.returncode == 0, build.stdout[-2000:]
+    run = sp.run([str(tmp_path / "obj_dir" / "Vbugloop")], capture_output=True,
+                 text=True, cwd=str(tmp_path))
+    assert run.returncode == 0, run.stderr[:600]
+
+    def _lines(text: str) -> list:
+        return [line for line in text.splitlines() if line.startswith("BUGLOOP ")]
+
+    assert len(_lines(arc.stdout)) == (probe_task.DIFFERENTIAL_CYCLES - 8) * 2
+    assert _lines(arc.stdout) == _lines(run.stdout)

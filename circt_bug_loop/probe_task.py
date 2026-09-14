@@ -19,6 +19,7 @@ import re
 import shlex
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -421,6 +422,393 @@ def _as_dict(frame: Frame, *, resolved: bool = False) -> dict:
     if resolved:
         out["in_circt_object"] = frame.in_circt_object
     return out
+
+
+# --- 3.6.3 B4's three harness helpers ---------------------------------------
+
+#: `03-LLD.md` §9.4's differential constants. None is a campaign parameter: each
+#: sizes a comparison rather than a budget, and each is equal for both arms by
+#: construction because the apparatus cannot tell the arms apart.
+X_POLICY = "x-assign=unique,x-initial=unique"
+ARC_JIT_ENTRY = "bugloop_main"
+VERILATOR_TOP = "bugloop_tb"
+STIMULUS_ID = "lfsr32-v1"
+RESET_PROTOCOL = "hold-8-then-release"
+RESET_CYCLES = 8
+SAMPLE_POINT = "pre-posedge"
+DIFFERENTIAL_CYCLES = 64
+PORT_LIST_TIMEOUT_SECONDS = 60
+
+_CLOCK_NAMES = ("clk", "clock", "clk_i", "i_clk")
+_RESET_NAMES = ("rst", "reset", "rst_n", "resetn", "areset", "rst_i", "i_rst")
+
+#: An active-low reset asserts at 0; every other reset port asserts at 1.
+_ACTIVE_LOW_RESETS = ("rst_n", "resetn")
+
+#: The feedback word of the 32-bit maximal-length Galois LFSR §3.6.3 names but
+#: does not choose a polynomial for. Taps 32, 30, 26 and 25, which is the
+#: textbook maximal-length quadruple; fixed HERE so that one definition reaches
+#: both generators and a second definition would be a second `stimulus_id`.
+_LFSR_TAPS = 0xA3000000
+_GOLDEN_RATIO = 0x9E3779B1
+
+_PORT_ENTRY = re.compile(r"^(?P<direction>input|output|inout)\s+(?P<name>\S+)\s*:\s*"
+                         r"(?P<type>.+)$")
+_IN_WIDTH = re.compile(r"^i(?P<bits>\d+)$")
+_IMMUTABLE = re.compile(r"^!seq\.immutable<i(?P<bits>\d+)>$")
+_HW_MODULE = re.compile(r'"hw\.module"\(\) <\{(?P<attrs>.*)\}> \(\{')
+
+
+class HarnessError(Exception):
+    """A design the differential oracle cannot drive (FR-08.8).
+
+    Every one of these is `harness_failure` with its reason carried into
+    `DifferentialVerdict.reason`, and never `diverge`.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(f"{reason}: {detail}" if detail else reason)
+        self.reason, self.detail = reason, detail
+
+
+@dataclass(kw_only=True)
+class Port:
+    """One port of the design under test, as the HW dialect declares it."""
+    index: int
+    name: str
+    direction: str                          # "input", "output" or "inout"
+    width: int                              # bits; 1 for i1 and for !seq.clock
+    mlir_type: str                          # "i8", "!seq.clock", verbatim
+    is_clock: bool
+    is_reset: bool
+
+
+def extract_port_list(lifted_hw_path: str,
+                      timeout_seconds: int = PORT_LIST_TIMEOUT_SECONDS,
+                      *, bin_dir: str = CIRCT_BIN_DIR) -> list:
+    """Read the design under test's port signature out of its lifted HW IR.
+
+    Runs ONE command on the lifted HW-dialect file the probe's own tool produced:
+
+        <bin_dir>/circt-opt <lifted_hw_path> -o - --mlir-print-op-generic
+
+    and reads the `module_type` attribute of the one `hw.module` that carries no
+    `sym_visibility = "private"`. The GENERIC form is used and the pretty form
+    is not, because the generic form spells every port as
+    `!hw.modty<input <name> : <type>, output <name> : <type>, ...>`, with the
+    direction as a word and the order as written, where the pretty form spells
+    the same thing as `in %name : type` / `out name : type` and drops the `%` on
+    outputs. Verified 2026-09-14 against the measured build.
+
+    Ports come back in signature order, inputs and outputs interleaved exactly
+    as the signature declares them, because that order is what the port_list
+    digest is taken over and what both harnesses index.
+
+    Returns:
+        list[Port], one per declared port, in signature order.
+    Worker:
+        {"circt": 1} - it runs the image's own circt-opt. Called inside B4, so
+        it takes no slot of its own.
+    Raises:
+        HarnessError("no_top"), ("bad_port_type"), ("no_clock"),
+        ("circt_opt_failed"), each of which is `harness_failure`.
+    """
+    return _ports(_top_module(_generic(lifted_hw_path, timeout_seconds, bin_dir))[1])
+
+
+def top_module_name(lifted_hw_path: str,
+                    timeout_seconds: int = PORT_LIST_TIMEOUT_SECONDS,
+                    *, bin_dir: str = CIRCT_BIN_DIR) -> str:
+    """The symbol name of the one public `hw.module`, which both harnesses name.
+
+    §3.6.3 gives the generators no way to learn it and §4.6 passes arcilator ONE
+    file, so the instantiate has to name a symbol the generator was told about
+    (erratum candidate). This is that one line, over the same generic form
+    `extract_port_list` reads.
+
+    Returns:
+        the symbol name.
+    Worker:
+        {"circt": 1}; called beside extract_port_list, on the same file.
+    Raises:
+        HarnessError, exactly as extract_port_list does.
+    """
+    return _top_module(_generic(lifted_hw_path, timeout_seconds, bin_dir))[0]
+
+
+def stimulus_seed(probe_id: str) -> int:
+    """§3.6.3's seed: reproducible from the probe id alone, never from `random`."""
+    digest = hashlib.sha256(f"{probe_id}|{STIMULUS_ID}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+def lfsr_value(seed: int, port_index: int, cycle: int, width: int) -> int:
+    """The low *width* bits of the shared stimulus for one (cycle, port) pair.
+
+    One Galois step from `seed ^ (port_index * 0x9E3779B1) ^ cycle`, as a plain
+    Python integer. A zero state is forced to one, which a Galois LFSR requires:
+    zero is its absorbing state and would drive a constant.
+    """
+    state = (seed ^ (port_index * _GOLDEN_RATIO) ^ cycle) & 0xFFFFFFFF
+    state = state or 1
+    lsb = state & 1
+    state >>= 1
+    if lsb:
+        state ^= _LFSR_TAPS
+    return state & ((1 << width) - 1)
+
+
+def gen_arc_harness(port_list: list, seed: int, *, top: str, design: str) -> str:
+    """Build the arcilator harness MLIR that drives one design from the stimulus.
+
+    Emits the design and one `func.func @bugloop_main` around its `arc.sim.*`
+    operations: `arc.sim.instantiate`, `arc.sim.set_input` per driven input per
+    cycle by the LFSR rule, `arc.sim.step` per edge, `arc.sim.get_port` per
+    output at the sample point and `arc.sim.emit` per sampled value. The entry
+    name is `ARC_JIT_ENTRY` and not a parameter, because §4.6 passes
+    `--jit-entry=bugloop_main` and a name per probe would be a second knob.
+
+    *top* and *design* are keywords §3.6.3's signature does not have and §4.6
+    forces: arcilator is passed ONE file, so the harness must carry the design,
+    and `arc.sim.instantiate` must name its symbol (erratum candidate).
+
+    The loop is fully unrolled because each cycle drives different values and
+    emits a different label, neither of which an `scf.for` can carry.
+
+    **The acceptance shape is arcilator's, not this document's.** Measured
+    2026-09-14 on the assertions-on build, `arc.sim.emit "BUGLOOP 0 o", %v : i8`
+    prints `BUGLOOP 0 o = 07`: one sampled value per line, the value zero-padded
+    to ceil(width / 4) hexadecimal digits. §3.6.3 asks for every port of a cycle
+    on ONE line and for `<port>=<value>` with no spaces, and `arc.sim.emit` is
+    arcilator's only output operation and cannot produce either. The padding
+    rule §3.6.3 fixes is exactly what the tool already does. `gen_verilator_tb`
+    emits the same measured shape, so the differ still compares two identical
+    line sequences positionally (erratum candidate).
+
+    Returns:
+        the harness as MLIR text, one trailing newline, UTF-8.
+    Worker:
+        pure; it builds a string, runs no process and reads no file.
+    Raises:
+        HarnessError("empty_port_list") for a port list with no driven input or
+            no sampled output, which has nothing to compare.
+    """
+    driven, sampled, clocks, resets = _roles(port_list)
+    body = ["module {", design.rstrip("\n"),
+            f"  func.func @{ARC_JIT_ENTRY}() {{",
+            "    %bl_lo = arith.constant 0 : i1",
+            "    %bl_hi = arith.constant 1 : i1",
+            "    %bl_ck0 = seq.to_clock %bl_lo",
+            "    %bl_ck1 = seq.to_clock %bl_hi",
+            f"    arc.sim.instantiate @{top} as %model {{"]
+    instance = f"!arc.sim.instance<@{top}>"
+    for cycle in range(DIFFERENTIAL_CYCLES):
+        for port in clocks:
+            body.append(f'      arc.sim.set_input %model, "{port.name}" = %bl_ck0 '
+                        f": {port.mlir_type}, {instance}")
+        for port in resets:
+            level = "%bl_hi" if _reset_asserted(port, cycle) else "%bl_lo"
+            body.append(f'      arc.sim.set_input %model, "{port.name}" = {level} '
+                        f": {port.mlir_type}, {instance}")
+        for port in driven:
+            value = lfsr_value(seed, port.index, cycle, port.width)
+            name = f"%bl_c{cycle}_{port.index}"
+            body.append(f"      {name} = arith.constant {value} : {port.mlir_type}")
+            body.append(f'      arc.sim.set_input %model, "{port.name}" = {name} '
+                        f": {port.mlir_type}, {instance}")
+        body.append(f"      arc.sim.step %model : {instance}")
+        if cycle >= RESET_CYCLES:
+            for port in sampled:
+                name = f"%bl_o{cycle}_{port.index}"
+                body.append(f'      {name} = arc.sim.get_port %model, "{port.name}" '
+                            f": {port.mlir_type}, {instance}")
+                body.append(f'      arc.sim.emit "BUGLOOP {cycle} {port.name}", '
+                            f"{name} : {port.mlir_type}")
+        for port in clocks:
+            body.append(f'      arc.sim.set_input %model, "{port.name}" = %bl_ck1 '
+                        f": {port.mlir_type}, {instance}")
+        body.append(f"      arc.sim.step %model : {instance}")
+    body += ["    }", "    return", "  }", "}"]
+    return "\n".join(body) + "\n"
+
+
+def gen_verilator_tb(port_list: list, seed: int, *, top: str) -> str:
+    """Build the SystemVerilog testbench that drives the same design identically.
+
+    Emits `module bugloop_tb`, which is the literal §4.10's `--top-module`
+    names: one `reg` per input, one `wire` per output, an instance of the design
+    bound by port NAME and never by position, the same reset protocol, the same
+    LFSR values in the same order, and one `$display` per sampled value in the
+    measured acceptance shape `gen_arc_harness` documents. `%h` pads to the
+    declared width, which is `ceil(width / 4)` hexadecimal digits, so the two
+    sides agree digit for digit without either being told the width twice.
+
+    *top* is a keyword §3.6.3's signature does not have: a testbench must name
+    the module it instantiates (erratum candidate).
+
+    Returns:
+        the testbench as SystemVerilog text, one trailing newline, UTF-8.
+    Worker:
+        pure; as above.
+    Raises:
+        HarnessError("empty_port_list"), exactly as gen_arc_harness does and for
+        the same reason, so a port list that fails one fails both.
+    """
+    driven, sampled, clocks, resets = _roles(port_list)
+    lines = ["`timescale 1ns/1ps", f"module {VERILATOR_TOP};"]
+    for port in port_list:
+        kind = "wire" if port.direction == "output" else "reg"
+        initial = "" if port.direction == "output" else " = 0"
+        lines.append(f"  {kind} {_range(port.width)}{port.name}{initial};")
+    binding = ", ".join(f".{port.name}({port.name})" for port in port_list)
+    lines.append(f"  {top} dut ({binding});")
+    lines.append("  initial begin")
+    for cycle in range(DIFFERENTIAL_CYCLES):
+        for port in clocks:
+            lines.append(f"    {port.name} = 1'b0;")
+        for port in resets:
+            lines.append(f"    {port.name} = 1'b{int(_reset_asserted(port, cycle))};")
+        for port in driven:
+            value = lfsr_value(seed, port.index, cycle, port.width)
+            lines.append(f"    {port.name} = {port.width}'h{value:x};")
+        lines.append("    #1;")
+        if cycle >= RESET_CYCLES:
+            for port in sampled:
+                lines.append(f'    $display("BUGLOOP {cycle} {port.name} = %h", '
+                             f"{port.name});")
+        for port in clocks:
+            lines.append(f"    {port.name} = 1'b1;")
+        lines.append("    #1;")
+    lines += ["    $finish;", "  end", "endmodule"]
+    return "\n".join(lines) + "\n"
+
+
+def _roles(port_list: list) -> tuple:
+    """(driven inputs, sampled outputs, clocks, resets), and the one refusal.
+
+    Clock and reset ports are excluded from the stimulus: the harness drives the
+    clock and the reset protocol drives the resets (§3.6.3). An `inout` port is
+    neither driven nor sampled, there being no two-state protocol for one.
+    """
+    clocks = [p for p in port_list if p.is_clock]
+    resets = [p for p in port_list if p.is_reset and not p.is_clock]
+    driven = [p for p in port_list
+              if p.direction == "input" and not p.is_clock and not p.is_reset]
+    sampled = [p for p in port_list if p.direction == "output"]
+    if not driven or not sampled:
+        raise HarnessError("empty_port_list",
+                           f"{len(driven)} driven inputs, {len(sampled)} outputs")
+    return driven, sampled, clocks, resets
+
+
+def _reset_asserted(port: Port, cycle: int) -> bool:
+    """`hold-8-then-release`: the LEVEL to drive, active low taken into account."""
+    active_low = port.name in _ACTIVE_LOW_RESETS
+    return (cycle < RESET_CYCLES) != active_low
+
+
+def _range(width: int) -> str:
+    return "" if width == 1 else f"[{width - 1}:0] "
+
+
+def _generic(path: str, timeout_seconds: int, bin_dir: str) -> str:
+    """The one `circt-opt --mlir-print-op-generic` run, bounded by subprocess."""
+    try:
+        done = subprocess.run([os.path.join(bin_dir, "circt-opt"), path, "-o", "-",
+                               "--mlir-print-op-generic"],
+                              capture_output=True, text=True, timeout=timeout_seconds)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise HarnessError("circt_opt_failed", str(error)) from error
+    if done.returncode != 0:
+        raise HarnessError("circt_opt_failed", done.stderr.strip()[:400])
+    return done.stdout
+
+
+def _top_module(generic: str) -> tuple:
+    """(symbol name, modty body) of the one hw.module with public visibility."""
+    headers = list(_HW_MODULE.finditer(generic))
+    public = []
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(generic)
+        if 'sym_visibility = "private"' in generic[header.end():end]:
+            continue
+        attrs = header.group("attrs")
+        name = re.search(r'sym_name = "(?P<name>[^"]*)"', attrs)
+        marker = attrs.find("!hw.modty<")
+        if not name or marker < 0:
+            continue
+        public.append((name.group("name"),
+                       _balanced(attrs, marker + len("!hw.modty<") - 1)))
+    if len(public) != 1:
+        raise HarnessError("no_top", f"{len(public)} public hw.module operations")
+    return public[0]
+
+
+def _balanced(text: str, open_index: int) -> str:
+    """The contents of the `<...>` opening at *open_index*, nesting respected."""
+    depth = 0
+    for index in range(open_index, len(text)):
+        if text[index] == "<":
+            depth += 1
+        elif text[index] == ">":
+            depth -= 1
+            if depth == 0:
+                return text[open_index + 1:index]
+    raise HarnessError("no_top", "unbalanced !hw.modty")
+
+
+def _ports(modty: str) -> list:
+    """Parse one `!hw.modty<...>` body into `Port`s, in signature order."""
+    ports = []
+    for index, entry in enumerate(_split_top_level(modty)):
+        match = _PORT_ENTRY.match(entry.strip())
+        if not match:
+            raise HarnessError("bad_port_type", entry.strip()[:120])
+        mlir_type = match.group("type").strip()
+        name = match.group("name")
+        ports.append(Port(index=index, name=name, direction=match.group("direction"),
+                          width=_width(mlir_type), mlir_type=mlir_type,
+                          is_clock=mlir_type == "!seq.clock" or name in _CLOCK_NAMES,
+                          is_reset=name in _RESET_NAMES and _width(mlir_type) == 1))
+    if not any(port.is_clock for port in ports):
+        raise HarnessError("no_clock", "a combinational design has no cycle to sample")
+    return ports
+
+
+def _split_top_level(modty: str) -> list:
+    """Split a modty body on commas that are not inside a bracket of any kind."""
+    entries, depth, start = [], 0, 0
+    for index, char in enumerate(modty):
+        if char in "<([":
+            depth += 1
+        elif char in ">)]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            entries.append(modty[start:index])
+            start = index + 1
+    tail = modty[start:]
+    if tail.strip():
+        entries.append(tail)
+    return entries
+
+
+def _width(mlir_type: str) -> int:
+    """`iN`, `!seq.clock` and `!seq.immutable<iN>`; everything else is refused.
+
+    Every aggregate (`!hw.array`, `!hw.struct`, `!hw.inout`) and every
+    parameterised width lands here, which is `bad_port_type` and
+    `harness_failure` and never `diverge`.
+    """
+    if mlir_type == "!seq.clock":
+        return 1
+    for pattern in (_IN_WIDTH, _IMMUTABLE):
+        found = pattern.match(mlir_type)
+        if found:
+            bits = int(found.group("bits"))
+            if bits < 1:
+                raise HarnessError("bad_port_type", mlir_type)
+            return bits
+    raise HarnessError("bad_port_type", mlir_type)
 
 
 # --- 3.6.4 B5, the reducer --------------------------------------------------
@@ -939,5 +1327,9 @@ def _sha256(path: str) -> str:
 
 __all__ = ["BinaryMismatch", "probe_execute", "classify_build", "oracle_primary",
            "strip_prologue", "select_reducer", "reduce_case",
-           "write_interestingness", "PROBE_NOFILE", "PROBE_WALL_MARGIN_SECONDS",
-           "CPU_HARD_MARGIN_SECONDS"]
+           "write_interestingness", "HarnessError", "Port", "extract_port_list",
+           "top_module_name", "gen_arc_harness", "gen_verilator_tb",
+           "stimulus_seed", "lfsr_value", "PROBE_NOFILE",
+           "PROBE_WALL_MARGIN_SECONDS", "CPU_HARD_MARGIN_SECONDS", "X_POLICY",
+           "ARC_JIT_ENTRY", "STIMULUS_ID", "RESET_PROTOCOL", "SAMPLE_POINT",
+           "DIFFERENTIAL_CYCLES", "PORT_LIST_TIMEOUT_SECONDS"]
