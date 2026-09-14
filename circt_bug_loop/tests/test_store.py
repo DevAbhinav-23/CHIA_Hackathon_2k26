@@ -144,8 +144,13 @@ def test_T_U_store_01(tmp_path: Path):
                       "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
     tables = [r["name"] for r in rows if r["type"] == "table"]
     indexes = [r["name"] for r in rows if r["type"] == "index"]
-    assert len(tables) == 21 and "candidate" in tables and "ledger_entry" in tables
+    # §6.2's twenty-one, plus `registration`, which §6.2 does NOT declare: W-12
+    # made the pre-registration an annotated tag, and the run records which one
+    # it was checked against. It is a statement of its own, so the two
+    # comparisons below still hold §6.2 and §6.3 to the letter (errata row 32).
+    assert len(tables) == 22 and "candidate" in tables and "registration" in tables
     assert len(indexes) == 9 and "ix_ledger_day" in indexes
+    assert "registration" not in store._DDL_TABLES
 
     conn = sqlite3.connect(str(tmp_path / "loop.db"))
     try:
@@ -287,7 +292,7 @@ def test_T_U_store_06(tmp_path: Path):
         else:
             campaign_wide.append(table)
     assert campaign_wide == ["image", "issue_mirror"]
-    assert len(traced) == 19
+    assert len(traced) == 20                 # 19 of §6.2, plus W-12's `registration`
 
     seed_rows(loop)
     row = loop.query_one("SELECT artefact_dir, run_manifest_id FROM candidate")

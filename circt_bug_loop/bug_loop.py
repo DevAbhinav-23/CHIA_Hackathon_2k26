@@ -910,12 +910,18 @@ def _git(repo_root: str, *args: str, timeout: int = 60) -> str:
 
 
 def check_01_budget_registered(*, budget_path: str, repo_root: str,
-                               run_start_utc: str, exact_pin_shas=None) -> BudgetFile:
-    """Check 1: budget.yaml is committed and its commit predates the run (FR-14.2).
+                               run_start_utc: str, campaign: bool = False,
+                               exact_pin_shas=None) -> BudgetFile:
+    """Check 1: budget.yaml is committed, earlier than the run, and registered.
 
     `budget.load_budget` is the one place the six registration checks live, so
     this check runs them rather than restating them; FR-05.2's mutator-set rule
     is check 2 and runs inside the same call (W-06 erratum 6).
+
+    *campaign* is what makes a missing `registration/*` tag fatal (FR-14.2,
+    FR-14.3, W-12): `run_campaign` passes false for a `--dry-run` and for a
+    `--generator recorded` run, neither of which reports a result, and true for
+    every run that does.
 
     Returns:
         BudgetFile, which every later check and the manifest read.
@@ -927,14 +933,20 @@ def check_01_budget_registered(*, budget_path: str, repo_root: str,
     try:
         return budget_module.load_budget._chia_original(
             budget_path, repo_root, run_start_utc=run_start_utc,
-            exact_pin_shas=exact_pin_shas)["budget"]
+            campaign=campaign, exact_pin_shas=exact_pin_shas)["budget"]
     except budget_module.BudgetError as error:
         raise PreflightFailed("budget_registered", str(error)) from error
 
 
-def check_02_mutator_set_earlier(*, budget: BudgetFile, repo_root: str,
+def check_02_mutator_set_earlier(*, repo_root: str,
                                  flow_dir: str = str(FLOW_DIR)) -> None:
-    """Check 2: the mutator set's last commit predates the budget file's (FR-05.2).
+    """Check 2: the registration tag reaches the mutator set's commit (FR-05.2).
+
+    W-12 replaced the date comparison with ancestry under the tag, so this check
+    no longer needs the `BudgetFile` it used to take the registration SHA off:
+    the tag is the registration and `budget.registration` resolves it. An
+    unregistered repository has nothing to be earlier than and passes, which is
+    the dry run's case; check 1 has already refused a campaign in one.
 
     Returns:
         None.
@@ -943,13 +955,11 @@ def check_02_mutator_set_earlier(*, budget: BudgetFile, repo_root: str,
     Raises:
         PreflightFailed("mutator_set_earlier", detail).
     """
+    tag, registered = budget_module.registration(repo_root)
+    if not tag:
+        return
     try:
-        budget_module._check_frozen_set(repo_root, flow_dir, budget.budget_file_sha,
-                                        budget_module._last_commit(
-                                            repo_root,
-                                            budget_module._relative(
-                                                str(Path(flow_dir) / "budget.yaml"),
-                                                repo_root))[1])
+        budget_module._check_frozen_set(repo_root, flow_dir, tag, registered)
     except budget_module.BudgetError as error:
         raise PreflightFailed("mutator_set_earlier", str(error)) from error
 
@@ -1893,7 +1903,8 @@ _utc = utc_now
 
 def write_run_rows(store: LoopStore, manifest: RunManifest, *,
                    image_spec: ImageSpec, mined: Optional[dict] = None,
-                   mirror: Optional[dict] = None) -> None:
+                   mirror: Optional[dict] = None,
+                   registration: tuple = ("", "")) -> None:
     """Write everything §6.4 puts in the store before the first probe is dispatched.
 
     In the order the foreign keys fix: the `run` row first, because every other
@@ -1902,6 +1913,12 @@ def write_run_rows(store: LoopStore, manifest: RunManifest, *,
     its `sdk_map`; then B6a's `issue_mirror_meta`, which is keyed by the run.
     Each is written once, so a `--resume` run finds its own rows and adds none,
     and an image built for an earlier run is not inserted twice.
+
+    *registration* is `budget.registration`'s (tag, commit), recorded in the
+    `registration` table so the run says WHICH pre-registration it was checked
+    against (W-12). An unregistered repository writes no row, which is the dry
+    run's case; the manifest's `budget_file_sha` is the run's identity either
+    way and the contract does not move.
 
     Returns:
         None.
@@ -1915,6 +1932,10 @@ def write_run_rows(store: LoopStore, manifest: RunManifest, *,
                        (run_id,)) is None:
         store.insert("run", _row(store, "run", manifest,
                                  manifest_json=schema.to_json(manifest)))
+        if registration[0]:
+            store.insert("registration", {"run_manifest_id": run_id,
+                                          "registration_tag": registration[0],
+                                          "registration_commit": registration[1]})
     if store.query_one("SELECT 1 FROM image WHERE image_digest = ?",
                        (image_spec.image_digest,)) is None:
         store.insert("image", _row(store, "image", image_spec, built_utc=_utc()))
@@ -3589,10 +3610,13 @@ def run_campaign(args, out) -> int:
     # Before anything is dispatched: the staged package is what every worker
     # imports, and checks 13 and 14 read it (K3, K6, K7, K11, W6).
     shipped = stage_shipped()
-    budget = check_01_budget_registered(budget_path=args.budget,
-                                        repo_root=repo_root,
-                                        run_start_utc=started_utc)
-    check_02_mutator_set_earlier(budget=budget, repo_root=repo_root)
+    # A run that reports a result is a campaign and needs the registration tag;
+    # a dry run and a `--generator recorded` run report none and do not (W-12).
+    budget = check_01_budget_registered(
+        budget_path=args.budget, repo_root=repo_root, run_start_utc=started_utc,
+        campaign=not (args.dry_run or args.generator == "recorded"))
+    registration = budget_module.registration(repo_root)
+    check_02_mutator_set_earlier(repo_root=repo_root)
     check_03_clone_head(clone_path=args.clone,
                         corpus_head_sha=budget.corpus_head_sha)
     check_04_artefact_root_head(artefact_root=args.artefact_root)
@@ -3713,7 +3737,7 @@ def run_campaign(args, out) -> int:
     # before --dry-run returns: a dry run's loop.db is what an operator reads to
     # see what the run would have been taken against.
     write_run_rows(store, manifest, image_spec=image_spec, mined=mined,
-                   mirror=mirror)
+                   mirror=mirror, registration=registration)
     accrue_offline(store, manifest, budget, dispatch=dispatch, recorder=recorder,
                    image_seconds=getattr(built.get("counters"), "seconds", 0.0))
     print(f"manifest {manifest.run_manifest_id} at {run_root}", file=out)

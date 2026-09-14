@@ -402,8 +402,24 @@ CREATE INDEX IF NOT EXISTS ix_mirror_state          ON issue_mirror(state);
 CREATE INDEX IF NOT EXISTS ix_filing_confirmed      ON filing(confirmed);
 """
 
+#: The one table 6.2 does NOT declare, and the reason it is a statement of its
+#: own rather than a row of `_DDL_TABLES` (errata row 32): `T-U-store-01`
+#: compares `_DDL_TABLES` to 03-LLD.md 6.2 for TEXTUAL equality, so a column
+#: added to the `run` table there would either fail that comparison or need an
+#: edit to a design document W-12 may not make. W-12 turned the pre-registration
+#: into an annotated tag, and the architect's decision asks the run to record
+#: WHICH registration it was checked against; `RunManifest.budget_file_sha`
+#: stays the run's identity and gains nothing, so the contract does not move.
+_DDL_REGISTRATION = """\
+CREATE TABLE IF NOT EXISTS registration (
+    run_manifest_id     TEXT PRIMARY KEY REFERENCES run(run_manifest_id),
+    registration_tag    TEXT NOT NULL,
+    registration_commit TEXT NOT NULL
+);
+"""
+
 #: What init_schema runs. executescript takes the whole text at once.
-_SCHEMA = _DDL_TABLES + "\n" + _DDL_INDEXES
+_SCHEMA = _DDL_TABLES + "\n" + _DDL_INDEXES + "\n" + _DDL_REGISTRATION
 
 #: The zero-byte marker of FR-17.8, named once.
 PARTIAL = "PARTIAL"
@@ -855,6 +871,8 @@ def _ident(name: str) -> str:
 
 def init_schema(node: Any) -> None:
     """Create every table of 03-LLD.md 6.2 and every index of 6.3, idempotently.
+
+    Plus `registration`, which 6.2 does not declare; see `_DDL_REGISTRATION`.
 
     *node* is either the SQLiteNode of 6.1, whose init_schema member runs the
     script as a Ray task on the pinned head, or an open sqlite3.Connection,

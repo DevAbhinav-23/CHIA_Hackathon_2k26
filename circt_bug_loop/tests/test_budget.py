@@ -62,6 +62,11 @@ class Repo:
         self.git("commit", "-q", "-m", f"land {relative}", when=when)
         return self.git("log", "-1", "--format=%H", "--", relative).strip()
 
+    def register(self, name: str = "registration/campaign-01") -> str:
+        """Annotate HEAD as the pre-registration and return the commit it names."""
+        self.git("tag", "-a", name, "-m", "the pre-registration")
+        return self.git("rev-parse", f"{name}^{{commit}}").strip()
+
     def load(self, **kwargs):
         """`load_budget` against this repository's budget file.
 
@@ -192,22 +197,52 @@ def test_T_U_budget_06(repo: Repo):
     assert manifest.budget_file_sha == expected
 
 
-def test_T_U_budget_07(repo: Repo):
-    """T-U-budget-07 (FR-05.2): a mutator set committed after the budget file is refused."""
-    repo.commit("circt_bug_loop/mutators/set_v1.json", '{"set_version": "v1"}\n',
-                when=_EARLY + timedelta(days=1))
-    with pytest.raises(budget_module.BudgetError) as caught:
-        repo.load()
-    assert "mutators/set_v1.json" in str(caught.value)
-    assert "FR-05.2" in str(caught.value)
+def test_T_U_budget_07(repo: Repo, tmp_path: Path):
+    """T-U-budget-07 (FR-05.2, FR-14.3): the registration is a TAG, and it must reach the set.
 
-    repo.commit("circt_bug_loop/mutators/set_v1.json", '{"set_version": "v2"}\n',
-                when=_EARLY - timedelta(days=1))
-    assert repo.load().budget_file_sha, "a set frozen before the registration passes"
+    W-12's architect decision, in the three states that matter. UNREGISTERED: a
+    campaign is refused and every other reader is not, which is what lets A7
+    synthesise and the calibration sample be drawn before the tag exists.
+    TAGGED, with the set committed BEFORE the tag's commit: accepted. TAGGED,
+    with the set committed after it: refused, naming the set's commit and the
+    tag. Ancestry decides, not the two commit dates: a rebase rewrites a date
+    and cannot rewrite reachability.
+    """
+    assert budget_module.registration(str(repo.root)) == ("", "")
+    assert repo.load().budget_file_sha, "an unregistered repository still loads"
+    with pytest.raises(budget_module.BudgetError) as caught:
+        repo.load(campaign=True)
+    assert "registration" in str(caught.value) and "FR-14.3" in str(caught.value)
+
+    registered = repo.register()
+    assert budget_module.registration(str(repo.root)) == (
+        "registration/campaign-01", registered)
+    out = call_node(budget_module.load_budget, str(repo.budget), str(repo.root),
+                    run_start_utc=_RUN_START, campaign=True)
+    assert out["registration"] == {"tag": "registration/campaign-01",
+                                   "commit": registered}
+    # The tag does not become the identity: FR-14.3's SHA is still the commit.
+    assert out["budget"].budget_file_sha == repo.git(
+        "log", "-1", "--format=%H", "--", "circt_bug_loop/budget.yaml").strip()
+
+    later = repo.commit("circt_bug_loop/mutators/set_v1.json",
+                        '{"set_version": "v1"}\n', when=_EARLY - timedelta(days=1))
+    with pytest.raises(budget_module.BudgetError) as caught:
+        repo.load(campaign=True)
+    message = str(caught.value)
+    assert "mutators/set_v1.json" in message and "FR-05.2" in message
+    assert later in message and "registration/campaign-01" in message
+
+    ordered = Repo(tmp_path / "ordered")
+    ordered.commit("circt_bug_loop/mutators/set_v1.json", '{"set_version": "v1"}\n')
+    ordered.commit("circt_bug_loop/budget.yaml", COMPLETE.read_text(encoding="utf-8"))
+    ordered.register()
+    assert ordered.load(campaign=True).budget_file_sha, \
+        "a set the registration tag reaches passes"
 
 
 def test_T_U_budget_08(repo: Repo):
-    """T-U-budget-08 (FR-14.7): a change after the manifest is stamped invalidates it."""
+    """T-U-budget-08 (FR-14.7): a change after the stamp, and a change after the TAG."""
     stamped = repo.load().budget_file_sha
     assert repo.load(manifest_budget_file_sha=stamped).budget_file_sha == stamped
 
@@ -216,6 +251,17 @@ def test_T_U_budget_08(repo: Repo):
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load(manifest_budget_file_sha=stamped)
     assert stamped in str(caught.value) and amended in str(caught.value)
+
+    # W-12: registered at the amendment, then edited again. The file's own
+    # commit is then one the tag cannot reach, and that refuses the run on its
+    # own, before any manifest has been stamped.
+    registered = repo.register()
+    assert repo.load(campaign=True).budget_file_sha == amended
+    again = repo.commit("circt_bug_loop/budget.yaml", edited(filings_total=98))
+    with pytest.raises(budget_module.BudgetError) as caught:
+        repo.load(campaign=True)
+    assert again in str(caught.value) and registered in str(caught.value)
+    assert "FR-14.7" in str(caught.value)
 
 
 def test_T_U_budget_09(repo: Repo):

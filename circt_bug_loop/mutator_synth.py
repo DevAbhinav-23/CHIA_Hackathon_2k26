@@ -1,12 +1,12 @@
 """A7: the offline, once, pre-registration mutator synthesis and freeze (8.3).
 
-Not imported by the campaign, and it refuses to run at all once a
-pre-registration commit exists (8.1 rule 3), so a running campaign cannot
+Not imported by the campaign, and it refuses to run at all once the
+pre-registration TAG exists (8.1 rule 3), so a running campaign cannot
 synthesise a mutator even by accident. Its input is the issue mirror B6a built
 in `loop.db` and nothing else: no GitHub request is made here, for the same
 reason 3.7.3's screen makes none (FR-10.3, NFR-04).
 
-Two deviations from 03-LLD.md, both recorded in
+Three deviations from 03-LLD.md, each recorded in
 `design/reviews/implementation-errata-log.md`:
 
   * The mirror is read through a read-only `sqlite3` connection and not through
@@ -14,6 +14,10 @@ Two deviations from 03-LLD.md, both recorded in
     import a `store.py` name, and A7 only ever reads one table.
   * 8.3 step 2's column is `number`; the table's column is `issue_number`
     (6.2), and the query here uses the column that exists.
+  * 8.3 step 1 asks whether a `budget.yaml` commit exists. It is an annotated
+    `registration/*` tag that is asked for instead (W-12 architect decision,
+    errata row 30): the file's first landing commit is not the registration, and
+    reading it as one refused A7 - which runs BEFORE the registration - forever.
 """
 from __future__ import annotations
 
@@ -21,7 +25,6 @@ import hashlib
 import json
 import re
 import sqlite3
-import subprocess
 import time
 from pathlib import Path
 from string import Template
@@ -29,7 +32,7 @@ from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop import llm, mutators
+from circt_bug_loop import budget, llm, mutators
 from circt_bug_loop.contract.schema import CounterBlock, canonical_json
 
 #: 8.3's prompt, beside this module (1.1). `cfg["mutator_synth"]` overrides it.
@@ -56,27 +59,27 @@ class MutatorSynthError(Exception):
         super().__init__(f"{reason}: {detail}" if detail else reason)
 
 
-def _git(repo_root: str, *args: str) -> str:
-    """Run one git argument vector in *repo_root* and return its stdout."""
-    done = subprocess.run(["git", "-C", repo_root, *args], capture_output=True,
-                          text=True, errors="backslashreplace", timeout=300,
-                          check=False)
-    return done.stdout.strip() if done.returncode == 0 else ""
-
-
 def registration_commit(repo_root: str) -> str:
-    """Return the commit that landed `budget.yaml`, or "" when there is none.
+    """Return the commit the newest `registration/*` tag names, or "".
 
-    That commit IS the pre-registration (FR-14.3), so its existence is the one
-    fact step 1 needs. Two pathspecs and not one path: the loop lives at
-    `circt_bug_loop/` in the team repository and at `examples/circt_bug_loop/`
-    in a CHIA checkout (1.4), and a module here may not walk above its own
-    directory to work out which, so the question asked of git is "a file called
-    budget.yaml, at the root or at any depth" (erratum: 8.3 step 1 gives one
-    bare path, which is right in only one of the two trees).
+    That tag IS the pre-registration (FR-14.3 as amended by W-12), so its
+    existence is the one fact step 1 needs, and its absence is what makes this
+    synthesis legal at all: A7 runs once, before the campaign is registered.
+
+    Resolved by `budget.registration` and not by a second `git` read of this
+    module's own, so the rule the synthesis refuses on and the rule the campaign
+    is checked against cannot drift apart (N3). It also drops the two-pathspec
+    problem the old reading had, a tag name being the same in both of 1.4's
+    trees.
+
+    Returns:
+        str, a 40-character commit SHA, or "" when the repository holds no tag.
+    Worker:
+        head; two `git` reads and no write.
+    Raises:
+        budget.BudgetError when `git` itself fails.
     """
-    return _git(repo_root, "log", "-1", "--format=%H", "--",
-                "budget.yaml", "*/budget.yaml")
+    return budget.registration(repo_root)[1]
 
 
 def read_mirror(db_path: str) -> list:
@@ -221,7 +224,7 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
         turn is dispatched from here at {"llm": 1.0}.
     Raises:
         MutatorSynthError("already_registered", sha) when step 1 finds a
-            budget.yaml commit; MutatorSynthError("empty_mirror") when step 2
+            `registration/*` tag; MutatorSynthError("empty_mirror") when step 2
             returns no row; MutatorSynthError("set_exists", path) when step 5
             finds the file; PromptContractError from 7.1's parser, which
             freezes nothing.

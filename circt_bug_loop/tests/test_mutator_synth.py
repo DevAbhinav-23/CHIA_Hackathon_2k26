@@ -127,11 +127,16 @@ def set_directory(tmp_path):
 @pytest.mark.t0
 def test_T_U_msyn_01_a_registered_campaign_refuses_before_any_turn(
         mirror, unregistered_repo, turn, tmp_path):
-    """T-U-msyn-01 (FR-05.2): step 1 is first, and the turn count for it is zero.
+    """T-U-msyn-01 (FR-05.2, FR-14.3): step 1 is first, and the turn count for it is zero.
 
     The refusal is first so that no model turn is spent discovering it, and the
     fix for it is to synthesise before registering, never to edit the
     registration (FR-14.3, FR-14.7).
+
+    W-12: the registration is an annotated `registration/*` TAG, so a repository
+    that has merely COMMITTED `budget.yaml` is not registered and the synthesis
+    runs in it - which is the state A7 is specified to run in, and which the
+    previous reading of step 1 had made unreachable for good.
     """
     state = turn(transcript("mutator_synth_ok"))
     root = Path(unregistered_repo)
@@ -140,16 +145,24 @@ def test_T_U_msyn_01_a_registered_campaign_refuses_before_any_turn(
                                                          encoding="utf-8")
     _git(root, "add", "-A")
     _git(root, "-c", "user.name=b", "-c", "user.email=b@l", "commit", "-q",
-         "-m", "the pre-registration")
-    registration = _git(root, "rev-parse", "HEAD")
+         "-m", "budget.yaml lands, and registers nothing")
 
+    assert mutator_synth.registration_commit(unregistered_repo) == ""
+    assert run(mirror, unregistered_repo, tmp_path)["mutators_written"]
+    assert len(state["calls"]) == 1
+
+    _git(root, "-c", "user.name=b", "-c", "user.email=b@l", "tag", "-a",
+         "registration/campaign-01", "-m", "the pre-registration")
+    registration = _git(root, "rev-parse", "registration/campaign-01^{commit}")
     assert mutator_synth.registration_commit(unregistered_repo) == registration
 
+    state["calls"].clear()
     with pytest.raises(MutatorSynthError) as raised:
-        run(mirror, unregistered_repo, tmp_path)
+        run(mirror, unregistered_repo, tmp_path, set_version="v2")
     assert raised.value.reason == "already_registered"
+    assert raised.value.detail == registration
     assert state["calls"] == [], "a turn was dispatched before the refusal"
-    assert not list((tmp_path / "sets").iterdir())
+    assert [p.name for p in (tmp_path / "sets").iterdir()] == ["set_v1.json"]
 
 
 @pytest.mark.t0

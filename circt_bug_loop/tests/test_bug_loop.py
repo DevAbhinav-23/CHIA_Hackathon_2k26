@@ -77,17 +77,22 @@ def budget_file(**overrides) -> schema.BudgetFile:
     return parsed
 
 
-def registered_repo(tmp_path: Path, *, mutator_after: bool = False) -> Path:
-    """A throwaway repository whose `budget.yaml` commit is the registration.
+def registered_repo(tmp_path: Path, *, mutator_after: bool = False,
+                    tag: str = "registration/campaign-01") -> Path:
+    """A throwaway repository whose `budget.yaml` commit carries the registration tag.
 
     Built here rather than committed, which is W-06 erratum 18's rule for every
     budget fixture: the file under test is the repository's own `budget.yaml`
     and a second copy would drift from it.
 
-    Every commit is dated EXPLICITLY, an hour apart. `budget.py`'s freeze rule
-    is `committed_at >= budget_at`, so two commits made in the same wall-clock
-    second refuse a correctly ordered repository, which is what W-16 hit: the
-    ordering under test is the commits' own and not the test machine's speed.
+    Every commit is dated EXPLICITLY, an hour apart. The dates no longer decide
+    the freeze rule - W-12 made it ancestry under the registration tag - but
+    they still decide FR-14.2's "earlier than the run's start", and two commits
+    in the same wall-clock second are what W-16 hit.
+
+    *tag* is the annotated `registration/*` tag, placed on the registration
+    commit. `None` builds the same repository UNREGISTERED, which is what a dry
+    run, the calibration draw and A7 all see (W-12).
     """
     repo = tmp_path / "repo"
     flow = repo / "circt_bug_loop" / "mutators"
@@ -112,6 +117,10 @@ def registered_repo(tmp_path: Path, *, mutator_after: bool = False) -> Path:
         commit("the mutator set", 1)
     budget_path.write_text(source, encoding="utf-8")
     commit("the registration", 2)
+    if tag is not None:
+        subprocess.run(git + ("tag", "-a", tag, "-m", "W-22"), check=True,
+                       env={**os.environ, "GIT_COMMITTER_DATE":
+                            "2026-09-18T02:00:00+00:00"})
     if mutator_after:
         frozen.write_text('{"set_version": "v1", "edited": true}\n', encoding="utf-8")
         commit("the set, edited after", 3)
@@ -135,37 +144,57 @@ def parsed_args(**overrides):
 
 
 def test_T_U_driver_01(tmp_path: Path):
-    """T-U-driver-01 (FR-14.2): check 1 accepts a registered file and refuses a later one.
+    """T-U-driver-01 (FR-14.2, FR-14.3): check 1 accepts a registered file, refuses a later one.
+
+    Since W-12 it also refuses a CAMPAIGN in a repository carrying no
+    `registration/*` tag, and lets a dry run and a `--generator recorded` run
+    read the same file, which is the whole point of the tag: A7 and the
+    calibration draw both run before the registration exists.
 
     Fixture: a throwaway repository built here. Tier 0.
     """
     repo = registered_repo(tmp_path)
+    path = str(repo / "circt_bug_loop" / "budget.yaml")
     budget = bug_loop.check_01_budget_registered(
-        budget_path=str(repo / "circt_bug_loop" / "budget.yaml"),
-        repo_root=str(repo), run_start_utc="2036-01-01T00:00:00+00:00")
+        budget_path=path, repo_root=str(repo),
+        run_start_utc="2036-01-01T00:00:00+00:00", campaign=True)
     assert len(budget.budget_file_sha) == 40
 
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_01_budget_registered(
-            budget_path=str(repo / "circt_bug_loop" / "budget.yaml"),
-            repo_root=str(repo), run_start_utc="2000-01-01T00:00:00+00:00")
+            budget_path=path, repo_root=str(repo),
+            run_start_utc="2000-01-01T00:00:00+00:00")
     assert raised.value.check == "budget_registered"
+
+    unregistered = registered_repo(tmp_path / "untagged", tag=None)
+    other = str(unregistered / "circt_bug_loop" / "budget.yaml")
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_01_budget_registered(
+            budget_path=other, repo_root=str(unregistered),
+            run_start_utc="2036-01-01T00:00:00+00:00", campaign=True)
+    assert raised.value.check == "budget_registered"
+    assert "registration" in str(raised.value)
+    assert bug_loop.check_01_budget_registered(
+        budget_path=other, repo_root=str(unregistered),
+        run_start_utc="2036-01-01T00:00:00+00:00").budget_file_sha
 
 
 def test_T_U_driver_02(tmp_path: Path):
-    """T-U-driver-02 (FR-05.2): check 2 refuses a mutator set committed after the budget.
+    """T-U-driver-02 (FR-05.2): check 2 refuses a set the registration tag cannot reach.
 
     Fixture: the same repository, with the frozen set edited afterwards. Tier 0.
     """
     repo = registered_repo(tmp_path, mutator_after=True)
-    budget = schema.BudgetFile(
-        **{**yaml.safe_load(Path(budget_module.BUDGET_YAML).read_text()),
-           "budget_file_sha": "b" * 40})
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.check_02_mutator_set_earlier(
-            budget=budget, repo_root=str(repo),
-            flow_dir=str(repo / "circt_bug_loop"))
+            repo_root=str(repo), flow_dir=str(repo / "circt_bug_loop"))
     assert raised.value.check == "mutator_set_earlier"
+
+    # An unregistered repository has nothing to be earlier than, and check 1
+    # has already refused the campaign in it (W-12).
+    untagged = registered_repo(tmp_path / "untagged", mutator_after=True, tag=None)
+    bug_loop.check_02_mutator_set_earlier(
+        repo_root=str(untagged), flow_dir=str(untagged / "circt_bug_loop"))
 
 
 def test_T_U_driver_03():
