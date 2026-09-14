@@ -103,6 +103,14 @@ available_node_types:
                 # the key and not this still cannot reach Vertex (3.5.1). Unset
                 # in every tier below T3, and set only for the pilot onward.
                 - "-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}"
+                # FR-17.9's ONE artefact root, on this type too (W-18). It was
+                # missing here and present on the other two, and pre-flight
+                # check 5 probes EVERY worker type, so every run through
+                # `run_campaign` was refused with
+                # `bugloop_llm cannot write ${BUGLOOP_ARTEFACTS}`. Nothing had
+                # met it: W-19a's smoke and W-19b's tier-3 tests drive
+                # `campaign_drive` directly and never reach the pre-flight.
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
                 - "-v $SSH_AUTH_SOCK:/ssh-agent"
                 - "-e SSH_AUTH_SOCK=/ssh-agent"
             run_setup_commands:

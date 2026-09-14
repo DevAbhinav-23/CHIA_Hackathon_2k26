@@ -96,11 +96,16 @@ def test_T_U_cluster_04():
     for name in TYPES:
         options = types[name]["docker"]["run_options"]
         assert "--user $(id -u):$(id -g)" in options, name
+    # FR-17.9's one artefact root is on ALL THREE types, which is what pre-flight
+    # check 5 probes: it was missing from `bugloop_llm` and refused every run
+    # through `run_campaign` (W-18).
+    for name in TYPES:
+        options = types[name]["docker"]["run_options"]
+        assert "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}" in options, name
     for name in ("bugloop_circt", "bugloop_repair"):
         options = types[name]["docker"]["run_options"]
         assert any(o.startswith("--cpus=") for o in options), name
         assert any(o.startswith("--memory=") for o in options), name
-        assert "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}" in options, name
     llm = types["bugloop_llm"]["docker"]["run_options"]
     assert not [o for o in llm if o.startswith(("--cpus", "--memory"))]
     assert "NFR-05's outer level" in SINGLE.read_text(encoding="utf-8")
