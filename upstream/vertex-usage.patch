@@ -1,8 +1,17 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..ad2f568 100644
+index d103349..64ed021 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
-@@ -168,6 +168,54 @@ class ContentBlockedError(VertexError):
+@@ -25,6 +25,8 @@ from __future__ import annotations
+ import json
+ import logging
+ import os
++import random
++import re
+ from datetime import datetime, timedelta, timezone
+ from typing import TYPE_CHECKING, List, Optional
+ 
+@@ -168,6 +170,94 @@ class ContentBlockedError(VertexError):
          return (self.__class__, (self.node_id, self.block_reason, self.raw_message))
  
  
@@ -53,24 +62,69 @@ index d103349..ad2f568 100644
 +#: Seconds ``_get_node_id`` waits for Ray before answering "unknown".
 +NODE_ID_TIMEOUT_SECONDS = 10.0
 +
++#: The backoff ``_one_call`` waits out a 429 with: the first wait in seconds,
++#: doubled per attempt, never past the cap, each wait randomised by +/- the
++#: jitter so concurrent stage nodes do not re-send together. A refused call is
++#: billed nothing, so waiting costs the turn wall clock only - and the arm
++#: window already bounds that. MEASURED, pilot 7: express-mode quota refused a
++#: campaign's first call outright and one 429 ended the whole turn.
++RATE_LIMIT_BACKOFF_SECONDS = 20.0
++RATE_LIMIT_BACKOFF_CAP_SECONDS = 300.0
++RATE_LIMIT_BACKOFF_JITTER = 0.2
++
++#: A ``Retry-After`` count of seconds, or a protobuf duration ("17s", "1.5s").
++_RETRY_DELAY_PATTERN = re.compile(r"^\s*([0-9]+(?:\.[0-9]+)?)s?\s*$")
++
++
++def _retry_after_seconds(exc) -> Optional[float]:
++    """The wait a 429 itself names, or None when it names none.
++
++    Two places carry it and the header wins: ``Retry-After`` on the response,
++    and a ``google.rpc.RetryInfo`` ``retryDelay`` among the error body's
++    details. None leaves the caller on its own backoff.
++    """
++    asked = []
++    headers = getattr(getattr(exc, "response", None), "headers", None)
++    if headers is not None:
++        try:
++            asked.append(headers.get("Retry-After"))
++        except Exception:
++            pass
++    details = getattr(exc, "details", None)
++    error = details.get("error") if isinstance(details, dict) else None
++    inner = error.get("details") if isinstance(error, dict) else None
++    for item in inner if isinstance(inner, list) else []:
++        if isinstance(item, dict) and item.get("retryDelay") is not None:
++            asked.append(item["retryDelay"])
++    for value in asked:
++        matched = _RETRY_DELAY_PATTERN.match(str(value or ""))
++        if matched:
++            return float(matched.group(1))
++    return None
++
 +
  # Gemini ``finish_reason`` values that mean the candidate was blocked / unusable
  # rather than a normal STOP or a MAX_TOKENS truncation (which is handled
  # separately as MaxOutputTokensError).
-@@ -225,6 +273,9 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -225,6 +315,10 @@ class VertexGeminiLLM(LLMCallBase):
          location: Optional[str] = None,
          max_tokens: int = 16000,
          max_tool_iterations: int = 100,
++        rate_limit_retries: int = 6,
 +        turn_budget_usd: Optional[float] = None,
 +        final_tool_names: Optional[list] = None,
 +        final_tool_iterations: int = 0,
          client_kwargs: Optional[dict] = None,
          dangerously_skip_permissions=UNSET,
          config=UNSET,
-@@ -247,6 +298,19 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -247,6 +341,23 @@ class VertexGeminiLLM(LLMCallBase):
          )
          self.max_tokens = max_tokens
          self.max_tool_iterations = max_tool_iterations
++        # How many times ONE generate_content is re-sent after a 429. The
++        # refusal is never retried by prompt(), which would re-send the whole
++        # conversation; it is waited out inside the call instead.
++        self.rate_limit_retries = rate_limit_retries
 +        # The money ONE call to prompt() may spend across its whole tool loop,
 +        # or None for no ceiling (the default, and CHIA's behaviour before).
 +        self.turn_budget_usd = turn_budget_usd
@@ -87,7 +141,7 @@ index d103349..ad2f568 100644
          self.client_kwargs = client_kwargs or {}
          self.logger = logging.getLogger(logging_name)
          self._last_metadata: dict = {}
-@@ -302,7 +366,7 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -302,7 +413,7 @@ class VertexGeminiLLM(LLMCallBase):
  
              # -- Never retry: propagate immediately --
              except (RateLimitError, AuthenticationError, InvalidRequestError,
@@ -96,7 +150,7 @@ index d103349..ad2f568 100644
                  raise
  
              # -- Retry once: a shorter generation may fit --
-@@ -339,11 +403,158 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -339,11 +450,187 @@ class VertexGeminiLLM(LLMCallBase):
          return QueryResult(result="", returncode=-1, stderr="", stream_result="", success=False)
  
      def _get_node_id(self) -> str:
@@ -214,7 +268,18 @@ index d103349..ad2f568 100644
 +                    f"{estimate:.6f} would pass turn_budget_usd "
 +                    f"{float(self.turn_budget_usd):.6f}"))
 +
-+    async def _one_call(self, client, contents, config, meta: dict):
++    def _rate_limit_delay(self, exc, attempt: int) -> float:
++        """Seconds to wait out one 429: what it asked for, else the backoff."""
++        asked = _retry_after_seconds(exc)
++        if asked is not None:
++            return min(asked, RATE_LIMIT_BACKOFF_CAP_SECONDS)
++        backoff = min(RATE_LIMIT_BACKOFF_SECONDS * 2 ** attempt,
++                      RATE_LIMIT_BACKOFF_CAP_SECONDS)
++        return backoff * random.uniform(1.0 - RATE_LIMIT_BACKOFF_JITTER,
++                                        1.0 + RATE_LIMIT_BACKOFF_JITTER)
++
++    async def _one_call(self, client, contents, config, meta: dict,
++                        stream: Optional[list] = None):
 +        """Send ONE ``generate_content``, translate its errors, count its tokens.
 +
 +        Two call sites consume a response now — the tool loop and the final
@@ -225,24 +290,42 @@ index d103349..ad2f568 100644
 +        ``tool_use_prompt_token_count`` are separate from
 +        ``candidates_token_count`` and ``prompt_token_count``.
 +
++        A 429 is waited out here, up to ``rate_limit_retries`` times, because
++        ``prompt()`` never retries one: it would re-send the whole conversation
++        from the first call. The refusal is billed nothing, so the ceiling the
++        caller authorised is untouched and only the turn's wall clock grows.
++
 +        Raises:
 +            whatever ``_translate_error`` makes of the SDK's exception, or the
-+            SDK's own when it has no translation.
++            SDK's own when it has no translation; the LAST
++            :class:`RateLimitError` once the retries are spent.
 +        """
 +        import asyncio
 +
-+        try:
-+            resp = await asyncio.to_thread(
-+                client.models.generate_content,
-+                model=self.model,
-+                contents=contents,
-+                config=config,
-+            )
-+        except Exception as exc:
-+            translated = self._translate_error(exc)
-+            if translated is not None:
-+                raise translated from exc
-+            raise
++        for attempt in range(self.rate_limit_retries + 1):
++            try:
++                resp = await asyncio.to_thread(
++                    client.models.generate_content,
++                    model=self.model,
++                    contents=contents,
++                    config=config,
++                )
++                break
++            except Exception as exc:
++                translated = self._translate_error(exc)
++                if (isinstance(translated, RateLimitError)
++                        and attempt < self.rate_limit_retries):
++                    delay = self._rate_limit_delay(exc, attempt)
++                    line = (f"[DEBUG] 429; retry {attempt + 1}/"
++                            f"{self.rate_limit_retries} in {delay:.1f} seconds\n")
++                    self.logger.warning(line.strip())
++                    if stream is not None:
++                        stream.append(line)
++                    await asyncio.sleep(delay)
++                    continue
++                if translated is not None:
++                    raise translated from exc
++                raise
 +
 +        meta["num_turns"] += 1
 +        usage = getattr(resp, "usage_metadata", None)
@@ -258,7 +341,7 @@ index d103349..ad2f568 100644
      # ------------------------------------------------------------------
      # generate_content implementation
      # ------------------------------------------------------------------
-@@ -360,7 +571,13 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -360,7 +647,13 @@ class VertexGeminiLLM(LLMCallBase):
          wrapped in an ``ExceptionGroup`` by MCP's anyio task group — without
          this, the wrapped error never matches ``prompt()``'s ``except`` clauses
          and every API error in the tools path is misfiled as "unexpected".
@@ -272,7 +355,7 @@ index d103349..ad2f568 100644
          try:
              return self._run_coroutine(self._run_generate_async(user_message, tools or []))
          except Exception as exc:
-@@ -368,6 +585,8 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -368,6 +661,8 @@ class VertexGeminiLLM(LLMCallBase):
              if translated is not None:
                  raise translated from exc
              raise
@@ -281,7 +364,7 @@ index d103349..ad2f568 100644
  
      def _run_coroutine(self, coro):
          """Run *coro* whether or not an event loop is already running."""
-@@ -458,122 +677,220 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -458,122 +753,222 @@ class VertexGeminiLLM(LLMCallBase):
              contents = [types.Content(
                  role="user", parts=[types.Part.from_text(text=user_message)]
              )]
@@ -319,7 +402,8 @@ index d103349..ad2f568 100644
 +                for _ in range(iterations):
 +                    # BEFORE the call, so the money it would have cost is not spent.
 +                    self._check_turn_budget(meta, contents)
-+                    resp = await self._one_call(client, contents, phase_config, meta)
++                    resp = await self._one_call(client, contents, phase_config,
++                                                meta, stream_parts)
 +
 +                    candidate = (resp.candidates or [None])[0]
 +                    if candidate is None or candidate.content is None:
@@ -503,7 +587,8 @@ index d103349..ad2f568 100644
 +                self._check_turn_budget(meta, contents)
 +                resp = await self._one_call(
 +                    client, contents,
-+                    types.GenerateContentConfig(**final_kwargs), meta)
++                    types.GenerateContentConfig(**final_kwargs), meta,
++                    stream_parts)
 +                candidate = (resp.candidates or [None])[0]
 +                parts = getattr(getattr(candidate, "content", None), "parts", None)
 +                final_parts = []

@@ -543,3 +543,97 @@ def test_T_U_upstream_08_a_truncated_final_answer_says_so(monkeypatch,
     assert ("[DEBUG] final answer: finish=MAX_TOKENS, parts=['thought'] "
             "(truncated at max_output_tokens)\n" in result.stream_result)
     assert "[DEBUG] the final answer was empty" in result.stream_result
+
+
+def _rate_limited(retry_delay=None, header=None):
+    """One express-mode 429, optionally naming the wait it wants."""
+    from google.genai import errors as genai_errors
+
+    body = {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                      "message": "Resource has been exhausted (e.g. check quota)."}}
+    if retry_delay is not None:
+        body["error"]["details"] = [
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo",
+             "retryDelay": retry_delay}]
+    response = None
+    if header is not None:
+        response = SimpleNamespace(headers={"Retry-After": header})
+    return genai_errors.ClientError(429, body, response)
+
+
+def _record_sleeps(monkeypatch):
+    """Patch both sleeps away and return the list of waits `_one_call` asks for."""
+    import asyncio
+    import time
+
+    slept: list = []
+
+    async def _async_sleep(delay):
+        slept.append(delay)
+
+    monkeypatch.setattr(asyncio, "sleep", _async_sleep)
+    monkeypatch.setattr(time, "sleep", slept.append)
+    return slept
+
+
+@pytest.mark.t0
+def test_T_U_upstream_12_a_429_is_waited_out_inside_the_call(monkeypatch,
+                                                             patched_vertex):
+    """T-U-upstream-12 (D-8, pilot 7): one refused call is re-sent, not the turn."""
+    slept = _record_sleeps(monkeypatch)
+    calls = _install_fake_genai(monkeypatch, [
+        _rate_limited(), _rate_limited(),
+        _response(types.Part(text="PONG"), _usage(prompt=10, candidates=5))])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1")
+    assert llm.rate_limit_retries == 6
+    result = llm._run_generate("ping", [])
+
+    assert result.result == "PONG" and len(calls) == 3
+    # 20 s then 40 s, each randomised by +/- 20%.
+    assert len(slept) == 2
+    assert 16.0 <= slept[0] <= 24.0, slept
+    assert 32.0 <= slept[1] <= 48.0, slept
+    assert f"[DEBUG] 429; retry 1/6 in {slept[0]:.1f} seconds\n" in result.stream_result
+    assert f"[DEBUG] 429; retry 2/6 in {slept[1]:.1f} seconds\n" in result.stream_result
+    # A refused call is billed nothing, so only the answered one is metered.
+    assert llm._last_metadata == {
+        "input_tokens": 10, "output_tokens": 5, "num_turns": 1}
+
+    # The doubling stops at the cap, which is what bounds the turn's wall clock.
+    monkeypatch.setattr(patched_vertex.random, "uniform", lambda low, high: 1.0)
+    assert llm._rate_limit_delay(RuntimeError("no delay named"), 0) == 20.0
+    assert llm._rate_limit_delay(RuntimeError("no delay named"), 10) == \
+        patched_vertex.RATE_LIMIT_BACKOFF_CAP_SECONDS
+
+
+@pytest.mark.t0
+def test_T_U_upstream_13_the_429_retries_run_out_and_it_is_raised(monkeypatch,
+                                                                  patched_vertex):
+    """T-U-upstream-13 (D-8): the wait it asks for is honoured, then it propagates."""
+    from chia.trace import profiler as profiler_module
+
+    monkeypatch.setattr(profiler_module, "get_profiler",
+                        lambda: type("P", (), {"enabled": False})())
+    slept = _record_sleeps(monkeypatch)
+    refusals = [_rate_limited("5s", header="7"), _rate_limited("5s"),
+                _rate_limited("5s")]
+    calls = _install_fake_genai(monkeypatch, list(refusals))
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        rate_limit_retries=2)
+    with pytest.raises(patched_vertex.RateLimitError):
+        llm._run_generate("ping", [])
+
+    # One call plus its two retries, and the header wins over the body.
+    assert len(calls) == 3
+    assert slept == [7.0, 5.0]
+
+    # And `prompt()` still does not retry what the call already waited out.
+    calls = _install_fake_genai(monkeypatch, list(refusals))
+    assert llm.retries == 3
+    with pytest.raises(patched_vertex.RateLimitError):
+        llm.prompt._chia_original(llm, "ping", [])
+    assert len(calls) == 3, "one attempt of three calls, not three of three"
