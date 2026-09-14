@@ -1,10 +1,14 @@
 {
   "amount": 14400.0,
   "arm": "seeded",
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "entry_id": "l-0000000001",
   "metered": true,
   "observed": {
+    "authorised_usd": null,
+    "billed_usd": null,
+    "calls": null,
+    "ceiling_usd": null,
     "cost_usd": 5.431,
     "cpu_seconds": 11827.5,
     "tokens_in": 4183920,

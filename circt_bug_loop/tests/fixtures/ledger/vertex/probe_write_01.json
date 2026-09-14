@@ -1,10 +1,14 @@
 {
   "amount": 42.7,
   "arm": "seeded",
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "entry_id": "v-stage2-01",
   "metered": true,
   "observed": {
+    "authorised_usd": null,
+    "billed_usd": null,
+    "calls": null,
+    "ceiling_usd": null,
     "cost_usd": 0.0213,
     "cpu_seconds": 3.4,
     "tokens_in": 12880,

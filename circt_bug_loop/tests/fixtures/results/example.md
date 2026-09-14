@@ -153,6 +153,8 @@ None of these four is the budget. The budget is one elapsed wall-clock second of
 
 **Unpriced turns: 1.** That is the number of metered model-stage entries whose token counts were never observed, so they carry a null cost rather than a zero and the USD total above excludes every one of them. A turn that raised inside the tool loop reports nothing at all, however many model calls it had already made, and so does every stage-7 attempt by construction; the figure is what the lower bound is a lower bound BY, counted rather than described.
 
+**Billed against authorised, over 2 turn(s): max 0.200x, mean 0.175x; 0 turn(s) billed more than they were authorised for and 0 reached the backend's own per-turn ceiling.** `SpendGuard` authorises a turn before it is sent and this is how close the estimate came. A ratio above 1.0 is money the cap did not stop: W-18 measured 19.7x, 32.3x and 64.1x, because the authorisation bounded one model call and a turn with tools makes up to `max_tool_iterations` of them (errata row 38).
+
 ## 8. Declarations and disclosures
 
 **The mutator synthesis is the one place the mutation arm sees bug reports.** The frozen mutator set `1111111111111111111111111111111111111111111111111111111111111111` was synthesised at 2026-09-17T11:00:00+00:00 by vertex:gemini-3.8-flash from the mirrored issue set refreshed at 2026-09-19T00:00:00+00:00 (588 issues, all). That is Mut4All's design, which this arm reimplements, and not a leak in the experiment: the arm reads no report during the campaign, and the set was frozen and committed before the pre-registration.

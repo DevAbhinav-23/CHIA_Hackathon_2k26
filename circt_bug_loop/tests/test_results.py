@@ -425,6 +425,9 @@ def test_T_U_results_12(tmp_path):
     store.update("ledger_entry", {"entry_id": "l-0003"},
                  {"observed_json": json.dumps({"cpu_seconds": 90.0, "tokens_in": 1,
                                                "tokens_out": 1, "cost_usd": 0.1,
+                                               "authorised_usd": None,
+                                               "ceiling_usd": None,
+                                               "billed_usd": None, "calls": None,
                                                "price_usd": 0.1}, sort_keys=True)})
     only(refuse(store, manifest, pairs), "do not carry", "l-0003")
 

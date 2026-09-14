@@ -65,9 +65,13 @@ PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 #: tokens because no turn ran there (K10).
 MODEL_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
 
-#: `LedgerEntry.observed`'s four declared keys (§2.7). An entry whose block has
-#: another key set cannot be summed under the observed heading.
-OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd"}
+#: `LedgerEntry.observed`'s declared keys (§2.7, contract 2.2). An entry whose
+#: block has another key set cannot be summed under the observed heading. The
+#: last four are the per-turn money row W-18b added: what the guard authorised,
+#: what ceiling the backend was given, what the turn billed and how many
+#: `generate_content` calls it took (errata row 38).
+OBSERVED_KEYS = {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
+                 "authorised_usd", "ceiling_usd", "billed_usd", "calls"}
 
 #: The ledger stage the offline mutator synthesis is charged to, which is where
 #: FR-05.8's declaration gets its date (§3.11's counter stages).
@@ -544,6 +548,41 @@ def _observed(facts: dict, ledger_rows: list, gaps: dict) -> None:
             bucket["tokens_out"] += int(block["tokens_out"])
     facts["observed"] = totals
     facts["unpriced_turns"] = unpriced
+    facts["authorisation"] = _authorisation(ledger_rows)
+
+
+def _authorisation(ledger_rows: list) -> dict:
+    """How close the pre-authorisation came to what the turns actually billed.
+
+    The one number errata row 38 exists for. `SpendGuard` authorises a turn
+    before it is sent and the ledger records what it billed; until W-18b the
+    two were 19.7x to 64.1x apart and NOTHING printed the ratio, so the
+    campaign's own artefact could not say the control was broken. A ratio ABOVE
+    1.0 is a turn that cost more than it was authorised for, which is the
+    campaign spending money the cap did not stop.
+
+    Returns:
+        {"turns", "max_ratio", "mean_ratio", "over_authorised", "hit_ceiling"};
+        the two ratios are None when no turn carried both figures.
+    Worker:
+        pure; it reads the rows it is handed.
+    Raises:
+        nothing.
+    """
+    ratios, ceiling_hits = [], 0
+    for row in ledger_rows:
+        block = json.loads(row["observed_json"])
+        authorised, billed = block.get("authorised_usd"), block.get("billed_usd")
+        if not authorised or billed is None:
+            continue
+        ratios.append(billed / authorised)
+        if block.get("ceiling_usd") and billed >= float(block["ceiling_usd"]):
+            ceiling_hits += 1
+    return {"turns": len(ratios),
+            "max_ratio": max(ratios) if ratios else None,
+            "mean_ratio": sum(ratios) / len(ratios) if ratios else None,
+            "over_authorised": sum(1 for r in ratios if r > 1.0),
+            "hit_ceiling": ceiling_hits}
 
 
 def _windows(facts: dict, store: LoopStore, manifest: RunManifest, ledger_rows: list,
@@ -986,6 +1025,30 @@ def _render(facts: dict) -> str:
             "the lower bound is a lower bound BY, counted rather than described.",
             "",
         ]
+        authorisation = facts["authorisation"]
+        if authorisation["turns"]:
+            lines += [
+                f"**Billed against authorised, over {authorisation['turns']} "
+                f"turn(s): max {authorisation['max_ratio']:.3f}x, mean "
+                f"{authorisation['mean_ratio']:.3f}x; "
+                f"{authorisation['over_authorised']} turn(s) billed more than "
+                f"they were authorised for and {authorisation['hit_ceiling']} "
+                "reached the backend's own per-turn ceiling.** `SpendGuard` "
+                "authorises a turn before it is sent and this is how close the "
+                "estimate came. A ratio above 1.0 is money the cap did not "
+                "stop: W-18 measured 19.7x, 32.3x and 64.1x, because the "
+                "authorisation bounded one model call and a turn with tools "
+                "makes up to `max_tool_iterations` of them (errata row 38).",
+                "",
+            ]
+        else:
+            lines += [
+                "**Billed against authorised: no turn carried both figures.** "
+                "Either no model turn ran or every one of them raised before it "
+                "was billed; the pre-authorisation cannot be checked against a "
+                "measurement here.",
+                "",
+            ]
 
     lines += ["## 8. Declarations and disclosures", ""]
     if facts["mutator_declaration"] is None:

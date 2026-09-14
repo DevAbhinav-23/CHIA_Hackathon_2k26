@@ -96,7 +96,12 @@ _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
 #: the file a worker actually imports; the operator's own checkout is never
 #: modified (K7, K11, W-20b errata 3).
 VERTEX_BRANCH = 'elif backend == "vertex":'
-VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count")
+#: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38): the
+#: per-turn money ceiling the tool loop enforces from the inside, and the marker
+#: that says the staged file carries it. `NODE_ID_TIMEOUT_SECONDS` is errata
+#: row 37's, the bound on `_get_node_id`.
+VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
+                       "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS")
 
 #: Defaults for 13.1's argument table.
 DEFAULT_BUDGET = str(FLOW_DIR / "budget.yaml")
@@ -2586,7 +2591,7 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
     3.5 names it and a caller with a reason may pass one.
 
     Returns:
-        dict with the sixteen keys 3.5's two generators read.
+        dict with the seventeen keys 3.5's two generators read.
     Worker:
         head; it reads two records and touches no file.
     Raises:
@@ -2607,7 +2612,11 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
             "mutator_set_path": None,
             "mutator_set_sha": manifest.mutator_set_sha,
             "head_options": head_options,
-            "here_options": here_options}
+            "here_options": here_options,
+            # Errata row 38: the registered per-stage cap on the backend's own
+            # tool loop. Every turn reads its own stage's entry out of this, and
+            # `llm.SpendGuard` authorises exactly that many calls.
+            "max_tool_iterations": dict(budget.max_tool_iterations)}
 
 
 def empty_feedback(manifest: RunManifest, seed: SeedRecord, arm: str,
@@ -2866,10 +2875,20 @@ class Campaign:
                 run_manifest_id=run_id, arm=arm, scope="stage", stage=stage,
                 unit="wall_clock_seconds", amount=max(0.0, round(seconds, 6)),
                 metered=bool(self.manifest.stages_metered.get(stage, True)),
+                # The four money fields are contract 2.2's and are the TURN's
+                # own, straight from `dispatch_turn` (errata row 38): what the
+                # guard authorised, what ceiling the backend was given, what the
+                # turn billed at the file's two prices, and how many
+                # `generate_content` calls it made. Every one is None for a
+                # stage that made no turn, which is most of them.
                 observed={"cpu_seconds": None,
                           "tokens_in": usage.get("tokens_in"),
                           "tokens_out": usage.get("tokens_out"),
-                          "cost_usd": None},
+                          "cost_usd": None,
+                          "authorised_usd": usage.get("authorised_usd"),
+                          "ceiling_usd": usage.get("ceiling_usd"),
+                          "billed_usd": usage.get("billed_usd"),
+                          "calls": usage.get("calls")},
                 timestamp_utc=_utc(), stop_reason=None)
             self.recorder.record(entry)
             self.dispatch.call(ledger_module.accrue, entry, self.store.db_path,
@@ -3388,7 +3407,8 @@ def accrue_offline(store: LoopStore, manifest: RunManifest, budget: BudgetFile, 
             run_manifest_id=manifest.run_manifest_id, arm="shared", scope="stage",
             stage=stage, unit="wall_clock_seconds", amount=amount, metered=False,
             observed={"cpu_seconds": None, "tokens_in": None, "tokens_out": None,
-                      "cost_usd": None},
+                      "cost_usd": None, "authorised_usd": None,
+                      "ceiling_usd": None, "billed_usd": None, "calls": None},
             timestamp_utc=when, stop_reason=None)
         if store.query_one("SELECT 1 FROM ledger_entry WHERE entry_id = ?",
                            (entry.entry_id,)) is not None:
@@ -3420,7 +3440,8 @@ def _accrue_arm_window(campaign: Campaign, arm: str, seconds: float,
         scope="arm_window", stage="stage_3", unit="wall_clock_seconds",
         amount=float(seconds), metered=True,
         observed={"cpu_seconds": None, "tokens_in": None, "tokens_out": None,
-                  "cost_usd": None},
+                  "cost_usd": None, "authorised_usd": None, "ceiling_usd": None,
+                  "billed_usd": None, "calls": None},
         timestamp_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         stop_reason=reason)
     campaign.recorder.record(entry)

@@ -12,7 +12,7 @@ import typing
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Protocol
 
-CONTRACT_VERSION = "2.1"          # MAJOR.MINOR; the single source of the string
+CONTRACT_VERSION = "2.2"          # MAJOR.MINOR; the single source of the string
 
 Arm = Literal["seeded", "mutation"]
 LedgerArm = Literal["seeded", "mutation", "shared"]
@@ -39,6 +39,14 @@ Unit = Literal["wall_clock_seconds"]
 # ProbeResult.stopping_stage from stage_3 onward.
 _STAGE_IDS = ("stage_1", "stage_2", "stage_3", "stage_4", "stage_5",
               "stage_6", "stage_7", "gate")
+
+#: The stages that run a MODEL turn, and therefore the key set of
+#: `BudgetFile.max_tool_iterations` (contract 2.2, W-18b). Stages 1 and 2 are
+#: A3's two turns, stage 6 is B7's, and stage 7 is CHIA's own repair chain,
+#: whose loop this file records rather than bounds. The three tool-free stages
+#: and the gate carry no entry: a turn with no tool makes exactly one
+#: `generate_content` call whatever the cap says.
+_TOOL_LOOP_STAGES = ("stage_1", "stage_2", "stage_6", "stage_7")
 
 # 03-LLD.md 2.1's table, as a tuple so a test can assert the set is closed.
 # E010 is owned by this table and raised by generate_task.emit_specs; validate
@@ -183,6 +191,13 @@ class BudgetFile:
     before the data exists, the money cap bounds damage exactly as the per-day
     input cap does, and a price edited afterwards would put a free parameter
     inside a reported number (NFR-08).
+
+    max_tool_iterations and minimal_case_lines are the two keys contract 2.2
+    adds (W-18b, errata rows 38 and 46). Both are campaign parameters and not
+    implementation constants for the same reason the prices are: the first is
+    the factor the per-turn money ceiling is computed from, and the second is
+    the size at which a case counts as minimal, which decides a gate answer and
+    therefore a reported number.
     """
     contract_version: str = CONTRACT_VERSION
     budget_file_sha: str                    # the commit that landed this file
@@ -212,6 +227,8 @@ class BudgetFile:
     issue_mirror_issue_cap: int
     filing_poll_window_seconds: int
     artefact_inline_cap_bytes: int
+    max_tool_iterations: dict               # keys in _TOOL_LOOP_STAGES (2.2)
+    minimal_case_lines: int                 # FR-13.3's threshold (2.2)
     acceptance: dict                        # keys in 9.3
 
 
@@ -466,7 +483,15 @@ _DICT_KEYS = {
                                  "cost_usd", "metered"},
     ("ProbeSpec", "differential"): {"stimulus_id", "reset_protocol", "sample_point",
                                     "cycles", "port_list_sha"},
-    ("LedgerEntry", "observed"): {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd"},
+    ("BudgetFile", "max_tool_iterations"): set(_TOOL_LOOP_STAGES),
+    # The four money fields are contract 2.2's (W-18b): what the guard
+    # authorised for the turn, what ceiling the backend was given, what the
+    # turn actually billed at the file's two prices, and how many
+    # `generate_content` calls it made. The pilot measured the first and the
+    # third differing by up to 64x with no row anywhere that said so.
+    ("LedgerEntry", "observed"): {"cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
+                                  "authorised_usd", "ceiling_usd", "billed_usd",
+                                  "calls"},
     ("RunManifest", "image_spec"): {"circt_sha", "sdk_tag", "targets", "flag_string",
                                     "image_digest", "verilator_version", "slang_enabled",
                                     "tool_hashes"},
@@ -603,6 +628,15 @@ def _budget_conditionals(o: BudgetFile) -> None:
                  "price_usd_per_m_output_tokens"):
         _require(0 < getattr(o, name) < float("inf"), "E003_WRONG_TYPE",
                  f"BudgetFile.{name} must be positive and finite")
+    # Contract 2.2. A zero or negative iteration cap would authorise nothing and
+    # send nothing, and a bool is not a count (2.3's own rule, spelled here
+    # because these are dict VALUES and `_check_field` never sees them).
+    for stage, cap in sorted(o.max_tool_iterations.items()):
+        _require(isinstance(cap, int) and not isinstance(cap, bool) and cap > 0,
+                 "E003_WRONG_TYPE",
+                 f"BudgetFile.max_tool_iterations[{stage!r}] must be a positive int")
+    _require(o.minimal_case_lines > 0, "E003_WRONG_TYPE",
+             "BudgetFile.minimal_case_lines must be positive")
 
 
 def _feedback_conditionals(o: FeedbackBundle) -> None:

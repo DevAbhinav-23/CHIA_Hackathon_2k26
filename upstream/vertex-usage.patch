@@ -1,8 +1,211 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..0ddfcfc 100644
+index d103349..76eafd9 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
-@@ -360,7 +360,13 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -168,6 +168,54 @@ class ContentBlockedError(VertexError):
+         return (self.__class__, (self.node_id, self.block_reason, self.raw_message))
+ 
+ 
++class TurnBudgetExceeded(VertexError):
++    """The tool loop would have spent past ``turn_budget_usd`` on its NEXT call.
++
++    Raised BEFORE that ``generate_content`` is sent, so the money it names was
++    never spent. A turn with tools re-sends the whole conversation on every
++    iteration, so its input cost grows quadratically in the number of tool
++    calls: measured, one turn made 37 calls and cost 64x what its caller had
++    authorised for it. ``turn_budget_usd`` is the caller's ceiling for ONE turn
++    and this is the loop refusing to cross it. Never retried: the next attempt
++    would re-send the same conversation and cost the same.
++    """
++
++    def __init__(self, node_id: str, budget_usd: float = 0.0,
++                 spent_usd: float = 0.0, estimate_usd: float = 0.0,
++                 raw_message: str = ""):
++        self.budget_usd = budget_usd
++        self.spent_usd = spent_usd
++        self.estimate_usd = estimate_usd
++        super().__init__(node_id, "turn_budget_exceeded", None, raw_message)
++
++    def __reduce__(self):
++        return (self.__class__, (self.node_id, self.budget_usd, self.spent_usd,
++                                 self.estimate_usd, self.raw_message))
++
++
++#: Characters per token, for the per-turn budget estimate ONLY. An estimate,
++#: used where an OVER-estimate is the safe direction: a conversation that
++#: tokenises to fewer characters per token than this is allowed to make a call
++#: that costs more than the estimate said, by whatever the ratio is wrong by.
++#: 2.0 is a measurement rounded down - one real turn billed 619,603 input
++#: tokens for 1,509,080 characters, 2.436 characters per token.
++TURN_BUDGET_CHARS_PER_TOKEN = 2.0
++
++#: USD per MILLION tokens, ``(input, output)``, by model-id prefix, for the
++#: per-turn budget estimate ONLY: it prices nothing the caller is billed for
++#: and no caller should read it. Only entries verified against Google's own
++#: published pricing are listed; every other model takes
++#: ``TURN_BUDGET_DEFAULT_PRICES``, which is deliberately expensive, because an
++#: unknown model priced too low is a ceiling that binds too late.
++TURN_BUDGET_PRICES = {
++    "gemini-3.8-flash": (0.75, 3.75),      # verified 2026-09-15
++}
++TURN_BUDGET_DEFAULT_PRICES = (10.0, 40.0)
++
++#: Seconds ``_get_node_id`` waits for Ray before answering "unknown".
++NODE_ID_TIMEOUT_SECONDS = 10.0
++
++
+ # Gemini ``finish_reason`` values that mean the candidate was blocked / unusable
+ # rather than a normal STOP or a MAX_TOKENS truncation (which is handled
+ # separately as MaxOutputTokensError).
+@@ -225,6 +273,7 @@ class VertexGeminiLLM(LLMCallBase):
+         location: Optional[str] = None,
+         max_tokens: int = 16000,
+         max_tool_iterations: int = 100,
++        turn_budget_usd: Optional[float] = None,
+         client_kwargs: Optional[dict] = None,
+         dangerously_skip_permissions=UNSET,
+         config=UNSET,
+@@ -247,6 +296,9 @@ class VertexGeminiLLM(LLMCallBase):
+         )
+         self.max_tokens = max_tokens
+         self.max_tool_iterations = max_tool_iterations
++        # The money ONE call to prompt() may spend across its whole tool loop,
++        # or None for no ceiling (the default, and CHIA's behaviour before).
++        self.turn_budget_usd = turn_budget_usd
+         self.client_kwargs = client_kwargs or {}
+         self.logger = logging.getLogger(logging_name)
+         self._last_metadata: dict = {}
+@@ -302,7 +354,7 @@ class VertexGeminiLLM(LLMCallBase):
+ 
+             # -- Never retry: propagate immediately --
+             except (RateLimitError, AuthenticationError, InvalidRequestError,
+-                    ContentBlockedError):
++                    ContentBlockedError, TurnBudgetExceeded):
+                 raise
+ 
+             # -- Retry once: a shorter generation may fit --
+@@ -339,11 +391,117 @@ class VertexGeminiLLM(LLMCallBase):
+         return QueryResult(result="", returncode=-1, stderr="", stream_result="", success=False)
+ 
+     def _get_node_id(self) -> str:
+-        try:
+-            return ray.get_runtime_context().get_node_id()
+-        except Exception:
++        """This node's Ray id, or ``"unknown"`` — bounded, and never for ever.
++
++        ``ray.get_runtime_context()`` retries the GCS five seconds at a time
++        FOR EVER when ``/tmp/ray/ray_current_cluster`` names a cluster that is
++        down, and an ``except`` cannot catch a call that never returns. All four
++        callers are on error paths — a blocked prompt, a blocked response,
++        ``MAX_TOKENS``, and every translated ``APIError`` — so a 429 met on a
++        machine with a stale file hung the caller instead of retrying (measured:
++        twelve minutes, then killed, with the turn's token counts lost with the
++        process). The call cannot be cancelled, so it runs on a daemon thread
++        the answer is given up on after ``NODE_ID_TIMEOUT_SECONDS``.
++        """
++        import threading
++
++        # MEASURED, and the reason the thread below is not enough on its own:
++        # with no Ray in this process, ``get_runtime_context()`` blocks for
++        # SIXTY seconds and then Ray's own client calls QuickExit - "Failed to
++        # connect to GCS within 60 seconds ... The program will terminate." - so
++        # the background thread would take the whole process down ten seconds
++        # after this method had already answered. A process with no Ray has no
++        # node id to report, so it does not ask.
++        if not ray.is_initialized():
+             return "unknown"
+ 
++        answer = {}
++
++        def _read():
++            try:
++                answer["node_id"] = ray.get_runtime_context().get_node_id()
++            except Exception:
++                pass
++
++        worker = threading.Thread(target=_read, name="vertex-node-id",
++                                  daemon=True)
++        worker.start()
++        worker.join(NODE_ID_TIMEOUT_SECONDS)
++        return answer.get("node_id") or "unknown"
++
++    # ------------------------------------------------------------------
++    # The per-turn money ceiling
++    # ------------------------------------------------------------------
++
++    def _turn_prices(self) -> tuple:
++        """``(input, output)`` USD per million tokens for this model."""
++        for prefix, prices in TURN_BUDGET_PRICES.items():
++            if (self.model or "").startswith(prefix):
++                return prices
++        return TURN_BUDGET_DEFAULT_PRICES
++
++    def _priced_usage_usd(self, meta: dict) -> float:
++        """What the loop has spent so far this turn, at this model's prices.
++
++        Thinking tokens are billed as output and tool-use prompt tokens as
++        input; both are separate scalars from ``candidates_token_count`` and
++        ``prompt_token_count``.
++        """
++        price_in, price_out = self._turn_prices()
++        tokens_in = meta.get("input_tokens", 0) + meta.get("tool_use_prompt_tokens", 0)
++        tokens_out = meta.get("output_tokens", 0) + meta.get("thinking_tokens", 0)
++        return tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out
++
++    def _conversation_chars(self, contents) -> int:
++        """The characters the NEXT ``generate_content`` call will re-send.
++
++        The system instruction plus every part of every content: text, a
++        function call's arguments and a function response's body. It is the
++        conversation's size and not the original prompt's, which is the whole
++        point — the prompt is a constant and the conversation is what grows.
++        """
++        import json as _json
++
++        total = len(self.system_message or "")
++        for content in contents or []:
++            for part in getattr(content, "parts", None) or []:
++                total += len(getattr(part, "text", None) or "")
++                call = getattr(part, "function_call", None)
++                if call is not None:
++                    total += len(_json.dumps(dict(getattr(call, "args", None) or {}),
++                                             default=str))
++                response = getattr(part, "function_response", None)
++                if response is not None:
++                    total += len(_json.dumps(
++                        dict(getattr(response, "response", None) or {}), default=str))
++        return total
++
++    def _check_turn_budget(self, meta: dict, contents) -> None:
++        """Refuse the next call when it would take this turn past its ceiling.
++
++        Raises:
++            TurnBudgetExceeded, before anything is sent. ``_last_metadata``
++            still reports what the turn spent getting here, the ``finally`` in
++            ``_run_generate`` publishing it on every path.
++        """
++        if not self.turn_budget_usd:
++            return
++        price_in, price_out = self._turn_prices()
++        spent = self._priced_usage_usd(meta)
++        estimate = (self._conversation_chars(contents)
++                    / TURN_BUDGET_CHARS_PER_TOKEN / 1e6 * price_in
++                    + self.max_tokens / 1e6 * price_out)
++        if spent + estimate > self.turn_budget_usd:
++            raise TurnBudgetExceeded(
++                node_id=self._get_node_id(),
++                budget_usd=float(self.turn_budget_usd),
++                spent_usd=spent, estimate_usd=estimate,
++                raw_message=(
++                    f"refusing call {meta.get('num_turns', 0) + 1} of this turn: "
++                    f"USD {spent:.6f} already spent plus an estimated "
++                    f"{estimate:.6f} would pass turn_budget_usd "
++                    f"{float(self.turn_budget_usd):.6f}"))
++
+     # ------------------------------------------------------------------
+     # generate_content implementation
+     # ------------------------------------------------------------------
+@@ -360,7 +518,13 @@ class VertexGeminiLLM(LLMCallBase):
          wrapped in an ``ExceptionGroup`` by MCP's anyio task group — without
          this, the wrapped error never matches ``prompt()``'s ``except`` clauses
          and every API error in the tools path is misfiled as "unexpected".
@@ -16,7 +219,7 @@ index d103349..0ddfcfc 100644
          try:
              return self._run_coroutine(self._run_generate_async(user_message, tools or []))
          except Exception as exc:
-@@ -368,6 +374,8 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -368,6 +532,8 @@ class VertexGeminiLLM(LLMCallBase):
              if translated is not None:
                  raise translated from exc
              raise
@@ -25,7 +228,7 @@ index d103349..0ddfcfc 100644
  
      def _run_coroutine(self, coro):
          """Run *coro* whether or not an event loop is already running."""
-@@ -458,7 +466,12 @@ class VertexGeminiLLM(LLMCallBase):
+@@ -458,10 +624,17 @@ class VertexGeminiLLM(LLMCallBase):
              contents = [types.Content(
                  role="user", parts=[types.Part.from_text(text=user_message)]
              )]
@@ -39,7 +242,12 @@ index d103349..0ddfcfc 100644
              final_text = ""
  
              for _ in range(self.max_tool_iterations):
-@@ -480,6 +493,10 @@ class VertexGeminiLLM(LLMCallBase):
++                # BEFORE the call, so the money it would have cost is not spent.
++                self._check_turn_budget(meta, contents)
+                 try:
+                     resp = await asyncio.to_thread(
+                         client.models.generate_content,
+@@ -480,6 +653,10 @@ class VertexGeminiLLM(LLMCallBase):
                  if usage is not None:
                      meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
                      meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0

@@ -12,7 +12,7 @@
   ],
   "bumps_away": null,
   "committed_date_utc": "2026-01-30T18:37:33+00:00",
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "dialect_bucket": "Arc",
   "dialect_bucket_unmerged": "include/circt/Dialect",

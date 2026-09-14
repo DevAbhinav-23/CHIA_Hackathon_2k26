@@ -41,7 +41,7 @@
   "campaign_end_utc": "2026-09-24T11:59:00+00:00",
   "campaign_spend_cap_usd": 200.0,
   "campaign_start_utc": "2026-09-20T00:00:00+00:00",
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "filing_poll_window_seconds": 3600,
   "filings_per_day": 3,
@@ -49,6 +49,13 @@
   "fingerprint_top_n": 5,
   "generated_inputs_per_day": 2000,
   "issue_mirror_issue_cap": 12000,
+  "max_tool_iterations": {
+    "stage_1": 6,
+    "stage_2": 6,
+    "stage_6": 3,
+    "stage_7": 20
+  },
+  "minimal_case_lines": 12,
   "model_id": "gemini-3.8-flash",
   "per_seed_iteration_cap": 3,
   "per_seed_probe_cap": 5,

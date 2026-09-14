@@ -110,16 +110,21 @@ def repo(tmp_path: Path) -> Repo:
 def test_T_U_budget_01(repo: Repo):
     """T-U-budget-01 (FR-14.1): a file missing any key of §9.1 is rejected, naming it.
 
-    All 27 keys one at a time, the four of 2026-09-14 included.
+    All 29 keys one at a time, the four of 2026-09-14 and the two of contract
+    2.2 included.
     """
-    assert len(budget_module._KEYS) == 27
+    assert len(budget_module._KEYS) == 29
     for key in budget_module._KEYS:
         repo.commit("circt_bug_loop/budget.yaml", edited(**{key: _DROP}))
         with pytest.raises((budget_module.BudgetError, schema.ContractError)) as caught:
             repo.load()
         assert key in str(caught.value), f"the refusal does not name {key}"
     for key in ("model_id", "campaign_spend_cap_usd", "price_usd_per_m_input_tokens",
-                "price_usd_per_m_output_tokens"):
+                "price_usd_per_m_output_tokens",
+                # W-18b: the tool-loop cap and the minimality threshold are
+                # REGISTERED parameters, so a file that omits either is refused
+                # exactly as one that omits a price is (errata rows 38 and 46).
+                "max_tool_iterations", "minimal_case_lines"):
         assert key in budget_module._KEYS
 
 

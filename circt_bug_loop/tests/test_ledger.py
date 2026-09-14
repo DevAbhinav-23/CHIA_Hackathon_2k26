@@ -33,7 +33,8 @@ LEDGER_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "ledger"
 
 _RUN = "run-01"
 _DAY = "2026-09-20"
-_OBSERVED_KEYS = ("cpu_seconds", "tokens_in", "tokens_out", "cost_usd")
+_OBSERVED_KEYS = ("cpu_seconds", "tokens_in", "tokens_out", "cost_usd",
+                  "authorised_usd", "ceiling_usd", "billed_usd", "calls")
 
 
 def budget(**overrides) -> schema.BudgetFile:
@@ -45,10 +46,18 @@ def budget(**overrides) -> schema.BudgetFile:
     return parsed
 
 
-def observed(cpu_seconds=1.0, tokens_in=None, tokens_out=None) -> dict:
-    """An `observed` block carrying exactly the four keys §2.7 freezes."""
-    return {"cpu_seconds": cpu_seconds, "tokens_in": tokens_in,
-            "tokens_out": tokens_out, "cost_usd": None}
+def observed(cpu_seconds=1.0, tokens_in=None, tokens_out=None, **money) -> dict:
+    """An `observed` block carrying exactly the eight keys §2.7 freezes.
+
+    The four money keys are contract 2.2's per-turn row (W-18b): a stage that
+    made no turn carries them all null, which is most stages.
+    """
+    block = {"cpu_seconds": cpu_seconds, "tokens_in": tokens_in,
+             "tokens_out": tokens_out, "cost_usd": None,
+             "authorised_usd": None, "ceiling_usd": None,
+             "billed_usd": None, "calls": None}
+    block.update(money)
+    return block
 
 
 def entry(entry_id: str, *, arm="seeded", scope="stage", stage="stage_3",
@@ -316,9 +325,9 @@ def test_T_U_ledger_10(tmp_path: Path):
     seed_rows(open_store(tmp_path))
     backend_usage = {"prompt_token_count": 11, "candidates_token_count": 7,
                      "cost": 99.0}                       # the backend reports no price
-    charged = entry("v-1", stage="stage_1", observed={
-        "cpu_seconds": 0.5, "tokens_in": backend_usage["prompt_token_count"],
-        "tokens_out": backend_usage["candidates_token_count"], "cost_usd": 99.0})
+    charged = entry("v-1", stage="stage_1", observed=observed(
+        cpu_seconds=0.5, tokens_in=backend_usage["prompt_token_count"],
+        tokens_out=backend_usage["candidates_token_count"], cost_usd=99.0))
     call_node(ledger_module.accrue, charged, db_path, funds)
     assert charged.observed["cost_usd"] == 0.000034, "the backend's cost is ignored"
 

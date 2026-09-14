@@ -811,14 +811,18 @@ def test_repair_22b_the_loop_names_vertex_in_one_place_only(tmp_path):
 def test_repair_23_stage_sevens_tokens_are_null_with_a_reason(tmp_path, monkeypatch):
     """T-U-repair-23 (FR-12.1, FR-14.6, FR-14.8): the stage-7 `observed` carries
     **null** tokens and a **null** `cost_usd`, never zero; the reason lives on
-    `RepairResult.token_capture` and is not a key of `observed`, whose four
-    declared keys are frozen by §2.2's rule."""
+    `RepairResult.token_capture` and is not a key of `observed`, whose eight
+    declared keys are frozen by §2.2's rule. The four money keys of contract
+    2.2 are null here for the same reason the token counts are: the chain
+    dispatches its own turns and none of them goes through `dispatch_turn`."""
     observed = stage7_observed(12.5)
-    assert observed == {"cpu_seconds": 12.5, "tokens_in": None,
+    assert observed == {"cpu_seconds": 12.5, "authorised_usd": None,
+                        "ceiling_usd": None, "billed_usd": None, "calls": None,
+                        "tokens_in": None,
                         "tokens_out": None, "cost_usd": None}
     assert set(observed) == schema._DICT_KEYS[("LedgerEntry", "observed")]
     assert "token_capture" not in observed
-    assert schema.CONTRACT_VERSION == "2.1"
+    assert schema.CONTRACT_VERSION == "2.2"
 
     run = _attempt(tmp_path, monkeypatch)
     assert run.result.token_capture == "unavailable_remote_dispatch"

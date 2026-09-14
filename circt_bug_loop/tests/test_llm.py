@@ -222,7 +222,7 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex,
 def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
                                                             fake_vertex,
                                                             allow_worker_env):
-    """K2/W7: the request is six fields, none of them an LLM and none a key.
+    """K2/W7: the request is seven fields, none of them an LLM and none a key.
 
     Two halves. The request `dispatch_turn` builds is asserted field by field,
     and the backend it never constructs is asserted by refusing `build_llm`
@@ -245,7 +245,9 @@ def test_T_U_gen_24b_the_turn_request_carries_no_credential(monkeypatch,
 
     assert turn["result"] == "PONG"
     assert set(seen) == {"system_message", "prompt", "tools", "stage",
-                         "timeout_seconds", "model_id"}
+                         "timeout_seconds", "model_id", "max_tool_iterations"}
+    # No guard, so no ceiling is sent either: the key is absent, not null.
+    assert "turn_budget_usd" not in seen
     assert seen["tools"] == [] and seen["stage"] == "synthesis"
     assert seen["timeout_seconds"] == 1200 and seen["model_id"] == MODEL_ID
     # No value anywhere in the request is the key, and nothing in it is an LLM.
@@ -442,11 +444,36 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
         price_usd_per_m_input_tokens=0.75,
         price_usd_per_m_output_tokens=3.75)
 
-    # W1's formula, arithmetic and all: at 2.0 characters per token, 3000
+    # The formula, arithmetic and all. A turn with NO tool makes exactly one
+    # call whatever the iteration cap says: at 2.0 characters per token, 3000
     # characters is 1500 prompt tokens.
-    assert guard.worst_case_usd("x" * 3000) == round(
+    one_call = {"prompt": "x" * 3000, "system_message": "", "tools": [],
+                "max_tool_iterations": 6}
+    assert guard.iterations(one_call) == 1
+    assert guard.worst_case_usd(one_call) == round(
         1500 / 1e6 * 0.75 + llm_module.MAX_OUTPUT_TOKENS / 1e6 * 3.75, 6)
     assert llm_module.MAX_OUTPUT_TOKENS == 16000, "CHIA's own max_tokens default"
+
+    # W-18b, errata row 38: the SAME request with a tool is the whole loop, and
+    # the input tokens grow by one tool result per iteration because the loop
+    # re-sends the conversation every time.
+    with_tool = {**one_call, "tools": [object()]}
+    assert guard.iterations(with_tool) == 6
+    cap = llm_module.TOOL_OUTPUT_TOKENS_CAP
+    expected_in = sum(1500 + i * cap for i in range(6))
+    assert guard.worst_case_usd(with_tool) == round(
+        expected_in / 1e6 * 0.75 + 6 * 16000 / 1e6 * 3.75, 6)
+    # It is the thing W-18 measured missing: the loop's worst case is orders of
+    # magnitude above one call's, which is what the old formula bounded.
+    assert guard.worst_case_usd(with_tool) > 10 * guard.worst_case_usd(one_call)
+    # The system message is re-sent on every call and counts.
+    assert (guard.worst_case_usd({**one_call, "system_message": "y" * 1000})
+            > guard.worst_case_usd(one_call))
+    # The cap is 32768 tokens, which is the pilot's own measurement doubled:
+    # 14 calls billed 1.58 M input tokens for a 6,087-character prompt, so
+    # 14 * 3044 + 91 * T = 1.58e6 gives T just under 17,000.
+    assert cap == 32768
+    assert cap > (1.58e6 - 14 * 6087 / 2.0) / 91
 
     # W-12c, closing errata row 34. The constant must sit BELOW the one ratio
     # ever measured - 1,509,080 prompt characters billed as 619,603 input
@@ -461,9 +488,9 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
 
     # Authorising accumulates, so two turns in one node bound each other even
     # though `spend_usd` is refreshed only per iteration (W10).
-    first = guard.authorise("x" * 3000)
+    first = guard.authorise(one_call)
     assert guard.authorised_usd == first
-    guard.authorise("x" * 3000)
+    guard.authorise(one_call)
     assert guard.authorised_usd == pytest.approx(2 * first)
 
     # And the refusal: a spend already at the cap stops the turn, and nothing
@@ -480,3 +507,28 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
                                  guard=tight)
     assert "campaign_spend_cap_usd" in str(raised.value)
     assert tight.authorised_usd == 0.0, "a refused turn authorises nothing"
+
+    # The ceiling handed to the backend is EXACTLY what the guard authorised,
+    # never more: that is the invariant W-18b asks for, and it is an equality.
+    sent = {}
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original",
+                        lambda request: sent.update(request) or {
+                            "result": "", "stream": "", "stderr": "",
+                            "success": True,
+                            "usage": {"tokens_in": 10, "tokens_out": 4,
+                                      "num_turns": 3}})
+    roomy = llm_module.SpendGuard(
+        cap_usd=100.0, spend_usd=0.0,
+        price_usd_per_m_input_tokens=0.75, price_usd_per_m_output_tokens=3.75)
+    out = llm_module.dispatch_turn("be terse", "ping", [], stage="stage_2",
+                                   timeout_seconds=60, model_id=MODEL_ID,
+                                   guard=roomy, max_tool_iterations=6)
+    assert sent["turn_budget_usd"] == roomy.authorised_usd
+    assert sent["max_tool_iterations"] == 6
+    assert roomy.worst_case_usd({**sent, "tools": []}) >= sent["turn_budget_usd"]
+    # And the four money fields the ledger row of contract 2.2 carries.
+    assert out["usage"]["authorised_usd"] == roomy.authorised_usd
+    assert out["usage"]["ceiling_usd"] == roomy.authorised_usd
+    assert out["usage"]["billed_usd"] == round(
+        10 / 1e6 * 0.75 + 4 / 1e6 * 3.75, 6)
+    assert out["usage"]["calls"] == 3

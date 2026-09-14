@@ -78,7 +78,7 @@ def registered(tmp_path):
 
 
 def test_T_U_byaml_01_the_committed_file_is_9_1s_schema(registered):
-    """T-U-byaml-01 (FR-14.1): 27 keys, no key missing and none extra.
+    """T-U-byaml-01 (FR-14.1): 29 keys, no key missing and none extra.
 
     The key set is compared against `BudgetFile`'s own fields for **equality**,
     which is stronger than a count and is what makes a key added to one and not
@@ -89,7 +89,7 @@ def test_T_U_byaml_01_the_committed_file_is_9_1s_schema(registered):
     doc = document()
     declared = {field.name for field in schema.dataclasses.fields(schema.BudgetFile)}
     assert set(doc) == declared - set(_NOT_IN_FILE)
-    assert len(doc) == 27
+    assert len(doc) == 29
 
     for key in BACKEND_KEYS:
         assert key in doc, f"{key} is one of the four the backend decision added"

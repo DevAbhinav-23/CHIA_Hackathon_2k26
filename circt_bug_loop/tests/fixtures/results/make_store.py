@@ -221,9 +221,13 @@ def _ledger(store: LoopStore) -> None:
     the artefact has an unspent balance to disclose (FR-18.10), and the offline
     mutator synthesis carries the date FR-05.8's declaration names.
     """
-    def observed(cpu=0.0, tokens_in=None, tokens_out=None, cost=None) -> str:
+    def observed(cpu=0.0, tokens_in=None, tokens_out=None, cost=None,
+                 authorised=None, ceiling=None, billed=None, calls=None) -> str:
+        """§2.7's eight keys (contract 2.2); the last four are the turn's money."""
         return json.dumps({"cpu_seconds": cpu, "tokens_in": tokens_in,
-                           "tokens_out": tokens_out, "cost_usd": cost}, sort_keys=True)
+                           "tokens_out": tokens_out, "cost_usd": cost,
+                           "authorised_usd": authorised, "ceiling_usd": ceiling,
+                           "billed_usd": billed, "calls": calls}, sort_keys=True)
 
     rows = [
         ("l-0001", "seeded", "arm_window", "campaign", 14400.0, 1,
@@ -231,9 +235,11 @@ def _ledger(store: LoopStore) -> None:
         ("l-0002", "mutation", "arm_window", "campaign", 9000.0, 1,
          observed(8100.0), "2026-09-19T08:00:00+00:00", "generated_inputs_per_day"),
         ("l-0003", "seeded", "stage", "stage_1", 120.0, 1,
-         observed(90.0, 41839, 6114, 0.054), "2026-09-19T01:00:00+00:00", None),
+         observed(90.0, 41839, 6114, 0.054, authorised=0.36, ceiling=0.36,
+                  billed=0.054, calls=4), "2026-09-19T01:00:00+00:00", None),
         ("l-0004", "seeded", "stage", "stage_2", 180.0, 1,
-         observed(150.0, 52310, 8820, 0.072), "2026-09-19T01:05:00+00:00", None),
+         observed(150.0, 52310, 8820, 0.072, authorised=0.36, ceiling=0.36,
+                  billed=0.072, calls=6), "2026-09-19T01:05:00+00:00", None),
         ("l-0005", "seeded", "stage", "stage_3", 12.0, 1,
          observed(9.0), "2026-09-19T01:10:00+00:00", None),
         ("l-0006", "seeded", "stage", "stage_3", 14.0, 1,

@@ -1553,7 +1553,10 @@ def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path
                      "snapshot_spent": remaining.spent})
         # What A3 does with a refusal: FR-04.8's blanket catch records it.
         try:
-            guard.authorise("x" * 3000)
+            guard.authorise({"prompt": "x" * 3000, "system_message": "",
+                             "tools": [object()],
+                             "max_tool_iterations": cfg["max_tool_iterations"]
+                             ["stage_2"]})
         except SpendCapRefused as error:
             return {"specs": [], "logs": {}, "counters": schema.CounterBlock(
                 stage="stage_2", started=1, completed=0, failed=1, seconds=0.1),

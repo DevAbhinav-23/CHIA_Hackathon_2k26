@@ -334,19 +334,22 @@ def stage7_observed(elapsed: float) -> dict:
 
     Null and never zero: zero is a number a reader will add up, and the counts
     are not merely zero but unobserved. The reason lives on `RepairResult`, not
-    here: `_DICT_KEYS[("LedgerEntry", "observed")]` is exactly these four keys
-    and a fifth fails validation as loudly as a missing one (§2.2, §2.6).
+    here: `_DICT_KEYS[("LedgerEntry", "observed")]` is exactly these EIGHT keys
+    (contract 2.2) and a ninth fails validation as loudly as a missing one
+    (§2.2, §2.6). The four money fields are `dispatch_turn`'s and stage 7 makes
+    no turn through it - CHIA's chain dispatches its own - so all four are null
+    here for the same reason the token counts are.
 
     Returns:
-        {"cpu_seconds": float, "tokens_in": None, "tokens_out": None,
-         "cost_usd": None}.
+        {"cpu_seconds": float, and the seven others at None}.
     Worker:
         pure.
     Raises:
         nothing.
     """
     return {"cpu_seconds": elapsed, "tokens_in": None, "tokens_out": None,
-            "cost_usd": None}
+            "cost_usd": None, "authorised_usd": None, "ceiling_usd": None,
+            "billed_usd": None, "calls": None}
 
 
 @ChiaFunction(resources={"repair": 1}, max_retries=0)

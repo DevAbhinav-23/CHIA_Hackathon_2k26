@@ -100,8 +100,19 @@ def require_live_model(purpose: str, *, need_key: bool = True,
 
 
 def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
-              env: Optional[Mapping[str, str]] = None):
+              env: Optional[Mapping[str, str]] = None,
+              max_tool_iterations: Optional[int] = None,
+              turn_budget_usd: Optional[float] = None):
     """Build the campaign backend, refusing to reach the network unbidden.
+
+    *max_tool_iterations* and *turn_budget_usd* are the two halves of errata
+    row 38's fix and are passed straight to CHIA's constructor. The first bounds
+    how many `generate_content` calls one turn may make - CHIA's own default is
+    100, and the pilot's three turns made 14, 21 and 37 of them - and the second
+    is the money ceiling the patched tool loop enforces from the inside, before
+    each call, on the estimate of that call's own cost. Both are None for the
+    offline synthesis, which precedes the registration and has no cap to be
+    authorised against.
 
     Returns:
         VertexGeminiLLM, configured for Vertex AI express mode: one API key, no
@@ -118,12 +129,18 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
     from chia.models.vertex import VertexGeminiLLM
 
     key = require_live_model(f"{MODEL_BACKEND}:{model_id}", env=env)
+    extra = {}
+    if max_tool_iterations is not None:
+        extra["max_tool_iterations"] = int(max_tool_iterations)
+    if turn_budget_usd is not None:
+        extra["turn_budget_usd"] = float(turn_budget_usd)
     llm = VertexGeminiLLM(
         model=model_id,
         system_message=system_message,
         timeout_seconds=timeout_seconds,
         project=None,
         location=None,
+        **extra,
         # api_key: express mode. http_options.timeout: MILLISECONDS, and the
         # only thing that bounds the request, because VertexGeminiLLM stores
         # timeout_seconds and never reads it (chia:chia/models/vertex.py:219,
@@ -200,6 +217,28 @@ MAX_OUTPUT_TOKENS = 16000
 #: down to the nearest safe value.
 CHARS_PER_TOKEN = 2.0
 
+#: The tokens ONE tool result may add to the conversation, for the
+#: pre-authorisation only (errata row 38). The tool loop re-sends the whole
+#: conversation on every call, so the input tokens of iteration *i* are the
+#: prompt plus *i* tool results and the turn's input cost is quadratic in the
+#: iteration count. This constant is what one of those results is bounded at.
+#:
+#: **32768, from the pilot's own measurement doubled.** W-18's `stage_1` turn
+#: made 14 calls and billed 1.58 M input tokens against a 6,087-character
+#: prompt; solving `14 * P + 91 * T = 1.58e6` at `P = 6087 / 2.0` gives
+#: **T = 16,900 tokens** per tool result. 32768 is that rounded up to the next
+#: power of two and doubled, which is the direction a cap must err in. It is NOT
+#: `artefact_inline_cap_bytes / CHARS_PER_TOKEN` (131,072 tokens): that is what
+#: `SourceReadTool` may return at its very largest, and authorising every
+#: iteration at it would refuse the second turn of every campaign.
+TOOL_OUTPUT_TOKENS_CAP = 32768
+
+#: The iterations a turn with NO tool can make: exactly one. CHIA's loop breaks
+#: as soon as a response carries no `function_call` part, and a turn that
+#: advertised no tool cannot receive one, so `max_tool_iterations` is not the
+#: factor for such a turn whatever the budget file says.
+_NO_TOOL_ITERATIONS = 1
+
 
 class SpendCapRefused(RuntimeError):
     """A turn was refused because its worst case would reach the USD cap (W1)."""
@@ -216,14 +255,24 @@ class SpendGuard:
     pre-authorisation: every turn, before it is sent, and the arm stops on the
     refusal rather than after the money is gone.
 
-    The worst case is W1's own formula, `(prompt_chars / 3 + max_output_tokens)`
-    priced at the two rates. IT BOUNDS ONE `generate_content` CALL: a turn with
-    tools runs a loop of up to `max_tool_iterations` (100) of them
-    (`chia:chia/models/vertex.py:227`), so for such a turn the authorised figure
-    is a FLOOR and not the true worst case. Recorded rather than absorbed; the
-    observed spend of the turn that overran still stops the arm at the next
-    authorisation, so the overshoot is bounded by one turn and no longer by one
-    seed.
+    **The worst case is the WHOLE TOOL LOOP and no longer one call** (errata
+    row 38, W-18b). W1's own formula was `(prompt_chars / 3 + max_output_tokens)`
+    priced at the two rates, which bounds ONE `generate_content` call; a turn
+    with tools runs a loop of up to `max_tool_iterations` of them
+    (`chia:chia/models/vertex.py:227`) and re-sends the whole conversation each
+    time, so the pilot's three turns billed 19.7x, 32.3x and 64.1x their
+    authorisation and the campaign went 43.3 % past its registered cap. The
+    formula is now, over iterations `i` in `range(n)`:
+
+        tokens_in  = sum(prompt_tokens + i * TOOL_OUTPUT_TOKENS_CAP)
+        tokens_out = n * max_output_tokens          # thinking included
+
+    priced at the file's two rates, with `n` the stage's own
+    `max_tool_iterations` for a turn that carries tools and 1 for one that does
+    not. The same figure is handed to the backend as `turn_budget_usd`, so the
+    ceiling the loop enforces from the inside is exactly what the guard
+    authorised and never more: the class invariant W-18b asks for,
+    `worst_case_usd >= ceiling_usd`, holds by construction and by equality.
 
     `authorised_usd` accumulates the worst case of every turn this guard has
     let through, so two turns inside one node are authorised against each
@@ -237,24 +286,49 @@ class SpendGuard:
     max_output_tokens: int = MAX_OUTPUT_TOKENS
     authorised_usd: float = 0.0
 
-    def worst_case_usd(self, prompt: str) -> float:
-        """The most one model call on *prompt* can cost, at the two prices."""
-        tokens_in = len(prompt or "") / CHARS_PER_TOKEN
-        return round(
-            tokens_in / 1e6 * self.price_usd_per_m_input_tokens
-            + self.max_output_tokens / 1e6 * self.price_usd_per_m_output_tokens, 6)
+    def iterations(self, request: Mapping) -> int:
+        """The `generate_content` calls *request* may make: `n` in the formula."""
+        if not request.get("tools"):
+            return _NO_TOOL_ITERATIONS
+        return max(1, int(request.get("max_tool_iterations") or 1))
 
-    def authorise(self, prompt: str) -> float:
-        """Authorise one turn on *prompt*, or refuse it.
+    def worst_case_usd(self, request: Mapping) -> float:
+        """The most the whole turn *request* can cost, at the two prices.
+
+        *request* is `dispatch_turn`'s own dict: `system_message`, `prompt`,
+        `tools` and `max_tool_iterations` are the four keys read. The system
+        message counts, being re-sent as `system_instruction` on every call.
 
         Returns:
-            float, the worst case that was authorised.
+            float, USD, rounded to six decimal places.
+        Worker:
+            pure; it reads one mapping and its own fields.
+        Raises:
+            nothing; a request with no prompt is authorised for its output only.
+        """
+        n = self.iterations(request)
+        prompt_chars = (len(request.get("prompt") or "")
+                        + len(request.get("system_message") or ""))
+        prompt_tokens = prompt_chars / CHARS_PER_TOKEN
+        tokens_in = sum(prompt_tokens + i * TOOL_OUTPUT_TOKENS_CAP
+                        for i in range(n))
+        tokens_out = n * self.max_output_tokens
+        return round(
+            tokens_in / 1e6 * self.price_usd_per_m_input_tokens
+            + tokens_out / 1e6 * self.price_usd_per_m_output_tokens, 6)
+
+    def authorise(self, request: Mapping) -> float:
+        """Authorise one turn, or refuse it.
+
+        Returns:
+            float, the worst case that was authorised, which is also the
+            ceiling the backend is given.
         Worker:
             pure; it reads its own fields.
         Raises:
             SpendCapRefused when the cap would be reached. Nothing is sent.
         """
-        worst = self.worst_case_usd(prompt)
+        worst = self.worst_case_usd(request)
         total = self.spend_usd + self.authorised_usd + worst
         if total >= self.cap_usd:
             raise SpendCapRefused(
@@ -264,6 +338,22 @@ class SpendGuard:
                 f"{self.cap_usd:.4f} (FR-18.10, W1)")
         self.authorised_usd += worst
         return worst
+
+    def billed_usd(self, usage: Mapping) -> Optional[float]:
+        """What a finished turn cost, at this guard's own two prices.
+
+        The same arithmetic `ledger.price` does, here so the per-turn row can
+        carry the billed figure beside the authorised one without the node
+        reaching for a `BudgetFile` it does not hold.
+
+        Returns:
+            float, or None when either count was never observed (K10).
+        """
+        tokens_in, tokens_out = usage.get("tokens_in"), usage.get("tokens_out")
+        if tokens_in is None or tokens_out is None:
+            return None
+        return round(tokens_in / 1e6 * self.price_usd_per_m_input_tokens
+                     + tokens_out / 1e6 * self.price_usd_per_m_output_tokens, 6)
 
 
 def worker_env() -> Mapping[str, str]:
@@ -284,8 +374,10 @@ def llm_turn(request: dict) -> dict:
     """Build the backend HERE and run one model turn, bringing its counts home.
 
     *request* is what a caller on any worker may send: `system_message`,
-    `prompt`, `tools` (a list of `ToolEndpoint`), `stage`, `timeout_seconds` and
-    `model_id`. It carries NO credential and no LLM object. The client is
+    `prompt`, `tools` (a list of `ToolEndpoint`), `stage`, `timeout_seconds`,
+    `model_id` and - since W-18b - `max_tool_iterations` and `turn_budget_usd`,
+    the two the patched backend bounds its own loop with. It carries NO
+    credential and no LLM object. The client is
     constructed on this node from this node's own environment, so the interlock
     and the key are needed on the `llm` containers and on no other: the `circt`
     workers that run A3 and B7 reach a model only through this node (K2).
@@ -315,7 +407,9 @@ def llm_turn(request: dict) -> dict:
     started = time.monotonic()
     stage = request.get("stage", "stage_2")
     llm = build_llm(request["system_message"], int(request["timeout_seconds"]),
-                    request["model_id"], env=worker_env())
+                    request["model_id"], env=worker_env(),
+                    max_tool_iterations=request.get("max_tool_iterations"),
+                    turn_budget_usd=request.get("turn_budget_usd"))
     cli = llm.prompt(request["prompt"], list(request.get("tools") or []))
     success = bool(getattr(cli, "success", False))
     return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
@@ -378,7 +472,8 @@ def turn_usage(metadata) -> dict:
 
 def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
                   timeout_seconds: int, model_id: str,
-                  guard: Optional[SpendGuard] = None) -> dict:
+                  guard: Optional[SpendGuard] = None,
+                  max_tool_iterations: Optional[int] = None) -> dict:
     """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn.
 
     A3, A7 and B7 all reach a model through this one line, and none of them
@@ -395,6 +490,17 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
     because the offline mutator synthesis precedes the registration commit and
     has no ledger to be authorised against (8.3).
 
+    *max_tool_iterations* is this stage's registered cap, and the guard's
+    authorisation is computed over exactly that many calls. The SAME figure the
+    guard authorised is handed to the backend as `turn_budget_usd`, so the
+    ceiling the patched tool loop enforces call by call is never above what the
+    campaign authorised (errata row 38). Without a guard nothing is authorised
+    and no ceiling is sent: the offline synthesis makes one call with no tool.
+
+    The returned `usage` is the node's own plus the four money fields the ledger
+    row of contract 2.2 carries - `authorised_usd`, `ceiling_usd`, `billed_usd`
+    and `calls` - which is the only place all four are known at once.
+
     Returns:
         `llm_turn`'s dict, whichever way it ran.
     Worker:
@@ -403,14 +509,22 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
         SpendCapRefused before anything is sent, when *guard* refuses; whatever
         the backend raises, unchanged, after that.
     """
-    if guard is not None:
-        guard.authorise(prompt)
     request = {"system_message": system_message, "prompt": prompt,
                "tools": tool_endpoints(tools), "stage": stage,
-               "timeout_seconds": int(timeout_seconds), "model_id": model_id}
-    if ray.is_initialized():
-        return get(llm_turn.chia_remote(request))
-    return llm_turn._chia_original(request)
+               "timeout_seconds": int(timeout_seconds), "model_id": model_id,
+               "max_tool_iterations": max_tool_iterations}
+    authorised = ceiling = None
+    if guard is not None:
+        authorised = ceiling = guard.authorise(request)
+        request["turn_budget_usd"] = ceiling
+    out = (get(llm_turn.chia_remote(request)) if ray.is_initialized()
+           else llm_turn._chia_original(request))
+    usage = dict(out.get("usage") or {})
+    usage.update(authorised_usd=authorised, ceiling_usd=ceiling,
+                 billed_usd=guard.billed_usd(usage) if guard is not None else None,
+                 calls=usage.get("num_turns"))
+    out["usage"] = usage
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +572,7 @@ def parse_json_footer(text: str, required: tuple) -> dict:
 
 
 __all__ = ["MODEL_BACKEND", "MAX_OUTPUT_TOKENS", "CHARS_PER_TOKEN",
+           "TOOL_OUTPUT_TOKENS_CAP",
            "LiveModelRefused", "PromptContractError", "SpendCapRefused",
            "SpendGuard", "ToolEndpoint", "build_llm", "dispatch_turn",
            "llm_turn", "parse_json_footer", "require_live_model",

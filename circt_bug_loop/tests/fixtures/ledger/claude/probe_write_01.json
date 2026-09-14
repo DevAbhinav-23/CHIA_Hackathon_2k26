@@ -1,10 +1,14 @@
 {
   "amount": 40.1,
   "arm": "mutation",
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "entry_id": "c-stage2-01",
   "metered": false,
   "observed": {
+    "authorised_usd": null,
+    "billed_usd": null,
+    "calls": null,
+    "ceiling_usd": null,
     "cost_usd": null,
     "cpu_seconds": 3.1,
     "tokens_in": null,

@@ -211,3 +211,148 @@ def test_T_U_upstream_03_failed_turn_keeps_its_counts(monkeypatch, patched_verte
         "input_tokens": 10, "output_tokens": 5,
         "thinking_tokens": 7, "tool_use_prompt_tokens": 3, "num_turns": 1,
     }
+
+
+def _budget_replies():
+    """Two replies: a tool call whose RESULT is huge, then a second answer.
+
+    The first grows the conversation past any small ceiling, which is the
+    quadratic growth errata row 38 is about; the second is what a loop with no
+    ceiling goes on to send. A fresh list per call, because the fake client
+    pops from the one it is given.
+    """
+    return [
+        _response(types.Part(function_call=types.FunctionCall(
+            name="calc__run", args={"x": "y" * 400_000})),
+            _usage(prompt=10, candidates=5, thoughts=7, tool_use=3)),
+        _response(types.Part(text="NEVER SENT"), _usage(prompt=1)),
+    ]
+
+
+@pytest.mark.t0
+def test_T_U_upstream_04_the_turn_budget_stops_the_loop_mid_way(monkeypatch,
+                                                                patched_vertex):
+    """T-U-upstream-04 (errata row 38): the ceiling fires BEFORE the call it refuses.
+
+    W-18 measured the cost of not having this: three turns made 14, 21 and 37
+    `generate_content` calls, each re-sending the whole conversation, and cost
+    19.7x, 32.3x and 64.1x what the caller had authorised. Here the first call
+    is allowed, its tool result grows the conversation, and the second is
+    refused before it is sent - so the money it would have cost is not spent -
+    while `_last_metadata` still reports what the first one billed (K10).
+    Fixture: a fake `genai.Client`. Tier 0.
+    """
+    calls = _install_fake_genai(monkeypatch, _budget_replies())
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        turn_budget_usd=0.10)
+    with pytest.raises(patched_vertex.TurnBudgetExceeded) as raised:
+        llm._run_generate("ping", [])
+
+    assert len(calls) == 1, "the second call was refused, not made"
+    error = raised.value
+    assert error.budget_usd == 0.10
+    assert error.estimate_usd > 0.10 and error.spent_usd >= 0.0
+    assert "turn_budget_usd" in error.raw_message
+    # K10 still holds: the counts of the call that DID run survive the raise.
+    assert llm._last_metadata["input_tokens"] == 10
+    assert llm._last_metadata["num_turns"] == 1
+
+    # The same conversation with NO ceiling runs to the end, which is CHIA's
+    # own behaviour and is what a `turn_budget_usd` of None preserves.
+    calls = _install_fake_genai(monkeypatch, _budget_replies())
+    free = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1")
+    assert free.turn_budget_usd is None
+    assert free._run_generate("ping", []).result == "NEVER SENT"
+    assert len(calls) == 2
+
+    # A ceiling the whole conversation fits under changes nothing either.
+    calls = _install_fake_genai(monkeypatch, _budget_replies())
+    roomy = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        turn_budget_usd=1000.0)
+    assert roomy._run_generate("ping", []).result == "NEVER SENT"
+    assert len(calls) == 2
+
+
+@pytest.mark.t0
+def test_T_U_upstream_05_the_budget_refusal_is_never_retried(monkeypatch,
+                                                             patched_vertex):
+    """T-U-upstream-05 (errata row 38): `prompt()` propagates it, it does not retry.
+
+    `prompt()` resets the accumulated counts at the top of every attempt, so a
+    retry would restart the whole tool loop with a clean slate and spend the
+    money the ceiling just refused - three times over, `retries` being 3. The
+    refusal therefore sits with the other never-retry errors. The profiler is
+    stubbed because `prompt` is a `@ChiaFunction` and `get_profiler()` starts a
+    local Ray where none is running (`04-Test-Plan.md` §0.4). Fixture: a fake
+    `genai.Client`. Tier 0.
+    """
+    from chia.trace import profiler as profiler_module
+
+    monkeypatch.setattr(profiler_module, "get_profiler",
+                        lambda: type("P", (), {"enabled": False})())
+    calls = _install_fake_genai(monkeypatch, _budget_replies())
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        turn_budget_usd=0.10)
+    assert llm.retries == 3
+    with pytest.raises(patched_vertex.TurnBudgetExceeded):
+        llm.prompt._chia_original(llm, "ping", [])
+    assert len(calls) == 1, "one attempt, not three"
+
+
+@pytest.mark.t0
+def test_T_U_upstream_06_get_node_id_is_bounded(monkeypatch, patched_vertex):
+    """T-U-upstream-06 (errata row 37): a Ray call that never returns is given up on.
+
+    MEASURED, W-12c: with `/tmp/ray/ray_current_cluster` naming a cluster that
+    is down, `ray.get_runtime_context()` retries the GCS five seconds at a time
+    and the `try/except` around it cannot catch a call that does not return. The
+    first live attempt of the project sat twelve minutes inside it and was
+    killed, taking that turn's token counts with it. All four callers are on
+    error paths, so a 429 met on such a machine hung the whole campaign.
+    Fixture: a `ray.get_runtime_context` that never returns. Tier 0.
+    """
+    import threading
+    import time
+
+    released = threading.Event()
+
+    def _never():
+        released.wait(30)
+        raise AssertionError("the bound should have answered long before this")
+
+    llm = patched_vertex.VertexGeminiLLM(model="gemini-3.8-flash")
+
+    # First guard: a process with no Ray in it does not ask Ray anything.
+    # Without it the call blocks sixty seconds and then Ray's own client calls
+    # QuickExit - "Failed to connect to GCS within 60 seconds ... The program
+    # will terminate." - which no worker thread can be rescued from. MEASURED,
+    # W-18b, while writing this test: it killed the pytest process.
+    monkeypatch.setattr(patched_vertex.ray, "is_initialized", lambda: False)
+    monkeypatch.setattr(patched_vertex.ray, "get_runtime_context",
+                        lambda: pytest.fail("asked Ray with no Ray running"))
+    assert llm._get_node_id() == "unknown"
+
+    # Second guard, for a cluster that dies UNDER a live driver, where the
+    # first does not apply: the call is given up on rather than waited out.
+    monkeypatch.setattr(patched_vertex, "NODE_ID_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(patched_vertex.ray, "is_initialized", lambda: True)
+    monkeypatch.setattr(patched_vertex.ray, "get_runtime_context", _never)
+    started = time.monotonic()
+    assert llm._get_node_id() == "unknown"
+    elapsed = time.monotonic() - started
+    released.set()
+    assert elapsed < 5.0, f"the call was not bounded: {elapsed:.1f}s"
+
+    # And the real answer still comes back when Ray does answer.
+    monkeypatch.setattr(
+        patched_vertex.ray, "get_runtime_context",
+        lambda: type("Ctx", (), {"get_node_id": staticmethod(lambda: "n0de")})())
+    assert llm._get_node_id() == "n0de"
+    # The committed bound is ten seconds, which is the patch's own constant.
+    patch = (UPSTREAM / "vertex-usage.patch").read_text(encoding="utf-8")
+    assert "+NODE_ID_TIMEOUT_SECONDS = 10.0" in patch

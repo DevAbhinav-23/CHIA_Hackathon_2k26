@@ -107,6 +107,42 @@ calibration_sample_shas:
   - "e36f5695723e46a6d8463a521452dcda8aff2c4b"
   - "ef82ef1b1e33a8ec4d9a74a134e4ecfb4d8256a6"
 
+# --- the model's own tool loop (errata row 38) -------------------------------
+# How many `generate_content` calls ONE turn of each model-bearing stage may
+# make. CHIA's backend default is 100 and its loop re-sends the whole
+# conversation on every call, so a turn's input cost grows QUADRATICALLY in the
+# number of tool calls. MEASURED, W-18: three turns made 14, 21 and 37 calls and
+# cost USD 1.23, 1.98 and 3.96 against pre-authorisations of about USD 0.06 -
+# 19.7x, 32.3x and 64.1x - and the pilot finished 43.3 % past its registered
+# cap. This is a REGISTERED parameter and not an implementation constant,
+# because `llm.SpendGuard` computes the authorisation from it and the same
+# figure becomes the per-turn ceiling the patched backend enforces from the
+# inside: change it and every authorised number changes.
+#
+# 6 for stages 1 and 2: the pilot's two A3 turns took 14 and 21 calls at a cap
+# of 100 and neither of them needed more than a handful of source reads to
+# write three probes. 3 for stage 6, which reads the record and writes prose.
+# 20 for stage 7, which is CHIA's OWN repair chain: the loop there is the
+# chain's and this value is RECORDED rather than enforced by this file.
+max_tool_iterations:
+  stage_1: 6
+  stage_2: 6
+  stage_6: 3
+  stage_7: 20
+
+# --- minimality (FR-13.3, gate question 2) -----------------------------------
+# The lines at or below which a case is minimal WHETHER OR NOT the reducer
+# removed anything. MEASURED, W-18: `circt-reduce` made 20 interestingness
+# calls on a three-operation module, removed nothing, reported
+# `reason=no_progress` with `fixpoint=1`, and gate question 2 then answered
+# `not_minimal` for all three of the pilot's candidates - the reducer having
+# reached a fixpoint is EVIDENCE OF minimality and was being read as evidence
+# against it. 12 lines is the threshold: every case the pilot produced was
+# six lines or fewer, and a bug report a maintainer reads is not improved by a
+# case being eight lines rather than twelve. A case ABOVE it that the reducer
+# could not shrink still fails, which is the case worth failing.
+minimal_case_lines: 12
+
 # --- per-seed caps ----------------------------------------------------------
 per_seed_probe_cap: 5                  # FR-04.5, and the mutation arm's cap too
 per_seed_iteration_cap: 3              # FR-16.3
