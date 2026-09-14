@@ -1,26 +1,4 @@
-"""B12, the campaign driver, and B1's `build_image` (03-LLD.md 3.11, 4.11.1, 13.1).
-
-The driver is a program and not a node: it parses argv, runs the twelve
-pre-flight checks, builds the one `RunManifest`, opens both stores, sequences
-the two arm windows one after the other, logs every returned `CounterBlock`,
-reconciles against CHIA's own `issues.db` and renders the results.
-
-Three things this module does differently from 03-LLD.md 13.1, each recorded in
-design/reviews/implementation-errata-log.md and each for one reason:
-
-  * the stage nodes are reached through `Stages`, a record of nine callables,
-    and dispatched through `Dispatch`, which is `chia_remote` under Ray and the
-    node's own undecorated body without it. That is what makes one whole
-    iteration runnable at T0 with no cluster, which is what W-17's join needs
-    before it wires the real nodes together.
-  * `--dry-run` still dispatches nothing: it stops after the manifest, exactly
-    as 13.1's table says. The in-process path above is `campaign_drive`'s
-    `remote=False`, which the driver never takes on its own.
-  * the path constants are derived from the IMPORTED `chia` module and never
-    from this file's ancestors, because the flow lives at two different depths
-    in two trees (1.4). `chia.__path__[0]`, not `chia.__file__`, which is None
-    for a namespace package.
-"""
+"""B12, the campaign driver, and B1's `build_image` (03-LLD.md 3.11)."""
 from __future__ import annotations
 
 import argparse
@@ -58,9 +36,6 @@ from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore
 
 logger = logging.getLogger("circt_bug_loop")
 
-# ---------------------------------------------------------------------------
-# The four path constants (13.1)
-# ---------------------------------------------------------------------------
 
 #: The flow directory, in either tree. Nothing here walks past it.
 FLOW_DIR = Path(__file__).resolve().parent
@@ -70,37 +45,20 @@ _CHIA_PKG = Path(chia.__path__[0]).resolve()
 _CHIA_ROOT = _CHIA_PKG.parent
 _ISSUE_SOLVER = _CHIA_ROOT / "examples" / "circt_issue_solver"
 
-#: The staged package the workers run, and the ONLY thing `runtime_env` ships
-#: (W6, K7). It is rebuilt at every start-up by `stage_shipped` and is not
-#: committed: it holds a PATCHED copy of CHIA, and a patched copy in the tree
-#: would be a second source of truth for a file this repository does not own.
+#: The staged package the workers run, and the ONLY thing `runtime_env` ships (W6).
 SHIPPED_DIR = FLOW_DIR / "_shipped"
 
 #: The four `py_modules` entries `stage_shipped` writes, in Ray's own order.
-#: Each becomes its own directory on a worker's `sys.path`, so the flow is
-#: importable as `circt_bug_loop.<module>`, CHIA as `chia.<module>`, and the
-#: example's two files by their bare names, which is how `repair_adapter`
-#: imports them (FR-12.1 forbids copying them into this package).
 SHIPPED_MODULES = ("circt_bug_loop", "chia", "issue_task.py", "circt_util.py")
 
-#: What is left behind when the flow package is staged. `tests/` is 3.8 MB of
-#: the 5.8, and it carries `fixtures/repair/issues.db` and the synthetic
-#: `fixtures/secrets/known_values.txt`; `loop.db` at 6.1's path is the mirrored
-#: issue corpus, which `sync-to-chia.sh` has always excluded and `runtime_env`
-#: did not (W6).
+#: What is left behind when the flow package is staged.
 _STAGE_EXCLUDES = ("tests", "_shipped", "__pycache__", "*.pyc",
                    "loop.db", "loop.db-shm", "loop.db-wal")
 _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
 
-#: The two upstream patches the staged copy carries, and the text that proves
-#: each one is in it. Pre-flight checks 13 and 14 grep the STAGED file, which is
-#: the file a worker actually imports; the operator's own checkout is never
-#: modified (K7, K11, W-20b errata 3).
+#: The two upstream patches the staged copy carries.
 VERTEX_BRANCH = 'elif backend == "vertex":'
-#: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38): the
-#: per-turn money ceiling the tool loop enforces from the inside, and the marker
-#: that says the staged file carries it. `NODE_ID_TIMEOUT_SECONDS` is errata
-#: row 37's, the bound on `_get_node_id`.
+#: `turn_budget_usd` is W-18b's addition to the same patch (errata row 38).
 VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
                        "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS")
 
@@ -127,27 +85,18 @@ _METERED_REPAIR_BACKEND = "vertex"
 #: The four repair backends 13.1's table offers.
 REPAIR_BACKENDS = ("vertex", "claude", "antigravity", "opencode")
 
-#: B1's two build parameters that are neither argv nor budget.yaml: the six
-#: targets ADR-D-13 branch (a) builds and FR-03.4's flag string, both as the
-#: measured image at `eade0de61bc5` carries them (W-04).
+#: B1's two build parameters that are neither argv nor budget.yaml.
 IMAGE_TARGETS = ("circt-opt", "firtool", "circt-translate", "arcilator",
                  "circt-reduce", "circt-verilog")
 IMAGE_FLAG_STRING = "-O3 -UNDEBUG -gline-tables-only"
 
-#: Step 3's evidence that the pin equality check RAN, which is distinct from
-#: its passing: the Dockerfile prints this on the `then` branch and
-#: `PIN CHECK FAILED` and `exit 1` on the other, so a build whose log carries
-#: neither has lost the layer (FR-03.2).
+#: Step 3's evidence that the pin equality check RAN, which is distinct from its passing.
 PIN_CHECK_LINE = "PIN CHECK PASSED"
 
 #: The statuses at which a probe carries on to stage 4 (FR-06.9, 3.6).
 _FIRING_STATUSES = ("assertion", "fatal_error", "crash")
 
-#: The status at which a probe stops WITHOUT the differential being asked
-#: (N9). `tool_unavailable` means the binary never started, so there is no
-#: design to simulate and no verdict to take; dispatching B4 would spend a
-#: `circt` slot to record a harness failure that is the loader's and not the
-#: probe's.
+#: The status at which a probe stops WITHOUT the differential being asked (N9).
 _UNDECIDED_STATUS = "tool_unavailable"
 
 #: Which stage id each dispatched callable's counters belong to (3.11).
@@ -156,23 +105,15 @@ _STAGE_OF = {"generate_seeded": "stage_2", "generate_mutation": "stage_2",
              "oracle_differential": "stage_4", "reduce_case": "stage_5",
              "dedup_and_screen": "stage_6", "triage_report": "stage_6",
              "repair_adapt": "stage_7", "gate_decide": "gate",
-             # The gate's own two `{"circt": 1}` nodes (N8). They are dispatched
-             # by `gate_decide`, which holds NO circt resource, so without a row
-             # here their occupancy of a worker was folded into the head node's
-             # wall clock and charged as though the gate had run on the head.
-             # Both are the gate's stage; what changes is that they are
-             # charged, and `gate_decide`'s own entry no longer carries them.
+             # The gate's own two `{"circt": 1}` nodes (N8).
              "gate_rerun": "gate", "gate_validate": "gate"}
 
-#: Which stage id each of A3's two agent turns occupies, which is
-#: `generate_task._TURN_STAGE` read from the other side: the generator is one
-#: node and two stages, so its occupancy is charged as two ledger entries and
-#: not as one (3.11, FR-14.8).
+#: Which stage id each of A3's two agent turns occupies.
 _TURN_OF = {"seed_read": "stage_1", "probe_write": "stage_2"}
 
 
 class PreflightFailed(Exception):
-    """One pre-flight check refused the run. Carries the check's name (13.1)."""
+    """One pre-flight check refused the run."""
 
     def __init__(self, check: str, detail: str):
         self.check = check
@@ -181,7 +122,7 @@ class PreflightFailed(Exception):
 
 
 class ImageBuildError(Exception):
-    """A step of `build_image` failed. Carries the step's name (4.11.1)."""
+    """A step of `build_image` failed."""
 
     def __init__(self, step: str, detail: str):
         self.step = step
@@ -197,46 +138,12 @@ class BuildTimeout(Exception):
         super().__init__(f"the image build exceeded {timeout_seconds} s")
 
 
-# ---------------------------------------------------------------------------
-# Placement, and the runtime environment
-# ---------------------------------------------------------------------------
-
-#: What `ray start` writes and `chia down` leaves behind: the address of the
-#: cluster this machine last joined. `ray.get_runtime_context()` reads it and
-#: then retries the GCS at that address five seconds at a time FOR EVER, so a
-#: file naming a cluster that is down hangs every caller instead of failing one
-#: (errata row 37, measured twice: W-12c's twelve-minute hang inside a vertex
-#: error path, and W-19b §3.4).
+#: What `ray start` writes and `chia down` leaves behind.
 RAY_CURRENT_CLUSTER = "/tmp/ray/ray_current_cluster"
 
 
 def clear_stale_ray_cluster(path: str = RAY_CURRENT_CLUSTER) -> Optional[str]:
-    """Remove *path* when it names a cluster that is not running (errata row 37).
-
-    The run rule is that the file must name a LIVE cluster or not exist. The
-    driver's own `ray.init(address="auto")` makes it live, which is why the
-    campaign never met the hang; the four call sites that did are on CHIA's
-    vertex error paths, where a 429 on a machine carrying a stale file waits
-    instead of retrying. This is the pre-flight half of the fix and
-    `_get_node_id`'s own bound - `upstream/vertex-usage.patch`,
-    `NODE_ID_TIMEOUT_SECONDS` - is the other; neither alone is enough, because a
-    stale file also hangs `ray.init` itself.
-
-    "Not running" is decided by `ray.is_initialized()` in this process and by
-    the absence of a GCS listening on the address the file names. Nothing is
-    removed when a cluster IS up: that file is load-bearing while it is true.
-
-    Returns:
-        str, the address the removed file named, or None when nothing was
-        removed - because there was no file, or because its cluster answers.
-    Worker:
-        head; one file read, one TCP connect with a one-second timeout, one
-        unlink.
-    Raises:
-        nothing. A file that cannot be read or removed is left alone: this is a
-        courtesy and not a check, and refusing the run over it would trade one
-        hang for one refusal.
-    """
+    """Remove *path* when it names a cluster that is not running (errata row 37)."""
     if ray.is_initialized():
         return None
     try:
@@ -262,52 +169,17 @@ def clear_stale_ray_cluster(path: str = RAY_CURRENT_CLUSTER) -> Optional[str]:
 
 
 def _head_node_id() -> str:
-    """Return the Ray node id of the process calling this, which is the head.
-
-    Called only from the driver and from head nodes, after ray.init(), so the
-    current node IS the head. It is the value NodeAffinitySchedulingStrategy
-    takes, and the value a ChiaTool's task_options takes to place its server on
-    the head (3.5's SourceReadTool).
-
-    Returns:
-        the node id as a hex string.
-    Worker:
-        the caller's; it reads the runtime context and dispatches nothing.
-    Raises:
-        RuntimeError from Ray if called before ray.init().
-    """
+    """Return the Ray node id of the process calling this, which is the head."""
     return ray.get_runtime_context().get_node_id()
 
 
 def head_options(node_id: str) -> dict:
-    """Return the scheduling_strategy dict that pins a task to the head.
-
-    `soft=False`, which is the whole point: a soft affinity is a preference and
-    Ray falls back to any node with a free CPU, which is exactly the failure K5
-    describes - `ledger.accrue` opening `loop.db` inside a container where the
-    path does not exist, non-deterministically, hours into a run.
-
-    Returns:
-        {"scheduling_strategy": NodeAffinitySchedulingStrategy}, ready for
-        `.options(**...)` and for a `ChiaTool`'s `task_options`.
-    Worker:
-        pure; it builds a strategy object and dispatches nothing.
-    Raises:
-        nothing.
-    """
+    """Return the scheduling_strategy dict that pins a task to the head."""
     return {"scheduling_strategy":
             NodeAffinitySchedulingStrategy(node_id=node_id, soft=False)}
 
 
-#: Every node of 3.2 that MUST run on the head, by `<module>.<name>` (K4, K5).
-#:
-#: Each one is handed a head path - `loop.db` at 6.1, the blobless clone, the
-#: 0600 GitHub token file - and each is declared `@ChiaFunction(max_retries=0)`
-#: with NO resource, which Ray reads as "any node with a free CPU". The worker
-#: containers advertise CPU, so before this set existed the placement was a
-#: coin toss and `max_retries=0` meant there was no second attempt. The
-#: membership rule is the node's own docstring: `T-U-layout-11` asserts this
-#: set is exactly the nodes whose `Worker:` paragraph says head.
+#: Every node of 3.2 that MUST run on the head, by `<module>.<name>` (K4).
 HEAD_NODES = frozenset({
     "circt_bug_loop.bug_loop.build_image",
     "circt_bug_loop.budget.load_budget",
@@ -325,38 +197,12 @@ HEAD_NODES = frozenset({
 })
 
 
-#: What `__module__` is for a node DEFINED IN THIS FILE when the file is run as
-#: a script, which is how `bug_loop_submit.sh` runs the driver: `__main__`. It
-#: is the only entry point of the flow that is run that way - `approve.py` is
-#: run with `-m` and every other module is imported - so the substitution below
-#: can name exactly one module and needs no search.
+#: What `__module__` is for a node DEFINED IN THIS FILE when the file is run as a script.
 _MAIN_MODULE = "circt_bug_loop.bug_loop"
 
 
 def node_key(fn: Callable) -> str:
-    """`<module>.<name>` for one node, which is how `HEAD_NODES` names it.
-
-    `ChiaFunction.__call__` returns a `functools.wraps` closure, so the wrapper
-    carries the undecorated function's `__module__` and `__name__` and the key
-    is the same either side of the decorator.
-
-    **`__main__` IS THIS MODULE** (W-18). `python <flow dir>/bug_loop.py` - the
-    entrypoint `bug_loop_submit.sh` builds - makes this file `__main__`, so
-    `build_image.__module__` was `"__main__"`, `"__main__.build_image"` is in no
-    set, and B1 lost its head affinity on every submitted run. Ray then placed
-    an unresourced task on any node with a free CPU, which is a worker
-    container with no Docker daemon: `FileNotFoundError: 'docker'`, with
-    `max_retries=0` and therefore no second attempt. It was invisible to
-    `T-U-layout-11`, which IMPORTS the module and sees the dotted name, and to
-    every test that builds a `Dispatch` in-process.
-
-    Returns:
-        str.
-    Worker:
-        pure.
-    Raises:
-        nothing; a callable with neither attribute yields "".
-    """
+    """`<module>.<name>` for one node, which is how `HEAD_NODES` names it."""
     module = getattr(fn, "__module__", "") or ""
     if module == "__main__":
         module = _MAIN_MODULE
@@ -372,30 +218,7 @@ def _stage_ignore(directory: str, names: list) -> set:
 
 
 def _apply_patch(patch: Path, cwd: Path, strip: int) -> None:
-    """Apply *patch* under *cwd*, which is the staging directory and not a checkout.
-
-    `git apply` is one of the commands that runs outside a work tree, which is
-    what makes this possible at all. `GIT_CEILING_DIRECTORIES` is what keeps it
-    outside one: the staging directory sits INSIDE this repository, and git
-    inside a work tree resolves a patch's paths against the repository ROOT and
-    silently SKIPS every path outside the current directory - measured, `git
-    apply -p1` printed "Skipped patch 'chia/models/vertex.py'." and exited 0,
-    which is the worst possible answer. The ceiling stops the upward search at
-    the staging directory, so git finds no repository and resolves against the
-    cwd, and the same call then behaves identically under a `tmp_path` that is
-    in no repository at all.
-
-    A patch that will not apply stops the run here, because the alternative is
-    a worker importing CHIA's unpatched file and a manifest that records a
-    backend which never ran (K7).
-
-    Returns:
-        None.
-    Worker:
-        head; one `git apply` subprocess, no shell.
-    Raises:
-        PreflightFailed("shipped_package", detail) carrying git's own stderr.
-    """
+    """Apply *patch* under *cwd*, which is the staging directory and not a checkout."""
     proc = subprocess.run(
         ["git", "apply", f"-p{strip}", str(patch)], cwd=str(cwd),
         env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cwd.resolve().parent)},
@@ -409,33 +232,7 @@ def _apply_patch(patch: Path, cwd: Path, strip: int) -> None:
 
 def stage_shipped(*, upstream: Optional[str] = None,
                   target: Optional[str] = None) -> dict:
-    """Build the staged package the workers import, patched, at every start-up.
-
-    K3, K6, K7 and W6, in one directory. Four things go in and nothing else:
-
-      * the flow package, without `tests/`, `loop.db*` and `__pycache__`;
-      * a COPY of CHIA's package with `__init__.py` added, so it shadows the
-        container's pip-installed `chia` deterministically rather than merging
-        with it as an implicit namespace package would (W6), and with
-        `upstream/vertex-usage.patch` applied so a turn's thinking tokens are
-        counted (K11);
-      * `issue_task.py` with `upstream/issue_task-vertex-branch.patch` applied,
-        so stage 7 runs the backend the manifest names (K7);
-      * `circt_util.py`, unchanged.
-
-    The operator's own CHIA checkout is never touched: the patches are applied
-    to the copy, so `~/.cache/chia-src` stays exactly what `git status` says it
-    is, and a checkout that has merged either patch upstream is detected by its
-    marker and left alone.
-
-    Returns:
-        {"root", "py_modules", "issue_task", "vertex", "applied"}.
-    Worker:
-        head; it copies about 4 MB and runs `git apply` twice.
-    Raises:
-        PreflightFailed("shipped_package", detail) when a source is missing or
-        a patch will not apply.
-    """
+    """Build the staged package the workers import, patched, at every start-up."""
     root = Path(target or SHIPPED_DIR)
     patches = Path(upstream or (FLOW_DIR.parent / "upstream"))
     if not _ISSUE_SOLVER.is_dir():
@@ -449,10 +246,7 @@ def stage_shipped(*, upstream: Optional[str] = None,
     root.mkdir(parents=True)
     shutil.copytree(FLOW_DIR, root / "circt_bug_loop", ignore=_stage_ignore)
     shutil.copytree(_CHIA_PKG, root / "chia", ignore=_stage_ignore)
-    # CHIA is an implicit namespace package upstream (`chia/__init__.py` does
-    # not exist), and a namespace directory uploaded as a py_module MERGES with
-    # the container's installed `chia` rather than shadowing it, so which
-    # `vertex.py` runs on a worker would not be decided by this repository (W6).
+    # CHIA is an implicit namespace package upstream (`chia/__init__.py` does not exist).
     (root / "chia" / "__init__.py").touch()
     for name in ("issue_task.py", "circt_util.py"):
         shutil.copyfile(_ISSUE_SOLVER / name, root / name)
@@ -474,79 +268,18 @@ def stage_shipped(*, upstream: Optional[str] = None,
 
 
 def runtime_env(shipped: Optional[dict] = None) -> dict:
-    """Return the `runtime_env` the driver's own `ray.init` ships (13.1).
-
-    The STAGED package and nothing else (W6). 13.1's `py_modules` named the
-    flow's loose modules, the installed `chia` directory and two of CHIA's
-    example files; three of those are wrong on a worker. The flow's modules are
-    a package here and import each other as `circt_bug_loop.<module>`, which a
-    loose file cannot satisfy; uploading the whole flow directory shipped
-    `tests/` (3.8 of its 5.8 MB), `tests/fixtures/repair/issues.db` and, at
-    6.1's path, `loop.db` with the mirrored issue corpus in it; and the
-    installed `chia` is a namespace package and an unpatched one.
-
-    IT STAGES EVERY TIME unless the caller has already staged and hands the
-    result in. Reusing whatever `_shipped/` happened to be on disk is the same
-    defect in another place, and it was MEASURED on the cluster, 2026-09-15: a
-    directory staged earlier in the session made every dispatched node fail
-    with `AttributeError: Can't get attribute 'SpendGuard' on <module
-    'circt_bug_loop.llm' from .../_ray_pkg_*/circt_bug_loop/llm.py>` - the
-    workers were running an earlier commit's code - and the only symptom at the
-    driver was an arm that wrote no probe at all. Staging is a 3.7 MB copy and
-    two `git apply`s, once per `ray.init`.
-
-    Returns:
-        {"py_modules": list[str], "excludes": list[str]}.
-    Worker:
-        the driver's; it copies about 4 MB and dispatches nothing.
-    Raises:
-        PreflightFailed("shipped_package", detail) from `stage_shipped`.
-    """
+    """Return the `runtime_env` the driver's own `ray.init` ships (13.1)."""
     staged = shipped or stage_shipped()
     return {"py_modules": list(staged["py_modules"]),
             "excludes": list(_RUNTIME_ENV_EXCLUDES)}
 
 
 class Dispatch:
-    """How the driver reaches a stage node: through Ray, or in this process.
-
-    Under Ray a node is dispatched with `.options(**overrides).chia_remote(...)`
-    and collected with CHIA's own `get`. Without Ray the node's undecorated body
-    runs here, which is `04-Test-Plan.md` 0.4's plain call and is what makes one
-    whole iteration runnable at T0. The decorator stays on every node either
-    way, so 3.2's placement table is unchanged.
-
-    A NODE IS RECOGNISED BY `chia_remote` AND NOT BY ITS TYPE (W-19b). This test
-    read `isinstance(fn, ChiaFunction)` until 2026-09-15, and that is FALSE for
-    every node in the flow: `ChiaFunction.__call__` returns a `functools.wraps`
-    closure carrying `_chia_original`, `_chia_options` and `chia_remote` as
-    attributes and merely CAST to the `ChiaWrapped` protocol
-    (`chia:chia/base/ChiaFunction.py:108-129`), so `type(probe_execute)` is
-    `function`. The remote branch was therefore dead: every stage ran in the
-    driver process on the head, at `remote=True`, on a cluster whose five
-    workers never received a task. It was invisible because the head can run
-    most nodes - the head is where the clone, the store and the artefact root
-    are - and it failed only where a node needs the IMAGE: `probe_execute`
-    hashed a `/workspace/circt/build/bin/circt-opt` that does not exist on the
-    head, got "" and raised `BinaryMismatch` for every probe. The predicate is
-    now the duck test CHIA's own contract offers.
-
-    A NODE NAMED IN `HEAD_NODES` IS PINNED (K4, K5). Every head-side node is
-    declared with no resource, and Ray places an unresourced task on any node
-    with a free CPU; the worker containers advertise CPU, so `ledger.accrue`
-    and `dedup_and_screen` were free to land in a container where `loop.db`,
-    the clone and the token file do not exist. `call` adds a hard
-    `NodeAffinitySchedulingStrategy` for those and for no others.
-    """
+    """How the driver reaches a stage node: through Ray, or in this process."""
 
     def __init__(self, *, remote: bool = True, options: Optional[dict] = None,
                  head_node_id: Optional[str] = None):
-        """Take the dispatch mode, the `.options()` override and the head's id.
-
-        *head_node_id* defaults to the id of the node this runs on, resolved at
-        the first head dispatch: a `Dispatch` is only ever built by the driver
-        and the driver runs on the head (13.1's B12 row).
-        """
+        """Take the dispatch mode, the `.options()` override and the head's id."""
         self.remote = remote
         self.options = dict(options or {})
         self.head_node_id = head_node_id
@@ -558,23 +291,7 @@ class Dispatch:
         return head_options(self.head_node_id)
 
     def call(self, fn: Callable, *args, **kwargs) -> Any:
-        """Run one stage node and return what it returned.
-
-        A node named in `HEAD_NODES` is dispatched with a HARD node affinity for
-        the head and never merely with its declared resources (K5): it is handed
-        `loop.db`, the blobless clone or the token file, none of which exists
-        inside a worker container, and its `max_retries=0` means a misplacement
-        is a lost stage and not a retry.
-
-        Returns:
-            whatever *fn* returns.
-        Worker:
-            the node's own, declared by its decorator and, for a head node, by
-            the affinity this method adds; this method chooses only between
-            dispatching it and running it here.
-        Raises:
-            whatever *fn* raises, and whatever Ray re-raises from the worker.
-        """
+        """Run one stage node and return what it returned."""
         if self.remote and hasattr(fn, "chia_remote"):
             options = dict(self.options)
             if node_key(fn) in HEAD_NODES:
@@ -584,90 +301,29 @@ class Dispatch:
         return getattr(fn, "_chia_original", fn)(*args, **kwargs)
 
 
-# ---------------------------------------------------------------------------
-# B1, build_image (4.11.1)
-# ---------------------------------------------------------------------------
-
-
 def image_manifest(circt_sha: str, sdk_tag: str, targets, flag_string: str,
                    *, slang: bool = True,
                    base_image: str = DEFAULT_BASE_IMAGE) -> dict:
-    """Return 4.11.1's six-key hash manifest, the thing the image tag digests.
-
-    `targets` is sorted here and only here: the argument order the caller chose
-    must not change the tag, and the UNSORTED list is what step 2 passes and
-    what `ImageSpec.targets` records, that being FR-03.7's parameter.
-
-    Returns:
-        {"circt_sha", "sdk_tag", "targets", "flag_string", "slang",
-         "base_image"}.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return 4.11.1's six-key hash manifest, the thing the image tag digests."""
     return {"circt_sha": circt_sha, "sdk_tag": sdk_tag,
             "targets": sorted(targets), "flag_string": flag_string,
             "slang": bool(slang), "base_image": base_image}
 
 
 def manifest_digest(manifest: dict) -> str:
-    """SHA-256 over 4.11.1's six-key manifest, which is 3.2's idempotency key.
-
-    It is recorded on the `ImageSpec` and is NOT the tag (K1): the tag has to be
-    the one the Dockerfile's own header declares, and that names the CIRCT
-    commit alone, so the other five inputs - the SDK tag, the target list, the
-    flag string, slang and the base image - would otherwise be unrecorded. Two
-    images of one commit built with different flags share a tag and differ here.
-
-    Returns:
-        str, 64 hex characters.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        TypeError from json.dumps on a manifest holding a non-serialisable value.
-    """
+    """SHA-256 over 4.11.1's six-key manifest, which is 3.2's idempotency key."""
     return hashlib.sha256(
         json.dumps(manifest, sort_keys=True, separators=(",", ":"))
         .encode("utf-8")).hexdigest()
 
 
 def image_tag(manifest: dict) -> str:
-    """Return `<IMAGE_NAME>:<CIRCT_SHA[:12]>`, the Dockerfile's own scheme.
-
-    K1: this returned `<registry>/chia-circt-assert:<manifest digest[:12]>`
-    until 2026-09-15, and the Dockerfile's header has always said
-    `chia-circt-assert:<CIRCT_SHA[:12]>`. Two naming schemes that cannot agree:
-    step 1's reuse lookup therefore always missed, a full rebuild was attempted
-    on every run, and `${BUGLOOP_IMAGE_TAG}` (`eade0de61bc5`, a CIRCT SHA
-    prefix) could never match `--image-tag`. The scheme is now the Dockerfile's
-    and the manifest digest is recorded beside it.
-
-    Returns:
-        str, the local tag; there is no registry and nothing is pushed.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        KeyError when *manifest* carries no `circt_sha`.
-    """
+    """Return `<IMAGE_NAME>:<CIRCT_SHA[:12]>`, the Dockerfile's own scheme."""
     return f"{IMAGE_NAME}:{manifest['circt_sha'][:12]}"
 
 
 def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
-    """Return 4.11.1 step 2's `docker build` argument list, in its order.
-
-    No `--progress=plain`: it is a BuildKit flag, a host with the legacy builder
-    only rejects the whole build with rc 125 before anything runs, and the
-    legacy builder's output is already the per-step plain text the flag asked
-    for (4.11 deviation 7). No shell, as everywhere else here.
-
-    Returns:
-        list[str], ready for subprocess.Popen.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        KeyError when *manifest* is not `image_manifest`'s six keys.
-    """
+    """Return 4.11.1 step 2's `docker build` argument list, in its order."""
     return ["docker", "build", "-f", dockerfile, "-t", tag,
             "--build-arg", f"CIRCT_SHA={manifest['circt_sha']}",
             "--build-arg", f"CIRCT_VER={manifest['sdk_tag']}",
@@ -681,31 +337,12 @@ def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
 #: B1's Dockerfile, by name. It lives at two paths in the two trees of 1.4.
 DOCKERFILE_NAME = "ChiaCirctAssertDockerfile"
 
-#: The image's repository name, which is the Dockerfile's own and is what tells
-#: a cluster YAML's worker types apart: a type running this image has the six
-#: tool binaries and Verilator, and checks 7 and 8 ask it; a type running
-#: CHIA's plain `chia:latest` has neither and is not asked.
+#: The image's repository name, which is the Dockerfile's own.
 IMAGE_NAME = "chia-circt-assert"
 
 
 def dockerfile_and_context() -> tuple:
-    """B1's Dockerfile and its build context, in whichever tree this is (1.4).
-
-    In this repository the file is `upstream/dockerfiles/` and the context is
-    the repository root; in a CHIA checkout `sync-to-chia.sh` copies it to
-    `dockerfiles/` and the context is CHIA's root, which is what the file's own
-    header says to build from. K1 measured the third possibility and it is not
-    one: `~/.cache/chia-src/dockerfiles/ChiaCirctAssertDockerfile` does not
-    exist, because nothing runs the sync script against the installed checkout.
-
-    Returns:
-        (dockerfile path, context directory), both absolute strings.
-    Worker:
-        head; two `os.path.isfile` calls and no process.
-    Raises:
-        ImageBuildError("dockerfile", detail) when neither path holds it, which
-        is a refusal at start-up rather than a `docker build` that cannot start.
-    """
+    """B1's Dockerfile and its build context, in whichever tree this is (1.4)."""
     for root, relative in ((FLOW_DIR.parent, Path("upstream") / "dockerfiles"),
                            (_CHIA_ROOT, Path("dockerfiles"))):
         candidate = root / relative / DOCKERFILE_NAME
@@ -719,22 +356,7 @@ def dockerfile_and_context() -> tuple:
 
 
 def parse_hash_manifest(document: dict) -> dict:
-    """Flatten a recorded image manifest's `tool_hashes` to name -> SHA-256.
-
-    The recorded form (`analysis/measurements/raw/image-manifest.json`) maps a
-    tool to `{"path", "sha256"}`, because the path is what a re-hash inside a
-    fresh container has to be told; `ImageSpec.tool_hashes` is the flat map, and
-    FR-06.1's comparison is against that. A value that is already a plain hex
-    string passes through, so the flattening is idempotent.
-
-    Returns:
-        dict[str, str], one entry per target.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        KeyError when the document carries no `tool_hashes`; TypeError when an
-        entry is neither a string nor a mapping carrying `sha256`.
-    """
+    """Flatten a recorded image manifest's `tool_hashes` to name -> SHA-256."""
     flat = {}
     for name, value in document["tool_hashes"].items():
         if isinstance(value, str):
@@ -748,20 +370,7 @@ def parse_hash_manifest(document: dict) -> dict:
 
 
 def lit_discovery(exit_status: Optional[int], output: str) -> tuple:
-    """Read FR-03.17's two figures off one `lit --show-tests` run.
-
-    A non-zero exit, or ANY `fatal: unable to parse config file` line, is not a
-    discovery: it means `lit.site.cfg.py` did not resolve `mlir_src_root` and
-    the suite the image ships cannot be run at all. Both block publication.
-
-    Returns:
-        (ok: bool, discovered: int), the count being the number of lines lit
-        listed under its `-- Available Tests --` heading.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Read FR-03.17's two figures off one `lit --show-tests` run."""
     lines = output.splitlines()
     ok = exit_status == 0 and not any("fatal: unable to parse config file" in line
                                       for line in lines)
@@ -802,40 +411,14 @@ def build_image(circt_sha: str, sdk_tag: str, targets: tuple, flag_string: str,
                 timeout_seconds: int = 10800) -> dict:
     """Build and check the assertions-on CIRCT image, or reuse the one that exists.
 
-    4.11.1's steps in its order, stopping at the first failure: tag and reuse;
-    `docker build` with the six build arguments; the pin check's own line in the
-    build log; FR-03.17's lit discovery; every target's `--version`; the hash
-    manifest from a FRESHLY STARTED container and never from the build tree; and
-    FR-03.5's non-referencing `obj.CIRCT` objects compared as a SET against the
-    committed baseline.
-
-    NOTHING IS PUSHED (K1). The step-8 `docker push` to ghcr was measured
-    `denied` by W-19a, and a campaign does not need a registry: the cluster runs
-    the image from the host's own daemon and FR-06.1's per-probe hash check is
-    what proves a worker ran the recorded binaries.
-
-    *inspect_only* is `--dry-run`'s: an existing image is inspected and nothing
-    is ever built, so the one command whose purpose is "confirm a cluster is
-    ready to spend money without spending any" cannot start a three-hour build.
-
     Returns:
-        {"image_spec": ImageSpec, "reused": bool, "counters": CounterBlock},
-        where reused is True exactly when step 1 short-circuited.
+        {"image_spec": ImageSpec, "reused": bool, "counters": CounterBlock};
+        reused is True exactly when step 1 short-circuited.
     Worker:
-        head. It needs a DOCKER DAEMON and the head is where one is: the CIRCT
-        worker type is itself a container of the image B1 would build, mounts no
-        docker socket and carries no docker binary, so `build_image` at
-        `{"circt": 1}` raised `FileNotFoundError` out of the node on its first
-        line (K1). The head is also where the build context lives. It is not an
-        arm's occupancy: B1 runs once, before the arms, and never inside a
-        window.
+        head.
     Raises:
-        ImageBuildError(step, detail) for a failure at any step, with *step* the
-            name above and *detail* the command's stderr tail; step "reuse" when
-            *inspect_only* and no image carries the tag.
-        BuildTimeout(timeout_seconds) when the whole sequence exceeds its
-            timeout; the local tag is removed, so a later run does not find a
-            half-built image under the key it would have reused.
+        ImageBuildError(step, detail) for a failure at any step, "reuse" among
+        them when *inspect_only* and no image carries the tag.
     """
     started = time.monotonic()
     manifest = image_manifest(circt_sha, sdk_tag, targets, flag_string,
@@ -885,9 +468,7 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         Path(artefact_dir).mkdir(parents=True, exist_ok=True)
         Path(artefact_dir, "lit_discovery.txt").write_text(
             lit["stdout"] + lit["stderr"], encoding="utf-8")
-        # The six build inputs and their digest, which the tag cannot carry
-        # (K1) and which `image`'s columns have no home for until the design
-        # pass adds one. One file, beside the lit log, under the artefact root.
+        # The six build inputs and their digest.
         Path(artefact_dir, "image_manifest.json").write_text(
             json.dumps({**manifest, "image_tag": tag,
                         "manifest_digest": manifest_digest(manifest)},
@@ -922,9 +503,7 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         raise ImageBuildError("assertion_objects",
                               f"non-referencing objects differ by {difference}")
 
-    # `.RepoDigests` is empty for an image that was never pushed, which since
-    # K1 is every image this loop builds, so the LOCAL content id is what
-    # identifies it. Both are stable and neither is the tag's own text.
+    # `.RepoDigests` is empty for an image that was never pushed.
     digest = _run(["docker", "image", "inspect", "--format={{.Id}}", tag],
                   timeout=60)
     return ImageSpec(
@@ -938,10 +517,7 @@ def _image_spec(tag: str, manifest: dict, targets, *, timeout: int,
         assertion_nonreferencing=nonreferencing, tool_hashes=hashes)
 
 
-#: W-04's own object scan (`analysis/measurements/w04_verify_in_image.sh:38-45`),
-#: which measured 555 `obj.CIRCT` objects, 536 referencing and 19 not. One
-#: container and one `nm` per object; the paths are printed relative to the
-#: build directory, which is the shape `image/baseline_objects.txt` records.
+#: W-04's own object scan (`analysis/measurements/w04_verify_in_image.sh:38-45`).
 _OBJECT_SCAN = r'''
 find /workspace/circt/build -path "*obj.CIRCT*.dir*" -name "*.o" | sort |
 while read -r o; do
@@ -951,14 +527,7 @@ done'''
 
 
 def _assertion_objects(tag: str, targets, *, timeout: int) -> list:
-    """FR-03.5's two halves: every target binary, then the objects behind them.
-
-    Step 7 is `nm -u` over each target binary for `__assert_fail`, which must be
-    present in all of them, and the list of `obj.CIRCT` objects that do not
-    reference it, which is what the committed baseline is compared against as a
-    set. A binary without the symbol is an assertions-off build and stops the
-    publication here rather than at the first probe that does not fire.
-    """
+    """FR-03.5's two halves: every target binary, then the objects behind them."""
     binaries = _in_container(
         tag, ["sh", "-c",
               "for t in " + " ".join(targets) + "; do "
@@ -980,11 +549,6 @@ def _assertion_objects(tag: str, targets, *, timeout: int) -> list:
     return sorted(objects["stdout"].split())
 
 
-# ---------------------------------------------------------------------------
-# The twelve pre-flight checks (13.1), each stopping the run
-# ---------------------------------------------------------------------------
-
-
 def _git(repo_root: str, *args: str, timeout: int = 60) -> str:
     """One `git -C <repo_root> ...` read, no shell, stripped stdout."""
     proc = subprocess.run(["git", "-C", repo_root, *args], capture_output=True,
@@ -998,24 +562,7 @@ def _git(repo_root: str, *args: str, timeout: int = 60) -> str:
 def check_01_budget_registered(*, budget_path: str, repo_root: str,
                                run_start_utc: str, campaign: bool = False,
                                exact_pin_shas=None) -> BudgetFile:
-    """Check 1: budget.yaml is committed, earlier than the run, and registered.
-
-    `budget.load_budget` is the one place the six registration checks live, so
-    this check runs them rather than restating them; FR-05.2's mutator-set rule
-    is check 2 and runs inside the same call (W-06 erratum 6).
-
-    *campaign* is what makes a missing `registration/*` tag fatal (FR-14.2,
-    FR-14.3, W-12): `run_campaign` passes false for a `--dry-run` and for a
-    `--generator recorded` run, neither of which reports a result, and true for
-    every run that does.
-
-    Returns:
-        BudgetFile, which every later check and the manifest read.
-    Worker:
-        head; one subprocess per git read.
-    Raises:
-        PreflightFailed("budget_registered", detail) wrapping BudgetError.
-    """
+    """Check 1: budget.yaml is committed, earlier than the run, and registered."""
     try:
         return budget_module.load_budget._chia_original(
             budget_path, repo_root, run_start_utc=run_start_utc,
@@ -1026,21 +573,7 @@ def check_01_budget_registered(*, budget_path: str, repo_root: str,
 
 def check_02_mutator_set_earlier(*, repo_root: str,
                                  flow_dir: str = str(FLOW_DIR)) -> None:
-    """Check 2: the registration tag reaches the mutator set's commit (FR-05.2).
-
-    W-12 replaced the date comparison with ancestry under the tag, so this check
-    no longer needs the `BudgetFile` it used to take the registration SHA off:
-    the tag is the registration and `budget.registration` resolves it. An
-    unregistered repository has nothing to be earlier than and passes, which is
-    the dry run's case; check 1 has already refused a campaign in one.
-
-    Returns:
-        None.
-    Worker:
-        head; one subprocess per git read.
-    Raises:
-        PreflightFailed("mutator_set_earlier", detail).
-    """
+    """Check 2: the registration tag reaches the mutator set's commit (FR-05.2)."""
     tag, registered = budget_module.registration(repo_root)
     if not tag:
         return
@@ -1050,39 +583,15 @@ def check_02_mutator_set_earlier(*, repo_root: str,
         raise PreflightFailed("mutator_set_earlier", str(error)) from error
 
 
-#: What `RunManifest.forum_post_url` and `forum_post_date` record for a run that
-#: CANNOT FILE (W-18). Check 11 exempts a run whose registered `filings_total`
-#: is zero, and the contract - frozen at `contract-2.1`, so this cannot be an
-#: Optional - still requires both fields to be non-null. A sentinel that reads
-#: as a sentence is what the manifest carries, so a reader of the artefact meets
-#: the reason and never a URL that was never posted.
+#: What `RunManifest.forum_post_url` and `forum_post_date` record for a run that CANNOT FILE (W-18).
 NO_FORUM_POST = "none: this run's registered filings_total is 0 (FR-20.1)"
 
-#: FR-01.1's mining window: twenty-four months of `main`, ending at the corpus
-#: head. Two years back FROM THE HEAD'S OWN COMMIT DATE, which is the only date
-#: `corpus_head_sha` fixes and is therefore reproducible from the registered
-#: file plus the clone.
+#: FR-01.1's mining window: twenty-four months of `main`, ending at the corpus head.
 CORPUS_WINDOW_MONTHS = 24
 
 
 def corpus_since(clone_path: str, corpus_head_sha: str) -> str:
-    """The date FR-01.1's window opens on, as `build_corpus` wants it (W-18).
-
-    The driver passed `budget.campaign_start_utc[:10]` here, which is a date in
-    the FUTURE of every commit the corpus head reaches - `2026-09-20` against a
-    head dated `2026-09-11` - so `build_corpus`'s `commit["date"] < since_dt`
-    excluded every commit and **the mined corpus was empty on every campaign**.
-    Nothing met it: `test_corpus.py` passes `SINCE = "2024-09-11"` explicitly
-    and the tier-3 tests drive `campaign_drive` over fixture seeds without
-    mining at all.
-
-    Returns:
-        str, an ISO 8601 date, `2024-09-11` for the registered corpus head.
-    Worker:
-        head; one `git log -1` against the blobless clone.
-    Raises:
-        PreflightFailed("git", stderr) when git itself fails.
-    """
+    """The date FR-01.1's window opens on, as `build_corpus` wants it (W-18)."""
     when = _git(clone_path, "log", "-1", "--format=%cI", corpus_head_sha)
     head = datetime.fromisoformat(when[:-1] + "+00:00" if when.endswith("Z") else when)
     years = CORPUS_WINDOW_MONTHS // 12
@@ -1095,18 +604,7 @@ def corpus_since(clone_path: str, corpus_head_sha: str) -> str:
 
 def check_03_clone_head(*, clone_path: str, corpus_head_sha: str,
                         head_sha: Optional[str] = None) -> None:
-    """Check 3: the clone's HEAD equals `corpus_head_sha`, naming both (FR-01.11).
-
-    *head_sha* is the value a test supplies instead of running git, which is
-    what keeps this check tier 0.
-
-    Returns:
-        None.
-    Worker:
-        head; one `git rev-parse HEAD` against the blobless clone.
-    Raises:
-        PreflightFailed("clone_head", detail) naming both SHAs.
-    """
+    """Check 3: the clone's HEAD equals `corpus_head_sha`, naming both (FR-01.11)."""
     actual = head_sha if head_sha is not None else _git(clone_path, "rev-parse", "HEAD")
     if actual != corpus_head_sha:
         raise PreflightFailed(
@@ -1115,15 +613,7 @@ def check_03_clone_head(*, clone_path: str, corpus_head_sha: str,
 
 
 def check_04_artefact_root_head(*, artefact_root: str) -> None:
-    """Check 4: the artefact root exists and is writable on the head (FR-17.9).
-
-    Returns:
-        None.
-    Worker:
-        head; one write and one removal under the root.
-    Raises:
-        PreflightFailed("artefact_root_head", detail) naming the path.
-    """
+    """Check 4: the artefact root exists and is writable on the head (FR-17.9)."""
     root = Path(artefact_root or "")
     if not artefact_root:
         raise PreflightFailed("artefact_root_head",
@@ -1141,19 +631,7 @@ def check_04_artefact_root_head(*, artefact_root: str) -> None:
 
 
 def artefact_root_probe(artefact_root: str) -> dict:
-    """Write and remove one file under *artefact_root*, and report only whether it worked.
-
-    Dispatched once per worker type by check 5. It returns a boolean and the
-    worker's own name, never the directory listing and never a path it did not
-    receive.
-
-    Returns:
-        {"writable": bool, "worker": str, "detail": str | None}.
-    Worker:
-        one per worker type; the check dispatches it at each type's resource.
-    Raises:
-        nothing; an unwritable root is the returned False.
-    """
+    """Write and remove one file under *artefact_root*, and report only whether it worked."""
     import socket
 
     path = Path(artefact_root) / f".bugloop_write_check_{uuid.uuid4().hex}"
@@ -1166,20 +644,7 @@ def artefact_root_probe(artefact_root: str) -> dict:
 
 
 def check_05_artefact_root_workers(*, artefact_root: str, probes: dict) -> None:
-    """Check 5: the artefact root is writable on every worker type (FR-17.9).
-
-    *probes* maps a worker type's name to what `artefact_root_probe` returned on
-    it; the driver fills it by dispatching one trivial node per type, and a test
-    passes a mapping.
-
-    Returns:
-        None.
-    Worker:
-        head, dispatching one node per worker type.
-    Raises:
-        PreflightFailed("artefact_root_unmounted", detail) naming the worker
-        type and the path, which is FR-17.9's own failure name.
-    """
+    """Check 5: the artefact root is writable on every worker type (FR-17.9)."""
     for worker_type, result in sorted(probes.items()):
         if not result.get("writable"):
             raise PreflightFailed(
@@ -1189,15 +654,7 @@ def check_05_artefact_root_workers(*, artefact_root: str, probes: dict) -> None:
 
 
 def check_06_image_lit_discovery(*, image_spec: ImageSpec) -> None:
-    """Check 6: the image exists and its `lit_discovery_ok` is true (FR-03.17).
-
-    Returns:
-        None.
-    Worker:
-        head; it reads the recorded ImageSpec and runs nothing.
-    Raises:
-        PreflightFailed("image_lit_discovery", detail).
-    """
+    """Check 6: the image exists and its `lit_discovery_ok` is true (FR-03.17)."""
     if image_spec is None:
         raise PreflightFailed("image_lit_discovery", "no ImageSpec: the image was "
                               "neither built nor recorded")
@@ -1209,18 +666,7 @@ def check_06_image_lit_discovery(*, image_spec: ImageSpec) -> None:
 
 
 def check_07_tool_hashes(*, image_spec: ImageSpec, observed: dict) -> None:
-    """Check 7: every tool binary's SHA-256 on every worker matches (FR-06.1).
-
-    *observed* maps a worker type to that worker's own tool-name-to-hash map.
-
-    Returns:
-        None.
-    Worker:
-        head, reading one hash map per worker type.
-    Raises:
-        PreflightFailed("tool_hashes", detail) naming the worker, the tool and
-        both hashes.
-    """
+    """Check 7: every tool binary's SHA-256 on every worker matches (FR-06.1)."""
     for worker_type, hashes in sorted(observed.items()):
         for tool, expected in sorted(image_spec.tool_hashes.items()):
             actual = hashes.get(tool)
@@ -1232,18 +678,7 @@ def check_07_tool_hashes(*, image_spec: ImageSpec, observed: dict) -> None:
 
 
 def check_08_verilator_version(*, image_spec: ImageSpec, observed: dict) -> None:
-    """Check 8: every CIRCT worker's Verilator is the image's (FR-03.15).
-
-    A changed Verilator starts a new campaign, so a difference stops the run
-    naming both versions rather than being recorded and carried.
-
-    Returns:
-        None.
-    Worker:
-        head, reading one version string per CIRCT worker type.
-    Raises:
-        PreflightFailed("verilator_version", detail) naming both.
-    """
+    """Check 8: every CIRCT worker's Verilator is the image's (FR-03.15)."""
     for worker_type, version in sorted(observed.items()):
         if version != image_spec.verilator_version:
             raise PreflightFailed(
@@ -1258,19 +693,7 @@ PIN_FIELDS = ("run_commit", "pin_sha", "pin_tag", "tags_sharing_pin",
 
 
 def check_09_pin_stamped(*, pin: dict) -> None:
-    """Check 9: the pin selector ran and every pin field is stamped (FR-02.1 to 02.4).
-
-    A2 returns eight fields and seven of them are manifest fields; `resolved_utc`
-    is the eighth and has no manifest home (W-07 erratum 7), so it is required
-    of the return and not of the manifest.
-
-    Returns:
-        None.
-    Worker:
-        head; it reads A2's return and runs nothing.
-    Raises:
-        PreflightFailed("pin_stamped", detail) naming every missing field.
-    """
+    """Check 9: the pin selector ran and every pin field is stamped (FR-02.1 to 02.4)."""
     missing = [f for f in PIN_FIELDS if pin.get(f) is None]
     if missing:
         raise PreflightFailed("pin_stamped",
@@ -1278,16 +701,7 @@ def check_09_pin_stamped(*, pin: dict) -> None:
 
 
 def check_10_issue_mirror(*, mirror: Optional[dict], refresh_requested: bool) -> None:
-    """Check 10: the mirror is refreshed, or an existing one is reused (FR-10.9).
-
-    Returns:
-        None.
-    Worker:
-        head; the mirror is a table in the head-pinned loop.db.
-    Raises:
-        PreflightFailed("issue_mirror", detail) when neither a refresh nor a
-        reusable mirror is available, and when a refresh came back incomplete.
-    """
+    """Check 10: the mirror is refreshed, or an existing one is reused (FR-10.9)."""
     if mirror is None:
         raise PreflightFailed(
             "issue_mirror",
@@ -1307,24 +721,7 @@ def check_10_issue_mirror(*, mirror: Optional[dict], refresh_requested: bool) ->
 def check_11_forum_post(*, forum_post_url: Optional[str],
                         forum_post_date: Optional[str],
                         filings_total: Optional[int] = None) -> None:
-    """Check 11: the method's forum post exists before the campaign starts (FR-20.1).
-
-    *filings_total* is the run's registered filing cap, and **zero exempts the
-    run** (W-18). FR-20.1 posts the method so CIRCT's maintainers are not met by
-    reports from an automated system they were never told about; a run whose
-    pre-registration caps filings at zero can produce no report for anyone to be
-    surprised by, and the check would otherwise make the project's own pilot -
-    the run that exists to be small and to file nothing - impossible to start
-    until a human has posted to a public forum. Any positive cap, and the two
-    values are required exactly as before.
-
-    Returns:
-        None.
-    Worker:
-        head; it reads two argv values and one budget key, and makes no request.
-    Raises:
-        PreflightFailed("forum_post", detail) naming the missing one.
-    """
+    """Check 11: the method's forum post exists before the campaign starts (FR-20.1)."""
     if filings_total == 0:
         return
     missing = [name for name, value in (("forum_post_url", forum_post_url),
@@ -1338,23 +735,7 @@ def check_11_forum_post(*, forum_post_url: Optional[str],
 
 
 def interlock_probe(*, env=None, need_key: bool = True) -> dict:
-    """Report whether the live-model interlock and the key are set, and NEVER their values.
-
-    The two rules are `generate_task.require_live_model`'s: the interlock is
-    exactly "1", and the key is non-empty and is not an unexpanded `${...}`
-    reference, which is what an operator's shell leaves behind when the variable
-    the cluster YAML names is itself unset. *env* is the mapping to read, so a
-    test passes one explicitly and no test ever sets the real variable
-    (architect's decision, 2026-09-14).
-
-    Returns:
-        {"interlock_ok": bool, "key_ok": bool} - two booleans and no value.
-    Worker:
-        one per `llm` worker, and one per `repair` worker where repair is
-        enabled; dispatched by check 12 and by nothing else.
-    Raises:
-        nothing.
-    """
+    """Report whether the live-model interlock and the key are set, and NEVER their values."""
     source = os.environ if env is None else env
     key = (source.get(API_KEY_ENV) or "").strip()
     return {"interlock_ok": source.get(LIVE_MODEL_ENV) == "1",
@@ -1362,36 +743,7 @@ def interlock_probe(*, env=None, need_key: bool = True) -> dict:
 
 
 def check_12_live_model(*, workers: dict, head: Optional[dict] = None) -> None:
-    """Check 12: the interlock and the key are set, and agree, wherever a turn is built.
-
-    Each value of *workers*, and *head* when it is given, is what
-    `interlock_probe` returned there, which is two booleans; this check never
-    sees a credential. A failure names the place and the variable and stops the
-    run before one turn is dispatched, so a campaign cannot discover the
-    misconfiguration eight seeds in.
-
-    **The head is checked only where a turn would be BUILT there** (W-18), which
-    is a driver running with no Ray. Under Ray, `llm_turn` constructs the client
-    on the `llm` worker from that worker's own environment (K2, W7) and the
-    driver holds no credential at all - and §11.2 forbids forwarding one to it,
-    because `bug_loop_submit.sh`'s `--runtime-env-json` values are stored in the
-    job's metadata and shown by `chia job` and the dashboard. Requiring the head
-    to carry it made the submitted wrapper - which §11.2 mandates for NFR-09's
-    retrievable logs - unable to start any live campaign: `head:
-    BUGLOOP_ALLOW_LIVE_MODEL is not exactly '1'`, on a machine that needs
-    neither variable. The deliberate act the interlock exists for is still
-    required and is still the operator's: the `-e` lines expand from the
-    operator's own shell at `chia up`, and the worker rows below are what prove
-    it happened.
-
-    Returns:
-        None.
-    Worker:
-        head, dispatching one trivial node per `llm` worker and, where repair is
-        enabled, per `repair` worker (3.8, 12.1's two `-e` lines).
-    Raises:
-        PreflightFailed("live_model", detail) naming the place and the variable.
-    """
+    """Check 12: the interlock and the key are set, and agree, wherever a turn is built."""
     if not workers:
         raise PreflightFailed(
             "live_model",
@@ -1408,24 +760,7 @@ def check_12_live_model(*, workers: dict, head: Optional[dict] = None) -> None:
 
 
 def tool_probe(bin_dir: str, targets: tuple) -> dict:
-    """Hash every tool binary on THIS worker and report Verilator's version.
-
-    Dispatched once per image-bearing worker type by checks 7 and 8. It is what
-    those checks were missing: their `observed` mapping was built from the
-    `ImageSpec` itself (W2), so both compared a value to itself and could never
-    fail, and FR-06.1's "every tool binary's SHA-256 on every worker" and
-    FR-03.15's Verilator check had no pre-flight at all.
-
-    Returns:
-        {"worker": str, "tool_hashes": dict, "verilator_version": str,
-         "unreadable": list[str]}. A binary this worker cannot read yields no
-        entry in `tool_hashes`, which is what makes check 7 refuse rather than
-        pass on a missing tool.
-    Worker:
-        one per worker type whose container is the assertions-on image.
-    Raises:
-        nothing; every failure is a field.
-    """
+    """Hash every tool binary on THIS worker and report Verilator's version."""
     import socket
     import subprocess as sp
 
@@ -1465,24 +800,7 @@ def tool_probes(dispatch: Dispatch, resources: dict, bin_dir: str,
 
 def check_15_entrypoint_imports(*, flow_dir: str = str(FLOW_DIR),
                                 python: Optional[str] = None) -> None:
-    """Check 15 (W-19b #3): the driver's own entrypoint can import its package.
-
-    `bug_loop_submit.sh` runs `python <flow dir>/bug_loop.py`, which puts the
-    FLOW directory on `sys.path` and not its parent; in this tree every import
-    in `bug_loop.py` is `circt_bug_loop.<module>`, so a real `chia job submit`
-    died with `ModuleNotFoundError` before its first line of work. The wrapper
-    fixes it with `env PYTHONPATH=<flow dir's parent>` on the entrypoint, and
-    this is the check that the fix is still there: a SUBPROCESS with exactly
-    that path, importing exactly that name, before anything is dispatched.
-
-    Returns:
-        None.
-    Worker:
-        head; one short-lived subprocess.
-    Raises:
-        PreflightFailed("entrypoint_import", detail) carrying the interpreter's
-        own message.
-    """
+    """Check 15 (W-19b #3): the driver's own entrypoint can import its package."""
     parent = str(Path(flow_dir).resolve().parent)
     proc = subprocess.run(
         [python or sys.executable, "-c",
@@ -1499,27 +817,7 @@ def check_15_entrypoint_imports(*, flow_dir: str = str(FLOW_DIR),
 
 def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
                            repair_enabled: bool) -> str:
-    """Check 13 (K7): the backend the SHIPPED `issue_task.py` can actually run.
-
-    The `vertex` arm of `upstream/issue_task-vertex-branch.patch` was applied
-    only by `sync-to-chia.sh`, into a TARGET checkout the driver never runs, so
-    the file `_PY_MODULES` shipped carried CHIA's unpatched `_turn`: handed
-    `cfg["backend"] = "vertex"` it fell through to `else: ClaudeCodeLLM(...)`,
-    and the manifest recorded `vertex:gemini-3.8-flash` with
-    `stages_metered["stage_7"] = True` anyway. That is a false statement in the
-    registration artefact, which is worse than the failed turn beside it.
-
-    The check greps the STAGED copy, which is the file a worker imports, and
-    `RunManifest.model_ids["repair_adapt"]` takes the backend this returns.
-
-    Returns:
-        str, the backend id the manifest may record.
-    Worker:
-        head; one file read of the staged copy.
-    Raises:
-        PreflightFailed("vertex_branch", detail) when repair is enabled on the
-        `vertex` backend and the staged file does not carry the branch.
-    """
+    """Check 13 (K7): the backend the SHIPPED `issue_task.py` can actually run."""
     present = VERTEX_BRANCH in Path(issue_task_path).read_text(encoding="utf-8")
     if repair_enabled and repair_backend == _METERED_REPAIR_BACKEND and not present:
         raise PreflightFailed(
@@ -1532,22 +830,7 @@ def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
 
 
 def check_14_vertex_usage_patch(*, vertex_path: str, metered: bool) -> None:
-    """Check 14 (K11): the shipped `vertex.py` counts the two billed fields.
-
-    `thoughts_token_count` and `tool_use_prompt_token_count` are separate
-    scalars from `candidates_token_count` and `prompt_token_count` - the SDK's
-    own description of `total_token_count` is the sum of all four - and CHIA
-    sums neither. Without `upstream/vertex-usage.patch` in the file a worker
-    imports, every priced turn and therefore `campaign_spend_cap_usd` are
-    understated by whatever the model thinks, which is unbounded and unknown.
-
-    Returns:
-        None.
-    Worker:
-        head; one file read of the staged copy.
-    Raises:
-        PreflightFailed("vertex_usage_patch", detail) naming the missing field.
-    """
+    """Check 14 (K11): the shipped `vertex.py` counts the two billed fields."""
     if not metered:
         return
     text = Path(vertex_path).read_text(encoding="utf-8")
@@ -1561,8 +844,6 @@ def check_14_vertex_usage_patch(*, vertex_path: str, metered: bool) -> None:
 
 
 #: The pre-flight checks in 13.1's order, cheapest first, named for the log.
-#: Twelve until W-20b; K7 and K11 add two that read the STAGED package and
-#: W-19b #3 adds one that imports the flow the way the submitted job does.
 PREFLIGHT_CHECKS = (
     "budget_registered", "mutator_set_earlier", "clone_head",
     "artefact_root_head", "artefact_root_unmounted", "image_lit_discovery",
@@ -1571,29 +852,8 @@ PREFLIGHT_CHECKS = (
     "entrypoint_import")
 
 
-# ---------------------------------------------------------------------------
-# The manifest, and every field's producer (13.1)
-# ---------------------------------------------------------------------------
-
-
 def cluster_summary(cluster_yaml: str) -> dict:
-    """Return the four manifest fields the cluster YAML produces, plus its digest.
-
-    `image_worker_types` is the sixth and is not a manifest field: it is the
-    worker types whose container IS the assertions-on image, which is who
-    checks 7 and 8 have anything to ask (W2). Read off the YAML's own
-    `docker.image` rather than assumed from a resource name, so a cluster that
-    moves the image to another type is followed and not guessed at.
-
-    Returns:
-        {"cluster_yaml_sha", "worker_type", "apparatus_concurrency",
-         "llm_concurrency", "deployment", "image_worker_types"}.
-    Worker:
-        head; it reads one file through CHIA's own loader.
-    Raises:
-        chia.cluster.config.ConfigError when the file will not load; KeyError
-        when it declares no `circt` or no `llm` worker type.
-    """
+    """Return the four manifest fields the cluster YAML produces, plus its digest."""
     from chia.cluster.config import load_config
 
     config = load_config(cluster_yaml)
@@ -1618,21 +878,7 @@ def cluster_summary(cluster_yaml: str) -> dict:
 
 def model_ids(*, model_id: str, repair_backend: str,
               repair_model: Optional[str] = None) -> dict:
-    """Return 2.7's four `"<backend>:<model id>"` strings (13.1, 3.8).
-
-    Three stages take the pre-registered model on the campaign backend; stage 7
-    takes `--repair-backend` and `--repair-model`, which on a default run are
-    the same pair, `vertex:<budget.yaml's model_id>`.
-
-    Returns:
-        dict with exactly the keys generate_seeded, triage_report, repair_adapt
-        and mutator_synthesis.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ValueError on an empty model id, which would put a colon with nothing
-        after it into the manifest.
-    """
+    """Return 2.7's four `"<backend>:<model id>"` strings (13.1)."""
     if not model_id:
         raise ValueError("budget.yaml's model_id is empty")
     backend = _model_backend()
@@ -1644,26 +890,7 @@ def model_ids(*, model_id: str, repair_backend: str,
 
 def stages_metered(*, arms, repair_backend: str, repair_enabled: bool,
                    model_turns: bool = True) -> dict:
-    """Return one bool per stage id: whether the loop can meter that stage (FR-14.8).
-
-    Stages 1 and 2 are metered only where the seeded arm runs, no model running
-    on the mutation arm at all; stage 7 is metered exactly where its backend is
-    the campaign's, which on a default run it is.
-
-    *model_turns* is `--generator model`. Under `--generator recorded` the three
-    model-bearing nodes are replaced and NO turn is made anywhere, so stages 1,
-    2 and 6 are not metered either - which is also what makes the report's
-    `Assisted-by:` trailer honest, the trailer being read off this map
-    (W-19b #7): a report whose first line says NO MODEL TURN WAS MADE used to
-    end by naming `vertex:gemini-3.8-flash`.
-
-    Returns:
-        dict whose key set is exactly the contract's `_STAGE_IDS`.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return one bool per stage id: whether the loop can meter that stage (FR-14.8)."""
     seeded = "seeded" in tuple(arms)
     metered = {stage: True for stage in schema._STAGE_IDS}
     metered["stage_1"] = seeded and model_turns
@@ -1682,22 +909,7 @@ def _model_backend() -> str:
 
 
 def differential_driver() -> dict:
-    """Return FR-08.11's four keys from B4's own recorded deviation (3.6.3).
-
-    `circt/arc-tests` was not reused, so `source` names what did drive the
-    differential and `commit` is empty. The obstacle and the deviation are the
-    two halves of `probe_task.DIFFERENTIAL_DRIVER`, which B4 records verbatim on
-    every `DifferentialVerdict`, split at its one semicolon: the manifest and
-    the verdict then cannot state different reasons for the same deviation.
-
-    Returns:
-        dict with exactly the keys source, commit, deviation and obstacle.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ValueError if the recorded deviation loses its shape, because a manifest
-        that silently recorded half of it would satisfy FR-08.11 on paper only.
-    """
+    """Return FR-08.11's four keys from B4's own recorded deviation (3.6.3)."""
     from circt_bug_loop import probe_task
 
     recorded = probe_task.DIFFERENTIAL_DRIVER
@@ -1713,20 +925,7 @@ def differential_driver() -> dict:
 
 
 def run_commits(*, mode: str, pin: dict, seeds=()) -> list:
-    """Return FR-02.7's `run_commit` list for *mode*, one entry or one per seed.
-
-    Discovery runs at one commit and the entry's `seed_sha` is null; calibration
-    runs each sampled seed at its own parent commit, so there is one entry per
-    sampled seed and every `seed_sha` is set.
-
-    Returns:
-        list[RunCommit].
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ValueError on a calibration mode with no sampled seed, which would make
-        the manifest claim a calibration that examined nothing.
-    """
+    """Return FR-02.7's `run_commit` list for *mode*, one entry or one per seed."""
     if mode == "discovery":
         return [RunCommit(commit=pin["run_commit"], seed_sha=None)]
     if not seeds:
@@ -1740,27 +939,7 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
                    repair_backend: Optional[str] = None,
                    calibration_seeds=(), assertion_baseline_count: int = 0,
                    sv_seeds_excluded=None) -> RunManifest:
-    """Build the run's one `RunManifest`, every field from its named producer.
-
-    13.1's table is the source for each: argv, A1, A2, A6a, B1, B6a, the cluster
-    YAML, 9.4's constants, 3.6.3's differential rule, the image's own acceptance
-    run, and the operator. A field with no value stops the run here rather than
-    at the first stage that reads it.
-
-    *repair_backend* is what pre-flight check 13 verified against the STAGED
-    `issue_task.py` and not what `--repair-backend` asked for (K7): the flag
-    alone made `model_ids["repair_adapt"]` a claim about a file nothing had
-    read. It defaults to the flag for a caller that has no staged package -
-    every driver-less test - and the driver always passes the checked value.
-
-    Returns:
-        RunManifest, already through `contract.validate`.
-    Worker:
-        head; it dispatches nothing and reads only what it is handed.
-    Raises:
-        ContractError from `contract.validate` on any field the seam refuses;
-        ValueError from `run_commits` and `model_ids`.
-    """
+    """Build the run's one `RunManifest`, every field from its named producer."""
     from circt_bug_loop import probe_task, repair_adapter
 
     arms = tuple(budget.arm_order) if args.arm == "both" else (args.arm,)
@@ -1800,30 +979,16 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         issue_mirror={k: mirror[k]
                       for k in schema._DICT_KEYS[("RunManifest", "issue_mirror")]},
         local_id_range=[repair_adapter.LOCAL_ID_BASE, repair_adapter.LOCAL_ID_MAX],
-        # FR-20.1's two fields. A run whose registered filing cap is zero has no
-        # forum post to name and cannot be given one honestly, and the contract
-        # (frozen at `contract-2.1`) makes both fields non-null, so the manifest
-        # records WHY there is none rather than a URL nobody posted (W-18). The
-        # operator's own values win wherever they are supplied.
         forum_post_url=args.forum_post_url or NO_FORUM_POST,
         forum_post_date=args.forum_post_date or NO_FORUM_POST,
         confirmation_cutoff_date=budget.campaign_end_utc[:10],
         differential_driver=differential_driver(),
         started_utc=started_utc,
-        # The ELIGIBLE half of the registered sample, which the contract's own
-        # conditional requires to equal the `run_commit` entries' seed set
-        # (§2.4); the ineligible half is recorded in `seed.exclusion_reason` as
-        # `not_calibratable_in_deployment` (W-19b #6).
         calibration_sample=(sorted(s.seed_sha for s in calibration_seeds)
                             if args.mode == "calibration" else None),
         sv_seeds_excluded=sv_seeds_excluded)
     schema.validate(manifest)
     return manifest
-
-
-# ---------------------------------------------------------------------------
-# The counters, and how the driver logs them (3.11, FR-17.4)
-# ---------------------------------------------------------------------------
 
 
 def _counter_block(stage: str, started: int, completed: int, failed: int,
@@ -1834,16 +999,7 @@ def _counter_block(stage: str, started: int, completed: int, failed: int,
 
 
 class CounterLog:
-    """FR-17.4's per-stage counters, accumulated per (run, arm, stage) on the head.
-
-    One record per RETURNED block, as 3.11 says: the driver reads each return's
-    `counters` key, checks `started == completed + failed`, hands the block to
-    CHIA's `MetricsLogger`, and rewrites `results/counters.json` on every
-    aggregation so that inspecting a running campaign is a file read (NFR-09).
-    A node that returns no block has one SYNTHESISED from the driver's own
-    timing, and the synthesis is recorded as a named violation rather than
-    passed off as the node's own count.
-    """
+    """FR-17.4's per-stage counters, accumulated per (run, arm, stage) on the head."""
 
     def __init__(self, run_manifest_id: str, results_dir: Optional[str] = None,
                  metrics=None):
@@ -1856,16 +1012,7 @@ class CounterLog:
         self._step = 0
 
     def record(self, arm: str, block: CounterBlock, *, synthesised: bool = False) -> None:
-        """Fold one block into this run's totals and log it.
-
-        Returns:
-            None.
-        Worker:
-            head; one file rewrite per call, no dispatch.
-        Raises:
-            ValueError on a block whose stage is outside `_COUNTER_STAGES`,
-            which is the one thing a counter may not invent.
-        """
+        """Fold one block into this run's totals and log it."""
         if block.stage not in schema._COUNTER_STAGES:
             raise ValueError(f"CounterBlock.stage {block.stage!r} is outside "
                              f"{sorted(schema._COUNTER_STAGES)}")
@@ -1890,15 +1037,7 @@ class CounterLog:
         self.write()
 
     def write(self) -> Optional[str]:
-        """Rewrite `results/counters.json` with the running totals.
-
-        Returns:
-            str, the path written, or None when no results directory was given.
-        Worker:
-            head; one file write.
-        Raises:
-            OSError from the write.
-        """
+        """Rewrite `results/counters.json` with the running totals."""
         if not self.results_dir:
             return None
         Path(self.results_dir).mkdir(parents=True, exist_ok=True)
@@ -1910,10 +1049,6 @@ class CounterLog:
         return str(path)
 
 
-# ---------------------------------------------------------------------------
-# The seam recorder (02-HLD.md 2.13, --record-fixtures)
-# ---------------------------------------------------------------------------
-
 #: Which field names an instance of each member, for the recorded file's name.
 _FIXTURE_ID = {"SeedRecord": "seed_sha", "BudgetFile": "budget_file_sha",
                "ProbeSpec": "probe_id", "ProbeResult": "probe_id",
@@ -1921,13 +1056,7 @@ _FIXTURE_ID = {"SeedRecord": "seed_sha", "BudgetFile": "budget_file_sha",
 
 
 class FixtureRecorder:
-    """`--record-fixtures`: write every produced instance after validate accepts it.
-
-    One JSON document per file at `<dir>/<schema>/<id>.json`, which is the
-    layout `contract/fixtures/` uses and the layout the join replays from. A
-    fixture that does not validate is a defect in its producer, so validation
-    runs first and a refusal propagates.
-    """
+    """`--record-fixtures`: write every produced instance after validate accepts it."""
 
     def __init__(self, directory: Optional[str]):
         """Take the recording directory, or None to record nothing."""
@@ -1935,25 +1064,12 @@ class FixtureRecorder:
         self.written: list = []
 
     def record(self, instance) -> Optional[str]:
-        """Validate *instance* and write it under its schema's directory.
-
-        Returns:
-            str, the path written, or None when recording is off.
-        Worker:
-            head; one validate and one file write.
-        Raises:
-            ContractError from `contract.validate`; OSError from the write.
-        """
+        """Validate *instance* and write it under its schema's directory."""
         if not self.directory:
             return None
         schema.validate(instance)
         name = type(instance).__name__
         if name == "FeedbackBundle":
-            # The ARM is part of the identity and W-16 left it out: FR-16.2
-            # makes the two arms' bundles for one seed and one iteration
-            # DIFFERENT documents, the mutation arm's carrying no entries, and
-            # without the arm the second one recorded overwrote the first
-            # (found by W-17's recording run).
             ident = f"{instance.seed_sha}_{instance.arm}_{instance.iteration}"
         else:
             ident = getattr(instance, _FIXTURE_ID[name])
@@ -1975,37 +1091,15 @@ def _snake(name: str) -> str:
     return "".join(out)
 
 
-# ---------------------------------------------------------------------------
-# The rows the driver writes (6.2, 6.4)
-# ---------------------------------------------------------------------------
-
-#: Each table's column list, read once per process from the schema `loop.db`
-#: was created with. Repeating §6.2's DDL here as tuples would be a second
-#: spelling of it, and two spellings of one DDL is how a value gets written
-#: into the column beside the one it belongs in.
+#: Each table's column list.
 _TABLE_COLUMNS: dict = {}
 
-#: What `_row` treats as "the record does not carry this column", so that a
-#: column whose value is legitimately None is still written as NULL.
+#: What `_row` treats as "the record does not carry this column".
 _ABSENT = object()
 
 
 def table_columns(store: LoopStore, table: str) -> tuple:
-    """Return *table*'s columns, in the order §6.2's DDL declares them.
-
-    Read through the store's own read path, so the names are the ones the file
-    actually carries; `pragma_table_info` is a table-valued function and the
-    query goes through `LoopStore.query` like every other read, which is what
-    keeps the driver's whole database contact on one path (§6.1).
-
-    Returns:
-        tuple[str], one name per column.
-    Worker:
-        {"num_cpus": 0.1} for the one query, once per table per process.
-    Raises:
-        KeyError when the schema holds no such table, which is a caller defect
-        and never a state of the database.
-    """
+    """Return *table*'s columns, in the order §6.2's DDL declares them."""
     if table not in _TABLE_COLUMNS:
         rows = store.query("SELECT name FROM pragma_table_info(?)", (table,))
         if not rows:
@@ -2020,12 +1114,7 @@ def _cell(value):
 
 
 def _json_cell(value) -> str:
-    """A `_json` column's text: JSON with sorted keys, dataclasses expanded.
-
-    `OracleVerdict.frames` is a list of `Frame`s and `frames_json` is one
-    column, so the expansion belongs here rather than at each of the callers
-    that happen to hold a list of records.
-    """
+    """A `_json` column's text: JSON with sorted keys, dataclasses expanded."""
     if isinstance(value, list):
         value = [dataclasses.asdict(item) if dataclasses.is_dataclass(item) else item
                  for item in value]
@@ -2033,23 +1122,7 @@ def _json_cell(value) -> str:
 
 
 def _row(store: LoopStore, table: str, record=None, **extra) -> dict:
-    """Build one row of *table* from *record*, column by declared column.
-
-    Every column takes the field of its own name off the record, a `_json`
-    column taking the field without that suffix; *extra* overrides any column
-    and supplies the ones no record carries, which are the run id on a seed,
-    the timestamps, and the canonical-JSON documents of whole members. A column
-    neither the record nor *extra* carries is left out of the INSERT, so one
-    builder serves a table whose record is partial and the DDL's own defaults
-    and NULLs still apply.
-
-    Returns:
-        dict, column name to value, in the DDL's order.
-    Worker:
-        head; it reads the schema through the store and writes nothing.
-    Raises:
-        KeyError from `table_columns` on a table outside the schema.
-    """
+    """Build one row of *table* from *record*, column by declared column."""
     row = {}
     for column in table_columns(store, table):
         if column in extra:
@@ -2064,8 +1137,7 @@ def _row(store: LoopStore, table: str, record=None, **extra) -> dict:
     return row
 
 
-#: Now, UTC, ISO-8601. `store.utc_now` and not a second spelling of it: the
-#: driver and the approval CLI both stamp rows of the same store (N3).
+#: Now, UTC, ISO-8601.
 _utc = utc_now
 
 
@@ -2073,28 +1145,7 @@ def write_run_rows(store: LoopStore, manifest: RunManifest, *,
                    image_spec: ImageSpec, mined: Optional[dict] = None,
                    mirror: Optional[dict] = None,
                    registration: tuple = ("", "")) -> None:
-    """Write everything §6.4 puts in the store before the first probe is dispatched.
-
-    In the order the foreign keys fix: the `run` row first, because every other
-    table's `run_manifest_id` references it; then the `image`, because
-    `build_result.image_digest` references its digest; then A1's `seed` rows and
-    its `sdk_map`; then B6a's `issue_mirror_meta`, which is keyed by the run.
-    Each is written once, so a `--resume` run finds its own rows and adds none,
-    and an image built for an earlier run is not inserted twice.
-
-    *registration* is `budget.registration`'s (tag, commit), recorded in the
-    `registration` table so the run says WHICH pre-registration it was checked
-    against (W-12). An unregistered repository writes no row, which is the dry
-    run's case; the manifest's `budget_file_sha` is the run's identity either
-    way and the contract does not move.
-
-    Returns:
-        None.
-    Worker:
-        {"num_cpus": 0.1} per statement, on the head where loop.db lives.
-    Raises:
-        sqlite3.IntegrityError from any row the schema refuses.
-    """
+    """Write everything §6.4 puts in the store before the first probe is dispatched."""
     run_id = manifest.run_manifest_id
     if store.query_one("SELECT 1 FROM run WHERE run_manifest_id = ?",
                        (run_id,)) is None:
@@ -2111,8 +1162,7 @@ def write_run_rows(store: LoopStore, manifest: RunManifest, *,
     seeds = list((mined or {}).get("seeds") or ())
     if seeds:
         exclusions = dict((mined or {}).get("exclusions") or {})
-        # ADR-D-13 branch (b) only: under branch (a) the slang entry points are
-        # built and those seeds run like any other (§5.3).
+        # ADR-D-13 branch (b) only.
         excluded_sv = (set() if image_spec.slang_enabled
                        else set((mined or {}).get("sv_seeds") or ()))
         rows = []
@@ -2158,14 +1208,7 @@ def write_build_result(store: LoopStore, build) -> None:
 
 
 def write_probe_result(store: LoopStore, result, artefact_dir: str) -> None:
-    """Write the `probe_result` row, once, when the probe has stopped.
-
-    `ProbeResult` is "produced by B2 and completed by the stage the probe
-    stopped at" (§2.4), so the row is written at the end and carries the
-    stopping stage the probe actually reached. It is also the completion record
-    that lets the directory's PARTIAL marker be cleared (§6.5), which is why it
-    is the last row of a probe rather than the first.
-    """
+    """Write the `probe_result` row, once, when the probe has stopped."""
     store.insert("probe_result", _row(store, "probe_result", result,
                                       result_json=schema.to_json(result),
                                       artefact_dir=artefact_dir))
@@ -2188,22 +1231,7 @@ def write_reduced_case(store: LoopStore, reduced) -> None:
 
 
 def write_candidate(store: LoopStore, candidate: CandidateRecord) -> None:
-    """Write one `candidate` row the screen never sees: a differential one.
-
-    B6b writes the row of every candidate it screens, in one transaction with
-    its `fingerprint` and its `dedup_verdict` (§6.4 rule 4), and FR-08.10 keeps
-    a `differential` candidate out of that stage entirely, so this is the head's
-    own write and the one place the report-only candidate is persisted (§3.6.3).
-    `validate_candidate` runs first, as it does on B6b's path.
-
-    Returns:
-        None.
-    Worker:
-        {"num_cpus": 0.1}, on the head.
-    Raises:
-        ContractError from `validate_candidate`; sqlite3.IntegrityError on a
-        second candidate for one probe, `probe_id` being UNIQUE.
-    """
+    """Write one `candidate` row the screen never sees: a differential one."""
     validate_candidate(candidate)
     store.insert("candidate", _row(store, "candidate", candidate,
                                    created_utc=_utc()))
@@ -2216,22 +1244,7 @@ def write_report(store: LoopStore, report) -> None:
 
 def write_repair_dispatch(store: LoopStore, candidate_id: str, local_id: int, *,
                           repro_dir: str, backend: str) -> None:
-    """FR-12.10: the loop's row and the candidate's local id, before CHIA's.
-
-    §6.4 rule 1 puts this write **before** `run_issue_remote`, and B8 runs on a
-    `repair` worker holding no `loop.db` handle (§3.8), so the head writes the
-    row it can know at dispatch time and `write_repair_result` completes it from
-    what came back. The two statements are one transaction because a local id on
-    a candidate with no repair row, or the reverse, is a state the
-    reconciliation cannot read.
-
-    Returns:
-        None.
-    Worker:
-        {"num_cpus": 0.1}, on the head.
-    Raises:
-        sqlite3.Error from either statement, the batch rolled back.
-    """
+    """FR-12.10: the loop's row and the candidate's local id, before CHIA's."""
     store.transaction([
         ("UPDATE candidate SET local_id = ? WHERE candidate_id = ?",
          (local_id, candidate_id)),
@@ -2245,12 +1258,7 @@ def write_repair_dispatch(store: LoopStore, candidate_id: str, local_id: int, *,
 
 
 def write_repair_result(store: LoopStore, result) -> None:
-    """Complete the `repair` row from what B8 returned, leaving `chia_row_seen`.
-
-    An UPDATE and not an INSERT: the row was written before the chain ran
-    (§6.4 rule 1), and `chia_row_seen` is the reconciliation's column and is not
-    this write's to reset.
-    """
+    """Complete the `repair` row from what B8 returned, leaving `chia_row_seen`."""
     fields = _row(store, "repair", result)
     for column in ("candidate_id", "chia_row_seen"):
         fields.pop(column, None)
@@ -2258,13 +1266,7 @@ def write_repair_result(store: LoopStore, result) -> None:
 
 
 def write_gate_decision(store: LoopStore, decision) -> None:
-    """§6.4 rule 4's second batch: the decision row and the candidate's bucket.
-
-    One transaction, because a `gate_decision` row whose candidate carries a
-    different bucket is the disagreement the results artefact would then have to
-    resolve. `held_reason` travels with the bucket for the same reason: it is
-    the gate's own answer about a candidate it refused to pass.
-    """
+    """§6.4 rule 4's second batch: the decision row and the candidate's bucket."""
     from circt_bug_loop.gate import answers
 
     store.transaction([
@@ -2281,37 +1283,16 @@ def write_gate_decision(store: LoopStore, decision) -> None:
 
 
 def write_feedback(store: LoopStore, bundle: FeedbackBundle, path: str) -> None:
-    """Write the iteration's `feedback` row and A5's bundle beside it (§6.5).
-
-    The bundle is on disk as `feedback.json` in the iteration directory and the
-    row carries the path, which is §6.5's cap rule applied to the one artefact
-    the seeded arm reads back.
-
-    Written directly and not through `artefact_write`, as the manifest and the
-    budget copy are: the marker protocol belongs to a directory a STAGE owns and
-    no completion record is keyed on an iteration directory, so a marker created
-    here could never be cleared by anything.
-    """
+    """Write the iteration's `feedback` row and A5's bundle beside it (§6.5)."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(schema.to_json(bundle), encoding="utf-8")
     store.insert("feedback", _row(store, "feedback", bundle, path=path))
 
 
-# ---------------------------------------------------------------------------
-# The stage table, and the run loop
-# ---------------------------------------------------------------------------
-
-
 @dataclasses.dataclass(kw_only=True)
 class Stages:
-    """The ten stage callables `campaign_drive` dispatches, as one record.
-
-    They are a parameter and not an import list so that a test can substitute
-    the ones that need a CIRCT binary, a clone or a model, and drive the
-    sequencing, the verdicts and the counters with nothing installed. The
-    default is every real node, and the join wires them together unchanged.
-    """
+    """The ten stage callables `campaign_drive` dispatches, as one record."""
     generate_seeded: Any
     generate_mutation: Any
     probe_execute: Any
@@ -2329,15 +1310,7 @@ class Stages:
 
 
 def default_stages() -> Stages:
-    """Return the ten real nodes, imported here so a T0 test need not import them.
-
-    Returns:
-        Stages, one field per node of 3.2 the driver dispatches.
-    Worker:
-        head; it imports and dispatches nothing.
-    Raises:
-        ImportError when a stage module is missing, which is a broken checkout.
-    """
+    """Return the ten real nodes, imported here so a T0 test need not import them."""
     from circt_bug_loop import gate, generate_task, probe_task, repair_adapter, triage_task
 
     return Stages(generate_seeded=generate_task.generate_seeded,
@@ -2352,44 +1325,13 @@ def default_stages() -> Stages:
                   gate_decide=gate.gate_decide)
 
 
-# ---------------------------------------------------------------------------
-# `--generator recorded`: the Ray-dispatch path with no model at all (W-19b)
-# ---------------------------------------------------------------------------
-#
-# The mode exists so that the whole of `campaign_drive` - the dispatch, the two
-# arm windows, every stage's CounterBlock, the artefact tree, `loop.db` and the
-# results render - can be exercised ON THE CLUSTER with no model turn and no
-# credential. It is NOT `--dry-run`, which stops after the manifest and
-# dispatches nothing; it is the real dispatch path with the two model-bearing
-# nodes replaced. Every other node - B2 to B6b and the gate - is the real one.
-#
-# Two nodes of 3.2 reach a model, and both are replaced here:
-#
-#   A3 `generate_seeded`  two turns; replaced by `generate_recorded_seeded`
-#   B7 `triage_report`    one turn;  replaced by `recorded_report`
-#
-# A4 `generate_mutation` reaches no model (FR-05.1) and would have been left
-# alone, but it CANNOT run in a registered campaign at all: `mutators.load_set`
-# refuses a set whose `frozen` field is false to any run naming a digest (8.1
-# rule 1), the committed set is `set_dev.json` with `frozen: false`, and A7 has
-# not run. So the mutation arm is served by the same recorded generator, which
-# stamps `arm` and never branches on it, and the errata log carries the row.
-
-#: `--generator recorded`'s first source: the seam's own recorded ProbeSpecs,
-#: one document per file, written by a real `--record-fixtures` run (§0.6 rule 2).
+#: `--generator recorded`'s first source.
 RECORDED_SPEC_DIR = FLOW_DIR / "contract" / "fixtures" / "recorded" / "probe_spec"
 
-#: The mutator id a REPLAYED test file carries on the mutation arm. `ProbeSpec`'s
-#: conditional rule requires the three mutation fields (2.8), and a replay is not
-#: a mutant, so the id says so in its own name rather than borrowing a real
-#: mutator's and making the spec unreadable.
+#: The mutator id a REPLAYED test file carries on the mutation arm.
 RECORDED_MUTATOR_ID = "recorded.replay.identity"
 
 #: What `recorded_report` writes where the agent's three prose fields would be.
-#: `render_report` refuses an empty substitution point (FR-11.3), so the mode
-#: fills them with a sentence that says no agent wrote them - which is FR-11.4's
-#: rule pushed to its limit, the report carrying no agent's number AND no
-#: agent's prose.
 NO_TURN_PROSE = ("NO MODEL TURN WAS MADE. This run was driven with "
                  "`--generator recorded`, so stage 6's agent turn did not "
                  "happen and this field is the driver's own sentence and not "
@@ -2398,27 +1340,7 @@ NO_TURN_PROSE = ("NO MODEL TURN WAS MADE. This run was driven with "
 
 
 def recorded_inputs(seed: SeedRecord, cap: int) -> list:
-    """The probing inputs `--generator recorded` replays for one seed, in order.
-
-    Two sources and never a model. FIRST the seam's own recorded `ProbeSpec`s,
-    where one names this seed: those carry an `input_text` a real generator
-    produced, so a seed the recording covers is probed with the bytes the
-    recording holds. THEN the seed's own test files, replayed unchanged - which
-    is what makes the mode work over ANY seed, the recording covering exactly
-    one. `SeedRecord.test_files` is a required field carrying the full text of
-    every test path at the seed commit (2.0), so the second source needs no
-    clone, no git and no network.
-
-    Returns:
-        list[tuple[str, str, str]], at most *cap* of (text, source test path,
-        expected outcome); the source path is "" for a recorded spec that names
-        none.
-    Worker:
-        the caller's; it reads committed files and runs no process.
-    Raises:
-        nothing. An unreadable recorded document is skipped, the seed's own
-        files remaining.
-    """
+    """The probing inputs `--generator recorded` replays for one seed, in order."""
     out = []
     for document in sorted(RECORDED_SPEC_DIR.glob("*.json")):
         try:
@@ -2433,47 +1355,18 @@ def recorded_inputs(seed: SeedRecord, cap: int) -> list:
     return out[:max(0, cap)]
 
 
-#: SQLite's INTEGER is SIGNED 64-bit, so `probe.mutator_seed_int` holds at most
-#: 2**63 - 1 and `sqlite3` raises `OverflowError` - not a constraint error, an
-#: overflow - on anything larger.
+#: SQLite's INTEGER is SIGNED 64-bit, so `probe.mutator_seed_int` holds at most 2**63.
 SQLITE_MAX_INT = (1 << 63) - 1
 
 
 def _seed_int(text: str) -> int:
-    """A deterministic RNG seed for a replayed input, inside SQLite's range.
-
-    Sixty-three bits and not sixty-four, which is the W-19b finding this mode
-    tripped over first. `mutators.mutant_seed_int` returns
-    `int.from_bytes(digest[:8], "big")`, an UNSIGNED 64-bit integer, so half of
-    A4's mutants carry a `mutator_seed_int` above `SQLITE_MAX_INT`; `write_probe`
-    then raises `OverflowError` from inside `SQLiteNode.execute`, outside
-    `drive_probe`'s try, and the whole campaign stops. Both committed mutation
-    `ProbeSpec` fixtures are already over the limit. That defect is A4's and the
-    store's and is NOT fixed here - the fix changes every mutant the arm
-    produces and so belongs before A7 freezes the set - but this mode must not
-    reproduce it, so its own seed is masked.
-    """
+    """A deterministic RNG seed for a replayed input, inside SQLite's range."""
     return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8],
                           "big") & SQLITE_MAX_INT
 
 
 def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
-    """Build one seed's recorded `ProbeSpec`s for one arm, through A3/A4's builder.
-
-    `generate_task._spec` is the builder BOTH real generators use, so the
-    filename rule, the argv rule, `check_tool` and `contract.validate` are the
-    real ones here too and a spec this mode emits is one the apparatus cannot
-    tell from a generated one except by reading `expected_outcome` (FR-18.1).
-
-    Returns:
-        the Generator return shape: {"specs", "logs", "failure", "counters"}.
-    Worker:
-        the calling node's, `{"circt": 1}`.
-    Raises:
-        nothing. A seed whose spec cannot be built - no run line, a tool the
-        seed does not own - ends the seed with a named `failure`, exactly as a
-        failed turn does (FR-04.8).
-    """
+    """Build one seed's recorded `ProbeSpec`s for one arm, through A3/A4's builder."""
     from circt_bug_loop.generate_task import _spec, iteration_dir as generator_dir
 
     started = time.monotonic()
@@ -2510,12 +1403,7 @@ def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def generate_recorded_seeded(seed: SeedRecord, feedback: FeedbackBundle,
                              remaining, cfg: dict) -> dict:
-    """A3's signature and placement, with recorded inputs and no turn (W-19b).
-
-    The second and third arguments are accepted and never read, which is the
-    same rule A4 already keeps for *feedback* (FR-16.2): one `Generator`
-    signature, one call site, and the difference in the body.
-    """
+    """A3's signature and placement, with recorded inputs and no turn (W-19b)."""
     return _recorded_generation(seed, cfg, "seeded")
 
 
@@ -2532,21 +1420,12 @@ def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
                     differential=None) -> dict:
     """B7's signature and placement, rendering 7.4.1's template with no turn.
 
-    The report IS rendered - every count, size, time, hash, SHA and verdict of
-    it is read off the record by `triage_task.render_report`, which is FR-11.4's
-    rule and needs no agent - and the three prose fields carry `NO_TURN_PROSE`
-    instead of an agent's. The classification is `untriaged`, which is what
-    FR-11.8 gives a candidate whose turn did not produce one, and the TOOL
-    VERDICT still WINS: a candidate the screen matched to an issue is
-    `known_issue` here exactly as it is in B7 (FR-11.2).
-
     Returns:
         B7's shape: {"report": Report, "logs", "failure", "counters"}.
     Worker:
         `{"circt": 1}`, B7's own; no `{"llm": 1}` turn is dispatched.
     Raises:
-        nothing. A record that cannot fill the template yields B7's own
-        failure-shaped empty Report, as an unparseable answer does.
+        nothing.
     """
     from circt_bug_loop.triage_task import (ReportIncomplete, assisted_by_model,
                                             render_report)
@@ -2594,19 +1473,7 @@ def recorded_report(candidate: CandidateRecord, reduced, verdict, dedup,
 
 
 def recorded_stages() -> Stages:
-    """`default_stages()` with the two model-bearing nodes replaced (W-19b).
-
-    Eight of the ten are the real nodes, untouched. `dataclasses.replace` and
-    not a second constructor call, so a node added to `Stages` reaches this mode
-    without being named here twice.
-
-    Returns:
-        Stages, in which no field reaches `llm.build_llm`.
-    Worker:
-        head; it imports and dispatches nothing.
-    Raises:
-        ImportError when a stage module is missing, which is a broken checkout.
-    """
+    """`default_stages()` with the two model-bearing nodes replaced (W-19b)."""
     return dataclasses.replace(default_stages(),
                                generate_seeded=generate_recorded_seeded,
                                generate_mutation=generate_recorded_mutation,
@@ -2614,15 +1481,7 @@ def recorded_stages() -> Stages:
 
 
 def probe_limits(budget: BudgetFile) -> dict:
-    """Return the six per-probe and per-reduction limits budget.yaml fixes.
-
-    Returns:
-        dict, the keys `probe_task` and `reduce_case` read.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return the six per-probe and per-reduction limits budget.yaml fixes."""
     return {"probe_wall_seconds": budget.probe_wall_seconds,
             "probe_address_space_bytes": budget.probe_address_space_bytes,
             "probe_cpu_seconds": budget.probe_cpu_seconds,
@@ -2635,28 +1494,7 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
                   iteration: int, artefact_dir: Optional[str] = None,
                   head_options: Optional[dict] = None,
                   here_options: Optional[dict] = None) -> dict:
-    """Return the `cfg` A3 and A4 read, built from the manifest and the budget.
-
-    `head_options` is the placement K4 needs and nothing else supplies: A3 sits
-    on a `circt` worker and two of the things it uses live on the head - the
-    blobless clone `resolve_sites` queries, and the `SourceReadTool` server that
-    reads it. With the key absent the tool was placed wherever the scheduler
-    liked and `_resolve_sites` fell through to running the query IN THE
-    CONTAINER, against a clone that is not bind-mounted there, after the
-    seed-read turn had already been paid for.
-
-    `here_options` is the same parameter for `ProbeWriteTool`, whose directory
-    is under the artefact root and so is reachable identically everywhere
-    (FR-17.9); it is therefore left None on a default run and is here because
-    3.5 names it and a caller with a reason may pass one.
-
-    Returns:
-        dict with the seventeen keys 3.5's two generators read.
-    Worker:
-        head; it reads two records and touches no file.
-    Raises:
-        nothing.
-    """
+    """Return the `cfg` A3 and A4 read, built from the manifest and the budget."""
     return {"model_id": budget.model_id,
             "per_seed_probe_cap": budget.per_seed_probe_cap,
             "iteration": iteration,
@@ -2673,72 +1511,33 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
             "mutator_set_sha": manifest.mutator_set_sha,
             "head_options": head_options,
             "here_options": here_options,
-            # Errata row 38: the registered per-stage cap on the backend's own
-            # tool loop. Every turn reads its own stage's entry out of this, and
-            # `llm.SpendGuard` authorises exactly that many calls.
             "max_tool_iterations": dict(budget.max_tool_iterations)}
 
 
 def empty_feedback(manifest: RunManifest, seed: SeedRecord, arm: str,
                    iteration: int) -> FeedbackBundle:
-    """Return the bundle the first iteration of a seed reads: no entries at all.
-
-    A5 builds every later one from the iteration's ProbeResults; the first has
-    no previous iteration, and the mutation arm's is empty at every iteration
-    because it never reads one (FR-16.2).
-
-    Returns:
-        FeedbackBundle with an empty `entries` list.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return the bundle the first iteration of a seed reads: no entries at all."""
     return FeedbackBundle(run_manifest_id=manifest.run_manifest_id,
                           seed_sha=seed.seed_sha, arm=arm, iteration=iteration,
                           entries=[], abandoned=False)
 
 
 def iteration_dir(manifest: RunManifest, seed_sha: str, iteration: int) -> str:
-    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>`, one seed's one iteration.
-
-    Returns:
-        str, the absolute directory; it is not created here.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>`, one seed's one iteration."""
     return str(Path(manifest.artefact_root) / manifest.run_manifest_id
                / f"seed_{seed_sha}" / f"iter_{iteration}")
 
 
 def probe_dir(manifest: RunManifest, seed_sha: str, iteration: int,
               probe_id: str) -> str:
-    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>/probe_<id>` for one probe.
-
-    Returns:
-        str, the absolute directory; it is not created here, every stage that
-        writes into it creating its own.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return 6.5's `<root>/<run>/seed_<sha>/iter_<n>/probe_<id>` for one probe."""
     return str(Path(iteration_dir(manifest, seed_sha, iteration))
                / f"probe_{probe_id}")
 
 
 def _candidate(spec: ProbeSpec, build, verdict, reduced, manifest: RunManifest,
                artefact_dir: str, top_n: int) -> CandidateRecord:
-    """Assemble the pre-dedup candidate the screen fills in and validates (2.9).
-
-    `frame_tuple` is built here and not read off the verdict, `OracleVerdict`
-    carrying `frames` and no tuple: it is B6b's own two lines, the prologue strip
-    that must precede every use of a frame (K3) and B3's name normalisation, at
-    the same `fingerprint_top_n`, so the row this candidate writes and the
-    `Fingerprint` B6b computes from the same verdict cannot disagree.
-    """
+    """Assemble the pre-dedup candidate the screen fills in and validates (2.9)."""
     from circt_bug_loop.probe_task import _normalise_function, strip_prologue
 
     assertion = verdict.oracle_class == "assertion"
@@ -2768,21 +1567,7 @@ def _candidate(spec: ProbeSpec, build, verdict, reduced, manifest: RunManifest,
 
 
 def _occupancies(stage: str, block: CounterBlock, out) -> list:
-    """The (stage, seconds, usage) occupancies one dispatched call produced.
-
-    One per call, at the node's own stage, except where the return carries a
-    per-turn usage map: A3 is one node running stages 1 and 2 and its two turns
-    are two occupancies, the turn's own wall clock against the turn's stage and
-    the rest of the call against the node's. The seconds of one call's entries
-    therefore always sum to the block's own.
-
-    Returns:
-        list[tuple[str, float, dict]], never empty.
-    Worker:
-        pure; it reads two dicts.
-    Raises:
-        nothing.
-    """
+    """The (stage, seconds, usage) occupancies one dispatched call produced."""
     logs = out.get("logs") if isinstance(out, dict) else None
     usage = (logs or {}).get("usage") if isinstance(logs, dict) else None
     if not isinstance(usage, dict) or not usage:
@@ -2806,11 +1591,7 @@ def _occupancies(stage: str, block: CounterBlock, out) -> list:
 
 
 class Campaign:
-    """One run's state: the manifest, the budget, the stores and the dispatch.
-
-    It is a record and not a framework: it holds what every stage call needs and
-    nothing a stage could have computed for itself.
-    """
+    """One run's state: the manifest, the budget, the stores and the dispatch."""
 
     def __init__(self, *, manifest: RunManifest, budget: BudgetFile,
                  store: LoopStore, stages: Stages, dispatch: Dispatch,
@@ -2840,16 +1621,7 @@ class Campaign:
 
     def cfg(self, *, iteration: int, artefact_dir: Optional[str] = None,
             spend_usd: Optional[float] = None) -> dict:
-        """This run's `generator_cfg`, carrying the head placement K4 needs.
-
-        One method and not four call sites, so the placement cannot be supplied
-        to some stages and forgotten by others: A3's `SourceReadTool` and B7's
-        are the same tool with the same reason to be pinned to the head.
-
-        *spend_usd* is the ledger's campaign spend as of this iteration; given
-        one, the cfg carries W1's `SpendGuard` and every turn the stage runs is
-        pre-authorised against the cap before it is sent.
-        """
+        """This run's `generator_cfg`, carrying the head placement K4 needs."""
         cfg = generator_cfg(self.manifest, self.budget,
                             clone_path=self.clone_path, iteration=iteration,
                             artefact_dir=artefact_dir,
@@ -2874,21 +1646,7 @@ class Campaign:
             price_usd_per_m_output_tokens=self.budget.price_usd_per_m_output_tokens)
 
     def call(self, name: str, fn: Callable, *args, **kwargs):
-        """Dispatch one stage, fold its counters in, charge it, and return its result.
-
-        A node that returns a mapping carrying `counters` has that block
-        recorded; one that does not has a block synthesised from this call's own
-        timing and the synthesis recorded as a violation (3.11). Either way the
-        occupancy is charged to the ledger, a stage that failed having occupied
-        the apparatus exactly as one that returned.
-
-        Returns:
-            whatever the stage returned.
-        Worker:
-            the stage's own.
-        Raises:
-            whatever the stage raises; the caller decides what a failure means.
-        """
+        """Dispatch one stage, fold its counters in, charge it, and return its result."""
         started = self.now()
         arm = kwargs.pop("_arm", "shared")
         key = kwargs.pop("_key", "")
@@ -2910,22 +1668,7 @@ class Campaign:
         return out
 
     def charge(self, arm: str, name: str, block: CounterBlock, out, key: str) -> None:
-        """Append this call's stage occupancy to the ledger, one entry per stage.
-
-        The occupancy is the block's own seconds and the observation is whatever
-        usage the node reported, which A6b prices (§3.11's "a counter is never a
-        budget": these are different numbers with different owners and both are
-        recorded). A3 is one node and two stages, so a return carrying a
-        per-turn usage map is charged as two entries and `_TURN_OF` says which.
-
-        Returns:
-            None.
-        Worker:
-            {"num_cpus": 0.1} per entry, through `ledger.accrue` on the head.
-        Raises:
-            ContractError or sqlite3.IntegrityError from `accrue`, a repeated
-            entry id being a double charge and not a duplicate (§6.4 rule 3).
-        """
+        """Append this call's stage occupancy to the ledger, one entry per stage."""
         run_id = self.manifest.run_manifest_id
         for stage, seconds, usage in _occupancies(_STAGE_OF[name], block, out):
             entry = LedgerEntry(
@@ -2935,12 +1678,7 @@ class Campaign:
                 run_manifest_id=run_id, arm=arm, scope="stage", stage=stage,
                 unit="wall_clock_seconds", amount=max(0.0, round(seconds, 6)),
                 metered=bool(self.manifest.stages_metered.get(stage, True)),
-                # The four money fields are contract 2.2's and are the TURN's
-                # own, straight from `dispatch_turn` (errata row 38): what the
-                # guard authorised, what ceiling the backend was given, what the
-                # turn billed at the file's two prices, and how many
-                # `generate_content` calls it made. Every one is None for a
-                # stage that made no turn, which is most of them.
+                # The four money fields are contract 2.2's and are the TURN's own.
                 observed={"cpu_seconds": None,
                           "tokens_in": usage.get("tokens_in"),
                           "tokens_out": usage.get("tokens_out"),
@@ -2956,29 +1694,7 @@ class Campaign:
 
 
 def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
-    """Run one probing input through stages 3 to the gate, and record what happened.
-
-    The stages run in order and each one's outcome decides whether the next runs
-    at all: a probe that exits cleanly stops at stage 3, one whose oracle does
-    not fire stops at stage 4, and a `differential` candidate never reaches the
-    dedup or the gate at all (FR-08.10, FR-13.14).
-
-    Every stage's record lands in its own table as the stage returns it, in
-    §6.4's order, and the probe's own directory carries the PARTIAL marker of
-    §6.5 from before the first stage runs until the `probe_result` row that
-    completes it exists.
-
-    Returns:
-        {"probe_id", "arm", "seed_sha", "iteration", "stages": list[str],
-         "verdicts": dict[str, str], "stopping_stage", "stopping_reason",
-         "probe_result": ProbeResult | None, "candidate_id": str | None}.
-    Worker:
-        head, dispatching each stage at its own declared resource.
-    Raises:
-        nothing. A stage that raises is recorded against the probe as
-        `<stage>_error:<exception class>` and the probe stops there, because one
-        failed probe is not a failed campaign.
-    """
+    """Run one probing input through stages 3 to the gate, and record what happened."""
     out = {"probe_id": spec.probe_id, "arm": spec.arm, "seed_sha": spec.seed_sha,
            "iteration": spec.iteration, "stages": [], "verdicts": {},
            "stopping_stage": "stage_3", "stopping_reason": "not_run",
@@ -2994,22 +1710,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
 
 
 def _close_probe(campaign: Campaign, out: dict, artefact_dir: str) -> None:
-    """Write the probe's own row and clear its PARTIAL marker (§6.5, FR-17.8).
-
-    A probe whose stage 3 never returned has no `ProbeResult` to write and its
-    marker therefore stays, which is the marker doing its job: the directory
-    holds whatever the dead stage had written and nothing is deleted.
-
-    THE STOPPING REASON IS COPIED ONTO THE RECORD HERE (W3). The driver assigned
-    `result.stopping_stage` five times and `result.stopping_reason` never, so
-    the column carried stage 3's build classification for the life of the probe:
-    a candidate that reached the gate and was refused as `not_minimal` was
-    recorded as `assertion_fired`, and `feedback._reason` rendered
-    `f"{build_status}:{stopping_reason}"` into every `FeedbackEntry` - so the
-    model driving the seeded arm's next iteration was told the wrong thing about
-    what happened to its last probe, which is exactly the signal FR-16 exists to
-    carry.
-    """
+    """Write the probe's own row and clear its PARTIAL marker (FR-17.8)."""
     result = out["probe_result"]
     if result is None:
         return
@@ -3138,29 +1839,7 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
 
 def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecord,
                   reduced, verdict, report: dict, out: dict, result):
-    """Stage 7 for one candidate, the loop's own row written before CHIA's.
-
-    FR-12.10 and §6.4 rule 1: the head mints the identifier, writes it onto the
-    candidate and opens the `repair` row, and only then dispatches B8, whose
-    worker holds no `loop.db` handle (§3.8). The row is completed from the
-    `RepairResult` that comes back; an attempt that never came back leaves the
-    row at `dispatched`, which is what the reconciliation then reads.
-
-    THE CHAIN'S CFG IS ASSEMBLED HERE (K3, K6). `repair_adapt` used to be handed
-    the GENERATOR's cfg, which carries no `repair_backend`, so stage 7 raised
-    `KeyError` on every candidate and `_drive_repair`'s own `except Exception`
-    recorded it as `refused:KeyError` and nothing else; and `build_cfg` used to
-    run on the repair worker, where `chia.__path__[0]`'s parent holds no
-    `examples/` and the six prompt bodies cannot be read. The head has CHIA's
-    checkout, so it builds all sixteen keys and passes them complete.
-
-    Returns:
-        RepairResult, or None when repair is disabled or the attempt refused.
-    Worker:
-        head, dispatching one `{"repair": 1}` node.
-    Raises:
-        nothing; a refusal is `out["verdicts"]["stage_7"]`.
-    """
+    """Stage 7 for one candidate, the loop's own row written before CHIA's."""
     if not campaign.repair_enabled:
         return None
     from circt_bug_loop.repair_adapter import (build_cfg, issue_solver_dir,
@@ -3171,8 +1850,6 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
         local_id = mint_local_id(campaign.store, candidate.candidate_id)
         write_repair_dispatch(
             campaign.store, candidate.candidate_id, local_id,
-            # §6.5's repair directory and §3.8's own backend, both derived
-            # here because B8 computes them on a worker that cannot write.
             repro_dir=str(Path(campaign.manifest.artefact_root)
                           / campaign.manifest.run_manifest_id / "repair"
                           / str(local_id)),
@@ -3180,10 +1857,7 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
         solver = issue_solver_dir()
         cfg = {**build_cfg(candidate, campaign.manifest, local_id=local_id,
                            issue_solver=solver),
-               # The two keys the LOOP reads, which are not CHIA's cfg and are
-               # filtered out before `run_issue_remote` sees it. The backend
-               # here is the driver's flag and the one inside is the manifest's,
-               # so B8's comparison still has two independent sources.
+               # The two keys the LOOP reads.
                "repair_enabled": campaign.repair_enabled,
                "repair_backend": campaign.repair_backend}
         repair = campaign.call(
@@ -3203,23 +1877,7 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
 
 def _drive_differential(campaign: Campaign, spec: ProbeSpec, build, result,
                         out: dict, artefact_dir: str, stop) -> dict:
-    """B4, for the probes FR-08.1 admits, and the report-only candidate it can make.
-
-    B4 is not on `probe_execute`'s path and the driver is its only caller
-    (§3.6.3), so this is where the applicability rule is asked. It is asked of
-    the probes whose primary oracle did not fire: a tool that died has no design
-    to simulate, and the crash it died of is stage 4's answer, not stage 4b's.
-    A divergence is report-only (FR-08.10) - no reducer, no dedup, no repair and
-    no gate - so the driver writes the candidate itself, `dedup_and_screen`
-    refusing a `differential` one by design.
-
-    Returns:
-        the probe's `out` dict, stopped where the differential left it.
-    Worker:
-        head, dispatching one `{"circt": 1}` node.
-    Raises:
-        nothing.
-    """
+    """B4, for the probes FR-08.1 admits, and the report-only candidate it can make."""
     from circt_bug_loop.probe_task import differential_applicable
 
     applicable, _reason = differential_applicable(spec)
@@ -3270,22 +1928,7 @@ def _drive_differential(campaign: Campaign, spec: ProbeSpec, build, result,
 
 def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                deadline: Optional[float] = None) -> dict:
-    """Run one seed's iterations on one arm: generate, then every probe it wrote.
-
-    The iteration cap is `budget.yaml`'s `per_seed_iteration_cap`; a seed also
-    stops when A5 abandons it (FR-16.6) and when the arm's window has expired,
-    which is checked between iterations and never inside one, because a probe
-    that has started is bounded by its own limits and not by the window.
-
-    Returns:
-        {"seed_sha", "arm", "iterations": int, "probes": list[dict],
-         "terminating_condition": str}.
-    Worker:
-        head, dispatching the generator and every stage.
-    Raises:
-        nothing. A generator that fails ends the seed with
-        `terminating_condition="generator_failed:<class>"`.
-    """
+    """Run one seed's iterations on one arm: generate, then every probe it wrote."""
     out = {"seed_sha": seed.seed_sha, "arm": arm, "iterations": 0, "probes": [],
            "terminating_condition": "iteration_cap"}
     bundle = empty_feedback(campaign.manifest, seed, arm, 1)
@@ -3294,10 +1937,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
         if deadline is not None and campaign.now() >= deadline:
             out["terminating_condition"] = "arm_window"
             return out
-        # PER ITERATION, not once per seed (W10, W1): the snapshot A5 and the
-        # generator read is FR-16's "how much is left", and a seed's third
-        # iteration was being told what was true before its first; the same
-        # read is what the turn-level spend guard is built from.
+        # PER ITERATION, not once per seed (W10).
         aggregate = ledger_module.aggregate(campaign.manifest.run_manifest_id,
                                             campaign.store.db_path)
         snapshot = budget_module.snapshot(aggregate, arm, campaign.budget)
@@ -3339,25 +1979,14 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
 
 
 def _spend_refused(failure: Optional[str]) -> bool:
-    """Whether a stage's recorded failure is W1's pre-authorisation refusing.
-
-    A3 and B7 catch every exception and record it as `turn_failed:<class>`
-    (FR-04.8, FR-11.8), which is right for a backend error and wrong for this
-    one: a turn refused because the campaign's USD cap would be reached is not
-    a failed seed, it is the cap binding, and the arm stops.
-    """
+    """Whether a stage's recorded failure is W1's pre-authorisation refusing."""
     return bool(failure) and failure.endswith("SpendCapRefused")
 
 
 def _next_feedback(campaign: Campaign, results: list, previous: FeedbackBundle,
                    seed: SeedRecord, iteration: int, dispatched: list,
                    snapshot, probes_this_seed: int) -> FeedbackBundle:
-    """A5's bundle for the next iteration, imported at the call site (1.3 rule 2).
-
-    A5's arm is read off *snapshot*, which is the only arm-scoped thing a
-    generator may see, and `probes_this_seed` is the seed's running probe count,
-    which is what FR-16.3's `probe_cap` terminating condition is decided from.
-    """
+    """A5's bundle for the next iteration, imported at the call site (1.3 rule 2)."""
     from circt_bug_loop import feedback as feedback_module
 
     return campaign.dispatch.call(
@@ -3369,24 +1998,7 @@ def _next_feedback(campaign: Campaign, results: list, previous: FeedbackBundle,
 
 
 def campaign_drive(campaign: Campaign, seeds: list, *, arms=None) -> dict:
-    """Run the arms one after the other, each for the same window W (FR-14.5).
-
-    The arms are sequential and never overlap, in `budget.yaml`'s `arm_order`,
-    from one cluster YAML at one concurrency, which is what makes the wall-clock
-    equality mean anything. Each arm stops at the first of: its window; a
-    binding safety cap; and the campaign's USD cap, which is campaign-wide and
-    stops BOTH arms, so the arm in flight ends and the other never starts
-    (FR-18.10, 3.11).
-
-    Returns:
-        {"arms": {arm: {"stop_reason", "seconds", "seeds", "probes"}},
-         "seeds": list[dict], "counters": dict, "violations": list[str],
-         "stopped": str | None}.
-    Worker:
-        head; it dispatches every stage and runs none of them itself.
-    Raises:
-        nothing. Every stop is a recorded reason.
-    """
+    """Run the arms one after the other, each for the same window W (FR-14.5)."""
     order = list(arms if arms is not None else campaign.manifest.arm_order)
     out = {"arms": {}, "seeds": [], "counters": campaign.counters.totals,
            "violations": campaign.counters.violations, "stopped": None}
@@ -3407,8 +2019,7 @@ def campaign_drive(campaign: Campaign, seeds: list, *, arms=None) -> dict:
             out["seeds"].append(record)
             seeds_run += 1
             probes_run += len(record["probes"])
-            # W1: a turn refused by the pre-authorisation stops the arm HERE,
-            # without waiting for the next `_arm_stop` to find the money gone.
+            # W1: a turn refused by the pre-authorisation stops the arm HERE.
             if record["terminating_condition"] == "campaign_spend_cap":
                 reason = "campaign_spend_cap"
                 break
@@ -3436,25 +2047,7 @@ def _arm_stop(campaign: Campaign, arm: str, deadline: float) -> Optional[str]:
 def accrue_offline(store: LoopStore, manifest: RunManifest, budget: BudgetFile, *,
                    dispatch: Dispatch, recorder: Optional[FixtureRecorder] = None,
                    image_seconds: float = 0.0) -> None:
-    """Charge the run's two `shared` occupancies: B1's build and A7's synthesis.
-
-    Neither belongs to an arm and neither runs inside a window, and one of them
-    does not run inside the campaign at all. The offline mutator synthesis
-    precedes the registration commit (§8.3), so A7 cannot write its own entry -
-    `ledger_entry.run_manifest_id` has a foreign key to `run` and no run existed
-    when it ran - and it records the date in the frozen set instead. FR-05.8's
-    declaration is rendered off this entry's timestamp (§14.4), so the run
-    stamps what the set says, and the amount is zero because the frozen set
-    records the synthesis date and not its duration.
-
-    Returns:
-        None. A run that already carries the two entries adds neither, which is
-        what makes `--resume` re-enter here safely.
-    Worker:
-        {"num_cpus": 0.1} per entry, through `ledger.accrue` on the head.
-    Raises:
-        sqlite3.IntegrityError on a repeated entry id (§6.4 rule 3).
-    """
+    """Charge the run's two `shared` occupancies: B1's build and A7's synthesis."""
     from circt_bug_loop import mutators
 
     synthesised = (mutators.load_set().get("synthesised_utc")
@@ -3480,13 +2073,7 @@ def accrue_offline(store: LoopStore, manifest: RunManifest, budget: BudgetFile, 
 
 
 def results_stage() -> str:
-    """The stage name the offline synthesis is charged under (`results.py`'s own).
-
-    One constant, read from the renderer rather than spelled again here: §9
-    names the stage nowhere and `results.SYNTHESIS_STAGE` is what the
-    declaration looks the entry up by, so a second spelling here would be the
-    one way the two could disagree.
-    """
+    """The stage name the offline synthesis is charged under (`results.py`'s own)."""
     from circt_bug_loop.results import SYNTHESIS_STAGE
 
     return SYNTHESIS_STAGE
@@ -3510,26 +2097,8 @@ def _accrue_arm_window(campaign: Campaign, arm: str, seconds: float,
                            campaign.budget)
 
 
-# ---------------------------------------------------------------------------
-# The end-of-run reconciliation (FR-12.10)
-# ---------------------------------------------------------------------------
-
-
 def reconcile(store: LoopStore, issues_db: str) -> dict:
-    """Mark every loop repair row whose CHIA counterpart never appeared (FR-12.10).
-
-    The join key is `local_id`, which B8 minted inside `local_id_range` so that
-    a loop row can never collide with a real issue number. A row CHIA has is
-    `chia_row_seen = 1`; one it does not is marked `repair_row_missing`, which is
-    a recorded fact and not a repair.
-
-    Returns:
-        {"seen": int, "missing": list[int], "issues_db": str}.
-    Worker:
-        head; both databases are on it.
-    Raises:
-        sqlite3.Error from either query.
-    """
+    """Mark every loop repair row whose CHIA counterpart never appeared (FR-12.10)."""
     import sqlite3
 
     rows = store.query("SELECT candidate_id, local_id FROM repair")
@@ -3555,27 +2124,8 @@ def reconcile(store: LoopStore, issues_db: str) -> dict:
             "issues_db": issues_db}
 
 
-# ---------------------------------------------------------------------------
-# The CLI (13.1)
-# ---------------------------------------------------------------------------
-
-
 def build_parser() -> argparse.ArgumentParser:
-    """Return 13.1's argument parser, with that table's defaults.
-
-    Three arguments 13.1's table does not list are here and each has a reason
-    recorded in the errata log: `--forum-post-url` and `--forum-post-date`,
-    without which pre-flight check 11's two manifest fields have no producer at
-    all, and `--chia-root`, which 13.1's prose already names as the override for
-    a checkout whose `examples/` is not beside the installed package.
-
-    Returns:
-        argparse.ArgumentParser.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        nothing.
-    """
+    """Return 13.1's argument parser, with that table's defaults."""
     parser = argparse.ArgumentParser(prog="bug_loop.py",
                                      description="The closed CIRCT bug loop.")
     parser.add_argument("--mode", required=True, choices=("discovery", "calibration"))
@@ -3588,18 +2138,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repair-backend", default="vertex", choices=REPAIR_BACKENDS)
     parser.add_argument("--repair-model", default=None)
     parser.add_argument("--no-repair", action="store_true")
-    # W-19b. `model` is every real node and is what a campaign runs; `recorded`
-    # replaces the two model-bearing nodes with the recorded ones above, so the
-    # whole dispatch path runs on the cluster with no turn and no credential.
-    # It implies --no-repair: stage 7 IS a model, whatever the backend, and a
-    # recorded run that dispatched it would be a run with a turn in it.
     parser.add_argument("--generator", default="model",
                         choices=("model", "recorded"))
-    # W-18. A pilot is a campaign over a NAMED subset of the corpus; without it
-    # a short window measures whichever seeds the corpus happens to order first.
-    # It narrows only the list `campaign_drive` is handed - the mined corpus,
-    # its exclusions and the store's seed rows are unchanged - and a named seed
-    # the corpus does not hold refuses the run.
     parser.add_argument("--seed-sha", action="append", default=None, metavar="SHA")
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument("--resume", default=None, metavar="RUN_MANIFEST_ID")
@@ -3614,40 +2154,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-#: Why a seed cannot be calibrated by a run whose image is built at one commit
-#: (W-19b #6). FR-02.7 wants each sampled seed probed at ITS OWN parent commit;
-#: a run has one image and `probe_execute` runs and hashes that image's
-#: binaries, so the only seeds a deployment can calibrate are those whose parent
-#: shares the image's LLVM pin, where the image's own SDK can build that parent
-#: incrementally. Every other seed is excluded under this reason rather than
-#: probed at a commit the manifest does not name.
+#: Why a seed cannot be calibrated by a run whose image is built at one commit (W-19b #6).
 NOT_CALIBRATABLE = "not_calibratable_in_deployment"
 
 
 def calibratable(seeds, pin_sha: str) -> tuple:
-    """Split *seeds* into those a run pinned at *pin_sha* can calibrate, and the rest.
-
-    A seed is eligible when its parent's `llvm` gitlink IS the run's pin - the
-    equality FR-03.2 makes the image's own build condition - and when its SDK
-    tag is exact, which is ADR-D-01(d)'s existing rule. Anything else would need
-    the image's SDK to build a CIRCT commit it does not match, which FR-03.2
-    makes a hard build failure rather than a degradation.
-
-    MEASURED ON THIS CORPUS, 2026-09-15: **0 of 187** seed parents carry the
-    image's pin `6279700538792da0c5a08e17babfe9b6e824c69f`, and the 187 parents
-    are spread over 44 distinct pins, the commonest covering 27 seeds. So on
-    this deployment the eligible set is EMPTY, calibration mode refuses naming
-    the count, and no seed is silently probed at the wrong commit. The six
-    host-built crash fixtures remain the oracle and reducer calibration, as
-    W-09 recorded them.
-
-    Returns:
-        (eligible, excluded), two sorted lists of seed SHAs.
-    Worker:
-        pure; it reads two fields per seed.
-    Raises:
-        nothing.
-    """
+    """Split *seeds* into those a run pinned at *pin_sha* can calibrate, and the rest."""
     eligible = sorted(s.seed_sha for s in seeds
                       if s.sdk_exact and s.llvm_pin == pin_sha)
     chosen = set(eligible)
@@ -3655,26 +2167,7 @@ def calibratable(seeds, pin_sha: str) -> tuple:
 
 
 def seed_subset(seeds: list, named: list, corpus_head_sha: str) -> list:
-    """Narrow *seeds* to the SHAs *named*, in the order they were named (W-18).
-
-    A pilot drives a chosen subset of the corpus, so a short window reaches the
-    seeds it was designed around instead of whichever the corpus orders first.
-    Only the list `campaign_drive` is handed is narrowed: the mined corpus, its
-    exclusions and the store's seed rows are unchanged, so the run still records
-    what the corpus held.
-
-    A named seed the corpus does not hold REFUSES the run and is never silently
-    omitted, because a pilot that quietly drove eleven of twelve seeds would
-    report eleven as though twelve had been asked for. A repeated SHA is
-    de-duplicated, one seed being one seed however often it is named.
-
-    Returns:
-        list[SeedRecord], the named seeds in the named order.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        PreflightFailed("seed_subset", detail) naming every absent SHA.
-    """
+    """Narrow *seeds* to the SHAs *named*, in the order they were named (W-18)."""
     order = {sha: index for index, sha in enumerate(dict.fromkeys(named))}
     present = {seed.seed_sha for seed in seeds}
     absent = sorted(sha for sha in order if sha not in present)
@@ -3689,25 +2182,7 @@ def seed_subset(seeds: list, named: list, corpus_head_sha: str) -> list:
 
 def draw_calibration(*, corpus_head_sha: str, sample_size: int,
                      exact_pin_shas: list) -> list:
-    """Draw the calibration sample from the eligible seeds, reproducibly (ADR-D-01).
-
-    `random.Random(corpus_head_sha)` is seeded by a value already in the budget
-    file, so the draw is reproducible from the file itself and is a step of the
-    pre-registration rather than of the run. It writes nothing.
-
-    *exact_pin_shas* is the set the sample is drawn FROM, and since W-20b the
-    caller narrows it with `calibratable` first: a sample drawn from seeds no
-    deployment can probe at their own parent commit is a sample of nothing
-    (W-19b #6).
-
-    Returns:
-        list[str], *sample_size* seed SHAs, sorted so the printed order is
-        stable.
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ValueError when the set is smaller than the sample.
-    """
+    """Draw the calibration sample from the eligible seeds, reproducibly (ADR-D-01)."""
     if len(exact_pin_shas) < sample_size:
         raise ValueError(f"{len(exact_pin_shas)} eligible seeds cannot yield a "
                          f"sample of {sample_size}")
@@ -3716,15 +2191,7 @@ def draw_calibration(*, corpus_head_sha: str, sample_size: int,
 
 
 def resolved_config(args) -> dict:
-    """Return what `--print-config` prints: every resolved path, and no secret.
-
-    Returns:
-        dict, path names to resolved values.
-    Worker:
-        head; it reads argv and the environment and dispatches nothing.
-    Raises:
-        nothing.
-    """
+    """Return what `--print-config` prints: every resolved path, and no secret."""
     return {"mode": args.mode, "arm": args.arm, "budget": args.budget,
             "cluster_yaml": args.cluster_yaml, "clone": args.clone,
             "artefact_root": args.artefact_root, "image_tag": args.image_tag,
@@ -3739,30 +2206,12 @@ def resolved_config(args) -> dict:
 
 
 def repair_enabled(args) -> bool:
-    """Whether stage 7 runs: `--no-repair` and `--generator recorded` both stop it.
-
-    One function and not two spellings of the same condition, because the two
-    places that ask - `resolved_config` and the `Campaign` - would otherwise be
-    free to disagree about what a recorded run does.
-    """
+    """Whether stage 7 runs: `--no-repair` and `--generator recorded` both stop it."""
     return not args.no_repair and args.generator != "recorded"
 
 
 def check_issue_solver(chia_root: str) -> None:
-    """Refuse a checkout whose `examples/circt_issue_solver/` is not beside chia.
-
-    B8 needs CHIA's own `issue_task.py` and `circt_util.py` on the repair
-    worker's `sys.path` and FR-12.1 forbids copying them, so a wheel install
-    with no `examples/` cannot run stage 7. It bites at start-up rather than at
-    the first repair attempt.
-
-    Returns:
-        None.
-    Worker:
-        head; one filesystem check.
-    Raises:
-        PreflightFailed("issue_solver", detail) naming `--chia-root`.
-    """
+    """Refuse a checkout whose `examples/circt_issue_solver/` is not beside chia."""
     solver = Path(chia_root) / "examples" / "circt_issue_solver" / "issue_task.py"
     if not solver.exists():
         raise PreflightFailed(
@@ -3772,18 +2221,7 @@ def check_issue_solver(chia_root: str) -> None:
 
 
 def worker_probes(dispatch: Dispatch, artefact_root: str, resources: dict) -> dict:
-    """Dispatch `artefact_root_probe` once per worker type and collect the booleans.
-
-    *resources* maps a worker type's name to the resource dict its containers
-    advertise, which is what places the probe on that type and on no other.
-
-    Returns:
-        dict, worker type to what the probe returned there.
-    Worker:
-        head, dispatching one trivial node per worker type.
-    Raises:
-        nothing; a probe that cannot write returns False.
-    """
+    """Dispatch `artefact_root_probe` once per worker type and collect the booleans."""
     node = ChiaFunction(max_retries=0)(artefact_root_probe)
     probes = {}
     for worker_type, resource in sorted(resources.items()):
@@ -3794,15 +2232,7 @@ def worker_probes(dispatch: Dispatch, artefact_root: str, resources: dict) -> di
 
 
 def interlock_probes(dispatch: Dispatch, resources: dict) -> dict:
-    """Dispatch `interlock_probe` once per worker type that runs a model turn.
-
-    Returns:
-        dict, worker type to {"interlock_ok", "key_ok"} - booleans and no value.
-    Worker:
-        head, dispatching one trivial node per `llm` and `repair` worker type.
-    Raises:
-        nothing.
-    """
+    """Dispatch `interlock_probe` once per worker type that runs a model turn."""
     node = ChiaFunction(max_retries=0)(interlock_probe)
     probes = {}
     for worker_type, resource in sorted(resources.items()):
@@ -3813,15 +2243,7 @@ def interlock_probes(dispatch: Dispatch, resources: dict) -> dict:
 
 
 def run_campaign(args, out) -> int:
-    """The whole run: twelve checks, the manifest, both arms, the reconciliation.
-
-    Returns:
-        int, 0 on a completed run and non-zero on a refusal.
-    Worker:
-        head; it dispatches every stage and runs none of them.
-    Raises:
-        PreflightFailed, which `main` turns into a named message and a status.
-    """
+    """The whole run: twelve checks, the manifest, both arms, the reconciliation."""
     from chia.cluster.config import load_config
     from chia.trace.metrics import MetricsLogger
 
@@ -3832,11 +2254,9 @@ def run_campaign(args, out) -> int:
 
     check_issue_solver(args.chia_root)
     check_15_entrypoint_imports()
-    # Before anything is dispatched: the staged package is what every worker
-    # imports, and checks 13 and 14 read it (K3, K6, K7, K11, W6).
+    # Before anything is dispatched.
     shipped = stage_shipped()
-    # A run that reports a result is a campaign and needs the registration tag;
-    # a dry run and a `--generator recorded` run report none and do not (W-12).
+    # A run that reports a result is a campaign and needs the registration tag.
     budget = check_01_budget_registered(
         budget_path=args.budget, repo_root=repo_root, run_start_utc=started_utc,
         campaign=not (args.dry_run or args.generator == "recorded"))
@@ -3850,18 +2270,13 @@ def run_campaign(args, out) -> int:
     config = load_config(args.cluster_yaml)
     resources = {name: dict(node_type.resources)
                  for name, node_type in config.node_types.items()}
-    # Errata row 37, before anything reads the Ray runtime context: a
-    # `ray_current_cluster` left behind by a `chia down` names a GCS that does
-    # not answer, and every reader then retries it five seconds at a time for
-    # ever - `ray.init` included.
     stale = clear_stale_ray_cluster()
     if stale is not None:
         print(f"pre-flight: removed a stale {RAY_CURRENT_CLUSTER} naming "
               f"{stale}, which no cluster answers (errata row 37)", file=out)
     ray.init(address="auto", runtime_env=runtime_env(shipped),
              ignore_reinit_error=True)
-    # The driver IS the head (13.1's B12 row), so its own node id is what pins
-    # every `HEAD_NODES` member and every head-side tool server (K4, K5).
+    # The driver IS the head (13.1's B12 row).
     dispatch = Dispatch(remote=True, head_node_id=_head_node_id())
 
     check_05_artefact_root_workers(
@@ -3884,9 +2299,7 @@ def run_campaign(args, out) -> int:
             f"({image_spec.image_tag!r}): the cluster would run a different "
             "image from the one this run records")
     check_06_image_lit_discovery(image_spec=image_spec)
-    # W2: the observations are the WORKERS' own. Both checks used to build
-    # `observed` from the `ImageSpec` they were comparing against, so each
-    # compared a value to itself and neither could ever fail.
+    # W2: the observations are the WORKERS' own.
     observations = tool_probes(
         dispatch,
         {name: resources[name] for name in cluster["image_worker_types"]},
@@ -3905,10 +2318,7 @@ def run_campaign(args, out) -> int:
     check_11_forum_post(forum_post_url=args.forum_post_url,
                         forum_post_date=args.forum_post_date,
                         filings_total=budget.filings_total)
-    # W4: `--generator recorded` exists so the whole dispatch path can be
-    # exercised ON THE CLUSTER with no model turn and no credential, and
-    # check 12 refused such a run unless the head and both llm workers carried
-    # the interlock and a usable key - the opposite of what the mode is for.
+    # W4: `--generator recorded` exists so the whole dispatch path can be exercised with no model turn and no credential.
     if args.generator == "recorded":
         print("generator recorded: check 12 is skipped, no turn is made and no "
               "credential is needed anywhere", file=out)
@@ -3917,8 +2327,7 @@ def run_campaign(args, out) -> int:
                            if "llm" in resource
                            or ("repair" in resource and repair_enabled(args))}
         check_12_live_model(
-            # The head is checked only where a turn would be built there, and
-            # under Ray it never is - see the check's own docstring (W-18).
+            # The head is checked only where a turn would be built there, and under Ray it never is.
             head=None if ray.is_initialized() else interlock_probe(),
             workers=interlock_probes(dispatch, model_resources))
     repair_backend = check_13_vertex_branch(
@@ -3935,23 +2344,12 @@ def run_campaign(args, out) -> int:
                           corpus_since(args.clone, budget.corpus_head_sha),
                           budget.artefact_inline_cap_bytes)
     seeds = list(mined["seeds"])
-    # W-18: a PILOT drives a named subset of the corpus, so a small run reaches
-    # the seeds it was designed around instead of the first few the corpus
-    # happens to order. The mined corpus is unchanged - `mined` still carries
-    # every seed and every exclusion, and the store still records them - and
-    # only the list handed to `campaign_drive` is narrowed. A named seed the
-    # corpus does not hold is a refusal and never a silent omission, because a
-    # pilot that quietly ran eleven of twelve seeds would report eleven as if
-    # twelve had been asked for.
+    # W-18: a PILOT drives a named subset of the corpus.
     if args.seed_sha:
         seeds = seed_subset(seeds, args.seed_sha, budget.corpus_head_sha)
         print(f"--seed-sha: {len(seeds)} of {len(mined['seeds'])} mined seeds, "
               "in the order named", file=out)
-    # FR-02.7, as W-19b #6 leaves it: a run has ONE image and `probe_execute`
-    # runs and hashes its binaries, so a sampled seed can only be probed at its
-    # own parent commit where that parent shares the image's pin. The registered
-    # sample is narrowed to those, and the rest are recorded excluded rather
-    # than probed at a commit the manifest does not name.
+    # FR-02.7, as W-19b #6 leaves it.
     eligible, _ineligible = calibratable(seeds, pin["pin_sha"])
     sample = [s for s in (budget.calibration_sample_shas or []) if s in eligible]
     if args.mode == "calibration" and not sample:
@@ -3982,9 +2380,7 @@ def run_campaign(args, out) -> int:
     recorder = FixtureRecorder(args.record_fixtures)
     recorder.record(manifest)
     recorder.record(budget)
-    # 6.4's first four tables, before a stage can reference one of them, and
-    # before --dry-run returns: a dry run's loop.db is what an operator reads to
-    # see what the run would have been taken against.
+    # 6.4's first four tables, before a stage can reference one of them, and before --dry-run returns.
     write_run_rows(store, manifest, image_spec=image_spec, mined=mined,
                    mirror=mirror, registration=registration)
     accrue_offline(store, manifest, budget, dispatch=dispatch, recorder=recorder,
@@ -4020,10 +2416,7 @@ def run_campaign(args, out) -> int:
 
     from circt_bug_loop import results as results_module
 
-    # W-19b #4: the artefact is rendered AFTER the ledger and the store are
-    # complete, with FR-10.2's labelled set supplied, and a refusal is written
-    # down rather than raised out of `main` as a traceback. A campaign used to
-    # run both four-hour arm windows and then die without writing its results.
+    # W-19b #4: the artefact is rendered AFTER the ledger and the store are complete.
     (run_root / "results").mkdir(parents=True, exist_ok=True)
     try:
         rendered = results_module.render_results(
@@ -4045,17 +2438,7 @@ def run_campaign(args, out) -> int:
 
 def _mirror(store: LoopStore, budget: BudgetFile, args, dispatch: Dispatch,
             triage_task) -> Optional[dict]:
-    """Refresh the issue mirror, or return the existing one's meta row (FR-10.9).
-
-    `issue_mirror_meta` is keyed by `run_manifest_id` and is written by
-    `write_run_rows`, so only a previous DRIVER run can have put a row in it. A
-    mirror built by `triage_task.issue_mirror_refresh` called any other way -
-    which is how A7's offline synthesis builds one (8.3) - filled
-    `issue_mirror` and left the meta table empty, and FR-10.9's "or an existing
-    one is reused" could then never be taken (W-18). The fallback reads the
-    mirror TABLE: every field comes off the rows themselves, and a table with no
-    row still returns None so check 10's refusal is untouched.
-    """
+    """Refresh the issue mirror, or return the existing one's meta row (FR-10.9)."""
     existing = store.query_one(
         "SELECT refreshed_utc, issues_mirrored, issue_cap, cap_bound, state, "
         "comments_mirrored FROM issue_mirror_meta ORDER BY refreshed_utc DESC")
@@ -4072,9 +2455,7 @@ def _mirror(store: LoopStore, budget: BudgetFile, args, dispatch: Dispatch,
             return {"refreshed_utc": rows["refreshed"],
                     "issues_mirrored": int(rows["mirrored"]),
                     "issue_cap": cap, "cap_bound": int(rows["mirrored"]) >= cap,
-                    # The table can hold nothing else: `state` has a CHECK for
-                    # the two values and `comments_mirrored` a CHECK for zero
-                    # (FR-20.4, 6.2), so neither is a guess.
+                    # The table can hold nothing else.
                     "state": "all", "comments_mirrored": False,
                     "incomplete_reason": None}
     return dispatch.call(triage_task.issue_mirror_refresh, "llvm/circt",
@@ -4083,22 +2464,7 @@ def _mirror(store: LoopStore, budget: BudgetFile, args, dispatch: Dispatch,
 
 
 def main(argv: Optional[list] = None, out=None) -> int:
-    """Parse argv, run the pre-flight checks, build the manifest, drive the campaign.
-
-    The three arguments that exit early do so before anything is dispatched:
-    `--print-config` prints the resolved paths and exits, `--draw-calibration`
-    prints the drawn sample and exits, and `--dry-run` runs every pre-flight
-    check and builds the manifest and dispatches no stage, which is how an
-    operator confirms a cluster is ready to spend money without spending any.
-
-    Returns:
-        int, 0 on success, 2 on a pre-flight refusal and 1 on any other failure.
-    Worker:
-        head; it is a program and not a node (3.2's B12 row).
-    Raises:
-        nothing; every refusal is a named message on stderr and a non-zero
-        status.
-    """
+    """Parse argv, run the pre-flight checks, build the manifest, drive the campaign."""
     out = out or sys.stdout
     args = build_parser().parse_args(argv)
     if args.print_config:
@@ -4113,10 +2479,7 @@ def main(argv: Optional[list] = None, out=None) -> int:
             args.clone, budget.corpus_head_sha,
             corpus_since(args.clone, budget.corpus_head_sha),
             budget.artefact_inline_cap_bytes)
-        # The draw is from the ELIGIBLE seeds since W-20b (W-19b #6): a sample
-        # drawn from seeds no deployment can probe at their own parent commit
-        # is a sample of nothing. The pin is A2's own walk over the clone, so
-        # the draw stays reproducible from the committed file plus that clone.
+        # The draw is from the ELIGIBLE seeds since W-20b (W-19b #6).
         pin = pin_select.select_release_pinned_main._chia_original(
             args.clone, ref="origin/main")
         eligible, ineligible = calibratable(mined["seeds"], pin["pin_sha"])
