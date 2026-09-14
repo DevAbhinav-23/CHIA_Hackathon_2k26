@@ -11,6 +11,10 @@
 \usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
 \usepackage{cite}
 \usepackage{microtype}
+\usepackage{url}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\dbltextfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
 
 % ==== figure palette: three hues plus greys, separated by value in greyscale
 \definecolor{agF}{HTML}{F6F2FC}\definecolor{agB}{HTML}{6B4FA0} % agent, violet
@@ -31,293 +35,407 @@
 
 \begin{abstract}
 CIRCT is an open-source compiler that turns hardware descriptions into Verilog,
-the text that chip design tools consume, so a defect inside it can corrupt a
-design unnoticed. Agents that repair CIRCT take their work from its public issue
-tracker, a queue users fill and maintainers, whose attention is the scarce
-resource, must drain. We describe a loop that makes its own supply: an agent
+the text chip design tools consume, so a defect inside it can corrupt a design
+unnoticed. Agents that repair CIRCT take their work from its public issue
+tracker, a queue users fill and maintainers,
+whose attention is scarce, must drain. We describe a loop that makes its own supply: an agent
 reads a past bug fix, states the class of mistake it corrected, and writes fresh
-inputs probing for the same mistake elsewhere in the compiler. A fixed harness
-then builds, judges, minimises, deduplicates and repairs, and a gate ending in
+inputs probing for the same mistake elsewhere in the compiler. A fixed harness builds, judges, minimises, deduplicates and repairs, and a gate ending in
 human approval decides what, if anything, is filed. We evaluate the seeded agent
 against a mutation fuzzer at equal, pre-registered budget under identical tools.
-We release the loop as reusable nodes and tools for the CHIA agent framework,
-with its seed corpus, transcripts and verdicts.
+The loop is built and its oracle measured on real CIRCT failures; we release it
+as nodes and tools for the CHIA agent framework.
 \end{abstract}
 
 % =====================================================================
 \section{Introduction}
 CIRCT is an open-source compiler for hardware. A designer writes how a circuit
 should behave, in FIRRTL (the form the Chisel hardware language produces) or in
-SystemVerilog, and CIRCT lowers it to Verilog, the text that synthesis and
-layout tools turn into a chip. It is built on MLIR, the LLVM project's framework
-for assembling a compiler out of interchangeable intermediate languages, and it
-inherits LLVM's way of testing: each regression test is a file carrying the
-exact command to run and the output pattern to expect, executed by a runner
-called \texttt{lit}.
+SystemVerilog, and CIRCT lowers it to Verilog, which synthesis and layout tools
+turn into a chip. It is built on MLIR, the LLVM project's compiler
+framework, and inherits LLVM's way of testing: a regression test carries the
+command to run and the output to expect, run by a tool called \texttt{lit}. A CIRCT bug that
+crashes the compiler is an inconvenience, seen and worked around; a bug that
+makes it emit wrong Verilog is not: the output is well formed, passes the tools
+below it, and can reach fabrication unnoticed.
 
-A CIRCT bug that crashes the compiler is an inconvenience: the designer sees it and works around it. A bug that makes CIRCT emit wrong Verilog is not, because the output is well formed, passes the tools below it, and can reach fabrication unnoticed.
+CHIA \cite{chia} is the agent framework this hackathon is built on. Its issue
+solver for CIRCT chains six phases, from assessing an issue to reproducing,
+fixing, verifying against the whole test suite, repairing regressions and
+writing the pull request; on 16 CIRCT issues it fixed five, three of them
+merged.
 
-CHIA \cite{chia} is the agent framework this hackathon is built on. An agent
-here is a language model wired into a program that reads files, runs commands
-and decides what to do next. CHIA ships an issue solver for CIRCT that chains
-six phases: assess the issue, reproduce it with a script, fix it, verify by rebuilding and rerunning the whole test suite, repair any regression the fix caused, and write the pull request description. Run on 16 CIRCT issues
-it fixed five, and three of those became merged pull requests. It writes nothing
-to GitHub; both of its flows only read.
-
-Its supply is the constraint. Over the past year CIRCT received 82 issues labelled as bugs and closed 65, so the project is neither short of reports nor ignoring them. What does not happen is the backlog draining: 101
-bug-labelled issues are open, at a median age of 911 days. The scarce resource
-is maintainer attention, not bug supply, and an agent that empties the queue
-faster creates none. What would help is a bug that arrives already minimised,
-already checked against what is known, already carrying a candidate fix, from a
-source that files nothing else.
-
-Past fixes are unspent information. A commit that corrects one wrong assumption
-inside a compiler pass usually leaves the same assumption standing at other
-sites, and CIRCT ships no fuzzing infrastructure in its own tree to find them.
+Its supply is the constraint. Over the past year CIRCT received 82 bug-labelled
+issues and closed 65, so the project is neither short of reports nor ignoring
+them; what does not drain is the backlog of 101 open ones, at a median age of
+911 days. The scarce resource is maintainer attention, and an
+agent that empties the queue faster creates none. What would help is a bug that
+arrives already minimised, already checked against what is known, already
+carrying a candidate fix, from a source that files nothing else. Past fixes are the unspent information: a commit that
+corrects one wrong assumption inside a pass usually leaves the same assumption
+at other sites, and CIRCT ships no fuzzing infrastructure to find them.
 
 This paper describes a loop that manufactures its own supply and then withholds
-most of it. We contribute the loop design (Section~\ref{sec:loop}), two preconditions we measured and repaired before it could run
-(Section~\ref{sec:pre}), and a pre-registered head-to-head against a mutation
-fuzzer (Section~\ref{sec:eval}).
+most of it: the loop as built (Section~\ref{sec:loop}), the preconditions we
+measured and repaired first (Section~\ref{sec:pre}), a pre-registered
+head-to-head against a mutation fuzzer (Section~\ref{sec:eval}), and its result
+(Section~\ref{sec:res}).
 
 \begin{figure*}[!t]
 \centering
 \input{fig-loop}
-\caption{Seeded CIRCT bug loop, a CHIA loop for turning past fixes into new,
-checked, repair-carrying bug reports. The agent holds the violet band at the
-top and acts three times only, at stages 1, 2 and 6; the blue ribbon below it is
-fixed apparatus, so no number in the result comes from the model. The ribbon is
-the candidates in flight. It is poured wide out of stage 2 and pinched by a bar
-at each gate, a question with two answers: the share answering no peels away
-onto the floor and ends its iteration, the rest carries on, and the reason
-climbs the thin rail back to the agent. Only a sliver survives to the human
-gate, which files nothing without a named author's approval. Ribbon and peel
-widths are illustrative, not measured.}
+\caption{Seeded CIRCT bug loop. The agent holds the violet band and acts three
+times only, at stages 1, 2 and 6; the blue ribbon below it is fixed apparatus,
+so no number in the result comes from the model. The ribbon is the candidates in
+flight, pinched at each gate by a question with two answers: the share answering
+no peels onto the floor, and its reason climbs the rail back to the agent.
+Widths are illustrative, not measured.}
 \label{fig:loop}
 \end{figure*}
 
 % =====================================================================
 \section{The Loop}\label{sec:loop}
-Fig.~\ref{fig:loop} names the stages and marks the ones the agent runs. The
-agent proposes inputs and writes prose; the tools decide everything else, so no number in the result comes from inside the model.
+Fig.~\ref{fig:loop} names the stages and marks the ones the agent runs; tools
+decide everything else, so no number in the result comes from inside the model.
+One model serves every agent stage, Gemini 3.8 Flash through CHIA's Vertex
+backend, % model and backend, express mode: design/ADR/ADR-D-03-model-backend.md, superseding decision 2026-09-14
+and no stage can build a client for it unless one environment variable
+is set for that run, so a test or a dry run cannot reach the model. % live-call interlock BUGLOOP_ALLOW_LIVE_MODEL: ADR-D-03 rule (1); design/03-LLD.md 3.5.1
 
 \textbf{Read the seed (1).} A seed is one of 187 CIRCT commits from the last two
-years that look like bug fixes, each with its diff and the test its author added
-or changed. The agent reads both, states in one sentence the root-cause class
-the fix corrected, and names other sites in the compiler where the same
-assumption still stands.
+years that look like bug fixes, with its diff and the test its author added or
+changed. The agent reads both, states in one sentence the root-cause class
+the fix corrected, and names other sites where the same assumption still stands.
+The record carries that diff and those tests, so the worker needs no clone of
+CIRCT's history. % SeedRecord carries diff and test_files, contract 2.0: design/00-README.md, seam rule
 
-\textbf{Write probing inputs (2).} The seed's own test decides the language of
-the new inputs. Its command line names the tool through which the bug was
-reachable: \texttt{circt-opt}, which runs a named sequence of compiler passes
-over an intermediate file; \texttt{firtool}, the end-to-end driver from FIRRTL
-to Verilog; or the SystemVerilog front end. About 127 of the 187 seeds sit in
-code that no FIRRTL input can reach, so a generator that emitted only FIRRTL
-would be blind to most of the corpus.
+\textbf{Write probing inputs (2).} The seed's own test decides the language,
+because its command line names the tool through which the bug was reachable:
+\texttt{circt-opt}, which runs a named sequence of passes over an intermediate
+file; \texttt{firtool}, the driver from FIRRTL to Verilog; or the SystemVerilog
+front end. About 127 of the 187 seeds sit in code no FIRRTL input can reach, so
+a FIRRTL-only generator would miss most of the corpus. The agent reads the
+compiler's source and writes each candidate through tools of its own, and runs
+no command.
 
 \textbf{Build (3).} CIRCT compiles against one pinned commit of LLVM and MLIR,
-and building those from source costs hours; Section~\ref{sec:pre} explains how
-the loop avoids that. The build also compiles in CIRCT's assertions, the
-internal consistency checks its own authors wrote into the source, which stop
-the compiler the moment an assumption breaks instead of letting the damage
-travel into the output.
+and Section~\ref{sec:pre} explains how the loop avoids building those from
+source. The build compiles in CIRCT's assertions, the internal checks its own
+authors wrote, which stop the compiler the moment an assumption breaks.
 
-\textbf{Judge (4).} An oracle is the rule that decides whether an input has
-found a bug. The primary one admits no argument: the compiler crashed, or one of
-its assertions fired. A second oracle runs the same design through CIRCT's
-simulator and through Verilator, an independent and long-established one, and
-treats disagreement as suspicious. It produces reports only, because the two
-disagree routinely over uninitialised and reset signals.
+\textbf{Judge (4).} An oracle is the rule that decides whether an input found a
+bug. The primary one admits no argument: the compiler crashed, or an assertion
+fired. A second runs the same design through CIRCT's simulator and
+through Verilator, and treats disagreement as suspicious; it reports
+only, because the two disagree routinely over uninitialised and reset signals.
 
-\textbf{Reduce (5).} An input that triggers a crash is usually large and mostly
-irrelevant to it. Reduction is the mechanical search for a smaller input that
-still fails: \texttt{circt-reduce}, which CIRCT ships, deletes parts of the
-input and keeps each deletion while the failure survives. A maintainer then reads the case in a minute, not an hour.
+\textbf{Reduce (5).} A crashing input is usually large and mostly irrelevant to
+the crash. \texttt{circt-reduce}, which CIRCT ships, deletes parts of it and
+keeps each deletion while the failure survives; a textual reducer takes over
+where that tool dies on the input itself.
 
-\textbf{Triage and report (6).} Many failures are one failure. Deduplication
-decides which candidates are the same bug, by assertion text and source
-location, by symbolised stack frames, and by a structural hash of the reduced
-input. Survivors are checked against CIRCT's open and closed issues and the commits made since the build point. The agent classifies each survivor as a
-bug, an invalid input or a known issue, and writes the report a maintainer would
-read.
+\textbf{Triage and report (6).} Many failures are one failure, and deciding
+which are the same is mechanical: a fingerprint is the assertion text with its
+source location, or, for a crash, the symbolised frames left once the crash
+handler's prologue is stripped. Survivors are matched against a local mirror
+of CIRCT's open and closed issues and against commits made since the build
+point. The agent's share is the last part, writing the report, and no gate reads
+what it concluded. % gate reads no triage classification: design/03-LLD.md 3.9 (FR-13.4)
 
-\textbf{Repair (7).} CHIA's phase chain runs unaltered; the only addition is an entry point that accepts a local report in place of a GitHub issue. Repair is
-restricted to crashes and assertion failures, where nobody has to argue about
-what the right answer was.
+\textbf{Repair (7).} CHIA's phase chain runs unaltered but for one added branch
+selecting the backend the rest of the loop uses, and an entry point taking a
+local report in place of a GitHub issue. Repair is restricted to crashes and
+assertion failures, where nobody has to argue about what the right answer was.
 
-\textbf{The gates.} Between stages sit questions with two answers, drawn as the
-bars that pinch the ribbon in Fig.~\ref{fig:loop}: does it build, does it fail,
-is it minimal, is it new. A no ends the iteration, skips every stage downstream of it, and returns
-the reason to the agent with the oracle verdicts and reduced cases. The last
-gate is a person. A named author approves every filing, under a cap on filings
-per day, and the loop files nothing by default.
+\textbf{The gates.} Between stages sit questions with two answers, the bars that
+pinch the ribbon in Fig.~\ref{fig:loop}. A no ends the iteration and returns its
+reason to the agent with the verdicts and reduced cases. The last is a gate of four questions, each
+answered by a tool: does the failure reproduce in a fresh process on another
+worker, is the case minimal, is the input valid, and is it new. % four mechanical gate questions: design/03-LLD.md 3.9 (FR-13.1)
+The third is
+three parse-and-verify commands, one per input language, and a clean rejection
+makes the input the loop's own fault rather than the compiler's. % gate question 3, the three commands: design/03-LLD.md 4.8 (FR-13.15)
+Then the gate
+is a person: a named author approves every filing at a command line, under a cap
+on filings per day, and nothing is filed by default. % approval CLI, python -m circt_bug_loop.approve: design/03-LLD.md 16.2, 13.2 errata
 
 \begin{table}[!t]
-\caption{What we measured, and what it means}
+\caption{What we measured on the image the loop runs}
 \label{tab:meas}
 \centering
 \scriptsize
-\renewcommand{\arraystretch}{1.12}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.55cm}@{\hspace{5pt}}>{\raggedright\arraybackslash}p{1.42cm}@{\hspace{5pt}}>{\raggedright\arraybackslash}p{3.62cm}@{}}
+\renewcommand{\arraystretch}{0.98}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.55cm}@{\hspace{5pt}}>{\raggedright\arraybackslash}p{2.04cm}@{}}
 \toprule
-\textbf{Measurement} & \textbf{Result} & \textbf{What it means} \\
+\textbf{Measurement} & \textbf{Result} \\
 \midrule
-\multicolumn{3}{@{}l}{\textit{Building CIRCT at a past commit}}\\
-Fix-shaped commits mined from 24 months & 187 & The seed corpus: each is a past bug with its fix and its test. \\
-Seeds with an exactly matching prebuilt SDK & 171 & Nearly all of them rebuild in minutes rather than hours. \\
-One full build, assertions off, \texttt{circt-opt} targets only & 1{,}027 targets, 939\,s & Cheap enough to redo per seed. The seed's test was red before its fix and green after. \\
-Pin windows with no matching release & 16 of 63 & Sometimes no buildable point exists. The worst run lasted 100 commits and 16 days. \\
-Lag from a pin change to a usable release & 3.3\,d median, 33.5\,d worst & The loop's build point trails the branch head by days. \\
+\multicolumn{2}{@{}l}{\textit{Building the past cheaply}}\\
+% 187 and 171: analysis/pin-window-analysis.md
+Fix-shaped commits mined from 24 months, the seed corpus & 187 \\
+Of those, seeds with an exactly matching prebuilt SDK & 171 \\
+% 16 of 63, worst run 100 commits / 16.1 d: design/ADR/ADR-D-10-lag-window-policy.md, Context
+Pin windows with no matching release, worst 16 days & 16 of 63 \\
 \addlinespace[2pt]
-\multicolumn{3}{@{}l}{\textit{Letting the compiler complain}}\\
-Compile commands defining \texttt{NDEBUG} & 620 of 620 & Assertions are absent from the stock CHIA image. \\
-Assertion-handler references in the built binary & 0 & The primary oracle would have nothing to detect. \\
-Targets that build with \texttt{-UNDEBUG} & 605 of 605 & Restoring the assertions does not break the build. \\
-Object files carrying the handler again & 495 of 513 & The checks are back across the compiler. \\
-Core dialect and conversion tests passing with assertions on & 520 of 523 & CIRCT still behaves. The three failures trace to a stale SDK tool. \\
+\multicolumn{2}{@{}l}{\textit{Letting the compiler complain}}\\
+% 778 of 778 carry -UNDEBUG, 0 carry -DNDEBUG: analysis/measurements/2026-09-14-image-build.md 4, FR-03.4
+Compile commands carrying \texttt{-UNDEBUG} & 778 of 778 \\
+% 536 of 555 objects (96.58%): analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
+Object files carrying the assertion handler again & 536 of 555 \\
+% 1119 passed, 0 failed of 1127 considered, identical in both images: 2026-09-14-image-build.md 5 run 2, and W-04b 3
+CHIA's whole test gate, assertions on and then off & 1{,}119 pass, 0 fail, identical \\
+% +179 s = 18.4% of wall; +24.48% over six targets; median +4.84% per probe: W-04b 1, 2, 4
+What the assertions cost: wall clock, bytes, per probe & 18\%, 25\%, 4\% \\
+% -gline-tables-only costs essentially nothing in compile time: analysis/measurements/2026-09-13-frd-followups.md, M2
+Build cost of the line tables that name the crash site & none measurable \\
+% lit discovers 1,390 tests with 0 parse errors once MLIR_SOURCE_DIR is the SDK: 2026-09-14-image-build.md 4 (FR-03.17)
+Tests \texttt{lit} discovers, once its source root is the SDK & 1{,}390, 0 errors \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 % =====================================================================
-\section{Two Measured Preconditions}\label{sec:pre}
+\section{Measured Preconditions}\label{sec:pre}
 The loop has to build CIRCT at arbitrary points of its history, and the compiler
 has to be able to complain. Neither held when we started. Table~\ref{tab:meas}
-lists what we measured, and this section gives the conclusions.
+is what we measured on the image the loop now runs; this section gives the
+conclusions.
 
-\subsection{Building the past cheaply}
-CIRCT records the exact LLVM commit it expects, called the pin, and a build against any other fails outright rather than degrading, stopping in the first few targets. Compiling that LLVM from source costs hours per seed and would consume the campaign's budget. The project also publishes release tarballs of prebuilt LLVM and MLIR libraries, an SDK, each recording the pin it was built against. Where a release shares a seed's pin, CIRCT rebuilds in minutes. We mined 187 fix-shaped commits from 24 months
-of history and found an exactly matching SDK for 171 of them. To check that the
-mechanism works rather than merely counts, we rebuilt one seed from a stock release: its own test failed at the commit before the fix and passed at the fix.
+\textbf{Building the past cheaply.} CIRCT records the exact LLVM commit it expects, the pin; a build against any other fails outright rather than degrading, and compiling that LLVM from source costs hours per seed. It also publishes an SDK, a tarball of prebuilt LLVM and MLIR libraries recording its own pin, and where an SDK shares a seed's pin CIRCT rebuilds in minutes: of 187 fix-shaped commits mined from 24 months, 171 match exactly.
 
-\begin{figure}[!t]
-\centering
-\input{fig-timeline}
-\caption{Release-pinned \texttt{main}. Changes to the LLVM commit CIRCT pins cut
-its branch into windows, and a prebuilt SDK exists for a window only where a
-release falls inside it. The loop builds at the newest commit whose pin has a
-release, which is the head of the branch only while the current window has one.
-A bug fixed inside the lag is found again by the loop and dropped as already
-known.}
-\label{fig:timeline}
-\end{figure}
 
-The same mechanism fixes where the loop runs. It does not run at the newest commit of CIRCT's main branch, whose pin has no published release today. It runs at release-pinned main, the newest commit whose pin does
-have one. That point trails the branch head by days, as Fig.~\ref{fig:timeline} shows.
 
-\subsection{Letting the compiler complain}
-Optimised builds delete assertions by defining the macro \texttt{NDEBUG}. CHIA's
-CIRCT image is such a build: every one of its 620 compile commands defines that
-macro, and the resulting binary holds no reference to the assertion handler at
-all. A loop whose primary oracle is a failed assertion would find nothing under
-the stock image, whatever the agent wrote. One compiler flag,
-\texttt{-UNDEBUG}, puts the assertions back. The build still completes, nearly
-every object file carries the handler again, and the core dialect and conversion
-tests still pass on all but three, which fail for an unrelated reason (a stale tool in the SDK). The restored binary still describes itself as an optimised
-build, so every report the loop files has to name the flag.
+The same mechanism fixes where the loop runs: not the newest commit of CIRCT's
+main branch, whose pin has no published release today, but release-pinned main,
+the newest commit whose pin has one, which for this image is 8 commits and 4.8
+days behind the head. % lag measured at eade0de6 with SDK firtool-1.159.0: analysis/measurements/2026-09-14-image-build.md 1; ADR-D-10 first application
+A long lag mechanically lowers the filing rate, because
+more candidates come back already fixed.
 
-One caution about Table~\ref{tab:meas}: the timed build was made with assertions
-off and covered only one of CIRCT's tools, so it is a lower bound
-on what the loop's image will cost.
+\textbf{Letting the compiler complain.} Optimised builds delete assertions by defining the macro \texttt{NDEBUG}, and
+CHIA's published CIRCT image is such a build: its binaries hold no reference to
+the assertion handler, so a loop whose oracle is a failed assertion would find
+nothing under it, whatever the agent wrote. One compiler
+flag, \texttt{-UNDEBUG}, puts them back, and the image the loop runs is that
+build at release-pinned main, with the flag in every compile command and the
+handler back in all but 19 of its 555 compiler objects, which assert nothing. % 536 of 555 objects reference the handler: analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
+
+Whether the restored checks fire on CIRCT's own tests is what the oracle rests
+on, so we built the image twice, differing in that flag alone, and ran CHIA's
+whole test gate in both: the two runs pass the same 1,119 tests and fail none. % 1,119 of 1,127 considered, 0 failed, identical in both images: image-build.md 5 run 2 and W-04b 3
+The set of tests that pass with assertions compiled out and fail with them
+compiled in is therefore empty, so a probe that trips an assertion trips it
+because of what the probe does, and Table~\ref{tab:meas} prices the flag.
+
+One defect had to be repaired first: at CIRCT commits after mid-2026 a test
+directory's configuration file raises while \texttt{lit} is discovering tests,
+and CHIA's exclusion of that directory is applied after discovery, so the gate
+discovered nothing. Pointing the build at the SDK as its MLIR source root, one
+flag, restores discovery. % lit then discovers 1,390 tests with 0 parse errors: 2026-09-14-image-build.md 4 (FR-03.17) and 5
+The binary still calls itself an optimised build,
+so every report names the flag.
+
+\textbf{Tested on real failures.} The oracle and its fingerprints were calibrated on real output: six past CIRCT
+bugs, rebuilt at the commit before their fix and recorded with input, argument
+vector and error output, in three classes across two SDK releases at 14\,s to
+601\,s of build each. % six fixtures, three classes, two SDK tags, build costs: analysis/measurements/2026-09-14-crash-fixtures.md 1 and 2
+Two defects in the fingerprinting rules appeared only
+there: the name normaliser erased every frame in an anonymous namespace, which
+is where CIRCT's passes live, and the scope test read an inlined frame instead
+of the physical one, putting three of the four real bugs outside the repair
+stage's reach. % the two frame defects: 2026-09-14-crash-fixtures.md 3.2 and 3.4; design/reviews/implementation-errata-log.md W-08 rows 1 and 2
+Both are fixed, and each fixture now pins the corrected
+answer.
 
 % =====================================================================
 \section{Evaluation Design}\label{sec:eval}
 The experiment asks whether reading a past fix makes an agent better at finding
-new bugs than mutating the same tests at random. Two arms run the same harness, oracles, reducer and gate; only the generator differs. The seeded arm is stages 1 and 2 above. The mutation arm starts from
-the same seed tests and applies syntactic mutations without ever seeing the diff
-or the root-cause class, following Mut4All's design for mutators synthesised by
-a language model \cite{mut4all}.
+new bugs than mutating the same tests at random. Two arms run the same harness,
+oracles, reducer and gate, and only the generator differs: the seeded arm is
+stages 1 and 2 above, and the mutation arm mutates the same seed tests
+syntactically without ever seeing the diff or the root-cause class, following
+Mut4All's design for mutators synthesised by a language model \cite{mut4all}.
 
-Both arms spend the same pre-registered budget: the compute allowance and the caps on generated inputs and on filings are committed to the public loop repository before the campaign starts, so no threshold can be chosen afterwards. The headline result is the number of distinct bugs a
-CIRCT maintainer confirmed, by labelling, commenting on or fixing them, within
-that budget. Our own oracle agreeing with itself produces a candidate, not a
-bug. The secondary counts are candidates before and after deduplication, reports
-filed, the fraction of filed reports maintainers accepted, and repairs merged.
+Both arms spend the same pre-registered budget, whose unit is one elapsed
+wall-clock second of an arm's fixed window: they run one after the other, each
+for four hours, on the same cluster at the same concurrency.
+Safety caps bound damage rather than effort, at 2,000 generated inputs per arm
+per day, 3 filings per day and 10 in the campaign, every probe held to 60
+seconds and 4\,GiB, and a hard cap of 200 US dollars on model spending stops
+both arms. % window 14,400 s per arm, the three caps and campaign_spend_cap_usd: circt_bug_loop/budget.yaml
+All of it is committed before the campaign starts, so no threshold
+can be chosen afterwards.
 
-If both arms find nothing, the paper reports that. Pre-registration is what
-makes such an outcome publishable, and it carries information: CIRCT's assertion
-surface would not be reachable at this budget by either strategy.
+The headline is the number of distinct bugs a CIRCT maintainer confirmed, by
+labelling, commenting on or fixing them, within that budget; our own oracle
+agreeing with itself produces a candidate, not a bug. Table~\ref{tab:res} names
+the five secondary counts.
 
-\textbf{Contamination.} CIRCT's history is public and sits in the training data
-of any model we can use, so the agent may reproduce a fix it memorised. Every candidate is screened against fixes made after
-its seed, and a match is recorded and reported apart from the rest. A match does
-not make the candidate invalid, since a real crash is a real crash, but it
-changes what the number means. The repair stage runs CHIA's executor unchanged
-and is not screened.
+\textbf{Deduplication.} Two candidates are one bug when a single primary
+fingerprint is equal, computed after the crash handler's own prologue is
+stripped from the trace. On a hand-labelled set of 22 candidate pairs the rule
+collides on 1 of the 11 distinct pairs and falsely merges 1 of the 11 duplicate
+pairs; % 22 labelled pairs, collision 1/11, false merge 1/11: design/reviews/implementation-errata-log.md W-10 row 20
+both rates are printed beside the headline, since a collision inflates
+that count and a false merge deflates it.
 
-\textbf{Maintainer protocol.} We post the method to the project's forum before
-the campaign starts, and leave issues marked as good first issues to human
-newcomers.
+\textbf{Known issues.} A mirror of the tracker, refreshed once per run, answers
+whether a candidate is already reported. GitHub stops paginating an
+issue listing at its hundredth page, which the loop met as an error and not as
+truncation, so the mirror walks newest first, then oldest first, and unions
+the two: 600 issues cost 35 requests and half a minute. % 422 at page 100; 600 issues in 35 requests, 33.9 s: implementation-errata-log.md W-14 row 21
 
-\textbf{Failure taxonomy.} Every candidate reaching the gate is recorded with its verdict, one of unreproducible, not minimal, invalid input, duplicate, undecided or new bug,
-and every repair attempt with the phase that failed. The record shows where the
-loop spent budget without return.
+\textbf{Contamination.} CIRCT's history sits in the training data of any model
+we can use, so the agent may reproduce a fix it memorised. Every candidate is
+screened against fixes made after its seed, at the level of the symbols the
+seed's fix touched: that screen flags 77\% of the corpus where the same screen
+at file level flags 96\%. % symbol level 77.0%, file level 96.3%: analysis/measurements/2026-09-13-frd-followups.md M4
+A real crash is a real crash, so the flag qualifies a
+candidate and reports it apart rather than excluding it. The repair stage runs CHIA's executor unchanged and is
+not screened. We post the method to the project's forum before the campaign
+starts, and leave issues marked as good first issues to human newcomers.
+
+\textbf{Failure taxonomy.} Every candidate reaching the gate is recorded with
+its verdict, one of unreproducible, not minimal, invalid input, duplicate,
+undecided or new bug, and every repair attempt with the phase that failed, so the record shows
+where budget went without return.
+
+% =====================================================================
+\section{Results}\label{sec:res}
+Table~\ref{tab:res} is filled from the artefact the loop renders out of its own
+database, one group of rows per table there, and every cell is \textit{pending}
+until the pre-registered window closes. A zero is reportable and would be reported: pre-registration makes such an
+outcome publishable, and it would say that CIRCT's assertion surface is not
+reachable at this budget.
+
+\begin{table}[!t]
+\caption{The campaign's result, one group of rows per table of the artefact the
+loop renders. The seeded-bug validation contributes nothing to the headline}
+\label{tab:res}
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.96}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.30cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.30cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.30cm}@{}}
+\toprule
+\textbf{Measure} & \textbf{seeded} & \textbf{mutation} \\
+\midrule
+% the three rows below: render_results section 1, "Headline" (tests/fixtures/results/example.md 1)
+\multicolumn{3}{@{}l}{\textit{Headline}}\\
+Distinct confirmed bugs & \textit{pending} & \textit{pending} \\
+Confirmed filings & \textit{pending} & \textit{pending} \\
+Contaminated candidates, and distinct confirmed without them & \textit{pending} & \textit{pending} \\
+% the five rows below: render_results section 2, "Secondary results" (example.md 2)
+\multicolumn{3}{@{}l}{\textit{The five secondaries}}\\
+Candidates before deduplication & \textit{pending} & \textit{pending} \\
+Candidates after deduplication & \textit{pending} & \textit{pending} \\
+Reports filed & \textit{pending} & \textit{pending} \\
+Gate precision, confirmed over filed & \textit{pending} & \textit{pending} \\
+Repairs merged & \textit{pending} & \textit{pending} \\
+% the four rows below: render_results section 6, "The budget: both windows and the campaign's spend" (example.md 6)
+\multicolumn{3}{@{}l}{\textit{The budget, in its own unit}}\\
+Window, seconds & 14{,}400 & 14{,}400 \\
+% 14,400 s per arm, pre-registered: circt_bug_loop/budget.yaml, arm_window_seconds
+Elapsed, seconds & \textit{pending} & \textit{pending} \\
+Stopped by & \textit{pending} & \textit{pending} \\
+Spend, US dollars & \textit{pending} & \textit{pending} \\
+% the six rows below: render_results section 3, "Failure taxonomy" (example.md 3)
+\multicolumn{3}{@{}l}{\textit{Candidates at the gate, one bucket each}}\\
+Unreproducible & \textit{pending} & \textit{pending} \\
+Not minimal & \textit{pending} & \textit{pending} \\
+Invalid input & \textit{pending} & \textit{pending} \\
+Duplicate & \textit{pending} & \textit{pending} \\
+Undecided & \textit{pending} & \textit{pending} \\
+New bug & \textit{pending} & \textit{pending} \\
+\bottomrule
+\end{tabular}
+
+\vspace{3pt}
+
+% one row per calibration seed: render_results section 4, "Seeded-bug validation" (example.md 4)
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.10cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.88cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.95cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.88cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.35cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.88cm}@{}}
+\toprule
+\textbf{Seed} & \textbf{SDK exact} & \textbf{eligible} & \textbf{probes} & \textbf{candidates} & \textbf{filings} \\
+\midrule
+\textit{pending} & \textit{pending} & \textit{pending} & \textit{pending} & \textit{pending} & \textit{pending} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % =====================================================================
 \section{Related Work}
 \textbf{Agentic repair.} SWE-bench \cite{swebench} scores agents on real GitHub
-issues and set the pattern this work inherits; CHIA's issue solver \cite{chia} applies it to a hardware compiler. Both draw from a queue; we add the stage that fills one.
+issues and set the pattern this work inherits; CHIA's issue solver \cite{chia}
+applies it to a hardware compiler. Both draw from a queue; we add the stage that
+fills one.
 
-\textbf{Compiler fuzzing.} CSmith \cite{csmith} generates random C programs and found previously unknown bugs throughout production C compilers. For MLIR, the framework CIRCT is built
-on, MLIRod mutates along operation dependencies \cite{mlirod}, N\"uwa adds
-generation driven by a language model \cite{nuwa}, DESIL targets silent
-wrong-output bugs \cite{desil}, and FLEX interleaves learning with exploration
-and found 80 previously unknown bugs in a 30-day campaign \cite{flex}. None of
-them repairs or withholds; they hand a
-human a pile of crashes. Mut4All synthesises mutators from past bug reports
-\cite{mut4all}, and our mutation arm follows its design.
+\textbf{Compiler fuzzing.} CSmith \cite{csmith} generates random C programs and
+found bugs throughout production C compilers. For MLIR, MLIRod mutates along
+operation dependencies \cite{mlirod}, N\"uwa adds generation driven by a
+language model \cite{nuwa}, DESIL targets silent wrong-output bugs
+\cite{desil}, and FLEX interleaves learning with exploration,
+finding 80 previously unknown bugs in a 30-day campaign \cite{flex}. None of them repairs
+or withholds. Mut4All synthesises mutators from past bug reports \cite{mut4all},
+and our mutation arm follows its design.
 
-\textbf{Seed-guided generation.} AFuzz \cite{afuzz} is the origin of the method:
-given a reference bug, an agent analyses the root cause, hypothesises where else
-that cause could live, and tests each hypothesis with generated code, finding 40
-bugs in V8 in about a month and 19 more in two other JavaScript engines. We apply it to a hardware compiler, behind a repair chain and a gate.
-
-\textbf{Reduction.} Delta debugging \cite{deltadebug} is the algorithm the reducer in stage 5
-implements. We use the tool as supplied and contribute only its placement
-inside the loop.
-
-\textbf{Gating and abstention.} Abstain-and-Validate raises repair success by
-letting a second model decline a bug and reject a patch \cite{abstain};
-llvm-harness packages LLVM's middle end for agents \cite{llvmharness}; and
-CodeRover-S repairs security bugs found by OSS-Fuzz \cite{coderovers}. Each
-makes an existing repair agent more selective. Our gate sits downstream,
+\textbf{Seed-guided generation, reduction, gating.} AFuzz \cite{afuzz} is the
+origin of our method: given a reference bug, an agent analyses the root cause,
+hypothesises where else that cause could live, and tests each hypothesis with
+generated code, finding 40 bugs in V8 in a month. We apply it to a hardware
+compiler, behind a repair chain and a gate. Delta debugging
+\cite{deltadebug} is the algorithm stage 5's reducer implements, and we
+contribute only its placement. Abstain-and-Validate raises repair success by
+letting a second model decline a bug and reject a patch \cite{abstain},
+llvm-harness packages LLVM's middle end for agents \cite{llvmharness}, and
+CodeRover-S repairs security bugs found by OSS-Fuzz \cite{coderovers}; each
+makes an existing repair agent more selective, while our gate sits downstream,
 decides what reaches a human at all, and discards by default.
 
 % =====================================================================
-\section{Artifact and Limitations}
+\section{Artefact and Limitations}
 We release the loop as CHIA nodes and tools, the framework's own units of
-composition: a node is a function tagged with the worker resources it needs, a
-tool is what an agent is permitted to call, each with typed inputs and outputs,
-and both run inside a container image the release ships. Swapping the generator
-for the mutation arm is then one node substituted in the loop. The release
-includes a pull request against CHIA, the seed corpus with its map from commit
-to SDK release, and every generated input, oracle verdict, reduced case, repair
-transcript and gate decision.
+composition, so swapping the generator for the mutation arm is one node
+substituted. Its two halves, the one that proposes work and the one that
+measures it, meet at a single frozen contract of seven record types and one
+function call, version 2.0, and are tested separately against recorded examples
+of it; % contract 2.0, seven schemas plus one interface, tag contract-2.0: design/00-README.md, seam rule
+the suite is 529 tests, of which 490 need no cluster, no
+network and no model. % pytest -m t0 --co at HEAD: 490/529 collected, 39 deselected
+Four
+things go upstream to CHIA: the Dockerfile for the assertions-on image, its
+build workflow, three helpers for CHIA's own CIRCT module, and the nineteen-line
+branch that lets its repair chain select the backend this loop runs on. % upstream/: dockerfiles/ChiaCirctAssertDockerfile, .github/workflows/chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions; ADR-D-03 addendum)
+All of it, with the seed corpus and every input, verdict, reduced
+case, transcript and gate decision, is at
+\url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
 
-\textbf{What is not built.} Nothing has run end to end; the stages are verified
-one at a time. The generator agent does not exist, and the claim that reading a
-CIRCT fix yields productive hypotheses rests on AFuzz's results on JavaScript
-engines, not on this compiler. No bug has been found by this loop, and no CIRCT
-assertion has been seen firing on a generated input. The second oracle has run
-once, on a hand-written twelve-line design where both simulators agreed, and
-neither of its harness generators exists. The mutation arm, the assertions-on
-image builder, the deduplication rules and the budget file are specified and
-unwritten. The 187 seeds rest on a subject-keyword filter, and no diffs were
-read to confirm that each one is a bug fix. The cost of running with assertions
-on is unmeasured.
+The apparatus is verified a stage at a time, and the strongest piece of that
+evidence is the second oracle's harness generators: from one generated design
+they emit a CIRCT simulation harness and a Verilator testbench printing
+identical 112-line sequences, and one changed constant makes them disagree at a
+named cycle and signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
+
+\textbf{What is not built.} Nothing has run end to end with a live model: beyond
+three one-word calls that verified the credential, no model call has been made,
+the interlock staying closed until the pilot. % three one-word probes, about 24 tokens: docs/HANDOFF.md, Gemini credential; ADR-D-03 rule (1)
+The 187 seeds rest on a
+subject-keyword filter, no diffs read to confirm each is a bug fix; of seven
+mining attempts, one seed did not fail at its parent. % 6 confirmed of 7 attempted, the discard recorded: analysis/measurements/2026-09-14-crash-fixtures.md 1
+How many seeds the second oracle applies to has not been counted, % A-19 still open: implementation-errata-log.md W-08 row 14
+the contamination screen misses a sibling fixed in a commit whose
+subject does not name it, and CHIA's repair chain returns no token counts for
+its own turns, so the reported spend excludes that stage. % stage 7 token capture unavailable, spend a lower bound: design/ADR/ADR-D-03-model-backend.md addendum
+The image is built but not published, so a report names its content hash rather
+than a registry digest.
 
 \textbf{Scope.} The loop does not repair wrong-output bugs, because the oracle
-that would find them is report-only. It does not replace maintainers. It converts the human event from writing a bug
-report into reading and approving one.
+that would find them is report-only, and it does not replace maintainers: it
+converts the human event from writing a bug report into reading one.
 
 \section*{Acknowledgements}
-We thank the CHIA developers for their support, and the A\textsuperscript{3}
-hackathon organisers and sponsors.
-
+We thank the CHIA developers and the A\textsuperscript{3} hackathon organisers.
 \textit{AI-assistance disclosure.} Claude (Anthropic) and Gemini (Google) were
-used for drafting, code generation and editorial revision. The human authors
+used for drafting, code generation and editorial revision; the human authors
 made every claim, design decision and number their own, and are responsible for
-the entire contents, tone and quality of this paper.
+the entire contents of this paper.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
