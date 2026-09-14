@@ -187,7 +187,21 @@ available_node_types:
         max_workers: 1
         docker:
             # LOCAL NAME, NO REGISTRY, AND NO PULL. See the header note.
-            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            #
+            # `-u1000`, AND ONLY ON THIS TYPE. The assertions image bakes
+            # /workspace/circt as uid 0 and every worker runs
+            # `--user $(id -u):$(id -g)` = 1000:1000. A probe only READS the
+            # tools, so the two bugloop_circt containers are unaffected and keep
+            # the image every artefact of this project records. The repair chain
+            # RE-CONFIGURES and REBUILDS that tree, and CMake closes every
+            # `configure_file` with a chmod, which needs OWNERSHIP and not a
+            # write bit: as uid 1000 the first one is EPERM and `_restore`'s
+            # rebuild fails (`analysis/measurements/2026-09-15-repair-build-
+            # diagnosis.md`). `-u1000` is one child layer of the SAME image,
+            # `RUN chown -R 1000:1000 /workspace/circt`, so all six tool
+            # binaries hash identically and pre-flight check 7 still proves this
+            # container runs the run's own build.
+            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}-u1000"
             container_name: "circt_bug_loop_repair_${USER}"
             pull_before_run: False
             run_options:

@@ -2223,6 +2223,18 @@ def calibratable(seeds, pin_sha: str) -> tuple:
     return eligible, sorted(s.seed_sha for s in seeds if s.seed_sha not in chosen)
 
 
+def tag_matches_pin(tag: str, circt_sha: str) -> bool:
+    """Whether *tag* names this run's CIRCT commit, bare or with a `-<variant>`.
+
+    A variant is the SAME build re-tagged - `…-u1000` is the assertions image
+    with `/workspace/circt` chowned to the uid the workers run as (W-23) - so it
+    carries the run's own tool binaries and `check_07_tool_hashes` still proves
+    it. A tag naming any other commit is still refused.
+    """
+    prefix = circt_sha[:12]
+    return tag == prefix or (tag.startswith(f"{prefix}-") and len(tag) > len(prefix) + 1)
+
+
 def parse_shard(value: Optional[str]) -> Optional[tuple]:
     """Parse `--shard K/N` into `(K, N)`, or None when no shard was asked for."""
     if not value:
@@ -2373,12 +2385,14 @@ def run_campaign(args, out) -> int:
                           IMAGE_TARGETS, IMAGE_FLAG_STRING, dockerfile,
                           context=context, inspect_only=args.dry_run)
     image_spec = built["image_spec"]
-    if args.image_tag and args.image_tag != image_spec.circt_sha[:12]:
+    if args.image_tag and not tag_matches_pin(args.image_tag,
+                                              image_spec.circt_sha):
         raise PreflightFailed(
             "image_tag", f"--image-tag {args.image_tag!r} is not the CIRCT SHA "
             f"prefix this run pinned, {image_spec.circt_sha[:12]!r} "
-            f"({image_spec.image_tag!r}): the cluster would run a different "
-            "image from the one this run records")
+            f"({image_spec.image_tag!r}), with or without a `-<variant>` "
+            f"suffix: the cluster would run a different image from the one "
+            "this run records")
     check_06_image_lit_discovery(image_spec=image_spec)
     # W2: the observations are the WORKERS' own.
     observations = tool_probes(

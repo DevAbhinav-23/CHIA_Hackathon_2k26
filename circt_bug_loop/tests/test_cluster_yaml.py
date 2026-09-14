@@ -193,3 +193,27 @@ def test_T_U_cluster_10(loader_env):
                        bug_loop.LIVE_MODEL_ENV in options)
     assert keyed == {"bugloop_llm": (True, True), "bugloop_repair": (True, True),
                      "bugloop_circt": (False, False)}
+
+
+def test_T_U_cluster_11(loader_env):
+    """W-23: only the repair type runs the chowned variant of the same image."""
+    from chia.cluster.config import load_config
+
+    nodes = load_config(str(SINGLE)).node_types
+    assert nodes["bugloop_circt"].docker.image == "chia-circt-assert:eade0de61bc5"
+    assert nodes["bugloop_repair"].docker.image == \
+        "chia-circt-assert:eade0de61bc5-u1000"
+    for name in ("bugloop_circt", "bugloop_repair"):
+        assert nodes[name].docker.pull_before_run is False, name
+
+    # The pre-flight accepts the variant and still refuses another commit.
+    sha = "eade0de61bc5a0d2ba1b9da951b69efcab19f8ce"
+    assert bug_loop.tag_matches_pin("eade0de61bc5", sha)
+    assert bug_loop.tag_matches_pin("eade0de61bc5-u1000", sha)
+    for wrong in ("eade0de61bc5-", "eade0de61bc", "deadbeefcafe",
+                  "deadbeefcafe-u1000", "eade0de61bc5a", ""):
+        assert not bug_loop.tag_matches_pin(wrong, sha), wrong
+
+    # Both circt-side types still carry the image name the hash check probes.
+    summary = bug_loop.cluster_summary(str(SINGLE))
+    assert summary["image_worker_types"] == ["bugloop_circt", "bugloop_repair"]

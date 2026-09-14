@@ -60,5 +60,23 @@
     }
   },
   "computed_utc": "2026-09-13T19:47:43.415046+00:00",
-  "computed_from": "a freshly started container of the published image (FR-03.16)"
+  "computed_from": "a freshly started container of the published image (FR-03.16)",
+  "variants": [
+    {
+      "image_tag": "chia-circt-assert:eade0de61bc5-u1000",
+      "image_id": "sha256:538aba96cbe47adc04a3eacc214b004fa4cc8acb38b69d97dba3c5cddd283aeb",
+      "image_digest": "chia-circt-assert@sha256:538aba96cbe47adc04a3eacc214b004fa4cc8acb38b69d97dba3c5cddd283aeb",
+      "image_size_bytes": 2400008980,
+      "layer_count": 24,
+      "parent_image_id": "sha256:8ac3cb311851ab5af1b21925b579f6b770346148cd3c6012e45b3b9d8256cf9e",
+      "built_by": "FROM chia-circt-assert:eade0de61bc5; RUN chown -R 1000:1000 /workspace/circt",
+      "why": "the repair worker RE-CONFIGURES and REBUILDS /workspace/circt and CMake closes every configure_file with a chmod, which needs ownership; the image bakes the tree as uid 0 and the cluster runs every worker as 1000:1000 (analysis/measurements/2026-09-15-repair-build-diagnosis.md)",
+      "used_by": [
+        "bugloop_repair"
+      ],
+      "tool_hashes_identical_to_parent": true,
+      "computed_utc": "2026-09-14T22:55:41.231882+00:00",
+      "computed_from": "docker image inspect of the built child layer, and a sha256sum of all six targets in a fresh container as uid 1000"
+    }
+  ]
 }
