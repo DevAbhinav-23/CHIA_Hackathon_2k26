@@ -641,7 +641,12 @@ def _render(facts: dict) -> str:
         "",
         f"Run `{facts['run_id']}`. {(qualifier or 'UNQUALIFIED').capitalize()}. "
         f"Arms run sequentially, {' then '.join(manifest.arm_order)}, "
-        f"each for {manifest.arm_window_seconds:.0f} wall-clock seconds.",
+        f"each for {manifest.arm_window_seconds:.0f} wall-clock seconds."
+        + (f" Corpus shard `{manifest.shard}`: this run drove every "
+           f"{manifest.shard.partition('/')[2]}th seed of the corpus order "
+           f"from position {manifest.shard.partition('/')[0]}, and its counts "
+           "are that shard's and not the whole corpus's."
+           if manifest.shard else ""),
         "",
         "Every table below carries the mode and the seed set it was taken under, "
         "and every number in it comes from a tool-produced record in `loop.db`.",

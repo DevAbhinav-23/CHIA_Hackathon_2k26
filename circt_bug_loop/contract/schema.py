@@ -294,6 +294,7 @@ class RunManifest:
     started_utc: str
     calibration_sample: Optional[list[str]] = None
     sv_seeds_excluded: Optional[list[str]] = None
+    shard: Optional[str] = None             # "K/N" when --shard narrowed the corpus (2.3)
     ended_utc: Optional[str] = None
 
     def __post_init__(self) -> None:

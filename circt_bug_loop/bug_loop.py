@@ -954,7 +954,7 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
                    run_manifest_id: str, started_utc: str,
                    repair_backend: Optional[str] = None,
                    calibration_seeds=(), assertion_baseline_count: int = 0,
-                   sv_seeds_excluded=None) -> RunManifest:
+                   sv_seeds_excluded=None, shard: Optional[str] = None) -> RunManifest:
     """Build the run's one `RunManifest`, every field from its named producer."""
     from circt_bug_loop import probe_task, repair_adapter
 
@@ -1002,7 +1002,8 @@ def build_manifest(*, args, budget: BudgetFile, pin: dict, image_spec: ImageSpec
         started_utc=started_utc,
         calibration_sample=(sorted(s.seed_sha for s in calibration_seeds)
                             if args.mode == "calibration" else None),
-        sv_seeds_excluded=sv_seeds_excluded)
+        sv_seeds_excluded=sv_seeds_excluded,
+        shard=shard)
     schema.validate(manifest)
     return manifest
 
@@ -2196,6 +2197,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--generator", default="model",
                         choices=("model", "recorded"))
     parser.add_argument("--seed-sha", action="append", default=None, metavar="SHA")
+    parser.add_argument("--shard", default=None, metavar="K/N")
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument("--resume", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--dry-run", action="store_true")
@@ -2219,6 +2221,29 @@ def calibratable(seeds, pin_sha: str) -> tuple:
                       if s.sdk_exact and s.llvm_pin == pin_sha)
     chosen = set(eligible)
     return eligible, sorted(s.seed_sha for s in seeds if s.seed_sha not in chosen)
+
+
+def parse_shard(value: Optional[str]) -> Optional[tuple]:
+    """Parse `--shard K/N` into `(K, N)`, or None when no shard was asked for."""
+    if not value:
+        return None
+    index, slash, count = str(value).partition("/")
+    if (not slash or not index.isdigit() or not count.isdigit()
+            or int(count) < 1 or not 0 <= int(index) < int(count)):
+        raise PreflightFailed(
+            "shard",
+            f"--shard {value!r} is not K/N with N >= 1 and 0 <= K < N: the "
+            "shards of one N partition the corpus and every seed is in exactly "
+            "one of them")
+    return int(index), int(count)
+
+
+def seed_shard(seeds: list, shard: Optional[tuple]) -> list:
+    """Keep shard K of N by POSITION in the corpus order, which is already fixed."""
+    if shard is None:
+        return list(seeds)
+    index, count = shard
+    return [seed for position, seed in enumerate(seeds) if position % count == index]
 
 
 def seed_subset(seeds: list, named: list, corpus_head_sha: str) -> list:
@@ -2257,6 +2282,7 @@ def resolved_config(args) -> dict:
             "repair_backend": args.repair_backend,
             "generator": args.generator,
             "seed_sha": list(args.seed_sha or []),
+            "shard": args.shard,
             "repair_enabled": repair_enabled(args)}
 
 
@@ -2404,6 +2430,12 @@ def run_campaign(args, out) -> int:
         seeds = seed_subset(seeds, args.seed_sha, budget.corpus_head_sha)
         print(f"--seed-sha: {len(seeds)} of {len(mined['seeds'])} mined seeds, "
               "in the order named", file=out)
+    # W-23: the seeded arm split over machines, the corpus order already fixed.
+    shard = parse_shard(args.shard)
+    if shard is not None:
+        seeds = seed_shard(seeds, shard)
+        print(f"--shard {args.shard}: {len(seeds)} seeds, every {shard[1]}th "
+              f"from position {shard[0]}", file=out)
     # FR-02.7, as W-19b #6 leaves it.
     eligible, _ineligible = calibratable(seeds, pin["pin_sha"])
     sample = [s for s in (budget.calibration_sample_shas or []) if s in eligible]
@@ -2425,6 +2457,7 @@ def run_campaign(args, out) -> int:
         repair_backend=repair_backend,
         run_manifest_id=args.resume or uuid.uuid4().hex, started_utc=started_utc,
         calibration_seeds=[s for s in seeds if s.seed_sha in sample],
+        shard=args.shard or None,
         sv_seeds_excluded=(None if image_spec.slang_enabled
                            else list(mined["sv_seeds"])))
     run_root = Path(args.artefact_root) / manifest.run_manifest_id

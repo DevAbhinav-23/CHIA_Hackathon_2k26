@@ -563,3 +563,18 @@ def test_T_U_results_22(tmp_path):
         "and render_results over the result")
     assert text.endswith("\n") and not text.endswith("\n\n")
     assert str(tmp_path) not in text, "the artefact carries an absolute path"
+
+
+def test_T_U_results_23_a_sharded_run_says_so_in_its_header(tmp_path):
+    """W-23: `--shard K/N` is stated where the counts are, not left implicit."""
+    import dataclasses
+
+    store, manifest, pairs = campaign(tmp_path)
+    assert manifest.shard is None
+    assert "Corpus shard" not in render(store, manifest, pairs)
+
+    sharded = dataclasses.replace(manifest, shard="1/3")
+    text = render(store, sharded, pairs)
+    assert "Corpus shard `1/3`" in text
+    assert "every 3th seed of the corpus order from position 1" in text
+    assert "that shard's and not the whole corpus's" in text

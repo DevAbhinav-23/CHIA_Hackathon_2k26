@@ -1633,3 +1633,55 @@ class _Stopping:
 
     def __init__(self):
         self.stopping_stage = "stage_6"
+
+
+@pytest.mark.t0
+def test_T_U_driver_39_the_corpus_shards_partition_the_seed_set():
+    """W-23: `--shard K/N` keeps every Nth seed and the shards lose nobody."""
+    from types import SimpleNamespace
+
+    seeds = [SimpleNamespace(seed_sha=f"{n:040x}") for n in range(11)]
+
+    assert bug_loop.parse_shard(None) is None
+    assert bug_loop.parse_shard("") is None
+    assert bug_loop.parse_shard("2/5") == (2, 5)
+
+    # The identity, and the partition.
+    assert bug_loop.seed_shard(seeds, None) == seeds
+    assert bug_loop.seed_shard(seeds, bug_loop.parse_shard("0/1")) == seeds
+    shards = [bug_loop.seed_shard(seeds, (k, 3)) for k in range(3)]
+    assert [len(s) for s in shards] == [4, 4, 3]
+    assert sorted((s.seed_sha for shard in shards for s in shard)) == \
+        sorted(s.seed_sha for s in seeds)
+    for first, second in ((0, 1), (0, 2), (1, 2)):
+        assert not ({s.seed_sha for s in shards[first]}
+                    & {s.seed_sha for s in shards[second]})
+    # Position in the FIXED corpus order, not a hash of the sha.
+    assert [s.seed_sha for s in shards[1]] == [seeds[i].seed_sha
+                                               for i in (1, 4, 7, 10)]
+
+    for bad in ("3/3", "4/3", "-1/3", "1/0", "1", "a/3", "1/b", "1/2/3", "/3"):
+        with pytest.raises(bug_loop.PreflightFailed) as raised:
+            bug_loop.parse_shard(bad)
+        assert raised.value.check == "shard"
+
+
+@pytest.mark.t0
+def test_T_U_driver_40_the_shard_is_on_the_manifest_and_in_the_config():
+    """W-23: a sharded run records which shard it drove (contract 2.3)."""
+    args = bug_loop.build_parser().parse_args(["--mode", "discovery"])
+    assert args.shard is None
+    assert bug_loop.resolved_config(args)["shard"] is None
+    sharded = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--shard", "1/4"])
+    assert sharded.shard == "1/4"
+    assert bug_loop.resolved_config(sharded)["shard"] == "1/4"
+
+    fields = {f.name for f in dataclasses.fields(schema.RunManifest)}
+    assert "shard" in fields
+    contract_fixtures = Path(schema.__file__).resolve().parent / "fixtures"
+    manifest = schema.from_json(
+        (contract_fixtures / "run_manifest" / "discovery_01.json").read_text(
+            encoding="utf-8"), schema.RunManifest)
+    assert manifest.shard is None
+    schema.validate(dataclasses.replace(manifest, shard="1/4"))
