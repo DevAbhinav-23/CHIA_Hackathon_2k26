@@ -606,7 +606,9 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
                              stage=_TURN_STAGE[stage],
                              timeout_seconds=int(cfg.get("timeout_seconds", 2400)),
                              model_id=cfg["model_id"],
-                             guard=cfg.get("spend_guard"))
+                             guard=cfg.get("spend_guard"),
+                             max_tool_iterations=(cfg.get("max_tool_iterations")
+                                                  or {}).get(_TURN_STAGE[stage]))
         return turn
     finally:
         turn["wall_seconds"] = time.monotonic() - started
