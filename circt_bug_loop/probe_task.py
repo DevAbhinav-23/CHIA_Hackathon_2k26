@@ -1003,9 +1003,9 @@ def compare_traces(arcilator_out: str, verilator_out: str) -> dict:
     artefact.
 
     The two sequences are generated from ONE port list and ONE cycle count, so
-    unequal lengths or a signal mismatch at one index mean an arm stopped early
-    or ran a different design: that is `harness_failure` under FR-08.8 and never
-    a divergence, and the caller is told which arm was short.
+    unequal lengths or a signal mismatch at one index mean a SIMULATOR stopped
+    early or ran a different design: that is `harness_failure` under FR-08.8 and
+    never a divergence, and the caller is told which side was short.
 
     **The X bucket (FR-08.9), made computable.** §3.6.3 declares a divergence
     "confined to cycles before the first write of the divergent output signal"
@@ -1035,13 +1035,13 @@ def compare_traces(arcilator_out: str, verilator_out: str) -> dict:
              "signal": None, "arcilator_value": None, "verilator_value": None,
              "lines": min(len(left), len(right))}
     if not left or not right:
-        arm = "arcilator" if not left else "verilator"
+        side = "arcilator" if not left else "verilator"
         if not left and not right:
-            arm = "arcilator and verilator"
-        return {**empty, "reason": f"{arm} printed no BUGLOOP line"}
+            side = "arcilator and verilator"
+        return {**empty, "reason": f"{side} printed no BUGLOOP line"}
     if len(left) != len(right):
-        arm = "arcilator" if len(left) < len(right) else "verilator"
-        return {**empty, "reason": f"{arm} stopped after {min(len(left), len(right))} "
+        side = "arcilator" if len(left) < len(right) else "verilator"
+        return {**empty, "reason": f"{side} stopped after {min(len(left), len(right))} "
                                    f"of {max(len(left), len(right))} lines"}
     if [(c, s) for c, s, _ in left] != [(c, s) for c, s, _ in right]:
         return {**empty, "reason": "the two arms sampled different signals"}
@@ -1179,17 +1179,21 @@ def _oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
     (directory / "arcilator.out.txt").write_text(arc["stdout"], encoding="utf-8")
     (directory / "verilator.out.txt").write_text(ver["stdout"], encoding="utf-8")
     (directory / "differential_evidence.json").write_text(
-        _canonical({"arcilator": _arm_evidence(arc), "verilator": _arm_evidence(ver),
+        _canonical({"arcilator": _side_evidence(arc), "verilator": _side_evidence(ver),
                     "driver_source": DIFFERENTIAL_DRIVER, "x_policy": X_POLICY,
                     "stimulus_id": STIMULUS_ID, "port_list_sha": port_list_sha}),
         encoding="utf-8")
 
-    for arm, name in ((arc, "arcilator"), (ver, "verilator")):
-        if arm["exit_status"] != 0:
+    # `side` and not `arm`: the two SIMULATORS are not the campaign's two arms,
+    # and §14.5's walk reads the name and not the meaning, so the collision made
+    # `T-U-layout-02` fire on a module that branches on no arm at all (errata
+    # row 19, W-17 fix 7).
+    for side, name in ((arc, "arcilator"), (ver, "verilator")):
+        if side["exit_status"] != 0:
             return _differential_verdict(
                 spec, image_spec, "harness_failure",
-                f"{name} {arm.get('stage', 'run')} exited {arm['exit_status']}, "
-                f"signal {arm['signal']}, limit {arm['limit_hit']}")
+                f"{name} {side.get('stage', 'run')} exited {side['exit_status']}, "
+                f"signal {side['signal']}, limit {side['limit_hit']}")
 
     outcome = compare_traces(arc["stdout"], ver["stdout"])
     if outcome["verdict"] == "harness_failure":
@@ -1355,22 +1359,27 @@ def _which(name: str) -> str:
     return found
 
 
-def _arm_evidence(arm: dict) -> dict:
-    """One arm's recorded argv, output digest and limit outcome.
+def _side_evidence(side: dict) -> dict:
+    """One SIMULATOR side's recorded argv, output digest and limit outcome.
+
+    "side" and not "arm": a differential probe has two simulators and the
+    campaign has two arms, and they are different things. §14.5's walk reads the
+    NAME, so the collision made `T-U-layout-02` report `probe_task.py` for a
+    branch on the campaign's arm that this module never makes (errata row 19).
 
     FR-08.4's acceptance criterion reads the **recorded** Verilator argument
     vector for the two X flags and §6.5 names no file that holds one, so this is
     that file's content (erratum candidate against §6.5).
     """
-    return {"argv": arm["argv"], "build_argv": arm.get("build_argv"),
+    return {"argv": side["argv"], "build_argv": side.get("build_argv"),
             "stdout_sha256": hashlib.sha256(
-                arm["stdout"].encode("utf-8")).hexdigest(),
-            "stdout_bytes": len(arm["stdout"].encode("utf-8")),
-            "exit_status": arm["exit_status"], "signal": arm["signal"],
+                side["stdout"].encode("utf-8")).hexdigest(),
+            "stdout_bytes": len(side["stdout"].encode("utf-8")),
+            "exit_status": side["exit_status"], "signal": side["signal"],
             # Keyed "limit" and not by the field's own name: T-U-probe-41
             # asserts that no module but circt_core.py writes that key, and this
             # is a copy of the field for the record, never a derivation of it.
-            "limit": arm["limit_hit"]}
+            "limit": side["limit_hit"]}
 
 
 # --- 3.6.4 B5, the reducer --------------------------------------------------

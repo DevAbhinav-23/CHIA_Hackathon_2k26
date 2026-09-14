@@ -282,24 +282,25 @@ def test_T_U_layout_02():
     Fixture: none. Tier 0.
     """
     for name in APPARATUS:
-        if name == "probe_task.py":
-            continue                      # its own assertion below, errata row 19
         assert arm_branches(FLOW / name) == [], name
     assert set(ARM_EXEMPT) == {"ledger.py", "results.py", "contract/schema.py"}
     assert arm_branches(FLOW / "ledger.py"), "the exemption is used by ledger.py"
     assert arm_branches(FLOW / "results.py"), "the exemption is used by results.py"
 
 
-@pytest.mark.xfail(reason="errata row 19: probe_task.oracle_differential names "
-                          "its two SIMULATOR sides `arm`, so 14.5's walk fires "
-                          "on a name collision and not on a campaign arm")
 @pytest.mark.t0
 def test_T_U_layout_02_probe_task():
     """T-U-layout-02 (FR-18.1): the walk over `probe_task.py` itself.
 
-    Fixture: none. Tier 0.
+    It failed on a NAME COLLISION and not on a violation: `oracle_differential`
+    called its two SIMULATOR sides `arm`, and §14.5's walk reads the name.
+    W-17's seventh fix renamed them `side`, so the walk passes honestly: the one
+    remaining `arm` in the module is `spec.arm` carried into a `ProbeResult`,
+    which FR-18.1 requires it to carry (errata row 19). Fixture: none. Tier 0.
     """
     assert arm_branches(FLOW / "probe_task.py") == []
+    source = (FLOW / "probe_task.py").read_text(encoding="utf-8")
+    assert "arm=spec.arm" in source, "the arm is carried, which is the rule"
 
 
 # ---------------------------------------------------------------------------
