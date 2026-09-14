@@ -45,14 +45,12 @@ elsewhere. Fixed tools, not the model, build, judge, minimise, deduplicate and
 repair; a named person approves every filing. CHIA's CIRCT image compiles
 out the compiler's own consistency checks, so nothing can fire; % CHIA's published chia-circt image: 606 of 606 compile commands carry -DNDEBUG, circt-opt has 0 undefined __assert_fail: analysis/measurements/2026-09-13-frd-followups.md lines 469-470, A-10
 restored, they reach 536 of 555 compiler objects % 536 of 555 obj.CIRCT objects reference the assertion handler: analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
-and leave CHIA's test gate at 1,119 passes and 0 failures, identical with them
-off. % 1,119 passed / 0 failed of 1,127 considered, identical in both images: analysis/measurements/2026-09-14-image-build.md 5 run 2 and W-04b 3
-Replaying six real CIRCT failures exposed two defects that would have misrouted
-three of four bugs. % 6 confirmed fixtures of 7 attempts: analysis/measurements/2026-09-14-crash-fixtures.md 1; the two frame defects and "three of the four real bugs are out of scope": same file 3.2 and 3.4
-We release the loop as CHIA nodes and tools; a capped pilot fired the restored
-assertions on all three inputs it wrote for its first seed, % pilot: 1 seed driven, 3 probes, 3 of 3 fired the primary oracle: analysis/measurements/2026-09-16-pilot.md 0 and 4
-and the pre-registered campaign against a mutation fuzzer will report its
-maintainer-confirmed bug count.
+and CHIA's test gate passes the same 1,119 tests with them on and off. % 1,119 passed / 0 failed of 1,127 considered, identical in both images: analysis/measurements/2026-09-14-image-build.md 5 run 2 and W-04b 3
+We release the loop as CHIA nodes and tools. A capped pilot fired the restored
+assertions on all three inputs it wrote for its first seed, matched them to an
+open issue and filed nothing, % pilot: 1 seed driven, 3 probes, 3 of 3 fired the primary oracle, dedup known_open_issue #8508, 0 filings: analysis/measurements/2026-09-16-pilot.md 0, 4 and 5
+and every live model call, two mutator syntheses and two pilots, cost under
+ten US dollars together. % 0.486733 + 0.490623 + 7.163957 + 0.814315 = 8.96, plus one unmeasured attempt bounded 0.47-0.53: 2026-09-16-mutator-synthesis.md 9.3, 10.4 (bounds), 2026-09-16-pilot.md 0 and P2.2
 \end{abstract}
 
 % =====================================================================
@@ -73,26 +71,27 @@ verifying against the whole test suite, repairing regressions and writing the
 pull request; on 16 CIRCT issues it fixed five, three of them merged.
 
 Its supply is the constraint. Over the past year CIRCT received 82 bug-labelled
-issues and closed 65, so the project is neither short of reports nor ignoring
-them; what does not drain is the backlog of 101 open ones, at a median age of
-911 days. The scarce resource is maintainer attention, and an
-agent that empties the queue faster creates none. What would help is a bug that
-arrives already minimised, already checked against what is known, already
-carrying a candidate fix, from a source that files nothing else. Past fixes are the unspent information: a commit that
-corrects one wrong assumption inside a pass usually leaves the same assumption
-at other sites, and CIRCT ships no fuzzing infrastructure to find them.
+issues and closed 65; what does not drain is the backlog of 101 open ones, at a
+median age of 911 days. % 82 bug-labelled issues, 65 closed, 101 open, median age 911 d: analysis/measurements/2026-09-13-frd-followups.md M1
+The scarce resource is maintainer attention, and an agent that empties the queue
+faster creates none. What would help is a bug that arrives already minimised,
+already checked against what is known, already carrying a candidate fix, from a
+source that files nothing else. Past fixes are the unspent information: a commit
+that corrects one wrong assumption inside a pass usually leaves the same
+assumption at other sites, and CIRCT ships no fuzzing infrastructure to find
+them.
 
 This paper describes a loop that manufactures its own supply and then withholds
 most of it.
 
 \begin{figure*}[!t]
 \centering
-\input{fig-loop}
+\scalebox{0.94}{\input{fig-loop}}
 \caption{Seeded CIRCT bug loop. The agent holds the violet band and acts three
 times only, at stages 1, 2 and 6; the blue ribbon below it is fixed apparatus,
 so no number in the result comes from the model. The ribbon is the candidates in
-flight, pinched at each gate by a question with two answers: the share answering
-no peels onto the floor. Widths are illustrative, not measured.}
+flight, pinched at each gate by a yes-or-no question; the share answering no
+peels onto the floor. Widths are illustrative.}
 \label{fig:loop}
 \end{figure*}
 
@@ -183,8 +182,6 @@ Object files carrying the assertion handler again & 536 of 555 \\
 CHIA's whole test gate, assertions on and then off & 1{,}119 pass, 0 fail, identical \\
 % +179 s = 18.4% of wall; +24.48% over six targets; median +4.84% per probe: W-04b 1, 2, 4
 What the assertions cost: wall clock, bytes, per probe & 18\%, 25\%, 4\% \\
-% -gline-tables-only costs essentially nothing in compile time: analysis/measurements/2026-09-13-frd-followups.md, M2
-Build cost of the line tables that name the crash site & none measurable \\
 % lit discovers 1,390 tests with 0 parse errors once MLIR_SOURCE_DIR is the SDK: 2026-09-14-image-build.md 4 (FR-03.17)
 Tests \texttt{lit} discovers, once its source root is the SDK & 1{,}390, 0 errors \\
 \bottomrule
@@ -197,7 +194,7 @@ The loop has to build CIRCT at arbitrary points of its history, and the compiler
 has to be able to complain. Neither held when we started; Table~\ref{tab:meas}
 is what we measured on the image the loop now runs.
 
-\textbf{Building the past cheaply.} CIRCT records the exact LLVM commit it expects, the pin; a build against any other fails outright, and compiling that LLVM from source costs hours per seed. It also publishes an SDK, a tarball of prebuilt LLVM and MLIR libraries recording its own pin, and where an SDK shares a seed's pin CIRCT rebuilds in minutes: of 187 fix-shaped commits mined from 24 months, 171 match exactly.
+\textbf{Building the past cheaply.} CIRCT records the exact LLVM commit it expects, its pin; a build against any other fails, and compiling that LLVM costs hours per seed. CIRCT also publishes an SDK of prebuilt LLVM and MLIR libraries carrying its own pin, and where the two pins match CIRCT rebuilds in minutes: 171 of the 187 seeds do.
 
 
 
@@ -243,27 +240,29 @@ stage's reach. % the two frame defects: 2026-09-14-crash-fixtures.md 3.2 and 3.4
 Both are fixed.
 
 % =====================================================================
-\section{Evaluation Design}\label{sec:eval}
-The experiment asks whether reading a past fix makes an agent better at finding
-new bugs than mutating the same tests at random. Two arms run the same harness,
-oracles, reducer and gate, and only the generator differs: the seeded arm is
-stages 1 and 2 above, and the mutation arm mutates the same seed tests
-syntactically without ever seeing the diff or the root-cause class, following
+\section{Controls}\label{sec:eval}
+The experiment the loop embodies asks whether reading a past fix makes an agent
+better at finding new bugs than mutating the same tests at random. Two arms
+share the harness, oracles, reducer and gate, and only the generator differs:
+the seeded arm is stages 1 and 2, and the mutation arm rewrites the same seed
+tests syntactically without seeing the diff or the root-cause class, following
 Mut4All's design for mutators synthesised by a language model \cite{mut4all}.
+Both arms spend the same budget, a fixed window of wall-clock seconds, one after
+the other on the same cluster at the same concurrency, and the artefact renders
+one headline: distinct bugs a CIRCT maintainer confirmed by labelling,
+commenting on or fixing them. Our oracle agreeing with itself produces a
+candidate, not a bug.
 
-Both arms spend the same pre-registered budget, one elapsed wall-clock second of
-an arm's fixed window: they run one after the other, each for two hours, on the % 7,200 s per arm: budget.yaml arm_window_seconds; errata row 53
-same cluster at the same concurrency.
-Safety caps bound damage rather than effort, at 2,000 generated inputs per arm
-per day, 3 filings per day and 10 in the campaign, every probe held to 60
-seconds and 4\,GiB, and a hard cap of 200 US dollars on model spending stops
-both arms. % window 7,200 s per arm, the three caps and campaign_spend_cap_usd: circt_bug_loop/budget.yaml
-All of it is committed before the campaign starts, so no threshold
-can be chosen afterwards.
-
-The headline is the number of distinct bugs a CIRCT maintainer confirmed, by
-labelling, commenting on or fixing them, within that budget; our own oracle
-agreeing with itself produces a candidate, not a bug.
+\textbf{Pre-registration.} Every threshold lives in one budget file, and a run
+is registered by an annotated git tag on the commit that lands that file; the
+loop refuses a file no tag names and a mutator set committed after the tag, so
+no threshold can be chosen after the fact. % registration/<run> tag, load_budget checks, mutator set must be an ancestor: circt_bug_loop/budget.py; docs/HANDOFF.md W-12b
+Safety caps bound damage rather than effort: 2,000 generated inputs per arm per
+day, 3 filings per day and 10 per run, 60 seconds and 4\,GiB per probe, and a
+hard cap on model spending that stops both arms. % the caps: circt_bug_loop/budget.yaml
+A run with a positive filing cap does not start until a human has posted the
+method to the project's forum, and issues marked as good first issues are
+refused. % pre-flight check 11 (FR-20.1), FR-20.2: circt_bug_loop/bug_loop.py check_11_forum_post
 
 \textbf{Deduplication.} Two candidates are one bug when a single primary
 fingerprint is equal. On a hand-labelled set of 22 candidate pairs the rule
@@ -272,154 +271,151 @@ pairs; % 22 labelled pairs, collision 1/11, false merge 1/11: design/reviews/imp
 both rates are printed beside the headline, since a collision inflates
 that count and a false merge deflates it.
 
-\textbf{Known issues.} A mirror of the tracker, refreshed once per run, answers
-whether a candidate is already reported. GitHub stops paginating an
-issue listing at its hundredth page, which the loop met as an error and not as
-truncation, so the mirror walks newest first, then oldest first, and unions
-the two: 600 issues cost 35 requests and half a minute. % 422 at page 100; 600 issues in 35 requests, 33.9 s: implementation-errata-log.md W-14 row 21
+\textbf{Known issues.} A mirror of the tracker answers whether a candidate is
+already reported. GitHub stops paginating an issue listing at its hundredth
+page, which the loop met as an error and not as truncation, so the mirror walks
+newest first, then oldest first, and unions the two: the whole tracker, 2,652
+issues, 1,795 closed and 857 open, costs 198 requests and 200 seconds. % 422 at page 100: implementation-errata-log.md W-14 row 21; live mirror 2,652 issues (1,795 closed / 857 open), 198 pages, 200 s: docs/HANDOFF.md W-17 join
 
 \textbf{Contamination.} CIRCT's history sits in the training data of any model
 we can use, so the agent may reproduce a fix it memorised. Every candidate is
 screened against fixes made after its seed, at the level of the symbols the
 seed's fix touched: that screen flags 77\% of the corpus where the same screen
 at file level flags 96\%. % symbol level 77.0%, file level 96.3%: analysis/measurements/2026-09-13-frd-followups.md M4
-A real crash is a real crash, so the flag qualifies a
-candidate rather than excluding it. The repair stage runs CHIA's executor unchanged and is
-not screened. We post the method to the project's forum before the campaign
-starts, and leave issues marked as good first issues to human newcomers.
-
-\textbf{Failure taxonomy.} Every candidate reaching the gate is recorded with
-its verdict, one of unreproducible, not minimal, invalid input, duplicate,
-undecided or new bug, and every repair attempt with the phase that failed, so the record shows
-where budget went without return.
+A real crash is a real crash, so the flag qualifies a candidate rather than
+excluding it.
 
 % =====================================================================
 \section{Results}\label{sec:res}
-Table~\ref{tab:res} is filled from the artefact the loop renders out of its own
-database, and every cell is \textit{pending} until the pre-registered window closes. A zero is reportable and would be
-reported: it would say that CIRCT's assertion surface is not reachable at this
-budget.
-
-\textbf{Pilot.} A pilot ran first under its own pre-registration, capped at five
-US dollars, repair disabled, twelve seeds named. % tag registration/pilot-1 landing budget-pilot.yaml, campaign_spend_cap_usd 5.0, --no-repair, the twelve named seeds: analysis/measurements/2026-09-16-pilot.md preamble, 1 and 2
-It reached one, wrote three probes, and all three fired the
-primary oracle on one assertion,
-\texttt{isa<To>(Val)\allowbreak{} \&\&\allowbreak{} "cast<Ty>()\allowbreak{}
-argument of incompatible type!"} at \texttt{Casting.h:566}, in the frame
-\texttt{NetOpConversion::\allowbreak{}matchAndRewrite} of
-\texttt{MooreToCore.\allowbreak{}cpp}, % 1 of 12 seeds driven, 3 probes written and executed, 3 of 3 oracle firings, assertion text, assertion site and fingerprint frame: 2026-09-16-pilot.md 4 and 5
-on a case of three operations, a \texttt{moore.net} of an open array type. % reduced.mlir: module, moore.net wire : <open_uarray<i32>>, moore.output; 3 operations before and after, the reducer made no progress: 2026-09-16-pilot.md 4 and 5
-The tracker mirror matched all three to open issue 8508, so the loop withheld
-them and filed nothing. % dedup verdict known_open_issue against issue 8508 on all three, gate decision nothing x 3, 0 filings: 2026-09-16-pilot.md 4 and 5
-Then the money control failed: the guard authorises one model call per turn,
-while a turn carrying tools makes one per tool iteration, up to 37 here; the run
-spent USD 7.16 against its cap of 5.00 before that cap stopped it, and the
-mutation arm never started. % 14, 21 and 37 generate_content calls, 19.7x to 64.1x the authorisation; ledger 7.163957 against 5.00; stop_reason campaign_spend_cap; mutation arm never started: 2026-09-16-pilot.md 0, 4 and 7
-A per-turn ceiling now sits inside the model backend's tool loop, with an
-iteration cap per stage, and a second capped pilot verifies both before the
-campaign. % W-18b in progress: per-turn USD ceiling inside the shipped patched vertex.py loop, max_tool_iterations per stage, then a capped mini pilot: docs/HANDOFF.md tail
-Both mutator sets cost under half a dollar: the first kept 11 of 22 returned
-because its prompt named no regular-expression engine, the second 25 of 25 once
-it did. % v1 22 returned, 11 kept, 10 bad_pattern on Python re look-behinds, USD 0.486733; v2 25 of 25 kept, USD 0.490623, prompt names Python 3.10's re: 2026-09-16-mutator-synthesis.md 9.5, 10.2, 10.4 and 10.5
-This pilot is not the campaign and counts nothing towards the headline.
+Four live runs have been made and Table~\ref{tab:res} is all of them, read from
+the loop's own database and ledger; the ledger prices the SDK's own token
+counts at Google's published rates. % ledger = SDK counts x budget.yaml prices: 2026-09-16-pilot.md 7
 
 \begin{table}[!t]
-\caption{The campaign's result, one group of rows per table of the rendered
-artefact}
+\caption{Every live model run, from the loop's ledger; the last column is
+billed over what the guard authorised before the first call}
 \label{tab:res}
 \centering
 \scriptsize
-\renewcommand{\arraystretch}{0.90}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.30cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.30cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.30cm}@{}}
+\renewcommand{\arraystretch}{0.88}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.45cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.55cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.55cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.75cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.55cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.55cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{0.65cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.35cm}@{}}
 \toprule
-\textbf{Measure} & \textbf{seeded} & \textbf{mutation} \\
+\textbf{Run} & \textbf{turns} & \textbf{seeds} & \textbf{probes} & \textbf{fired} & \textbf{filed} & \textbf{USD} & \textbf{billed / authorised} \\
 \midrule
-% the three rows below: render_results section 1, "Headline" (tests/fixtures/results/example.md 1)
-\multicolumn{3}{@{}l}{\textit{Headline}}\\
-Distinct confirmed bugs & \textit{pending} & \textit{pending} \\
-Confirmed filings & \textit{pending} & \textit{pending} \\
-Contaminated candidates, and distinct confirmed without them & \textit{pending} & \textit{pending} \\
-% the five rows below: render_results section 2, "Secondary results" (example.md 2)
-\multicolumn{3}{@{}l}{\textit{The five secondaries}}\\
-Candidates before deduplication & \textit{pending} & \textit{pending} \\
-Candidates after deduplication & \textit{pending} & \textit{pending} \\
-Reports filed & \textit{pending} & \textit{pending} \\
-Gate precision, confirmed over filed & \textit{pending} & \textit{pending} \\
-Repairs merged & \textit{pending} & \textit{pending} \\
-% the four rows below: render_results section 6, "The budget: both windows and the campaign's spend" (example.md 6)
-\multicolumn{3}{@{}l}{\textit{The budget, in its own unit}}\\
-Window, seconds & 7{,}200 & 7{,}200 \\
-% 7,200 s per arm in the final budget.yaml (commit 927b2af; W-22 tag pending): pilot 1 ran at about USD 0.6 a minute, so two four-hour arms would pass the USD 200 cap inside the first arm: implementation-errata-log.md row 53
-Elapsed, seconds & \textit{pending} & \textit{pending} \\
-Stopped by & \textit{pending} & \textit{pending} \\
-Spend, US dollars & \textit{pending} & \textit{pending} \\
-% the six rows below: render_results section 3, "Failure taxonomy" (example.md 3)
-\multicolumn{3}{@{}l}{\textit{Candidates at the gate, one bucket each}}\\
-Unreproducible & \textit{pending} & \textit{pending} \\
-Not minimal & \textit{pending} & \textit{pending} \\
-Invalid input & \textit{pending} & \textit{pending} \\
-Duplicate & \textit{pending} & \textit{pending} \\
-Undecided & \textit{pending} & \textit{pending} \\
-New bug & \textit{pending} & \textit{pending} \\
+% v1: 1 turn, 22 returned / 11 kept, USD 0.486733, authorised 1.31181 (3 attempts): 2026-09-16-mutator-synthesis.md 9.3, 9.5
+Mutator set 1 (22 in, 11 kept) & 1 & -- & -- & -- & -- & 0.49 & 0.37 \\
+% v2: 1 turn, 25 / 25, USD 0.490623, authorised 1.881525: same file 10.4, 10.5
+Mutator set 2 (25 in, 25 kept) & 1 & -- & -- & -- & -- & 0.49 & 0.26 \\
+% pilot 1: 3 billed turns, 1 seed, 3 probes, 3 firings, 0 filed, USD 7.163957 against cap 5.00, ratios 19.7x to 64.1x: 2026-09-16-pilot.md 0, 4, 7
+Pilot 1, seeded, cap 5.00 & 3 & 1 & 3 & 3 & 0 & 7.16 & 19.7 to 64.1 \\
+% pilot 2 seeded: 2 turns, 2 seeds, 0 probes, USD 0.814315 for the run, ratios 0.498 and 0.591: same file P2.2
+Pilot 2, seeded, cap 3.00 & 2 & 2 & 0 & 0 & 0 & 0.81 & 0.50 to 0.59 \\
+% pilot 2 mutation: 0 model turns, 2 seeds, 5 probes (4 parse_error, 1 clean_exit), 0 firings, 1.7 s: same file P2 tables
+Pilot 2, mutation & 0 & 2 & 5 & 0 & 0 & 0 & -- \\
 \bottomrule
 \end{tabular}
-
 \end{table}
+
+\textbf{The restored assertions are reachable, on the first seed.} Pilot 1 read
+its first seed, a fix in the SystemVerilog lowering, wrote three probes, and all
+three tripped the same check,
+\texttt{isa<To>(Val)\allowbreak{} \&\&\allowbreak{} "cast<Ty>()\allowbreak{}
+argument of incompatible type!"} at \texttt{Casting.h:566} in
+\texttt{NetOpConversion::\allowbreak{}matchAndRewrite} of
+\texttt{MooreToCore.\allowbreak{}cpp}, on a three-operation case, a
+\texttt{moore.net} of an open array type; each reproduced in a fresh process on
+another worker, and twenty reduction attempts removed nothing. % 3 of 3, assertion text, site, frame, reduced.mlir, question 1 on another worker, circt-reduce 20 calls no_progress: 2026-09-16-pilot.md 4 and 5
+The oracle Section~\ref{sec:pre} restored found a real, reproducible failure with
+a three-line reproducer at the first attempt.
+
+\textbf{Withholding works, and the tool outranks the model.} The mirror matched
+all three to open issue 8508 on the assertion text, and nothing was filed. The
+one report a model wrote argued the match was wrong; the tool's verdict stood,
+by rule. % known_open_issue #8508 x3, gate nothing x3, 0 filings, the model's report disagreeing, FR-11.2: same file 4 and 5
+A maintainer sees nothing they already know, and the model cannot promote a
+candidate.
+
+\textbf{The money control, measured twice.} Pilot 1's guard priced one model
+call per turn, but a turn carrying tools makes one call per tool iteration: its
+three turns made 14, 21 and 37 calls and cost 19.7, 32.3 and 64.1 times the
+authorised figure, USD 7.16 against a cap of 5.00; the cap still stopped the
+run. % 14/21/37 calls, 19.7x/32.3x/64.1x, 7.163957 vs 5.00, stop_reason campaign_spend_cap: same file 0 and 7
+The guard now prices the whole loop, and a ceiling inside the backend refuses
+the call that would pass it: pilot 2 billed 0.50 and 0.59 of what it
+authorised. % ratios 0.498 and 0.591, no TurnBudgetExceeded, USD 0.814315: same file P2.2
+Spending is bounded before a request leaves the machine, within a factor of two
+of the bill.
+
+\textbf{The tool budget decides whether the model answers.} At six tool calls a
+turn, both of pilot 2's seed-reading turns spent all six reading source and
+returned no answer, so no probe was written; the turn that read pilot 1's firing
+seed had taken fourteen. % both stage-1 turns exhausted at 6, final_text empty, 0 seeded probes; pilot 1 stage_1 14 calls: implementation-errata-log.md row 47; 2026-09-16-pilot.md 7
+The cap is registered, and this is the measurement it is chosen with.
+
+\textbf{Seven defects no test could see.} The first run driven end to end on the
+cluster met seven pre-flight defects invisible to 620 passing tests, none about
+the model: among them, the corpus emptied because its date bound was the run's
+start, and a check demanded the head hold a credential the design forbids it. % errata rows 39-45; suite 620 at W-20b: 2026-09-16-pilot.md 3; docs/HANDOFF.md W-20b
+All were fixed before a model call was made: a capped pilot is part of the
+method.
+
+\textbf{Under-billing, and one fact that doubled the yield.} CHIA's Vertex
+backend omits thinking tokens from usage; on the two synthesis turns they were
+2.3\% and 2.4\% of the price, and an eighteen-line patch makes the ledger equal
+the SDK's total exactly, 625{,}478 tokens on the first turn. % 2.3% (USD 0.011156), 2.4%: 2026-09-16-mutator-synthesis.md 9.3, 10.5; 625,478 = 619,603 + 2,900 + 2,975; vertex-usage.patch 18 insertions
+That turn returned 22 mutators and 11 survived: ten used look-behinds Python's
+regular-expression engine refuses, because the prompt named no engine. Naming
+it, the second returned 25 and all survived. % v1 22/11, 10 bad_pattern; v2 25/25: same file 9.5, 10.2, 10.4
+In pilot 2 they yielded five probes in under two seconds, four of which failed
+to parse, the loop's own fault; none fired. % 5 probes, 4 parse_error, 1 clean_exit, 0 firings, 1.7 s: 2026-09-16-pilot.md P2 tables
 
 % =====================================================================
 \section{Related Work}
-\textbf{Agentic repair and fuzzing.} SWE-bench \cite{swebench} scores agents on
-real GitHub issues and set the pattern this work inherits; CHIA's issue solver
-\cite{chia} applies it to a hardware compiler. Both draw from a queue; we fill
-one. Fuzzers fill queues without repairing or withholding: CSmith \cite{csmith}
-for C, and for MLIR, MLIRod along operation dependencies \cite{mlirod},
-N\"uwa with a language model \cite{nuwa}, DESIL on silent wrong-output bugs
-\cite{desil} and FLEX, which found 80 unknown bugs in 30 days \cite{flex}. Our
-mutation arm follows Mut4All, which synthesises mutators from past bug reports
-\cite{mut4all}.
-
-\textbf{Seed-guided generation, reduction, gating.} AFuzz \cite{afuzz} is the
-origin of our method: an agent hypothesises where else a reference bug's root
-cause could live and tests each hypothesis with generated code, finding 40 bugs
-in V8 in a month. We apply it behind a repair chain and a gate. Delta debugging \cite{deltadebug} is the algorithm stage 5's reducer
-implements, and we contribute only its placement. Abstain-and-Validate lets a
-second model decline a bug and reject a patch \cite{abstain}, llvm-harness
-packages LLVM's middle end for agents \cite{llvmharness}, and CodeRover-S
-repairs bugs found by OSS-Fuzz \cite{coderovers}; each makes a repair agent more
-selective, while our gate sits downstream and discards by default.
+SWE-bench \cite{swebench} scores agents on real GitHub issues and CHIA's issue
+solver \cite{chia} applies the pattern to a hardware compiler; both draw from a
+queue, and we fill one. Fuzzers fill queues without repairing or withholding:
+CSmith \cite{csmith} for C, and for MLIR, MLIRod along operation dependencies
+\cite{mlirod}, N\"uwa with a language model \cite{nuwa}, DESIL on silent
+wrong-output bugs \cite{desil} and FLEX, 80 unknown bugs in 30 days \cite{flex}.
+Our mutation arm follows Mut4All's synthesised mutators \cite{mut4all}. AFuzz
+\cite{afuzz} is the origin of our method, an agent hypothesising where else a
+reference bug's cause could live and testing each hypothesis, 40 bugs in V8 in
+a month; we apply it behind a repair chain and a gate. Delta debugging
+\cite{deltadebug} is stage 5's algorithm, and we contribute its placement.
+Abstain-and-Validate \cite{abstain}, llvm-harness \cite{llvmharness} and
+CodeRover-S \cite{coderovers} each make a repair agent more selective; our gate
+sits downstream and discards by default.
 
 % =====================================================================
 \section{Artefact and Limitations}
 We release the loop as CHIA nodes and tools, so swapping the generator for the
-mutation arm is one node substituted. Its two halves, the one that proposes work
-and the one that measures it, meet at a frozen contract of seven record types
-and one function call, version 2.1, tested separately against recorded
-examples; % contract 2.1, seven schemas plus one interface, tag contract-2.1: design/00-README.md, seam rule; circt_bug_loop/contract/FROZEN.md "Contract 2.1" (adds BuildStatus tool_unavailable, MINOR)
-the suite is 644 tests, 594 of which need no cluster, network or
-model. % 2026-09-14, at HEAD: pytest circt_bug_loop/tests -q --co = 644 collected; -m t0 = 594, -m "t0 or t1" = 627, -m t2 = 9, -m t3 = 7
-Four
-things go upstream to CHIA: the Dockerfile for the assertions-on image, its
+mutation arm is one node substituted. Its two halves meet at a frozen contract
+of seven record types and one function call, version 2.2, tested separately
+against recorded examples; % contract 2.2, tag contract-2.2: circt_bug_loop/contract/FROZEN.md
+the suite is 634 tests, 594 of which need no cluster, network or model. % 2026-09-14 at HEAD d94fc42: 634 passed, 1 skipped with -m "not t2 and not t3"; -m t0 = 594
+On CHIA's cluster layer the loop's five containers come up in 38 seconds and,
+with a recorded generator, drive 16 probes through both arms in 7.4 seconds. % chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s: docs/HANDOFF.md W-19b
+Four things go upstream to CHIA: the Dockerfile for the assertions-on image, its
 build workflow, three helpers for its CIRCT module, and the nineteen-line branch
-that lets its repair chain select our backend. % upstream/: dockerfiles/ChiaCirctAssertDockerfile, .github/workflows/chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions; ADR-D-03 addendum)
-All of it, with the seed corpus and every input, verdict, reduced
-case, transcript and gate decision, is at
+that lets its repair chain select our backend. % upstream/: dockerfiles/ChiaCirctAssertDockerfile, .github/workflows/chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
+All of it, with the seed corpus and every input, verdict, reduced case,
+transcript and gate decision, is at
 \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
 
-The apparatus is verified a stage at a time, most strongly at the second
-oracle's harness generators: from one generated design they emit a CIRCT
+The second oracle's harness generators emit, from one design, a CIRCT
 simulation harness and a Verilator testbench printing identical 112-line
 sequences, and one changed constant makes them disagree at a named cycle and
 signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
 
-\textbf{What is not built.} The pre-registered campaign has not run; the live
-model calls so far are the two mutator syntheses and the pilot. % the interlock is now opened deliberately per run: ADR-D-03 rule (1); docs/HANDOFF.md W-12b, W-12c and W-18
-The 187 seeds rest on a
-subject-keyword filter, no diffs read to confirm each is a bug fix; of seven
-mining attempts, one seed did not fail at its parent. % 6 confirmed of 7 attempted, the discard recorded: analysis/measurements/2026-09-14-crash-fixtures.md 1
-The second oracle applies to 6 of the 187 seeds, % A-19: 6 of 187 differential-applicable, all through circt-opt: analysis/measurements/2026-09-15-a19-differential-applicability.md, results table
-the contamination screen misses a sibling fixed in a commit whose
-subject does not name it, and CHIA's repair chain returns no token counts for
-its own turns, so the reported spend excludes that stage. % stage 7 token capture unavailable, spend a lower bound: design/ADR/ADR-D-03-model-backend.md addendum
+\textbf{Limitations.} Model time across the four live runs totals USD 9.5, and
+the repair stage, CHIA's chain, ran in none of them, because it returns no token
+counts and would spend outside the ledger. % 8.96 measured + one unmeasured attempt bounded 0.47-0.53; every pilot --no-repair; TOKEN_CAPTURE unavailable_remote_dispatch: repair_adapter.py
+The second oracle applies to 6 of the 187 seeds. % A-19: analysis/measurements/2026-09-15-a19-differential-applicability.md
+The 187 rest on a subject-keyword filter, no diffs read to confirm each is a bug
+fix; of seven mining attempts, one seed did not fail at its parent. % 6 confirmed of 7 attempted: analysis/measurements/2026-09-14-crash-fixtures.md 1
+The contamination screen misses a sibling fixed in a commit whose subject does
+not name it. Calibration by re-injecting known bugs is not possible on one
+prebuilt image: no seed's parent shares its LLVM pin. % 0 of 187 parents carry the image pin, 44 distinct pins: bug_loop.py calibratable docstring; errata row 52
 The image is built but not published, so a report names its content hash rather
 than a registry digest.
 
@@ -430,9 +426,8 @@ converts the human event from writing a bug report into reading one.
 \section*{Acknowledgements}
 We thank the CHIA developers and the A\textsuperscript{3} hackathon organisers.
 \textit{AI-assistance disclosure.} Claude (Anthropic) and Gemini (Google) were
-used for drafting, code generation and editorial revision; the human authors
-made every claim, design decision and number their own, and are responsible for
-the entire contents of this paper.
+used for drafting, code generation and revision; the human authors made every
+claim, decision and number their own and are responsible for the whole paper.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
