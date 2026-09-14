@@ -1,0 +1,10 @@
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-synth-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-ir-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-om-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-firrtl-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-firtool-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-ltl-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-rtg-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-rtgtest-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /home/ray/anaconda3/envs/py_worker/lib/python3.10/site-packages/lit/llvm/subst.py:130: note: Did not find circt-capi-support-test in /workspace/circt/build/bin::/opt/circt-sdk/bin:/usr/bin
+lit: /workspace/circt/build/test/lit.site.cfg.py:1: fatal: unable to parse config file '/workspace/circt/build/test/lit.site.cfg.py'

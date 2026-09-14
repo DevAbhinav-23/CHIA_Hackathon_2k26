@@ -1,0 +1,29 @@
+{
+  "assertion_nonreferencing": [],
+  "circt_sha": "eade0de61bc5a0d2ba1b9da951b69efcab19f8ce",
+  "cmake_args": [],
+  "flag_string": "-O3 -UNDEBUG -gline-tables-only",
+  "image_digest": "chia-circt-assert@sha256:8ac3cb311851ab5af1b21925b579f6b770346148cd3c6012e45b3b9d8256cf9e",
+  "image_tag": "chia-circt-assert:eade0de61bc5",
+  "lit_discovered_count": 0,
+  "lit_discovery_ok": false,
+  "sdk_tag": "firtool-1.159.0",
+  "slang_enabled": true,
+  "targets": [
+    "circt-opt",
+    "firtool",
+    "circt-translate",
+    "arcilator",
+    "circt-reduce",
+    "circt-verilog"
+  ],
+  "tool_hashes": {
+    "arcilator": "96a4144e3709cf1a7ee40c04c7d37da13da1596513cf564510077cbf9a828053",
+    "circt-opt": "dcb9599a27a063a1d604873bb20daae29a0a1960a145073973b56b496b51d042",
+    "circt-reduce": "4c8d44794a9c0b6ffaf3d3d7b64a6a2738a203f29ae2c8a81a6d7ea8b79f082a",
+    "circt-translate": "f59b0f93b30b281e045ecff833c6d6b5868edbc69b0ae339b68b8e0e1acdf685",
+    "circt-verilog": "53c3cbd5d41f4f92cd23133d5cb7dfb1a5362cce424b130ea2ddc58ad78487d2",
+    "firtool": "9ca9b3ba0138fe08bd9a8e49063a5aa05aa7790a088394d89e10979064b149b9"
+  },
+  "verilator_version": "Verilator 5.020 2024-01-01 rev (Debian 5.020-1)"
+}
