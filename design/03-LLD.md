@@ -733,6 +733,20 @@ class RunManifest:
                            for c in self.run_commit]
 ```
 
+**Erratum 2026-09-15 (contract 2.2, the annotated tag `contract-2.2`).** `BudgetFile` above is two
+fields short. It gains `max_tool_iterations: dict`, whose keys are exactly the four model-bearing
+stages `stage_1`, `stage_2`, `stage_6` and `stage_7` and whose values are positive ints, and
+`minimal_case_lines: int`, positive. Both are validated by rules of their own in §2.8's conditional
+set, and §9.1 carries their rows in the registered key set. They are registered parameters and not
+implementation constants because §3.5.1's pre-authorisation is computed from the iteration cap and
+the same figure becomes the per-turn ceiling the backend enforces, and because `minimal_case_lines`
+decides gate question 2 (§3.9, FR-13.3). `LedgerEntry.observed`'s declared key set gains four in the
+same bump, `authorised_usd`, `ceiling_usd`, `billed_usd` and `calls` (§2.7, `02-HLD.md` §2.9). The
+bump is **MINOR**: §2.2's check compares the major half only, so a 2.0 or 2.1 instance still loads,
+and the one refusal it introduces is the intended one, a `BudgetFile` built from a 2.1 `budget.yaml`
+failing §9.2's complete-and-closed check on two missing keys. This listing also still omits the four
+keys of 2026-09-14, which §16.2 records against §2.4 and which §9.1 and §9.5 carry.
+
 ### 2.5 The interface, and the read-only ledger view
 
 ```python
@@ -2146,6 +2160,57 @@ that both arrive on the `llm` workers by the same mechanism (§11.2, §12.1).
    `failure="max_output_tokens"` and charges to the ledger like any other failed turn. Raising it is
    a knob this design does not add.
 
+**Erratum 2026-09-15: the spend guard, which this section did not have.** `llm.SpendGuard` is what
+authorises a turn against `campaign_spend_cap_usd` before `llm_turn` is dispatched, and it prices
+**the whole tool loop**, because the backend re-sends the entire conversation on every call and a
+turn's input cost therefore grows quadratically in the number of calls.
+
+```python
+n = max_tool_iterations + final_tool_iterations + 1   # 1 for a turn with no tools
+tokens_in  = sum(prompt_tokens + i * TOOL_OUTPUT_TOKENS_CAP for i in range(n))
+tokens_out = n * max_output_tokens
+worst_case_usd = tokens_in / 1e6 * price_in + tokens_out / 1e6 * price_out
+```
+
+`prompt_tokens` is the prompt plus the system message at `CHARS_PER_TOKEN`, and
+`TOOL_OUTPUT_TOKENS_CAP` is **32768**, which is a cap **by construction** and not by measurement:
+`SourceReadTool.read_cap_bytes` is 65536 bytes and `CHARS_PER_TOKEN` is 2.0, so no single tool result
+can exceed it. `authorise` refuses the turn with `SpendCapRefused` when settled spend plus what is in
+flight plus this worst case reaches the cap; the same figure is then handed to the backend as
+`turn_budget_usd`, a **per-turn ceiling** the backend checks before every call and raises
+`TurnBudgetExceeded` on, which is never retried. `settle` closes a turn at its bill when usage came
+home and at its **whole authorisation** when none did, which is the case for every stage-7 attempt
+(§3.8) and for every turn that raised, because such a turn may already have been billed for the calls
+it made and releasing the authorisation would price it at nothing. A raised turn carries its
+settlement out on the exception itself, as `turn_usage`, so the figures do not die with the call
+stack. All of it reaches `LedgerEntry.observed` as `authorised_usd`, `ceiling_usd`, `billed_usd` and
+`calls` (contract 2.2, §2.4). Without the guard a pilot billed 19.7x, 32.3x and 64.1x its
+authorisations and finished 43.3 % past its registered cap.
+
+**Erratum 2026-09-15: a turn's tool budget is three phases, not one loop.** Phase A is
+`max_tool_iterations` calls with every tool callable. Phase B runs for **stage 2 only**, is
+`per_seed_probe_cap + 1` calls in function-calling mode `ANY` restricted by name to the
+`write_probe` method, and exists because stage 2's deliverable is itself a tool call: a turn that
+spends its reading budget has otherwise no call left in which to write, and the restriction is what
+keeps the forced call off the read tools. Phase C follows unconditionally, mode `ANY` forbidding a
+tool-free answer, and is **one** call in mode `NONE` carrying a user message that says the tool calls
+are exhausted and asks for the answer in exactly the format the instructions require. The tool
+**declarations** stay in that request and only the mode changes: dropping `tools` from a conversation
+whose history holds `function_call` and `function_response` parts leaves the request inconsistent and
+the model answers it with no part at all. Without phase C a turn that spent its whole budget reading
+returned an empty `final_text`, `parse_json_footer` raised `no_block` and the seed produced no probe,
+which is what a pilot measured on both of its seeds at a cap of 6. Phase C is bounded like every
+other call: `turn_budget_usd` is checked before it is sent and its tokens are accumulated when it
+returns. The paging half is the tool's: `read_file(path, first_line)` returns one 64 KiB page ending
+in `... [truncated: continue with first_line=N of M lines]`, and `grep` pages the same way and names
+the matches it dropped, so a large file costs several bounded calls rather than one unbounded return.
+§7.2 and §7.3 state the budgets to the model as `$max_tool_calls` and, for stage 2, `$write_calls`.
+Finally, a **429 is retried inside the call** rather than ending the turn: exponential backoff from
+20 s, doubling to a cap of 300 s, six tries, jittered by a fifth so concurrent stage nodes do not
+re-send together, with a `Retry-After` header or a protobuf retry delay in the error's own details
+taking precedence. A refused call is billed nothing, so waiting costs wall clock only and the arm
+window already bounds that.
+
 **The tool list handed to both turns is exactly `[source_read, probe_write]`** and FR-04.4's unit test
 asserts that literal list. **`BashTool` is not given to stage 1, stage 2 or stage 6** and this
 revision withdraws it from all three (W10).
@@ -2293,6 +2358,23 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
 `tests/test_generate_task.py` reads `inspect.getsource(generate_mutation)` and asserts the identifier
 `feedback` appears exactly once, in the parameter list. That satisfies FR-16.2 and FR-05.4 together
 with one signature and one code path.
+
+**Erratum 2026-09-15: `stale_at_build`, a seed the arm skips before any mutator runs.** `A4` first
+runs the seed's **own unmutated** first test file through its entry tool at the run's commit, under
+`budget.yaml`'s per-probe limits and through the same `circt_exec_probe` a real probe uses, writing
+the input as `seed_input<suffix>` and the tool's stderr as `seed_build.stderr` in the iteration
+directory. An ordinary non-zero exit means the tool no longer accepts the seed's own test, so every
+mutant of that seed would inherit the rejection and the arm would learn nothing: the node returns
+`failure=STALE_AT_BUILD` with a detail naming the tool, the test path and the commit, no
+`ProbeSpec`, no mutator charged and `CounterBlock.started` zero, because nothing was attempted. A
+**signal** or a limit hit is a finding and not staleness and does not skip the seed, which is why the
+test is `signal is None and limit_hit is None and exit_status not in (0, None)` and not a truth test
+on the exit code. The check costs one probe-shaped run per seed per iteration and is what stops the
+arm spending a whole window producing mutants that cannot parse. Separately, the argument vector the
+arm preserves (FR-05.5) is `seed_argv_template`, the seed's own template with `strip_probe_only_options`
+already applied, so `--verify-diagnostics` and `--split-input-file` in **both** dash spellings are
+gone before `mutate_seed` sees the vector and a mutator whose pattern targets one of them cannot fire
+in the arm at all.
 
 **`ProbeWriteTool`**, the second of the two agent-facing tools this design adds, and the only one that writes.
 
@@ -3353,6 +3435,25 @@ equivalent of CHIA's `prompts/system.md`. Until the join, `triage_report` import
 **inside the function**, because the apparatus half may not carry a module-scope edge into the supply
 half before W-17 and `generate_task.py` is where those callables were.
 
+**Erratum 2026-09-15: a third rule, and B7 makes no turn at all for most candidates.** B6b's
+`dedup_and_screen` runs **before** B7 and its verdict is an argument to it, so the verdict is known
+inside the node. For every verdict other than `new` the turn could change nothing: rule one above
+already fixes the classification and FR-13.5 already refuses the candidate at gate question 4, so the
+turn would buy a whole tool loop's worth of tokens and prose nothing reads. `screened_out(dedup)`
+therefore returns the classification, the prose and the reason with no dispatch: `known_issue` for
+`known_open_issue`, `known_closed_issue` and `fixed_post_pin`, `duplicate` for
+`duplicate_of_candidate` and `untriaged` for `dedup_unavailable`, with `NO_TURN_PROSE` in the three
+prose slots of §7.4.1, a sentence that says in the report itself that no model turn was made and why.
+The report is still rendered by `render_report` from the record, so rule two is untouched and every
+number in it is the record's. `Report.classification` is not a contract member, so `duplicate` costs
+no version bump. The turn's five files of FR-11.7 are still written, with an empty transcript and
+`turn_skipped` naming the verdict. A pilot paid USD 3.96 for one such turn over a candidate the
+screen had already matched to an open issue, and its prose disagreed with the match and was overruled
+by rule one in the same function. **Stage 6's surviving turn is §3.5.1's three-phase turn** and is
+bounded by `budget.yaml`'s `max_tool_iterations["stage_6"]`, which §7.4's prompt states to the model
+as `$max_tool_calls`; stage 6 has no write phase, its deliverable being text, so its `n` is the
+iteration cap plus one.
+
 ### 3.8 `repair_adapter.py` (B8, F-12)
 
 ```python
@@ -3395,6 +3496,24 @@ and `OracleVerdict.repro_command` names the original input without saying which 
 2026-09-15, `--no-repair`, which is `RepairRefused("repair_disabled")` and is checked before the
 interlock so that a disabled run asks for no credential at all** (consequence 4, §13.1). Only `crash`
 and `assertion` proceed.
+
+**Erratum 2026-09-15: one refusal more, and the two bounds `build_cfg` now assembles.** The driver
+refuses before B8 is dispatched at all when the candidate's `DedupVerdict` is anything but `new`:
+`_drive_repair` records `skipped:<verdict>` and invokes nothing, a known or duplicate candidate being
+already somebody's issue while stage 7 is the most expensive stage of the loop. The refusal is the
+**driver's** and not the adapter's, so §3.8's closed exception set is unchanged. `build_cfg` then
+carries two keys beyond the sixteen below: `max_tool_iterations`, the integer from `budget.yaml`'s
+`stage_7` entry, and `turn_budget_usd`, the per-turn money ceiling, computed as §3.5.1's worst case
+for the largest turn a phase can make, its longest prompt body as the system message and the rendered
+report as the prompt. Both are in `CFG_KEYS` and both are **type-checked before the chain is
+called**, one `int` and one `float`, because the generator's own `cfg` carries a `max_tool_iterations`
+that is a per-stage **dict** and handing that to a backend constructor would fail inside CHIA's file.
+The patched branch below passes both to `VertexGeminiLLM`, so no phase runs with the backend's own
+defaults and none is unbounded. The attempt's tokens stay unobservable for the reason this section
+already gives, so `stage7_observed` records `billed_usd` null and `calls` null and sets
+`authorised_usd` to **five times the ceiling**, one for each phase `run_issue_remote` runs, which is
+what the ledger counts the attempt at. Pre-flight check 13 greps the **staged** `issue_task.py` for
+both `cfg` reads and refuses the run when a stale copy passes neither (§13.1).
 
 **Then the interlock, added 2026-09-14 with the `vertex` branch** (§3.5.1). CHIA's `_turn` builds its
 own backend inside CHIA's file, which cannot carry the loop's refusal, so the adapter carries it:
@@ -3842,6 +3961,22 @@ answer, which FR-13.10 defaults to `nothing` and FR-18.6's table had no row for,
 **`undecided`**. The mapping lives in a pure `decide(fields, repair)` so that `T-U-gate-17` can
 produce a null answer at all: the four questions as implemented cannot be made to return one on
 demand.
+
+**Erratum 2026-09-15: a fifth question-2 value, `already_minimal`, and it is a PASS.** `reduced=false`
+with `fixpoint=true` is the reducer stating that the case **cannot** be made smaller, and question 2
+read it as `not_minimal`: a pilot's `circt-reduce` made twenty interestingness calls on a six-line
+`moore.net` module, removed nothing, and all three of that run's candidates, one of them a real CIRCT
+assertion found on the first seed, were refused over a case the reducer had just proved irreducible.
+`_question_2(reduced, minimal_case_lines)` is now, in order: no reducer, `no_reducer`; a re-check that
+did not match, `reduction_changed_failure`; no fixpoint, `not_fixpoint` when something was removed
+and the reducer's own reason otherwise; then, with a fixpoint reached and nothing removed, a pass as
+**`already_minimal`** when the case is at or below `minimal_case_lines` and a failure at the
+reducer's own reason when it is larger or its lines cannot be counted at all. Because
+`already_minimal` is a pass it never reaches `_q2_stopping_value`, so `TAXONOMY` is unchanged and
+FR-18.6's six buckets stay total; an unreadable case is never called minimal. `minimal_case_lines`
+is a registered `[DEFAULT]`, 12 (§9.1), and `gate_decide` takes it keyword-only from
+`campaign.budget`, which is what keeps the threshold in the pre-registration rather than in this
+module.
 
 **`approve.py`** is a program, not a node: `input()` and `print()`, no framework (ADR-D-12). §13.2
 gives its commands, ~~and its entry point is the `bugloop-approve` console script~~ **corrected
@@ -5127,6 +5262,36 @@ Every table carries `run_manifest_id` so a row traces to its run (FR-17.6), and 
 an artefact carries `artefact_dir` so a row traces to disk (FR-17.2). Types are SQLite's; a `TEXT`
 column holding JSON is named `_json` so a reader never has to guess.
 
+**Erratum 2026-09-15: one auxiliary table, `turn_failure`, outside the declared set below.** A turn
+that produced nothing reaches no other table in this section, because nothing downstream of stage 2
+runs for it: there is no probe, so no `probe_result`, no `candidate` and no verdict row, and the only
+trace is an artefact directory nobody counts. `turn_failure` is that row.
+
+```sql
+CREATE TABLE IF NOT EXISTS turn_failure (
+    run_manifest_id     TEXT NOT NULL REFERENCES run(run_manifest_id),
+    seed_sha            TEXT NOT NULL,
+    arm                 TEXT NOT NULL,
+    iteration           INTEGER NOT NULL,
+    stage               TEXT NOT NULL,
+    kind                TEXT NOT NULL,
+    detail              TEXT
+);
+```
+
+It is **appended to and never keyed**, one row per failure and not one per seed, so a seed that fails
+on each of its iterations leaves each of them. `kind` is the verdict the generator returned,
+`turn_failed:<ExceptionType>`, `prompt_contract:<reason>` or `stale_at_build`, and `detail` is the
+exception's type and the first 200 characters of its message, or, for `stale_at_build`, the tool, the
+test path and the commit. It is declared separately from the frozen
+`_DDL_TABLES` string and appended to the schema `init_schema` runs, which is what lets it be added
+without touching the table list this section declares. `render_results` reads it for a section of its
+own, "Turns that produced nothing", grouped by arm, stage and kind with a count and the first
+detail, because a turn that bought nothing is exactly what a lower-bound spend figure is a lower
+bound **by**, and it is counted rather than described. The same renderer prints an arm whose window
+never opened as **`not started`** in every column of the windows table rather than as a row of zeros,
+a zero elapsed and a zero spend being indistinguishable from an arm that ran and found nothing.
+
 ```sql
 PRAGMA foreign_keys = ON;
 
@@ -5506,6 +5671,21 @@ matters. `ix_mirror_state` above serves the state filter, not the match.
    (`chia:chia/database/sqlite_node.py:377-423`). Two places use it: the candidate row plus its
    `fingerprint` and `dedup_verdict` rows, and the `gate_decision` row plus the `candidate` row's
    `taxonomy_bucket` update.
+
+**Erratum 2026-09-15: a fifth rule, for the turn that produced nothing.** A turn that **raises** is
+written down three times, and the order matters because each of the three can be lost on its own.
+(a) Inside the node, the five files of FR-04.6 are written in a `finally`, so a raised turn still
+leaves its prompt, its empty transcript, its stderr and its `llm_<stage>.usage.json`; that usage file
+carries the **settlement** and not a row of zeros, the authorisation, the ceiling, a null bill and
+the settled figure, which §3.5.1's guard attaches to the exception before it propagates precisely
+because the counting copy would otherwise die with the call stack and the ledger would price a raised
+turn at nothing. (b) The exception itself is written to `turn_failed.txt` in the iteration directory:
+its type, its message capped at 2000 characters, then the last thirty lines of the traceback. (c) The
+generator returns the verdict `turn_failed:<ExceptionType>` and a 200-character detail, and the
+driver appends one `turn_failure` row (§6.2) **before** it decides whether to continue, so a run
+killed at the next seed still records the failure it already had. The node itself raises nothing:
+FR-04.8 requires the arm to continue, so the exception is caught at the node boundary and only the
+verdict travels.
 
 ### 6.5 The artefact tree, field by field
 
@@ -6422,6 +6602,24 @@ pre-registration commit, and `05-Work-Plan.md` schedules it. A wrong price moves
 quantity: it moves only `cost_usd` and the point at which the USD cap binds, and both are printed
 beside the headline with the price they were computed from.
 
+**Erratum 2026-09-15 (contract 2.2, the annotated tag `contract-2.2`): the registered key set gains
+two rows.** `budget.py` rejects a file carrying any key this table does not name and a file missing
+any key it does, so the table is the key set and these two belong in it.
+
+| Key | Type | Unit | Default marker | Requirement |
+|---|---|---|---|---|
+| `max_tool_iterations` | mapping, keys `stage_1`, `stage_2`, `stage_6`, `stage_7`, values positive ints | backend calls per turn | `[DEFAULT]`, 12, 12, 6, 20 | FR-04.1, FR-11.1, FR-12.1, FR-14.1 |
+| `minimal_case_lines` | int, positive | lines | `[DEFAULT]`, 12 | FR-13.3, FR-14.1 |
+
+Both are campaign parameters and not implementation constants, on this section's own test. §3.5.1's
+pre-authorisation is computed **from** the iteration cap and the same figure becomes the per-turn
+money ceiling the backend enforces, so changing it changes every authorised number and the point at
+which `campaign_spend_cap_usd` binds; a cap fixed in code after the data exists would put a free
+parameter inside a reported number, which is exactly what §9.1's opening rule forbids. Likewise
+`minimal_case_lines` decides gate question 2 (§3.9), and gate refusals are a reported number. The
+`stage_7` value is **recorded rather than enforced** by this file: the loop there hands the number to
+CHIA's own chain (§3.8), which owns the loop it bounds.
+
 ### 9.2 The checks `budget.py` makes before a run starts
 
 1. **Committed, and earlier.** `git -C <repo> log -1 --format=%H%x09%cI -- budget.yaml` must return a
@@ -6521,6 +6719,18 @@ module-level constant in the module named.
 Every value below is a `[DEFAULT]` chosen by design except `corpus_head_sha`, which is measured, and
 `calibration_sample_size`, which ADR-D-01 fixes at 20. This is a complete, valid file: `budget.py`
 accepts it and no key is missing.
+
+**Erratum 2026-09-15: three values in the registered file differ from the listing below, and the
+listing is two keys short.** The file is therefore no longer complete as written, and each difference
+is a measurement rather than a second opinion.
+
+| Key | Below | Registered | Why |
+|---|---|---|---|
+| `arm_window_seconds` | 14400.0 | **7200.0** | A pilot spent about USD 0.6 a minute of wall clock on the seeded arm, so two four-hour arms are about USD 288 against a cap of 200 and the money would stop the campaign inside its first arm, which is what happened. Two hours an arm, four for the campaign. The window is the budget (G-48), so it is fixed **before** the campaign from the pilot's own rate and the registered cap, never chosen to fit a result. |
+| `calibration_sample_size` | 20 | **0** | Not a choice: a seed is calibratable only when its parent's `llvm` gitlink **is** the run's own pin, and **0 of the 187 seed parents carry this deployment's pin**, the 187 being spread over 44 distinct pins. A sample of twenty drawn from the exact-pin seeds names twenty seeds calibration mode would refuse to probe. `calibration_sample_shas` is therefore empty and the campaign is registered as **discovery mode**; §9.2's check 5 asserts the two agree, which they do at zero. |
+| `max_tool_iterations` | absent | **12, 12, 6, 20** | New at contract 2.2 (§9.1). 12 for stages 1 and 2 because a pilot ran both of its stage-1 turns out of a cap of 6 and they returned nothing at all; 6 for stage 6, which reads the record and writes prose; 20 for stage 7, recorded rather than enforced here. |
+| `minimal_case_lines` | absent | **12** | New at contract 2.2 (§9.1). Every case that pilot produced was six lines or fewer, and a report a maintainer reads is not improved by a case being eight lines rather than twelve. A case **above** the threshold that the reducer could not shrink still fails, which is the case worth failing. |
+| `issue_mirror_issue_cap` | 20000 | **12000** | One direction of the walk reaches 9,900 numbered items and two reach 19,800, and `llvm/circt`'s newest number on 2026-09-14 was 11,113; a cap above the union's reach is a promise the endpoint cannot keep. Open since W-17 in the errata log and owed to this section; folded here so the differences are one list. |
 
 ```yaml
 # budget.yaml - the pre-registration of the CIRCT bug-loop campaign.
@@ -7413,6 +7623,34 @@ first, so a misconfiguration is caught before an image build is attempted.
     and the variable and stops the run before a single turn is dispatched, so a campaign cannot
     discover the misconfiguration eight seeds in. `--dry-run` runs this check like any other, which
     is how an operator confirms the cluster is ready to spend money without spending any.
+
+**Erratum 2026-09-15: three corrections to the list above.** The count is **fifteen**, not eleven:
+`PREFLIGHT_CHECKS` names them in order and the four beyond check 11 are `live_model`,
+`vertex_branch`, `vertex_usage_patch` and `entrypoint_import`.
+
+- **Check 11 exempts a run that cannot file.** A run whose **registered** `filings_total` is 0 is a
+  run that can produce no report for any maintainer to be surprised by, and FR-20.1's forum post
+  exists so that maintainers are not met by reports from a system they were never told about, so the
+  check returns without asking for a URL. The contract makes `RunManifest.forum_post_url` and
+  `forum_post_date` non-null, so such a run records **why** there is no post rather than a URL
+  nobody posted: the constant `NO_FORUM_POST`, "none: this run's registered filings_total is 0
+  (FR-20.1)". A positive cap is unchanged, and a missing URL still stops the run naming both fields.
+- **Check 13 reads the staged copy, not the source tree.** It greps the `issue_task.py` the workers
+  will actually run for `elif backend == "vertex":` and, where that branch is present, for both
+  bounds it must hand the backend, the `max_tool_iterations=cfg[` and `turn_budget_usd=cfg[` reads of
+  §3.8's patch. A branch that passes neither means every phase of stage 7 would run with the
+  backend's own defaults and no money ceiling, which is the failure this check converts into a
+  refusal; the message says to re-stage the package. The first half is unchanged: with repair enabled
+  on the metered backend, a staged copy carrying no `vertex` branch at all is refused, because the
+  manifest would record a backend the chain cannot run.
+- **Check 2 is ancestry of a tag, not a date comparison.** The pre-registration is an **annotated
+  tag** `registration/<campaign id>`, resolved as the newest `refs/tags/registration/*` by creator
+  date and dereferenced to its commit; `("", "")` means the repository holds none, and only a
+  campaign is refused there, `--dry-run`, `--generator recorded` and `--draw-calibration` all
+  necessarily preceding the tag. The mutator set's last commit must then be that commit **or an
+  ancestor of it**, tested by `git merge-base --is-ancestor` with exit 1 read as the answer "no" and
+  anything else as a failure, rather than by comparing two commit dates, which two branches can order
+  wrongly. The list's phrasing above, "predates the budget file's", is the erratum.
 
 **Every `RunManifest` field, and who computes it.** Half the forty had no named producer (W27), which
 for a document whose standard is "an engineer types it in" is the same defect as a missing signature.
