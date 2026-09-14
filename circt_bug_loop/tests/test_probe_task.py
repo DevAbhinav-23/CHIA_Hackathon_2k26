@@ -542,26 +542,78 @@ def test_u_probe_23_24_the_two_counts_and_the_scope_root(tmp_path) -> None:
     assert verdict.fingerprint_frame == "parseHWArray HWTypes.cpp"
 
 
-@pytest.mark.t0
-def test_u_probe_24b_a_circt_rooted_crash_is_in_scope(tmp_path) -> None:
-    """T-U-probe-24 (FR-07.5), the other side: a crash whose root IS CIRCT's.
+CRASHES = sorted(d for d in (FIXTURES / "crashes").iterdir() if d.is_dir()) \
+    if (FIXTURES / "crashes").is_dir() else []
 
-    Pass criterion: on the recorded `crash_01` fixture, whose first stripped
-    frames are SDK header inlines and whose first CIRCT frame is the folder that
-    dereferenced null, the fingerprint frame is the folder and the top-five
-    evidence tuple is the one the fixture recorded.
+
+def _fixture_roots(stderr: str) -> tuple:
+    """The CIRCT roots a mined fixture's own trace declares.
+
+    Every recorded trace names the binary it ran on its `Program arguments:`
+    line, and `analysis/measurements/w09_attempt.sh` builds each parent into
+    `w09/b<NNN>` from the worktree `w09/wt<NNN>`, so the two roots follow from
+    that one path. Read from the fixture and never from this host: the paths are
+    the mining host's and are recorded verbatim.
     """
-    crash = FIXTURES / "crashes" / "crash_01"
+    tool = re.search(r"Program arguments: (\S+)", stderr).group(1)
+    build = str(Path(tool).parent.parent) + "/"
+    number = re.search(r"/b(\d+)/", build).group(1)
+    return tool, (build, build.replace(f"/b{number}/", f"/wt{number}/"))
+
+
+@pytest.mark.t0
+@pytest.mark.parametrize("crash", CRASHES, ids=[d.name for d in CRASHES])
+def test_u_probe_51_the_oracle_against_every_recorded_real_failure(
+        crash, tmp_path) -> None:
+    """T-U-probe-51 (FR-07.1 to FR-07.5), `04-Test-Plan.md` §5 and F-07's acceptance.
+
+    W-09 mined each of these by building CIRCT at a seed's parent commit and
+    recording what the tool actually printed; `expected.json` is that recording.
+    This test replays every one of them through the oracle with no CIRCT
+    present, so the classifier, the two assertion patterns, `_FRAME`, the
+    prologue strip and the fingerprint rule are all checked against real output
+    rather than against a synthetic sample.
+
+    Pass criterion: for every committed fixture the class, the number of
+    prologue frames dropped, the fingerprint frame and the top-five evidence
+    tuple equal the recording, and for an `assertion` the extracted text and
+    site equal it character for character.
+    """
     expected = json.loads((crash / "expected.json").read_text())
-    build = _build("crash", "clean.txt", tmp_path, binary_path=CRASH_01_TOOL,
+    stderr = (crash / "stderr.txt").read_text()
+    tool, roots = _fixture_roots(stderr)
+    build = _build(expected["class"], "clean.txt", tmp_path, binary_path=tool,
+                   signal=expected["signal"], exit_status=expected["exit_status"],
                    stderr_path=str(crash / "stderr.txt"))
-    verdict = _oracle(build, tmp_path, circt_roots=CRASH_01_ROOTS)
+    verdict = _oracle(build, tmp_path, circt_roots=roots)
+    assert verdict.fired is True
+    assert verdict.oracle_class == expected["class"]
     assert verdict.prologue_dropped == expected["prologue_dropped"]
     assert verdict.fingerprint_frame == expected["fingerprint_frame"]
     stripped = strip_prologue(verdict.frames)
     assert [probe_task._normalise_function(f.function) for f in stripped[:5]] == \
         expected["top_frames"]
-    assert verdict.oracle_class == expected["class"]
+    assert verdict.assertion_text == expected["assertion_text"]
+    assert verdict.assertion_site == expected["assertion_site"]
+    if expected["class"] == "assertion":
+        assert verdict.assertion_text in stderr
+        assert verdict.assertion_site in stderr
+    assert classify_build(expected["exit_status"], expected["signal"], stderr,
+                          None)[0] == expected["class"]
+
+
+@pytest.mark.t0
+def test_u_probe_51b_at_least_five_recorded_failures_are_committed() -> None:
+    """F-07's feature acceptance: the sample size `budget.yaml` records.
+
+    Pass criterion: at least `acceptance.recorded_failures` fixtures exist and
+    they cover all three firing classes, so the oracle's acceptance is a
+    property of the committed set and not of whichever fixture a test picked.
+    """
+    classes = {json.loads((d / "expected.json").read_text())["class"]
+               for d in CRASHES}
+    assert len(CRASHES) >= 5, [d.name for d in CRASHES]
+    assert classes == {"assertion", "crash", "fatal_error"}, classes
 
 
 @pytest.mark.t0
