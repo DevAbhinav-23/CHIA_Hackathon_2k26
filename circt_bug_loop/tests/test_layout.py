@@ -471,13 +471,20 @@ def interlock_setters(path: Path) -> list:
     `os.putenv`, with the name read as a literal or as any attribute or name
     ending `LIVE_MODEL_ENV`; a name the walk cannot resolve to a literal is a
     failure, because "a computed name does not pass it".
+
+    The RECEIVER is read as well as the method name, which the first version did
+    not do: a bare `setdefault` is `dict.setdefault` far more often than it is
+    `os.environ`'s, and `by_rule.setdefault(raw["rule"], [])` is a computed key
+    on a plain dict that the unqualified rule reported as an interlock write.
     """
+    receivers = {"setenv": "monkeypatch", "setdefault": "environ", "putenv": "os"}
     found = []
     for node in ast.walk(parse(path)):
         name_expr = None
         if isinstance(node, ast.Call):
             called = getattr(node.func, "attr", "")
-            if called in ("setenv", "setdefault", "putenv") and node.args:
+            if (called in receivers and node.args
+                    and ast.unparse(node.func.value).endswith(receivers[called])):
                 name_expr = node.args[0]
         elif isinstance(node, ast.Assign):
             for target in node.targets:
@@ -498,10 +505,6 @@ def interlock_setters(path: Path) -> list:
     return sorted(set(found))
 
 
-@pytest.mark.xfail(reason="errata row 23 (architect's decision 2): "
-                          "test_repair_adapter.py sets BUGLOOP_ALLOW_LIVE_MODEL "
-                          "with monkeypatch.setenv, which the join replaces with "
-                          "require_live_model's env= mapping")
 @pytest.mark.t0
 def test_T_U_layout_08_no_test_sets_it():
     """T-U-layout-08 (NFR-06, NFR-08): no test module puts the interlock in the environment.

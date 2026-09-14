@@ -37,7 +37,7 @@ import os
 import shlex
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 
 import chia
 from chia.base.ChiaFunction import ChiaFunction
@@ -355,7 +355,8 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
                  verdict: OracleVerdict, manifest: RunManifest, cfg: dict, *,
                  local_id: int, input_path: str, created_utc: Optional[str] = None,
                  issue_solver: Optional[Path] = None,
-                 bin_dir: str = CIRCT_BUILD_BIN) -> RepairResult:
+                 bin_dir: str = CIRCT_BUILD_BIN,
+                 env: Optional[Mapping[str, str]] = None) -> RepairResult:
     """Present one local report to CHIA's chain, then restore the worker.
 
     Returns:
@@ -371,7 +372,10 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
         LiveModelRefused when the interlock of 3.5.1 is not set, or when the
         repair backend is vertex and GEMINI_API_KEY is unusable. Checked here
         because CHIA's _turn builds its own backend and cannot carry the loop's
-        refusal (3.5.1, 2026-09-14). The caller stops the run.
+        refusal (3.5.1, 2026-09-14). The caller stops the run. `env` is the
+        mapping that refusal reads, defaulting to the process environment; it is
+        `bug_loop.interlock_probe`'s own parameter applied to the one stage that
+        checks the interlock for itself (architect decision 2).
     """
     if not cfg.get("repair_enabled", True):
         raise RepairRefused("repair_disabled")
@@ -388,7 +392,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     # 3), so reaching it crosses no seam.
     require_live_model(
         f"stage 7 repair of {candidate.candidate_id}",
-        need_key=(cfg["repair_backend"] == MODEL_BACKEND))
+        need_key=(cfg["repair_backend"] == MODEL_BACKEND), env=env)
 
     import circt_util
 

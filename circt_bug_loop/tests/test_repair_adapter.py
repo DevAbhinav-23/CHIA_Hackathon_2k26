@@ -209,13 +209,17 @@ def _bin_dir(tmp_path, manifest, *, match=True):
     return str(directory)
 
 
+#: The interlock's ALLOW mapping, handed to `repair_adapt` as `env=`. Nothing in
+#: this file puts either name into the process environment: that is architect
+#: decision 2 and `T-U-layout-08` (1), and the refusal, the key check and the
+#: backend split all run against §3.5.1's real function either way.
+ALLOW_ENV = {"BUGLOOP_ALLOW_LIVE_MODEL": "1", "GEMINI_API_KEY": FAKE_KEY}
+
+
 def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
              manifest=None, chain=None, util=None, overwrite=None,
-             cfg=None, match=True, live=True):
+             cfg=None, match=True, env=None):
     """Drive one whole attempt with every CHIA edge replaced by a recorder."""
-    if live:
-        monkeypatch.setenv("BUGLOOP_ALLOW_LIVE_MODEL", "1")
-        monkeypatch.setenv("GEMINI_API_KEY", FAKE_KEY)
     generate = _recording_interlock(monkeypatch)
     manifest = manifest or _manifest(tmp_path)
     candidate = candidate or _candidate(tmp_path)
@@ -231,7 +235,8 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
         repair_adapt, _report(), candidate, _reduced(case), _verdict(), manifest,
         dict(cfg or {"repair_backend": "vertex"}),
         local_id=LOCAL_ID_BASE + 7, input_path="/art/probe/input.mlir",
-        created_utc="2026-09-14T00:00:00+00:00", bin_dir=bin_dir)
+        created_utc="2026-09-14T00:00:00+00:00", bin_dir=bin_dir,
+        env=dict(ALLOW_ENV if env is None else env))
     return types.SimpleNamespace(result=result, chain=chain, util=util,
                                  manifest=manifest, candidate=candidate,
                                  generate=generate, bin_dir=bin_dir)
@@ -400,7 +405,7 @@ def test_repair_06b_no_repair_refuses_before_the_interlock(tmp_path, monkeypatch
     `repair_disabled` as the stated reason, and asks for no credential at all."""
     chain = _Recorder({"status": "fixed"})
     with pytest.raises(RepairRefused) as refused:
-        _attempt(tmp_path, monkeypatch, chain=chain, live=False,
+        _attempt(tmp_path, monkeypatch, chain=chain, env={},
                  cfg={"repair_backend": "vertex", "repair_enabled": False})
     assert refused.value.reason == "repair_disabled"
     assert chain.calls == []
@@ -704,25 +709,27 @@ def test_repair_17_the_chain_is_called_inline(tmp_path, monkeypatch):
 
 def test_repair_22_the_interlock_gates_stage_seven(tmp_path, monkeypatch):
     """T-U-repair-22 (FR-12.1, NFR-08): `repair_adapt` calls
-    `generate_task.require_live_model` **before** it invokes the chain. With the
-    variable unset it refuses and never calls `run_issue_remote`; with it set and
-    the key unusable it refuses on the key half where the backend is `vertex` and
-    proceeds where it is `claude`, a fallback having its own credential."""
+    `llm.require_live_model` **before** it invokes the chain. With the variable
+    absent from the mapping it refuses and never calls `run_issue_remote`; with
+    it present and the key unusable it refuses on the key half where the backend
+    is `vertex` and proceeds where it is `claude`, a fallback having its own
+    credential. The mapping is passed as `env=` and no process variable is
+    touched (architect decision 2, T-U-layout-08 (1))."""
     chain = _Recorder({"status": "fixed"})
-    monkeypatch.delenv("BUGLOOP_ALLOW_LIVE_MODEL", raising=False)
     with pytest.raises(llm.LiveModelRefused):
-        _attempt(tmp_path, monkeypatch, chain=chain, live=False)
+        _attempt(tmp_path, monkeypatch, chain=chain, env={})
     assert chain.calls == [], "not one request may be made behind the interlock"
 
-    monkeypatch.setenv("BUGLOOP_ALLOW_LIVE_MODEL", "1")
-    monkeypatch.setenv("GEMINI_API_KEY", "${GEMINI_API_KEY}")
     with pytest.raises(llm.LiveModelRefused, match="GEMINI_API_KEY"):
-        _attempt(tmp_path / "b", monkeypatch, chain=chain, live=False)
+        _attempt(tmp_path / "b", monkeypatch, chain=chain,
+                 env={"BUGLOOP_ALLOW_LIVE_MODEL": "1",
+                      "GEMINI_API_KEY": "${GEMINI_API_KEY}"})
     assert chain.calls == []
 
     fallback = _manifest(tmp_path)
     fallback.model_ids["repair_adapt"] = "claude:claude-opus-4-6"
-    run = _attempt(tmp_path / "c", monkeypatch, manifest=fallback, live=False,
+    run = _attempt(tmp_path / "c", monkeypatch, manifest=fallback,
+                   env={"BUGLOOP_ALLOW_LIVE_MODEL": "1"},
                    cfg={"repair_backend": "claude"})
     assert run.generate.calls == [{"purpose": "stage 7 repair of cand-0001",
                                    "need_key": False}]
@@ -732,7 +739,7 @@ def test_repair_22_the_interlock_gates_stage_seven(tmp_path, monkeypatch):
 def test_repair_22b_the_loop_names_vertex_in_one_place_only(tmp_path):
     """T-U-layout-08's second clause, for this module: `repair_adapter.py` names
     no backend class at all. It gates CHIA's own construction path instead, and
-    `generate_task.build_llm` is the loop's only other one."""
+    `llm.build_llm` is the loop's only other one."""
     source = Path(repair_adapter.__file__).read_text()
     assert "VertexGeminiLLM" not in source
     assert "require_live_model" in source

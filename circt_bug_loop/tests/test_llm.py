@@ -8,11 +8,12 @@ generators stay in `test_generate_task.py` and the two `ChiaTool`s in
 `04-Test-Plan.md` §1.23 puts it.
 
 **`BUGLOOP_ALLOW_LIVE_MODEL` is never set by anything in this file**, not even
-inside `monkeypatch`. The allow path is exercised by handing
-`require_live_model` an explicit `env` mapping, which is architect's decision 2:
-the refusal, the key check and the express construction all run against the real
-code, and the real variable stays absent from this process for the whole session
-(`T-U-layout-08`, and `conftest.no_live_model` asserts it).
+inside `monkeypatch`, and neither is a stand-in name for it. The allow path is
+exercised by handing `require_live_model` and `build_llm` an explicit `env`
+mapping, which is architect's decision 2: the refusal, the key check and the
+express construction all run against the real code, and the real variable stays
+absent from this process for the whole session (`T-U-layout-08` (1), which the
+join un-`xfail`s, and `conftest.no_live_model`, which asserts it).
 """
 import ast
 import inspect
@@ -34,22 +35,16 @@ from circt_bug_loop.tests.test_tools import (throwaway_repo,  # noqa: F401
 pytestmark = pytest.mark.filterwarnings(
     "ignore::pydantic_settings.exceptions.IncompleteFieldDefinitionWarning")
 
-#: The variable name the interlock reads is substituted with this one wherever
-#: a test needs the ALLOW path. Nothing in this tree sets the real name.
-INTERLOCK_STUB = "BUGLOOP_TEST_INTERLOCK_STUB"
-
 #: A synthetic key, which is not a credential and never leaves this process.
 SYNTHETIC_KEY = "bugloop-synthetic-not-a-real-key"
 
 MODEL_ID = "gemini-3.8-flash"
 
-
-def allow_live_model(monkeypatch, key: str = SYNTHETIC_KEY) -> str:
-    """Open the interlock through a STUB variable name, never the real one."""
-    monkeypatch.setattr(llm_module, "_LIVE_MODEL_ENV", INTERLOCK_STUB)
-    monkeypatch.setenv(INTERLOCK_STUB, "1")
-    monkeypatch.setenv("GEMINI_API_KEY", key)
-    return key
+#: The interlock's ALLOW mapping. It is handed to `require_live_model` and to
+#: `build_llm` as `env=`, so the refusal, the key check and the express
+#: construction all run against the real code with the real variable absent from
+#: this process (architect decision 2; `T-U-layout-08` (1) has no carve-out).
+ALLOW_ENV = {"BUGLOOP_ALLOW_LIVE_MODEL": "1", "GEMINI_API_KEY": SYNTHETIC_KEY}
 
 
 # ---------------------------------------------------------------------------
@@ -70,25 +65,26 @@ def test_T_U_gen_21_the_interlock_refuses_without_the_variable(monkeypatch):
     monkeypatch.setattr(genai, "Client", lambda **kwargs: pytest.fail(
         "a client was constructed with the interlock closed"))
 
-    # (1) The real variable, absent, which is the state conftest asserts for
-    # every tier below T3 and which this file never changes.
+    # (1) The DEFAULT env, which is the process environment: the variable is
+    # absent for every tier below T3 and nothing in this tree sets it.
     assert llm_module._LIVE_MODEL_ENV not in os.environ
     with pytest.raises(LiveModelRefused) as raised:
         build_llm("system", 2400, MODEL_ID)
     assert llm_module._LIVE_MODEL_ENV in str(raised.value)
     assert "3.5.1" in str(raised.value)
 
-    # (2) The four other spellings, through the stub name, so that nothing here
-    # ever sets the real one.
-    monkeypatch.setattr(llm_module, "_LIVE_MODEL_ENV", INTERLOCK_STUB)
-    for spelling in ("", "0", "true", "${" + INTERLOCK_STUB + "}"):
-        monkeypatch.setenv(INTERLOCK_STUB, spelling)
+    # (2) The four other spellings, through an explicit mapping, so that nothing
+    # here writes the name into a process environment at all.
+    name = llm_module._LIVE_MODEL_ENV
+    for spelling in ("", "0", "true", "${" + name + "}"):
         with pytest.raises(LiveModelRefused):
-            build_llm("system", 2400, MODEL_ID)
+            build_llm("system", 2400, MODEL_ID,
+                      env={name: spelling, "GEMINI_API_KEY": SYNTHETIC_KEY})
 
-    monkeypatch.setenv(INTERLOCK_STUB, "1")
-    monkeypatch.setenv("GEMINI_API_KEY", SYNTHETIC_KEY)
-    assert llm_module.require_live_model("test") == SYNTHETIC_KEY
+    # (3) The one spelling that proceeds, against the same real function.
+    assert llm_module.require_live_model("test", env=ALLOW_ENV) == SYNTHETIC_KEY
+    assert llm_module.require_live_model(
+        "test", need_key=False, env={name: "1"}) is None
 
 
 @pytest.mark.t0
@@ -108,14 +104,12 @@ def test_T_U_gen_22_the_interlock_refuses_without_a_usable_key(monkeypatch, valu
 
     monkeypatch.setattr(genai, "Client", lambda **kwargs: pytest.fail(
         "a client was constructed without a usable key"))
-    allow_live_model(monkeypatch)
-    if value is None:
-        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    else:
-        monkeypatch.setenv("GEMINI_API_KEY", value)
+    env = {"BUGLOOP_ALLOW_LIVE_MODEL": "1"}
+    if value is not None:
+        env["GEMINI_API_KEY"] = value
 
     with pytest.raises(LiveModelRefused) as raised:
-        build_llm("system", 2400, MODEL_ID)
+        build_llm("system", 2400, MODEL_ID, env=env)
     message = str(raised.value)
     assert "GEMINI_API_KEY" in message and socket.gethostname() in message
     if value:
@@ -136,8 +130,8 @@ def test_T_U_gen_23_express_mode_construction(monkeypatch, fake_vertex):
     from chia.models.vertex import VertexGeminiLLM
 
     install, capture = fake_vertex
-    key = allow_live_model(monkeypatch)
-    llm = build_llm("be terse", 2400, MODEL_ID)
+    key = SYNTHETIC_KEY
+    llm = build_llm("be terse", 2400, MODEL_ID, env=ALLOW_ENV)
 
     assert isinstance(llm, VertexGeminiLLM)
     assert llm.model == MODEL_ID
@@ -177,10 +171,9 @@ def test_T_U_gen_24_llm_turn_brings_the_usage_home(monkeypatch, fake_vertex):
     from chia.base.llm_call import QueryResult
 
     install, _ = fake_vertex
-    allow_live_model(monkeypatch)
     install([vertex_response([vertex_text_part("PONG")], in_tok=11, out_tok=7)])
 
-    llm = build_llm("be terse", 2400, MODEL_ID)
+    llm = build_llm("be terse", 2400, MODEL_ID, env=ALLOW_ENV)
     turn = call_node(llm_turn, llm, "ping", [])
 
     assert turn["usage"] == {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
@@ -214,7 +207,6 @@ def test_T_U_gen_25_the_tool_loop_runs_offline(monkeypatch, fake_vertex, tmp_pat
     """
     path, head = throwaway_repo
     install, capture = fake_vertex
-    allow_live_model(monkeypatch)
     install([vertex_response([vertex_call_part("src_x__read_file",
                                                {"path": "README.md"})],
                              in_tok=10, out_tok=5),
@@ -223,7 +215,7 @@ def test_T_U_gen_25_the_tool_loop_runs_offline(monkeypatch, fake_vertex, tmp_pat
 
     source_read = SourceReadTool(name="src_x", clone_path=path, run_commit=head)
     probe_write = ProbeWriteTool(name="probe_x", probe_dir=str(tmp_path / "probes"))
-    llm = build_llm("be terse", 2400, MODEL_ID)
+    llm = build_llm("be terse", 2400, MODEL_ID, env=ALLOW_ENV)
     turn = call_node(llm_turn, llm, "look at the tree", [source_read, probe_write])
 
     assert turn["result"] == "done"
