@@ -637,3 +637,98 @@ def test_T_U_upstream_13_the_429_retries_run_out_and_it_is_raised(monkeypatch,
     with pytest.raises(patched_vertex.RateLimitError):
         llm.prompt._chia_original(llm, "ping", [])
     assert len(calls) == 3, "one attempt of three calls, not three of three"
+
+
+def _truncated(part, usage):
+    """One response cut off at `max_output_tokens`, carrying *part*."""
+    return types.GenerateContentResponse(
+        candidates=[types.Candidate(
+            content=types.Content(role="model", parts=[part]),
+            finish_reason=types.FinishReason.MAX_TOKENS,
+        )],
+        usage_metadata=usage,
+    )
+
+
+@pytest.mark.t0
+def test_T_U_upstream_14_a_raised_turn_still_writes_its_log(monkeypatch,
+                                                            patched_vertex,
+                                                            tmp_path):
+    """T-U-upstream-14 (W-23): the stream log survives an exception mid-loop."""
+    tool = _install_fake_mcp(monkeypatch)
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="source__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    _install_fake_genai(monkeypatch, [reading, RuntimeError("connection reset")])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        log_dir=str(tmp_path), max_tool_iterations=4)
+    with pytest.raises(RuntimeError):
+        llm._run_generate("ping", [tool])
+
+    logs = list(tmp_path.glob("*.log"))
+    assert len(logs) == 1, logs
+    written = logs[0].read_text(encoding="utf-8")
+    assert "[Tool Call: source__read_file]" in written
+    assert "[Tool Result]\nSOURCE\n" in written
+    assert written.rstrip().endswith("-" * 80)
+
+
+@pytest.mark.t0
+def test_T_U_upstream_15_max_tokens_with_calls_is_executed(monkeypatch,
+                                                           patched_vertex):
+    """T-U-upstream-15 (W-23): a truncation that called tools is run, not raised."""
+    tool = _install_fake_mcp(monkeypatch)
+    calls = _install_fake_genai(monkeypatch, [
+        _truncated(types.Part(function_call=types.FunctionCall(
+            name="source__read_file", args={"path": "a.cpp"})),
+            _usage(prompt=10, candidates=5)),
+        _response(types.Part(text="ANSWER"), _usage(prompt=20, candidates=5))])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        max_tool_iterations=4)
+    result = llm._run_generate("ping", [tool])
+
+    assert result.result == "ANSWER" and len(calls) == 2
+    assert ("[DEBUG] MAX_TOKENS with 1 function calls; executed and continued\n"
+            in result.stream_result)
+    assert "[Tool Result]\nSOURCE\n" in result.stream_result
+
+
+@pytest.mark.t0
+def test_T_U_upstream_16_max_tokens_without_a_call_still_raises(monkeypatch,
+                                                                patched_vertex,
+                                                                tmp_path):
+    """T-U-upstream-16 (W-23): phase A raises; phase B keeps the partial text first."""
+    tool, _served = _write_tool(monkeypatch)
+    _install_fake_genai(monkeypatch, [
+        _truncated(types.Part(text="half a probe"), _usage(prompt=10, candidates=5))])
+
+    llm = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        max_tool_iterations=2)
+    with pytest.raises(patched_vertex.MaxOutputTokensError) as raised:
+        llm._run_generate("ping", [tool])
+    assert raised.value.partial_text == "half a probe"
+    assert "no function call" in raised.value.raw_message
+
+    reading = _response(
+        types.Part(function_call=types.FunctionCall(name="probe__read_file",
+                                                    args={"path": "a.cpp"})),
+        _usage(prompt=10, candidates=5))
+    _install_fake_genai(monkeypatch, [
+        reading,
+        _truncated(types.Part(text="half a probe"), _usage(prompt=10, candidates=5))])
+    phased = patched_vertex.VertexGeminiLLM(
+        model="gemini-3.8-flash", project="p", location="us-central1",
+        log_dir=str(tmp_path), max_tool_iterations=1,
+        final_tool_names=["probe_abc_write_probe"], final_tool_iterations=2)
+    with pytest.raises(patched_vertex.MaxOutputTokensError):
+        phased._run_generate("ping", [tool])
+
+    written = next(iter(tmp_path.glob("*.log"))).read_text(encoding="utf-8")
+    assert "[Partial Response]\nhalf a probe\n" in written
+    assert written.index("read budget exhausted") < written.index("[Partial Response]")

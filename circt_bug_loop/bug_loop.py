@@ -66,11 +66,14 @@ VERTEX_BRANCH_BOUNDS = ("max_tool_iterations=cfg[", "turn_budget_usd=cfg[")
 #: the way pilot 3 measured returning nothing - `final_tool_names` is D-3's:
 #: without it stage 2 never gets the phase in which it can only write - and
 #: `rate_limit_retries` is D-8's: without it one 429 ends the turn the way
-#: pilot 7 measured. Each names a piece of the CURRENT patch, so a copy
-#: carrying an OLDER one is re-patched, and refused when it cannot be.
+#: pilot 7 measured; `executed and continued` is W-23's: without it a truncated
+#: response that carried tool calls ends the turn the way campaign 1 measured.
+#: Each names a piece of the CURRENT patch, so a copy carrying an OLDER one is
+#: re-patched, and refused when it cannot be.
 VERTEX_USAGE_FIELDS = ("thoughts_token_count", "tool_use_prompt_token_count",
                        "turn_budget_usd", "NODE_ID_TIMEOUT_SECONDS",
-                       "tool_config", "final_tool_names", "rate_limit_retries")
+                       "tool_config", "final_tool_names", "rate_limit_retries",
+                       "executed and continued")
 
 #: Defaults for 13.1's argument table.
 DEFAULT_BUDGET = str(FLOW_DIR / "budget.yaml")

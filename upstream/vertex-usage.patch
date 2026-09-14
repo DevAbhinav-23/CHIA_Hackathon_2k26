@@ -1,5 +1,5 @@
 diff --git a/chia/models/vertex.py b/chia/models/vertex.py
-index d103349..64ed021 100644
+index d103349..d301fbb 100644
 --- a/chia/models/vertex.py
 +++ b/chia/models/vertex.py
 @@ -25,6 +25,8 @@ from __future__ import annotations
@@ -364,19 +364,52 @@ index d103349..64ed021 100644
  
      def _run_coroutine(self, coro):
          """Run *coro* whether or not an event loop is already running."""
-@@ -458,122 +753,222 @@ class VertexGeminiLLM(LLMCallBase):
-             contents = [types.Content(
-                 role="user", parts=[types.Part.from_text(text=user_message)]
-             )]
--            meta = {"input_tokens": 0, "output_tokens": 0, "num_turns": 0}
-+            # Bound to ``self`` so ``_run_generate``'s ``finally`` can publish
-+            # whatever was accumulated when this coroutine raises.
-+            meta = self._usage_meta = {"input_tokens": 0, "output_tokens": 0,
-+                                       "thinking_tokens": 0,
-+                                       "tool_use_prompt_tokens": 0,
-+                                       "num_turns": 0}
-             final_text = ""
+@@ -419,170 +714,298 @@ class VertexGeminiLLM(LLMCallBase):
+         truncated = user_message[:500] + ("..." if len(user_message) > 500 else "")
+         stream_parts.append(f"[User Message]\n{truncated}\n\n")
  
+-        async with AsyncExitStack() as stack:
+-            # --- Connect to every MCP server and gather function declarations ---
+-            function_decls = []
+-            dispatch: dict = {}  # gemini function name -> (session, mcp tool name)
+-            for tool in tools or []:
+-                port = getattr(tool, "port", 8000)
+-                url = f"http://{tool.hostname}:{port}/{tool.name}/mcp"
+-                transport = await stack.enter_async_context(streamable_http_client(url))
+-                read, write = transport[0], transport[1]
+-                session = await stack.enter_async_context(ClientSession(read, write))
+-                await session.initialize()
+-                listed = await session.list_tools()
+-                for fn in listed.tools:
+-                    api_name = f"{tool.name}__{fn.name}"[:64]
+-                    function_decls.append(types.FunctionDeclaration(
+-                        name=api_name,
+-                        description=fn.description or " ",
+-                        parameters=self._sanitize_schema(
+-                            fn.inputSchema or {"type": "object", "properties": {}}
+-                        ),
+-                    ))
+-                    dispatch[api_name] = (session, fn.name)
+-
+-            config_kwargs: dict = {
+-                "max_output_tokens": self.max_tokens,
+-                # We run the loop ourselves; don't let the SDK auto-call.
+-                "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+-                    disable=True
+-                ),
+-            }
+-            if self.system_message:
+-                config_kwargs["system_instruction"] = self.system_message
+-            if function_decls:
+-                config_kwargs["tools"] = [types.Tool(function_declarations=function_decls)]
+-            config = types.GenerateContentConfig(**config_kwargs)
+-
+-            contents = [types.Content(
+-                role="user", parts=[types.Part.from_text(text=user_message)]
+-            )]
+-            meta = {"input_tokens": 0, "output_tokens": 0, "num_turns": 0}
+-            final_text = ""
+-
 -            for _ in range(self.max_tool_iterations):
 -                try:
 -                    resp = await asyncio.to_thread(
@@ -396,63 +429,7 @@ index d103349..64ed021 100644
 -                if usage is not None:
 -                    meta["input_tokens"] += getattr(usage, "prompt_token_count", 0) or 0
 -                    meta["output_tokens"] += getattr(usage, "candidates_token_count", 0) or 0
-+            async def _tool_phase(iterations: int, phase_config) -> bool:
-+                """Run up to *iterations* tool calls; True when the model answered without one."""
-+                nonlocal final_text
-+                for _ in range(iterations):
-+                    # BEFORE the call, so the money it would have cost is not spent.
-+                    self._check_turn_budget(meta, contents)
-+                    resp = await self._one_call(client, contents, phase_config,
-+                                                meta, stream_parts)
-+
-+                    candidate = (resp.candidates or [None])[0]
-+                    if candidate is None or candidate.content is None:
-+                        # No candidate at all -> the prompt itself may have been
-+                        # blocked (safety etc.); surface that rather than returning
-+                        # a silent empty success.
-+                        block = self._prompt_block_reason(resp)
-+                        if block:
-+                            raise ContentBlockedError(
-+                                node_id=self._get_node_id(), block_reason=block,
-+                                raw_message=f"prompt blocked: {block}",
-+                            )
-+                        return True
-+
-+                    finish = getattr(candidate, "finish_reason", None)
-+                    finish_name = getattr(finish, "name", str(finish) if finish else "")
-+
-+                    # --- Log this turn's parts; collect function calls ---
-+                    turn_text_parts: list[str] = []
-+                    function_calls = []
-+                    for part in candidate.content.parts or []:
-+                        fc = getattr(part, "function_call", None)
-+                        if fc is not None:
-+                            function_calls.append(fc)
-+                            args_str = json.dumps(dict(fc.args or {}))
-+                            if len(args_str) > 2000:
-+                                args_str = args_str[:2000] + "\n... [truncated]"
-+                            stream_parts.append(
-+                                f"[Tool Call: {fc.name}]\nArgs: {args_str}\n\n"
-+                            )
-+                        elif getattr(part, "thought", False) and part.text:
-+                            stream_parts.append(f"[Thinking]\n{part.text}\n\n")
-+                        elif getattr(part, "text", None):
-+                            turn_text_parts.append(part.text)
-+                            stream_parts.append(f"[Response]\n{part.text}\n\n")
-+                    if turn_text_parts:
-+                        final_text = "".join(turn_text_parts)
-+
-+                    # Echo the model turn back verbatim (function_call parts must
-+                    # round-trip for the follow-up request).
-+                    contents.append(candidate.content)
-+
-+                    if finish_name == "MAX_TOKENS":
-+                        raise MaxOutputTokensError(
-+                            node_id=self._get_node_id(),
-+                            raw_message="response truncated at max_output_tokens",
-+                            partial_text=final_text,
-+                        )
- 
+-
 -                candidate = (resp.candidates or [None])[0]
 -                if candidate is None or candidate.content is None:
 -                    # No candidate at all -> the prompt itself may have been
@@ -460,23 +437,15 @@ index d103349..64ed021 100644
 -                    # a silent empty success.
 -                    block = self._prompt_block_reason(resp)
 -                    if block:
-+                    # The response was content-blocked (safety/recitation/...) -> the
-+                    # turn has no trustworthy output; surface it instead of breaking
-+                    # into a silent empty success.
-+                    if finish_name in _BLOCK_FINISH_REASONS and not function_calls:
-                         raise ContentBlockedError(
+-                        raise ContentBlockedError(
 -                            node_id=self._get_node_id(), block_reason=block,
 -                            raw_message=f"prompt blocked: {block}",
-+                            node_id=self._get_node_id(), block_reason=finish_name,
-+                            raw_message=f"response blocked: {finish_name}",
-                         )
+-                        )
 -                    break
- 
+-
 -                finish = getattr(candidate, "finish_reason", None)
 -                finish_name = getattr(finish, "name", str(finish) if finish else "")
-+                    if not function_calls:
-+                        return True
- 
+-
 -                # --- Log this turn's parts; collect function calls ---
 -                turn_text_parts: list[str] = []
 -                function_calls = []
@@ -492,118 +461,9 @@ index d103349..64ed021 100644
 -                        )
 -                    elif getattr(part, "thought", False) and part.text:
 -                        stream_parts.append(f"[Thinking]\n{part.text}\n\n")
-+                    # --- Execute each requested tool over its MCP server ---
-+                    response_parts = []
-+                    for fc in function_calls:
-+                        session, fn_name = dispatch.get(fc.name, (None, None))
-+                        if session is None:
-+                            result_text = f"Unknown tool: {fc.name}"
-+                            is_error = True
-+                        else:
-+                            try:
-+                                mcp_result = await session.call_tool(
-+                                    fn_name, dict(fc.args or {})
-+                                )
-+                                result_text = self._mcp_result_to_text(mcp_result)
-+                                is_error = bool(getattr(mcp_result, "isError", False))
-+                            except Exception as exc:
-+                                result_text = f"Tool execution error: {exc}"
-+                                is_error = True
-+                        logged = result_text
-+                        if len(logged) > 2000:
-+                            logged = logged[:2000] + "\n... [truncated]"
-+                        label = "Tool Result (error)" if is_error else "Tool Result"
-+                        stream_parts.append(f"[{label}]\n{logged}\n\n")
-+                        response_parts.append(types.Part.from_function_response(
-+                            name=fc.name,
-+                            response={"error": result_text} if is_error
-+                            else {"result": result_text},
-+                        ))
-+
-+                    contents.append(types.Content(role="user", parts=response_parts))
-+                return False
-+
-+            answered = await _tool_phase(self.max_tool_iterations, config)
-+            # Phase B: the reading budget is gone and the turn still owes its
-+            # caller a tool call, so spend a SECOND budget in which only the
-+            # deliverable tools are callable at all. Mode ANY forces a call;
-+            # the allowed list is what keeps it off the read tools.
-+            restricted = [name for name in dispatch
-+                          if any(name.endswith(final)
-+                                 for final in self.final_tool_names)]
-+            if not answered and restricted and self.final_tool_iterations > 0:
-+                names = ", ".join(restricted)
-+                stream_parts.append(
-+                    f"[DEBUG] read budget exhausted; {self.final_tool_iterations}"
-+                    f" calls restricted to {names}\n")
-+                contents.append(types.Content(role="user", parts=[
-+                    types.Part.from_text(text=(
-+                        f"Your reading calls are exhausted. Only {names} may "
-+                        "be called now, once per input; then answer in the "
-+                        "required format."))]))
-+                await _tool_phase(self.final_tool_iterations,
-+                                  types.GenerateContentConfig(**dict(
-+                                      config_kwargs,
-+                                      tool_config=types.ToolConfig(
-+                                          function_calling_config=types.FunctionCallingConfig(
-+                                              mode="ANY",
-+                                              allowed_function_names=restricted)))))
-+            # Phase C follows phase B unconditionally: mode ANY forbids the
-+            # tool-free answer, so the turn has still not been asked for one.
-+            if not answered:
-+                # The loop ran out of iterations without ever getting a
-+                # tool-free response, so ASK for one: exactly one more call,
-+                # the same system instruction and the whole conversation, and
-+                # a last user message telling the model to answer from what it
-+                # has already read. Without it the turn's entire spend buys
-+                # nothing — MEASURED, pilot 2 (W-18b): both stage-1 turns spent
-+                # all six of their iterations on source reads, returned an
-+                # EMPTY result, failed their caller's output contract and wrote
-+                # no probe at all. This call is bounded like every other:
-+                # ``turn_budget_usd`` is checked before it is sent, and its
-+                # tokens are accumulated when it returns.
-+                #
-+                # The tool DECLARATIONS stay in the config and the function
-+                # calling mode is set to NONE instead — MEASURED, pilot 3
-+                # (W-18e): dropping ``tools`` from a conversation whose history
-+                # carries ``function_call`` and ``function_response`` parts left
-+                # the request inconsistent and the model answered it with no
-+                # part at all. Mode NONE forbids a call without invalidating
-+                # the history, so the model can only write.
-+                stream_parts.append(
-+                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}"
-+                    f"; final answer requested\n"
-+                )
-+                contents.append(types.Content(role="user", parts=[
-+                    types.Part.from_text(text=(
-+                        "Your tool calls for this turn are exhausted. Answer "
-+                        "now, in exactly the format the instructions require, "
-+                        "from what you have already read."))]))
-+                final_kwargs = dict(config_kwargs)
-+                if "tools" in final_kwargs:
-+                    final_kwargs["tool_config"] = types.ToolConfig(
-+                        function_calling_config=types.FunctionCallingConfig(
-+                            mode="NONE"))
-+                self._check_turn_budget(meta, contents)
-+                resp = await self._one_call(
-+                    client, contents,
-+                    types.GenerateContentConfig(**final_kwargs), meta,
-+                    stream_parts)
-+                candidate = (resp.candidates or [None])[0]
-+                parts = getattr(getattr(candidate, "content", None), "parts", None)
-+                final_parts = []
-+                kinds = []
-+                ignored = []
-+                for part in parts or []:
-+                    if getattr(part, "thought", False):
-+                        kinds.append("thought")
-+                        if part.text:
-+                            stream_parts.append(f"[Thinking]\n{part.text}\n\n")
-                     elif getattr(part, "text", None):
+-                    elif getattr(part, "text", None):
 -                        turn_text_parts.append(part.text)
-+                        kinds.append("text")
-+                        final_parts.append(part.text)
-                         stream_parts.append(f"[Response]\n{part.text}\n\n")
+-                        stream_parts.append(f"[Response]\n{part.text}\n\n")
 -                if turn_text_parts:
 -                    final_text = "".join(turn_text_parts)
 -
@@ -617,7 +477,138 @@ index d103349..64ed021 100644
 -                        raw_message="response truncated at max_output_tokens",
 -                        partial_text=final_text,
 -                    )
--
++        try:
++            async with AsyncExitStack() as stack:
++                # --- Connect to every MCP server and gather function declarations ---
++                function_decls = []
++                dispatch: dict = {}  # gemini function name -> (session, mcp tool name)
++                for tool in tools or []:
++                    port = getattr(tool, "port", 8000)
++                    url = f"http://{tool.hostname}:{port}/{tool.name}/mcp"
++                    transport = await stack.enter_async_context(streamable_http_client(url))
++                    read, write = transport[0], transport[1]
++                    session = await stack.enter_async_context(ClientSession(read, write))
++                    await session.initialize()
++                    listed = await session.list_tools()
++                    for fn in listed.tools:
++                        api_name = f"{tool.name}__{fn.name}"[:64]
++                        function_decls.append(types.FunctionDeclaration(
++                            name=api_name,
++                            description=fn.description or " ",
++                            parameters=self._sanitize_schema(
++                                fn.inputSchema or {"type": "object", "properties": {}}
++                            ),
++                        ))
++                        dispatch[api_name] = (session, fn.name)
++
++                config_kwargs: dict = {
++                    "max_output_tokens": self.max_tokens,
++                    # We run the loop ourselves; don't let the SDK auto-call.
++                    "automatic_function_calling": types.AutomaticFunctionCallingConfig(
++                        disable=True
++                    ),
++                }
++                if self.system_message:
++                    config_kwargs["system_instruction"] = self.system_message
++                if function_decls:
++                    config_kwargs["tools"] = [types.Tool(function_declarations=function_decls)]
++                config = types.GenerateContentConfig(**config_kwargs)
++
++                contents = [types.Content(
++                    role="user", parts=[types.Part.from_text(text=user_message)]
++                )]
++                # Bound to ``self`` so ``_run_generate``'s ``finally`` can publish
++                # whatever was accumulated when this coroutine raises.
++                meta = self._usage_meta = {"input_tokens": 0, "output_tokens": 0,
++                                           "thinking_tokens": 0,
++                                           "tool_use_prompt_tokens": 0,
++                                           "num_turns": 0}
++                final_text = ""
++
++                async def _tool_phase(iterations: int, phase_config,
++                                      phase: str = "A") -> bool:
++                    """Run up to *iterations* tool calls; True when the model answered without one."""
++                    nonlocal final_text
++                    for _ in range(iterations):
++                        # BEFORE the call, so the money it would have cost is not spent.
++                        self._check_turn_budget(meta, contents)
++                        resp = await self._one_call(client, contents, phase_config,
++                                                    meta, stream_parts)
++
++                        candidate = (resp.candidates or [None])[0]
++                        if candidate is None or candidate.content is None:
++                            # No candidate at all -> the prompt itself may have been
++                            # blocked (safety etc.); surface that rather than returning
++                            # a silent empty success.
++                            block = self._prompt_block_reason(resp)
++                            if block:
++                                raise ContentBlockedError(
++                                    node_id=self._get_node_id(), block_reason=block,
++                                    raw_message=f"prompt blocked: {block}",
++                                )
++                            return True
++
++                        finish = getattr(candidate, "finish_reason", None)
++                        finish_name = getattr(finish, "name", str(finish) if finish else "")
++
++                        # --- Log this turn's parts; collect function calls ---
++                        turn_text_parts: list[str] = []
++                        function_calls = []
++                        for part in candidate.content.parts or []:
++                            fc = getattr(part, "function_call", None)
++                            if fc is not None:
++                                function_calls.append(fc)
++                                args_str = json.dumps(dict(fc.args or {}))
++                                if len(args_str) > 2000:
++                                    args_str = args_str[:2000] + "\n... [truncated]"
++                                stream_parts.append(
++                                    f"[Tool Call: {fc.name}]\nArgs: {args_str}\n\n"
++                                )
++                            elif getattr(part, "thought", False) and part.text:
++                                stream_parts.append(f"[Thinking]\n{part.text}\n\n")
++                            elif getattr(part, "text", None):
++                                turn_text_parts.append(part.text)
++                                stream_parts.append(f"[Response]\n{part.text}\n\n")
++                        if turn_text_parts:
++                            final_text = "".join(turn_text_parts)
++
++                        # Echo the model turn back verbatim (function_call parts must
++                        # round-trip for the follow-up request).
++                        contents.append(candidate.content)
++
++                        # A truncated response that still carries complete
++                        # function_call parts is WORK, not a loss: executing them
++                        # and looping is what the model asked for. MEASURED,
++                        # campaign 1 seed 1: stage 2 raised here and the whole
++                        # turn's spend bought nothing. Only a truncation that
++                        # carried no call at all ends the turn.
++                        if finish_name == "MAX_TOKENS":
++                            if function_calls:
++                                stream_parts.append(
++                                    f"[DEBUG] MAX_TOKENS with "
++                                    f"{len(function_calls)} function calls; "
++                                    "executed and continued\n")
++                            else:
++                                if phase != "A" and final_text:
++                                    stream_parts.append(
++                                        f"[Partial Response]\n{final_text}\n\n")
++                                raise MaxOutputTokensError(
++                                    node_id=self._get_node_id(),
++                                    raw_message="response truncated at "
++                                                "max_output_tokens with no "
++                                                "function call",
++                                    partial_text=final_text,
++                                )
++
++                        # The response was content-blocked (safety/recitation/...) -> the
++                        # turn has no trustworthy output; surface it instead of breaking
++                        # into a silent empty success.
++                        if finish_name in _BLOCK_FINISH_REASONS and not function_calls:
++                            raise ContentBlockedError(
++                                node_id=self._get_node_id(), block_reason=finish_name,
++                                raw_message=f"response blocked: {finish_name}",
++                            )
+ 
 -                # The response was content-blocked (safety/recitation/...) -> the
 -                # turn has no trustworthy output; surface it instead of breaking
 -                # into a silent empty success.
@@ -625,7 +616,92 @@ index d103349..64ed021 100644
 -                    raise ContentBlockedError(
 -                        node_id=self._get_node_id(), block_reason=finish_name,
 -                        raw_message=f"response blocked: {finish_name}",
--                    )
++                        if not function_calls:
++                            return True
++
++                        # --- Execute each requested tool over its MCP server ---
++                        response_parts = []
++                        for fc in function_calls:
++                            session, fn_name = dispatch.get(fc.name, (None, None))
++                            if session is None:
++                                result_text = f"Unknown tool: {fc.name}"
++                                is_error = True
++                            else:
++                                try:
++                                    mcp_result = await session.call_tool(
++                                        fn_name, dict(fc.args or {})
++                                    )
++                                    result_text = self._mcp_result_to_text(mcp_result)
++                                    is_error = bool(getattr(mcp_result, "isError", False))
++                                except Exception as exc:
++                                    result_text = f"Tool execution error: {exc}"
++                                    is_error = True
++                            logged = result_text
++                            if len(logged) > 2000:
++                                logged = logged[:2000] + "\n... [truncated]"
++                            label = "Tool Result (error)" if is_error else "Tool Result"
++                            stream_parts.append(f"[{label}]\n{logged}\n\n")
++                            response_parts.append(types.Part.from_function_response(
++                                name=fc.name,
++                                response={"error": result_text} if is_error
++                                else {"result": result_text},
++                            ))
++
++                        contents.append(types.Content(role="user", parts=response_parts))
++                    return False
++
++                answered = await _tool_phase(self.max_tool_iterations, config)
++                # Phase B: the reading budget is gone and the turn still owes its
++                # caller a tool call, so spend a SECOND budget in which only the
++                # deliverable tools are callable at all. Mode ANY forces a call;
++                # the allowed list is what keeps it off the read tools.
++                restricted = [name for name in dispatch
++                              if any(name.endswith(final)
++                                     for final in self.final_tool_names)]
++                if not answered and restricted and self.final_tool_iterations > 0:
++                    names = ", ".join(restricted)
++                    stream_parts.append(
++                        f"[DEBUG] read budget exhausted; {self.final_tool_iterations}"
++                        f" calls restricted to {names}\n")
++                    contents.append(types.Content(role="user", parts=[
++                        types.Part.from_text(text=(
++                            f"Your reading calls are exhausted. Only {names} may "
++                            "be called now, once per input; then answer in the "
++                            "required format."))]))
++                    await _tool_phase(self.final_tool_iterations,
++                                      types.GenerateContentConfig(**dict(
++                                          config_kwargs,
++                                          tool_config=types.ToolConfig(
++                                              function_calling_config=types.FunctionCallingConfig(
++                                                  mode="ANY",
++                                                  allowed_function_names=restricted)))),
++                                      "B")
++                # Phase C follows phase B unconditionally: mode ANY forbids the
++                # tool-free answer, so the turn has still not been asked for one.
++                if not answered:
++                    # The loop ran out of iterations without ever getting a
++                    # tool-free response, so ASK for one: exactly one more call,
++                    # the same system instruction and the whole conversation, and
++                    # a last user message telling the model to answer from what it
++                    # has already read. Without it the turn's entire spend buys
++                    # nothing — MEASURED, pilot 2 (W-18b): both stage-1 turns spent
++                    # all six of their iterations on source reads, returned an
++                    # EMPTY result, failed their caller's output contract and wrote
++                    # no probe at all. This call is bounded like every other:
++                    # ``turn_budget_usd`` is checked before it is sent, and its
++                    # tokens are accumulated when it returns.
++                    #
++                    # The tool DECLARATIONS stay in the config and the function
++                    # calling mode is set to NONE instead — MEASURED, pilot 3
++                    # (W-18e): dropping ``tools`` from a conversation whose history
++                    # carries ``function_call`` and ``function_response`` parts left
++                    # the request inconsistent and the model answered it with no
++                    # part at all. Mode NONE forbids a call without invalidating
++                    # the history, so the model can only write.
++                    stream_parts.append(
++                        f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}"
++                        f"; final answer requested\n"
+                     )
 -
 -                if not function_calls:
 -                    break
@@ -637,9 +713,60 @@ index d103349..64ed021 100644
 -                    if session is None:
 -                        result_text = f"Unknown tool: {fc.name}"
 -                        is_error = True
-+                    elif getattr(part, "function_call", None) is not None:
-+                        kinds.append("function_call")
-+                        ignored.append(getattr(part.function_call, "name", "") or "?")
++                    contents.append(types.Content(role="user", parts=[
++                        types.Part.from_text(text=(
++                            "Your tool calls for this turn are exhausted. Answer "
++                            "now, in exactly the format the instructions require, "
++                            "from what you have already read."))]))
++                    final_kwargs = dict(config_kwargs)
++                    if "tools" in final_kwargs:
++                        final_kwargs["tool_config"] = types.ToolConfig(
++                            function_calling_config=types.FunctionCallingConfig(
++                                mode="NONE"))
++                    self._check_turn_budget(meta, contents)
++                    resp = await self._one_call(
++                        client, contents,
++                        types.GenerateContentConfig(**final_kwargs), meta,
++                        stream_parts)
++                    candidate = (resp.candidates or [None])[0]
++                    parts = getattr(getattr(candidate, "content", None), "parts", None)
++                    final_parts = []
++                    kinds = []
++                    ignored = []
++                    for part in parts or []:
++                        if getattr(part, "thought", False):
++                            kinds.append("thought")
++                            if part.text:
++                                stream_parts.append(f"[Thinking]\n{part.text}\n\n")
++                        elif getattr(part, "text", None):
++                            kinds.append("text")
++                            final_parts.append(part.text)
++                            stream_parts.append(f"[Response]\n{part.text}\n\n")
++                        elif getattr(part, "function_call", None) is not None:
++                            kinds.append("function_call")
++                            ignored.append(getattr(part.function_call, "name", "") or "?")
++                        else:
++                            kinds.append("other")
++                    # Why an empty answer was empty: a blocked or stopped candidate
++                    # and a truncated one are the same "" to the caller otherwise.
++                    finish = getattr(candidate, "finish_reason", None)
++                    finish_name = getattr(finish, "name", str(finish) if finish else "")
++                    stream_parts.append(
++                        f"[DEBUG] final answer: finish={finish_name}, parts={kinds}"
++                        + (" (truncated at max_output_tokens)"
++                           if finish_name == "MAX_TOKENS" else "") + "\n")
++                    # MEASURED, pilot 5 (D-3): mode NONE did not hold and the whole
++                    # answer was one function_call part, which nothing executes.
++                    if ignored:
++                        stream_parts.append(
++                            "[DEBUG] function_call under NONE ignored: "
++                            + ", ".join(ignored) + "\n")
++                    # Nothing is raised for an empty or blocked final answer: this
++                    # call exists to salvage a turn that was already going to
++                    # return nothing, and an exception here would take the
++                    # accumulated counts and the whole stream with it.
++                    if final_parts:
++                        final_text = "".join(final_parts)
                      else:
 -                        try:
 -                            mcp_result = await session.call_tool(
@@ -663,32 +790,34 @@ index d103349..64ed021 100644
 -
 -                contents.append(types.Content(role="user", parts=response_parts))
 -            else:
-+                        kinds.append("other")
-+                # Why an empty answer was empty: a blocked or stopped candidate
-+                # and a truncated one are the same "" to the caller otherwise.
-+                finish = getattr(candidate, "finish_reason", None)
-+                finish_name = getattr(finish, "name", str(finish) if finish else "")
-                 stream_parts.append(
+-                stream_parts.append(
 -                    f"[DEBUG] Reached max_tool_iterations={self.max_tool_iterations}\n"
 -                )
-+                    f"[DEBUG] final answer: finish={finish_name}, parts={kinds}"
-+                    + (" (truncated at max_output_tokens)"
-+                       if finish_name == "MAX_TOKENS" else "") + "\n")
-+                # MEASURED, pilot 5 (D-3): mode NONE did not hold and the whole
-+                # answer was one function_call part, which nothing executes.
-+                if ignored:
-+                    stream_parts.append(
-+                        "[DEBUG] function_call under NONE ignored: "
-+                        + ", ".join(ignored) + "\n")
-+                # Nothing is raised for an empty or blocked final answer: this
-+                # call exists to salvage a turn that was already going to
-+                # return nothing, and an exception here would take the
-+                # accumulated counts and the whole stream with it.
-+                if final_parts:
-+                    final_text = "".join(final_parts)
-+                else:
-+                    stream_parts.append(
-+                        "[DEBUG] the final answer was empty\n")
++                        stream_parts.append(
++                            "[DEBUG] the final answer was empty\n")
++
++        finally:
++            # The transcript is the only record of a turn that RAISED, and
++            # measured (campaign 1, seed 1) a MAX_TOKENS turn left a ZERO-BYTE
++            # log because the exception left before this ran.
++            stream_parts.append("-" * 80 + "\n\n")
++            if self._log_prefix is not None:
++                try:
++                    with open(f"{self._log_prefix}.log", "a") as f:
++                        f.write("".join(stream_parts))
++                except OSError as exc:
++                    self.logger.warning("could not write %s.log: %s",
++                                        self._log_prefix, exc)
  
-         # --- Metadata + log file ---
+-        # --- Metadata + log file ---
++        # --- Metadata ---
          self._last_metadata = {k: v for k, v in meta.items() if v}
+ 
+-        stream_parts.append("-" * 80 + "\n\n")
+-        if self._log_prefix is not None:
+-            with open(f"{self._log_prefix}.log", "a") as f:
+-                f.write("".join(stream_parts))
+-
+         return QueryResult(
+             result=final_text,
+             returncode=0,
