@@ -485,3 +485,42 @@ committed cap 12,000: 2,652 issues, 198 pages, 212.4 s, two-direction walk,
 labelled `bug`** - M9's measured count, independently re-derived from a mirror
 refreshed today, so ADR-D-05's fallback to the 24-month fix-commit set is not
 taken and §8.3 step 2's figure needs no erratum.
+
+### W-12b (2026-09-14): the pre-registration becomes a tag, and the first live call
+
+The architect's binding decision on rows 26's B1 and B2, then the turn itself.
+Full record: `analysis/measurements/2026-09-16-mutator-synthesis.md` §9.
+
+| # | Finding | Owed to |
+|---|---|---|
+| 30 | **The pre-registration is an annotated `registration/<campaign-id>` TAG, not the first commit that ever landed `budget.yaml`. Row 26's B1 and B2 are CLOSED.** `budget.registration(repo_root)` resolves the newest such tag and dereferences it to a commit, `("", "")` meaning "not registered"; `mutator_synth.registration_commit` **is** that resolver and no longer a `git log -1 -- budget.yaml` of its own, so the rule A7 refuses on and the rule the campaign is checked against are one implementation (N3) and the two-pathspec problem of §1.4's two trees disappears with it. **Erratum against FR-14.3's second clause** ("that SHA is the pre-registration"): the SHA is still what the `RunManifest` records and is still the run's identity, and it is the TAG that registers. **Erratum against §8.3 step 1 and §8.1 rule 3**: "once a pre-registration commit exists" is "once the tag exists", which is what makes A7 - specified to run BEFORE the registration - runnable at all; a REGISTERED campaign still cannot synthesise, so the rule's purpose is untouched. **Erratum against §9.2 check 1**: the check keeps `git log -1 --format=%H%x09%cI -- budget.yaml` for FR-14.2's "committed, and earlier", and gains the tag; `load_budget` takes `campaign: bool` and only a campaign is refused in an unregistered repository, `--dry-run`, `--generator recorded` and `--draw-calibration` being the readers that necessarily precede the tag. `_CHECKS` stays **six** | 01 FR-14.3, FR-14.7; 03 §8.1 rules 2 and 3, §8.3 step 1, §9.2 check 1; 05's W-22 row, which now has a tag to place |
+| 31 | **"Frozen before the pre-registration" is ANCESTRY, not two commit dates. Erratum against §8.1 rule 2 and FR-05.2's acceptance.** `budget._check_frozen_set` and the driver's check 2 ask `git merge-base --is-ancestor <set commit> <tag commit>`, and FR-14.7's "edited after registration" asks the same of the budget file's own commit. `%cI` is metadata a rebase rewrites and a skewed clock orders either way; reachability from the tag is a property of the history the tag actually names. `check_02_mutator_set_earlier` no longer takes a `BudgetFile`: the registration SHA it used to read off one is the tag's | 01 FR-05.2's acceptance sentence; 03 §8.1 rule 2's two `%cI` reads |
+| 32 | **A `registration` table, and why it is not a column of `run`.** The decision asks the run to record WHICH pre-registration it was checked against. `RunManifest` has no open `budget` block, and the fallback - a column on `run` - is not available either: `T-U-store-01` compares `store._DDL_TABLES` to §6.2 for **textual** equality and W-12b may not edit a design document. The table is therefore its own statement, `store._DDL_REGISTRATION`, appended to the schema, keyed by `run_manifest_id` and carrying the tag and its commit; §6.2's text is still exactly what `_DDL_TABLES` holds. `T-U-store-01`'s table count is 22 and `T-U-store-06`'s traced count is 20. **The contract did not move**: `budget_file_sha` is unchanged and is still the run's identity | 03 §6.2 owes the table, or the column, whichever the architect prefers; 02 §... nothing |
+| 33 | **The first live call: eleven of twenty-two mutators dropped, ten of them to one unstated sentence.** §8.3's prompt never says which regular-expression engine compiles `pattern`. The model answered with ten variable-width look-behinds - `(?<=depth\s*=>\s*)` and nine like it - which PCRE accepts and Python's `re` refuses with `look-behind requires fixed-width pattern`, so step 4's `bad_pattern` check dropped all ten; an eleventh was dropped for an empty `replacement`. `set_v1.json` therefore carries **11** mutators, all of kind `text`, `mlir` 5, `fir` 5, `sv` 1 and `any` 0, so the campaign's own set exercises neither FR-05.5's `argv` path nor §8.2's line operations. **The prompt was NOT edited**: the freeze is write-once and the repository must hold the text that produced the committed bytes, so adding the sentence is a `set_v2` decision with a second turn attached, priced at about USD 0.49 | 03 §8.3's prompt owes one sentence naming Python's `re`; the architect owes the v1-or-v2 call; 01 FR-05.5 is unexercised by the frozen set |
+| 34 | **W1's pre-authorised "worst case" is not one, MEASURED.** `llm.SpendGuard.worst_case_usd` estimates input tokens at `len(prompt) / CHARS_PER_TOKEN` with `CHARS_PER_TOKEN = 3`. The live turn's 1,509,080-character prompt billed **619,603** input tokens - **2.436 characters per token**, so the estimate was **18.8 % low** and the authorised USD 0.43727 was **11.3 % below** the USD 0.486733 the turn actually cost. The docstring admits the direction and nothing had measured the size. It matters because this is the control that stops the campaign at `campaign_spend_cap_usd`: at this ratio the guard lets through about a ninth more than it authorises, per turn, and `authorised_usd` accumulates the under-estimate across a whole arm. **NOT FIXED** - the constant is `03-LLD.md` §3.5.1's and the safe value is a measurement over the campaign's own prompt shapes, not this one | 03 §3.5.1 and W1's formula; 01 FR-18.10's third stop condition |
+
+**The turn.** One dispatch, 128.3 s, `PYTHONPATH=circt_bug_loop/_shipped` so K11's
+patch was in the file **this** process imported (row 27's run rule, followed).
+Ledger and SDK agree exactly: 619,603 in, 5,875 out of which **2,975 thinking**,
+SDK `total_token_count` **625,478 = 619,603 + 2,900 + 2,975**, **USD 0.486733**
+at `budget.yaml`'s two verified prices. Priced the way unpatched CHIA counts the
+same turn costs USD 0.475577, so **K11 is worth USD 0.011156, 2.3 %, on one
+turn** - the first measurement of the defect it exists to fix.
+
+**Row 24's standing item is discharged in part.** `mutators/set_v1.json` exists,
+`sha256 180ca0ebf9c38c3bfd2635f7f778bbdb0c5a6b550f8b615432ab8705cd541e55`,
+committed before any registration tag, so the mutation arm can run a registered
+campaign. What it will run is eleven `text` mutators of which five are eligible
+for an MLIR seed: over the five recorded corpus seeds it produces **8 mutants at
+the registered `per_seed_probe_cap` of 5** and 43 no-ops, with 0 failures and
+every derived seed inside 63 bits. The five fixtures are all MLIR and are not the
+187-seed corpus, so that is evidence and not a measurement of the arm.
+
+**One thing that went wrong and cost nothing.** The first live attempt sent no
+request at all: this task's own `genai.Client` recorder dropped the real client's
+last reference (`RealClient(**kwargs).models`), CPython collected it and closed
+the transport under the surviving `models` object - six
+`Cannot send a request, as the client has been closed`, two empty transcripts,
+**USD 0.00**. The loop behaved correctly throughout: the turn was reported
+unsuccessful, `turn_usage` returned NULL counts and not zeros (K10), and
+`ledger.price` returned `None` and not a price.
