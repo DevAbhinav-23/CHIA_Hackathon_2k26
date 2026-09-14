@@ -368,11 +368,12 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
     assert measured_chars / llm_module.CHARS_PER_TOKEN > measured_tokens, \
         "an over-estimate of the token count is the safe direction"
 
-    # Authorising accumulates.
-    first = guard.authorise(one_call)
-    assert guard.authorised_usd == first
-    guard.authorise(one_call)
-    assert guard.authorised_usd == pytest.approx(2 * first)
+    # Authorising accumulates, each turn under its own handle.
+    one, first = guard.authorise(one_call)
+    assert guard.in_flight_usd == first
+    two, _ = guard.authorise(one_call)
+    assert guard.in_flight_usd == pytest.approx(2 * first)
+    assert one != two
 
     # And the refusal: a spend already at the cap stops the turn, and nothing is dispatched.
     monkeypatch.setattr(llm_module.llm_turn, "_chia_original",
@@ -386,7 +387,8 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
                                  timeout_seconds=60, model_id=MODEL_ID,
                                  guard=tight)
     assert "campaign_spend_cap_usd" in str(raised.value)
-    assert tight.authorised_usd == 0.0, "a refused turn authorises nothing"
+    assert tight.in_flight_usd == 0.0, "a refused turn authorises nothing"
+    assert tight.settled_usd == 0.0
 
     # The ceiling handed to the backend is EXACTLY what the guard authorised, never more.
     sent = {}
@@ -402,12 +404,72 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
     out = llm_module.dispatch_turn("be terse", "ping", [], stage="stage_2",
                                    timeout_seconds=60, model_id=MODEL_ID,
                                    guard=roomy, max_tool_iterations=6)
-    assert sent["turn_budget_usd"] == roomy.authorised_usd
+    billed = round(10 / 1e6 * 0.75 + 4 / 1e6 * 3.75, 6)
+    assert sent["turn_budget_usd"] == out["usage"]["authorised_usd"]
     assert sent["max_tool_iterations"] == 6
     assert roomy.worst_case_usd({**sent, "tools": []}) >= sent["turn_budget_usd"]
     # And the four money fields the ledger row of contract 2.2 carries.
-    assert out["usage"]["authorised_usd"] == roomy.authorised_usd
-    assert out["usage"]["ceiling_usd"] == roomy.authorised_usd
-    assert out["usage"]["billed_usd"] == round(
-        10 / 1e6 * 0.75 + 4 / 1e6 * 3.75, 6)
+    assert out["usage"]["ceiling_usd"] == out["usage"]["authorised_usd"]
+    assert out["usage"]["billed_usd"] == billed
     assert out["usage"]["calls"] == 3
+    # D-5: the turn settled to its bill, and holds nothing any more.
+    assert out["usage"]["settled_usd"] == billed
+    assert (roomy.settled_usd, roomy.in_flight_usd) == (billed, 0.0)
+
+
+@pytest.mark.t0
+def test_the_guard_settles_an_authorisation_to_what_the_turn_billed(monkeypatch):
+    """D-5 (pilot 6): the cap bounds money SPENT, so an authorisation is reconciled."""
+    def guard(cap_usd: float = 6.0):
+        one = llm_module.SpendGuard(
+            cap_usd=cap_usd, spend_usd=0.0,
+            price_usd_per_m_input_tokens=0.075,
+            price_usd_per_m_output_tokens=0.30)
+        monkeypatch.setattr(one, "worst_case_usd", lambda request: request["worst"])
+        return one
+
+    # Pilot 6's own two turns, at pilot 6's own cap: stage 2 is now ADMITTED.
+    settling = guard()
+    stage_1, authorised = settling.authorise({"worst": 2.729162})
+    assert (authorised, settling.in_flight_usd) == (2.729162, 2.729162)
+    assert settling.settle(stage_1, 0.605893) == 0.605893
+    assert (settling.settled_usd, settling.in_flight_usd) == (0.605893, 0.0)
+    stage_2, _ = settling.authorise({"worst": 4.384600})
+    assert (settling.in_flight_usd, settling.settled_usd) == (4.3846, 0.605893)
+    assert 0.605893 + 4.3846 < settling.cap_usd <= 2.729162 + 4.3846, \
+        "the accumulated authorisations are what refused this turn"
+
+    # A turn settles ONCE, and never releases what it never held.
+    assert settling.settle(stage_2, 0.5) == 0.5
+    with pytest.raises(KeyError):
+        settling.settle(stage_2, 0.5)
+
+    # An unobserved turn, and a turn that raised after its calls, keep the lot.
+    unobserved = guard()
+    handle, worst = unobserved.authorise({"worst": 1.5})
+    assert unobserved.settle(handle, None) == worst
+    assert (unobserved.settled_usd, unobserved.in_flight_usd) == (1.5, 0.0)
+
+    def explode(request):
+        raise RuntimeError("the backend went away mid-turn")
+
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original", explode)
+    raising = llm_module.SpendGuard(
+        cap_usd=100.0, spend_usd=0.0, price_usd_per_m_input_tokens=0.075,
+        price_usd_per_m_output_tokens=0.30)
+    with pytest.raises(RuntimeError):
+        llm_module.dispatch_turn("be terse", "ping", [], stage="stage_2",
+                                 timeout_seconds=60, model_id=MODEL_ID,
+                                 guard=raising)
+    assert raising.in_flight_usd == 0.0
+    assert raising.settled_usd == raising.worst_case_usd(
+        {"prompt": "ping", "system_message": "be terse", "tools": []})
+
+    # And the cap still refuses: settled plus in flight plus the worst case.
+    refusing = guard()
+    refusing.settle(refusing.authorise({"worst": 3.0})[0], 1.0)
+    refusing.authorise({"worst": 2.0})
+    with pytest.raises(llm_module.SpendCapRefused) as raised:
+        refusing.authorise({"worst": 3.5})
+    assert "in flight" in str(raised.value)
+    assert refusing.in_flight_usd == 2.0, "a refused turn authorises nothing"

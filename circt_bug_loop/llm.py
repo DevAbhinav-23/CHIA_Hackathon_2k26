@@ -135,7 +135,14 @@ class SpendGuard:
     price_usd_per_m_input_tokens: float
     price_usd_per_m_output_tokens: float
     max_output_tokens: int = MAX_OUTPUT_TOKENS
-    authorised_usd: float = 0.0
+    settled_usd: float = 0.0
+    _in_flight: dict = dataclasses.field(default_factory=dict)
+    _turns: int = 0
+
+    @property
+    def in_flight_usd(self) -> float:
+        """What the turns authorised but not yet settled still hold (D-5)."""
+        return round(sum(self._in_flight.values()), 6)
 
     def iterations(self, request: Mapping) -> int:
         """The `generate_content` calls *request* may make: `n` in the formula."""
@@ -160,18 +167,33 @@ class SpendGuard:
             tokens_in / 1e6 * self.price_usd_per_m_input_tokens
             + tokens_out / 1e6 * self.price_usd_per_m_output_tokens, 6)
 
-    def authorise(self, request: Mapping) -> float:
-        """Authorise one turn, or refuse it."""
+    def authorise(self, request: Mapping) -> tuple:
+        """Authorise one turn against settled spend plus what is in flight, or refuse it."""
         worst = self.worst_case_usd(request)
-        total = self.spend_usd + self.authorised_usd + worst
+        spent = self.spend_usd + self.settled_usd
+        total = spent + self.in_flight_usd + worst
         if total >= self.cap_usd:
             raise SpendCapRefused(
-                f"refusing the turn: USD {self.spend_usd:.4f} spent plus "
-                f"{self.authorised_usd:.4f} already authorised plus a worst case "
+                f"refusing the turn: USD {spent:.4f} spent plus "
+                f"{self.in_flight_usd:.4f} in flight plus a worst case "
                 f"of {worst:.4f} reaches campaign_spend_cap_usd "
                 f"{self.cap_usd:.4f} (FR-18.10, W1)")
-        self.authorised_usd += worst
-        return worst
+        self._turns += 1
+        self._in_flight[self._turns] = worst
+        return self._turns, worst
+
+    def settle(self, handle: int, billed_usd: Optional[float]) -> float:
+        """Settle turn *handle* at its bill, or at its whole authorisation when none was observed.
+
+        A turn that raised after its calls may have been billed for them, so an
+        unobserved turn keeps the worst case rather than releasing it (D-5).
+        """
+        if handle not in self._in_flight:
+            raise KeyError(f"turn {handle!r} is not in flight: it settled already")
+        authorised = self._in_flight.pop(handle)
+        settled = authorised if billed_usd is None else float(billed_usd)
+        self.settled_usd = round(self.settled_usd + settled, 6)
+        return settled
 
     def billed_usd(self, usage: Mapping) -> Optional[float]:
         """What a finished turn cost, at this guard's own two prices."""
@@ -247,15 +269,21 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
                "max_tool_iterations": max_tool_iterations,
                "final_tool_names": list(final_tool_names or []),
                "final_tool_iterations": int(final_tool_iterations)}
-    authorised = ceiling = None
+    handle = authorised = ceiling = billed = None
     if guard is not None:
-        authorised = ceiling = guard.authorise(request)
+        handle, authorised = guard.authorise(request)
+        ceiling = authorised
         request["turn_budget_usd"] = ceiling
-    out = (get(llm_turn.chia_remote(request)) if ray.is_initialized()
-           else llm_turn._chia_original(request))
-    usage = dict(out.get("usage") or {})
+    try:
+        out = (get(llm_turn.chia_remote(request)) if ray.is_initialized()
+               else llm_turn._chia_original(request))
+        usage = dict(out.get("usage") or {})
+        billed = guard.billed_usd(usage) if guard is not None else None
+    finally:
+        # A turn that raised settles at its authorisation, not at nothing (D-5).
+        settled = None if guard is None else guard.settle(handle, billed)
     usage.update(authorised_usd=authorised, ceiling_usd=ceiling,
-                 billed_usd=guard.billed_usd(usage) if guard is not None else None,
+                 billed_usd=billed, settled_usd=settled,
                  calls=usage.get("num_turns"))
     out["usage"] = usage
     return out

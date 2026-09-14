@@ -1238,7 +1238,12 @@ def test_T_U_driver_36_the_spend_guard_is_wired_and_stops_the_arm(tmp_path: Path
     assert run["outcome"]["stopped"] == "campaign_spend_cap"
     assert run["outcome"]["seeds"][0]["terminating_condition"] == "campaign_spend_cap"
     # And nothing was spent discovering it: the refusal precedes the request.
-    assert guard.authorised_usd == 0.0
+    assert (guard.in_flight_usd, guard.settled_usd) == (0.0, 0.0)
+    # D-5: the driver keeps no second sum of its own — the ledger's is the bill
+    # `accrue` priced from the turn's own tokens, the guard's is settled plus in
+    # flight, and `_spend_refused` only reads the failure the generator recorded.
+    assert bug_loop._spend_refused("turn_failed:SpendCapRefused") is True
+    assert bug_loop._spend_refused("turn_failed:PromptContractError") is False
 
 
 def test_a_failed_generator_turn_is_kept_on_the_seed_record(tmp_path: Path):
