@@ -453,11 +453,27 @@ def test_T_U_schema_18():
     carried = edit(result(), assertion_text=decoded, assertion_site="Name.cpp:1")
     back = schema.from_json(schema.to_json(carried), schema.ProbeResult)
     assert back.assertion_text == decoded
-    needles = ("errors=" + '"replace"', "errors=" + "'replace'")
+    # Both spellings, the keyword AND the POSITIONAL: `decode("utf-8",
+    # "replace")` passed the keyword-only search for a week and is what W-08's
+    # erratum 20 found in `corpus.py`, so the check is now an `ast` walk over
+    # every `decode` and `decode_bytes` call in the flow rather than a grep.
+    import ast
+
+    offenders = []
     for source in sorted(_FLOW_DIR.rglob("*.py")):
-        text = source.read_text(encoding="utf-8")
-        for needle in needles:
-            assert needle not in text, f"{source} uses the destructive decoder"
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if getattr(node.func, "attr", "") not in ("decode", "decode_bytes"):
+                continue
+            given = [ast.literal_eval(a) for a in node.args
+                     if isinstance(a, ast.Constant)]
+            given += [ast.literal_eval(k.value) for k in node.keywords
+                      if k.arg == "errors" and isinstance(k.value, ast.Constant)]
+            if "replace" in given:
+                offenders.append(f"{source}:{node.lineno}")
+    assert offenders == [], f"the destructive decoder is used at {offenders}"
 
 
 def test_T_U_schema_19():

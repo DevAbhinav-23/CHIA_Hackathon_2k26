@@ -30,11 +30,20 @@
 # BUGLOOP_ALLOW_LIVE_MODEL forwarded: it is a cluster-level interlock, set in the
 # operator's shell beside the key, and a job that could set it would be a job
 # that could switch the loop live.
+#
+# THE HEAD ENVIRONMENT. cluster_single.yaml activates ${BUGLOOP_HEAD_ENV} in
+# every head_* command, and the YAML cannot default it, so the default lives
+# here: the driver's job must run from the same interpreter `ray start --head`
+# ran from, or it imports a chia the cluster does not have. Exported and not
+# merely read, so a `chia up` run from this shell afterwards sees the same
+# value. It is NOT forwarded through --runtime-env-json: it is a path on the
+# head and not a job parameter, and the three keys below are the whole set.
 set -euo pipefail
 
 ADDR="${RAY_JOB_ADDR:-http://localhost:8265}"
 FLOW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYBIN="${BUGLOOP_PY:-python}"
+export BUGLOOP_HEAD_ENV="${BUGLOOP_HEAD_ENV:-$HOME/.cache/chia-venv/bin/activate}"
+PYBIN="${BUGLOOP_PY:-$(dirname "$BUGLOOP_HEAD_ENV")/python}"
 CHIABIN="${BUGLOOP_CHIA:-chia}"
 
 : "${BUGLOOP_ARTEFACTS:?set BUGLOOP_ARTEFACTS to the bind-mounted artefact root}"

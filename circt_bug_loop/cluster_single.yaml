@@ -182,11 +182,37 @@ initialization_commands: []
 setup_commands: []
 worker_setup_commands: []
 
+# THE HEAD ENVIRONMENT. Every head_* command activates it first, because the
+# driver, both head nodes and `ray start` itself must run from the interpreter
+# that has chia, ray and this flow importable; a head that starts Ray from the
+# system python brings the cluster up and then fails on the first dispatch.
+#
+# ${BUGLOOP_HEAD_ENV} is the ACTIVATE SCRIPT of that environment, expanded from
+# the operator's shell by chia.cluster.config._expand_env_vars at load, exactly
+# as ${CHIA_HEAD} and ${GEMINI_API_KEY} are (chia/cluster/config.py:300-309).
+# On the implementation machine it is the uv venv the whole project is run from:
+#
+#     export BUGLOOP_HEAD_ENV=$HOME/.cache/chia-venv/bin/activate
+#
+# and that path is THIS OPERATOR'S and not a property of the design: a head with
+# a conda environment sets it to that environment's own activate script and
+# nothing else here changes. It replaces `source ~/.bashrc && conda activate
+# circtbugloop`, which 03-LLD.md 12.1 wrote and which names an environment no
+# machine of this project has (errata row 25).
+#
+# THE VARIABLE IS REQUIRED, and cannot be given a default here: YAML has no
+# defaulting form, and CHIA's loader leaves an unset ${VAR} as the seven literal
+# characters rather than substituting anything, so an operator who forgets it
+# gets `source ${BUGLOOP_HEAD_ENV}: No such file or directory` from `chia up`
+# and no cluster. That is the safe direction and it is the same one build_llm
+# takes on an unexpanded GEMINI_API_KEY (3.5.1). `bug_loop_submit.sh` exports
+# the same variable, defaulting it to this operator's path, so the job the
+# driver runs in and the head Ray was started from are one environment.
 head_setup_commands:
-    - "source ~/.bashrc && conda activate circtbugloop"
+    - "source ${BUGLOOP_HEAD_ENV}"
 head_start_ray_commands:
-    - "source ~/.bashrc && conda activate circtbugloop && ray stop"
-    - "source ~/.bashrc && conda activate circtbugloop && ulimit -c unlimited && ray start --head --port=6379 --include-dashboard=True --dashboard-agent-listen-port=0"
+    - "source ${BUGLOOP_HEAD_ENV} && ray stop"
+    - "source ${BUGLOOP_HEAD_ENV} && ulimit -c unlimited && ray start --head --port=6379 --include-dashboard=True --dashboard-agent-listen-port=0"
 worker_start_ray_commands:
     - ray stop
     - ray start --address=$RAY_HEAD_IP:6379 --dashboard-agent-listen-port=0

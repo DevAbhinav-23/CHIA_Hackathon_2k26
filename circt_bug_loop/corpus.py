@@ -458,11 +458,18 @@ class _Git:
             if newline < 0:
                 blobs[spec] = None
                 continue
-            header = out[pos:newline].decode("utf-8", "replace").split()
+            # `errors="backslashreplace"` and NOT "replace", and the keyword
+            # form and not the positional one: the destructive decoder maps
+            # every undecodable byte to one U+FFFD and a seed text that went
+            # through it cannot be written back as the bytes CIRCT parsed
+            # (W-08 erratum 20; T-U-schema-18 asserts the rule over the tree).
+            header = out[pos:newline].decode(
+                "utf-8", errors="backslashreplace").split()
             pos = newline + 1
             if len(header) == 3 and header[1] == "blob":
                 size = int(header[2])
-                blobs[spec] = out[pos:pos + size].decode("utf-8", "replace")
+                blobs[spec] = out[pos:pos + size].decode(
+                    "utf-8", errors="backslashreplace")
                 pos += size + 1
             else:                                 # "missing" / "dangling"
                 blobs[spec] = None

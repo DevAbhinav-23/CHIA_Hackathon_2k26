@@ -196,3 +196,59 @@ def test_T_U_cluster_08(loader_env, monkeypatch):
     unexpanded = load_config(str(SINGLE)).node_types["bugloop_llm"]
     assert "-e GEMINI_API_KEY=${GEMINI_API_KEY}" in unexpanded.docker.run_options
     assert bug_loop.LIVE_MODEL_ENV not in os.environ
+
+
+def test_T_U_cluster_09(monkeypatch, loader_env, tmp_path):
+    """T-U-cluster-09 (NFR-10, FR-19.8): the head activates one real environment.
+
+    New id (W-17's ninth fix, errata row 25). §12.1 wrote `source ~/.bashrc &&
+    conda activate circtbugloop` and no machine of this project has that
+    environment, so every head command would have failed at `chia up` and the
+    cluster would have come up with Ray started from the system python. The
+    three head commands now activate `${BUGLOOP_HEAD_ENV}`, which the operator
+    sets to their own environment's activate script; YAML has no defaulting
+    form, so an unset variable survives as the literal and `chia up` fails
+    loudly rather than starting the wrong interpreter. `bug_loop_submit.sh`
+    holds the default, so the driver's job and the head's Ray are one
+    environment. Fixture: none. Tier 0.
+    """
+    from chia.cluster.config import load_config
+
+    document = raw(SINGLE)
+    head = (document["head_setup_commands"]
+            + document["head_start_ray_commands"])
+    assert len(head) == 3
+    assert all(command.startswith("source ${BUGLOOP_HEAD_ENV}")
+               for command in head), head
+    # No command activates a conda environment or sources a login shell. The
+    # word survives in two COMMENTS, one naming the worker image's own lit path
+    # and one naming what this replaced, so the check is over the commands.
+    commands = [c for key, value in document.items()
+                if key.endswith(("_commands", "setup_commands"))
+                for c in (value or [])]
+    commands += [c for node in document["available_node_types"].values()
+                 for c in (node.get("run_setup_commands") or [])]
+    assert not [c for c in commands if "conda" in c or "bashrc" in c]
+
+    # Expanded by CHIA's own loader from the operator's shell, and left as the
+    # literal when the shell has no value, which is the same rule the model key
+    # travels by (T-U-cluster-08).
+    activate = tmp_path / "venv" / "bin" / "activate"
+    activate.parent.mkdir(parents=True)
+    activate.write_text("# a head environment\n", encoding="utf-8")
+    monkeypatch.setenv("BUGLOOP_HEAD_ENV", str(activate))
+    loaded = load_config(str(SINGLE))
+    assert loaded.head_setup_commands == [f"source {activate}"]
+    assert all(str(activate) in command
+               for command in loaded.head_start_ray_commands)
+
+    monkeypatch.delenv("BUGLOOP_HEAD_ENV")
+    unexpanded = load_config(str(SINGLE))
+    assert unexpanded.head_setup_commands == ["source ${BUGLOOP_HEAD_ENV}"]
+
+    # The submit wrapper is where the default lives, and it derives the job's
+    # own interpreter from it rather than trusting whatever `python` resolves to.
+    submit = (FLOW / "bug_loop_submit.sh").read_text(encoding="utf-8")
+    assert 'export BUGLOOP_HEAD_ENV="${BUGLOOP_HEAD_ENV:-' in submit
+    assert 'PYBIN="${BUGLOOP_PY:-$(dirname "$BUGLOOP_HEAD_ENV")/python}"' in submit
+    assert "BUGLOOP_HEAD_ENV" not in submit.split("ENV_JSON=")[1].split("PY\n)")[0]
