@@ -196,10 +196,66 @@ def _head_node_id() -> str:
     return ray.get_runtime_context().get_node_id()
 
 
-def _head_options() -> dict:
-    """Return the scheduling_strategy dict that pins a task to the head."""
+def head_options(node_id: str) -> dict:
+    """Return the scheduling_strategy dict that pins a task to the head.
+
+    `soft=False`, which is the whole point: a soft affinity is a preference and
+    Ray falls back to any node with a free CPU, which is exactly the failure K5
+    describes - `ledger.accrue` opening `loop.db` inside a container where the
+    path does not exist, non-deterministically, hours into a run.
+
+    Returns:
+        {"scheduling_strategy": NodeAffinitySchedulingStrategy}, ready for
+        `.options(**...)` and for a `ChiaTool`'s `task_options`.
+    Worker:
+        pure; it builds a strategy object and dispatches nothing.
+    Raises:
+        nothing.
+    """
     return {"scheduling_strategy":
-            NodeAffinitySchedulingStrategy(node_id=_head_node_id(), soft=False)}
+            NodeAffinitySchedulingStrategy(node_id=node_id, soft=False)}
+
+
+#: Every node of 3.2 that MUST run on the head, by `<module>.<name>` (K4, K5).
+#:
+#: Each one is handed a head path - `loop.db` at 6.1, the blobless clone, the
+#: 0600 GitHub token file - and each is declared `@ChiaFunction(max_retries=0)`
+#: with NO resource, which Ray reads as "any node with a free CPU". The worker
+#: containers advertise CPU, so before this set existed the placement was a
+#: coin toss and `max_retries=0` meant there was no second attempt. The
+#: membership rule is the node's own docstring: `T-U-layout-11` asserts this
+#: set is exactly the nodes whose `Worker:` paragraph says head.
+HEAD_NODES = frozenset({
+    "circt_bug_loop.budget.load_budget",
+    "circt_bug_loop.corpus.build_corpus",
+    "circt_bug_loop.corpus.resolve_sites",
+    "circt_bug_loop.feedback.build_feedback",
+    "circt_bug_loop.gate.gate_decide",
+    "circt_bug_loop.ledger.accrue",
+    "circt_bug_loop.mutator_synth.synthesise_mutators",
+    "circt_bug_loop.pin_select.select_release_pinned_main",
+    "circt_bug_loop.results.render_results",
+    "circt_bug_loop.store.artefact_write",
+    "circt_bug_loop.triage_task.dedup_and_screen",
+    "circt_bug_loop.triage_task.issue_mirror_refresh",
+})
+
+
+def node_key(fn: Callable) -> str:
+    """`<module>.<name>` for one node, which is how `HEAD_NODES` names it.
+
+    `ChiaFunction.__call__` returns a `functools.wraps` closure, so the wrapper
+    carries the undecorated function's `__module__` and `__name__` and the key
+    is the same either side of the decorator.
+
+    Returns:
+        str.
+    Worker:
+        pure.
+    Raises:
+        nothing; a callable with neither attribute yields "".
+    """
+    return f"{getattr(fn, '__module__', '')}.{getattr(fn, '__name__', '')}"
 
 
 def runtime_env() -> dict:
@@ -250,26 +306,56 @@ class Dispatch:
     hashed a `/workspace/circt/build/bin/circt-opt` that does not exist on the
     head, got "" and raised `BinaryMismatch` for every probe. The predicate is
     now the duck test CHIA's own contract offers.
+
+    A NODE NAMED IN `HEAD_NODES` IS PINNED (K4, K5). Every head-side node is
+    declared with no resource, and Ray places an unresourced task on any node
+    with a free CPU; the worker containers advertise CPU, so `ledger.accrue`
+    and `dedup_and_screen` were free to land in a container where `loop.db`,
+    the clone and the token file do not exist. `call` adds a hard
+    `NodeAffinitySchedulingStrategy` for those and for no others.
     """
 
-    def __init__(self, *, remote: bool = True, options: Optional[dict] = None):
-        """Take the dispatch mode and the per-call `.options()` override."""
+    def __init__(self, *, remote: bool = True, options: Optional[dict] = None,
+                 head_node_id: Optional[str] = None):
+        """Take the dispatch mode, the `.options()` override and the head's id.
+
+        *head_node_id* defaults to the id of the node this runs on, resolved at
+        the first head dispatch: a `Dispatch` is only ever built by the driver
+        and the driver runs on the head (13.1's B12 row).
+        """
         self.remote = remote
         self.options = dict(options or {})
+        self.head_node_id = head_node_id
+
+    def head_options(self) -> dict:
+        """The pinning options for a `HEAD_NODES` member, resolved once."""
+        if self.head_node_id is None:
+            self.head_node_id = _head_node_id()
+        return head_options(self.head_node_id)
 
     def call(self, fn: Callable, *args, **kwargs) -> Any:
         """Run one stage node and return what it returned.
 
+        A node named in `HEAD_NODES` is dispatched with a HARD node affinity for
+        the head and never merely with its declared resources (K5): it is handed
+        `loop.db`, the blobless clone or the token file, none of which exists
+        inside a worker container, and its `max_retries=0` means a misplacement
+        is a lost stage and not a retry.
+
         Returns:
             whatever *fn* returns.
         Worker:
-            the node's own, declared by its decorator; this method chooses only
-            between dispatching it and running it here.
+            the node's own, declared by its decorator and, for a head node, by
+            the affinity this method adds; this method chooses only between
+            dispatching it and running it here.
         Raises:
             whatever *fn* raises, and whatever Ray re-raises from the worker.
         """
         if self.remote and hasattr(fn, "chia_remote"):
-            handle = fn.options(**self.options) if self.options else fn
+            options = dict(self.options)
+            if node_key(fn) in HEAD_NODES:
+                options.update(self.head_options())
+            handle = fn.options(**options) if options else fn
             return get(handle.chia_remote(*args, **kwargs))
         return getattr(fn, "_chia_original", fn)(*args, **kwargs)
 
@@ -1941,8 +2027,23 @@ def probe_limits(budget: BudgetFile) -> dict:
 
 
 def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
-                  iteration: int, artefact_dir: Optional[str] = None) -> dict:
+                  iteration: int, artefact_dir: Optional[str] = None,
+                  head_options: Optional[dict] = None,
+                  here_options: Optional[dict] = None) -> dict:
     """Return the `cfg` A3 and A4 read, built from the manifest and the budget.
+
+    `head_options` is the placement K4 needs and nothing else supplies: A3 sits
+    on a `circt` worker and two of the things it uses live on the head - the
+    blobless clone `resolve_sites` queries, and the `SourceReadTool` server that
+    reads it. With the key absent the tool was placed wherever the scheduler
+    liked and `_resolve_sites` fell through to running the query IN THE
+    CONTAINER, against a clone that is not bind-mounted there, after the
+    seed-read turn had already been paid for.
+
+    `here_options` is the same parameter for `ProbeWriteTool`, whose directory
+    is under the artefact root and so is reachable identically everywhere
+    (FR-17.9); it is therefore left None on a default run and is here because
+    3.5 names it and a caller with a reason may pass one.
 
     Returns:
         dict with the sixteen keys 3.5's two generators read.
@@ -1963,7 +2064,10 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
             "timeout_seconds": budget.probe_wall_seconds * 40,
             "price_usd_per_m_input_tokens": budget.price_usd_per_m_input_tokens,
             "price_usd_per_m_output_tokens": budget.price_usd_per_m_output_tokens,
-            "mutator_set_sha": manifest.mutator_set_sha}
+            "mutator_set_path": None,
+            "mutator_set_sha": manifest.mutator_set_sha,
+            "head_options": head_options,
+            "here_options": here_options}
 
 
 def empty_feedback(manifest: RunManifest, seed: SeedRecord, arm: str,
@@ -2104,8 +2208,10 @@ class Campaign:
                  counters: CounterLog, recorder: Optional[FixtureRecorder] = None,
                  clone_path: str = "", image_spec=None, repair_enabled: bool = True,
                  seed_map: Optional[dict] = None, now: Optional[Callable] = None,
-                 bin_dir: str = CIRCT_BIN_DIR):
+                 bin_dir: str = CIRCT_BIN_DIR,
+                 head_options: Optional[dict] = None):
         """Take everything a stage call needs, and compute nothing else."""
+        self.head_options = head_options
         self.manifest = manifest
         self.budget = budget
         self.store = store
@@ -2120,6 +2226,18 @@ class Campaign:
         self.seed_map = seed_map or {}
         self.now = now or time.monotonic
         self.bin_dir = bin_dir
+
+    def cfg(self, *, iteration: int, artefact_dir: Optional[str] = None) -> dict:
+        """This run's `generator_cfg`, carrying the head placement K4 needs.
+
+        One method and not four call sites, so the placement cannot be supplied
+        to some stages and forgotten by others: A3's `SourceReadTool` and B7's
+        are the same tool with the same reason to be pinned to the head.
+        """
+        return generator_cfg(self.manifest, self.budget,
+                             clone_path=self.clone_path, iteration=iteration,
+                             artefact_dir=artefact_dir,
+                             head_options=self.head_options)
 
     def call(self, name: str, fn: Callable, *args, **kwargs):
         """Dispatch one stage, fold its counters in, charge it, and return its result.
@@ -2331,8 +2449,7 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
         report = campaign.call(
             "triage_report", campaign.stages.triage_report, candidate, reduced,
             verdict, dedup, campaign.manifest,
-            generator_cfg(campaign.manifest, campaign.budget,
-                          clone_path=campaign.clone_path, iteration=spec.iteration),
+            campaign.cfg(iteration=spec.iteration),
             artefact_dir, _arm=spec.arm, _key=spec.probe_id)
     except Exception as error:
         return stop("stage_6", f"stage_6_error:{type(error).__name__}")
@@ -2395,9 +2512,7 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
         repair = campaign.call(
             "repair_adapt", campaign.stages.repair_adapt, report["report"],
             candidate, reduced, verdict, campaign.manifest,
-            generator_cfg(campaign.manifest, campaign.budget,
-                          clone_path=campaign.clone_path,
-                          iteration=spec.iteration),
+            campaign.cfg(iteration=spec.iteration),
             local_id=local_id, input_path=reduced.path or spec.input_path,
             _arm=spec.arm, _key=spec.probe_id)["result"]
         out["verdicts"]["stage_7"] = repair.status
@@ -2465,8 +2580,7 @@ def _drive_differential(campaign: Campaign, spec: ProbeSpec, build, result,
         report = campaign.call(
             "triage_report", campaign.stages.triage_report, candidate, None, None,
             None, campaign.manifest,
-            generator_cfg(campaign.manifest, campaign.budget,
-                          clone_path=campaign.clone_path, iteration=spec.iteration),
+            campaign.cfg(iteration=spec.iteration),
             artefact_dir, differential=verdict, _arm=spec.arm, _key=spec.probe_id)
     except Exception as error:
         return stop("stage_6", f"stage_6_error:{type(error).__name__}")
@@ -2505,8 +2619,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
         if deadline is not None and campaign.now() >= deadline:
             out["terminating_condition"] = "arm_window"
             return out
-        cfg = generator_cfg(campaign.manifest, campaign.budget,
-                            clone_path=campaign.clone_path, iteration=iteration)
+        cfg = campaign.cfg(iteration=iteration)
         try:
             generated = campaign.call(
                 f"generate_{arm}", campaign.stages.generator(arm), seed, bundle,
@@ -2887,8 +3000,8 @@ def worker_probes(dispatch: Dispatch, artefact_root: str, resources: dict) -> di
     probes = {}
     for worker_type, resource in sorted(resources.items()):
         probes[worker_type] = Dispatch(
-            remote=dispatch.remote, options={"resources": dict(resource)}
-        ).call(node, artefact_root)
+            remote=dispatch.remote, options={"resources": dict(resource)},
+            head_node_id=dispatch.head_node_id).call(node, artefact_root)
     return probes
 
 
@@ -2906,8 +3019,8 @@ def interlock_probes(dispatch: Dispatch, resources: dict) -> dict:
     probes = {}
     for worker_type, resource in sorted(resources.items()):
         probes[worker_type] = Dispatch(
-            remote=dispatch.remote, options={"resources": dict(resource)}
-        ).call(node)
+            remote=dispatch.remote, options={"resources": dict(resource)},
+            head_node_id=dispatch.head_node_id).call(node)
     return probes
 
 
@@ -2943,7 +3056,9 @@ def run_campaign(args, out) -> int:
     resources = {name: dict(node_type.resources)
                  for name, node_type in config.node_types.items()}
     ray.init(address="auto", runtime_env=runtime_env(), ignore_reinit_error=True)
-    dispatch = Dispatch(remote=True)
+    # The driver IS the head (13.1's B12 row), so its own node id is what pins
+    # every `HEAD_NODES` member and every head-side tool server (K4, K5).
+    dispatch = Dispatch(remote=True, head_node_id=_head_node_id())
 
     check_05_artefact_root_workers(
         artefact_root=args.artefact_root,
@@ -3029,7 +3144,8 @@ def run_campaign(args, out) -> int:
                         dispatch=dispatch,
                         counters=counters, recorder=recorder,
                         clone_path=args.clone, image_spec=image_spec,
-                        repair_enabled=repair_enabled(args))
+                        repair_enabled=repair_enabled(args),
+                        head_options=dispatch.head_options())
     arms = None if args.arm == "both" else [args.arm]
     outcome = campaign_drive(campaign, seeds, arms=arms)
     outcome["reconciliation"] = reconcile(store, ISSUES_DB_PATH)

@@ -712,3 +712,95 @@ def test_T_U_layout_10_sync_into_a_real_checkout(tmp_path: Path):
     assert tree_state(target / "examples" / "circt_bug_loop") == once
     assert issue_task.read_text(encoding="utf-8").count(
         'elif backend == "vertex":') == 1
+
+
+# ---------------------------------------------------------------------------
+# T-U-layout-11: the head placement set (K4, K5)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.t0
+def test_T_U_layout_11_head_nodes_match_the_docstrings():
+    """T-U-layout-11 (K4, K5): `HEAD_NODES` is exactly the nodes that say head.
+
+    New id, W-20b. Ray places a task with no resource on any node with a free
+    CPU, and every head-side node is declared `@ChiaFunction(max_retries=0)`
+    with none; the worker containers advertise CPU, so before `HEAD_NODES`
+    existed `ledger.accrue` and `dedup_and_screen` were free to open `loop.db`
+    inside a container where its path does not exist, once per run, at random.
+    The membership rule is structural and is read off the tree rather than
+    restated: a node that declares NO resource is one Ray may place anywhere,
+    and every such node in this flow is a head node. Each one's own `Worker:`
+    paragraph is then asserted to say so, which is the half a human reads.
+
+    Fixture: none. Tier 0.
+    """
+    import re
+
+    unresourced = set()
+    for path in flow_files():
+        for node in parse(path).body:
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            decorators = [ast.unparse(d) for d in node.decorator_list]
+            chia = [d for d in decorators if "ChiaFunction" in d]
+            if chia and "resources=" not in chia[0]:
+                unresourced.add(f"circt_bug_loop.{path.stem}.{node.name}")
+
+    assert bug_loop.HEAD_NODES == unresourced
+
+    for dotted in sorted(bug_loop.HEAD_NODES):
+        node = node_object(dotted.split("circt_bug_loop.")[1])
+        assert node._chia_options == {"max_retries": 0}, dotted
+        assert bug_loop.node_key(node) == dotted
+        worker = re.search(r"Worker:\s*\n(.+?)(?:\n\s*Raises:|\Z)",
+                           node._chia_original.__doc__ or "", re.DOTALL)
+        assert worker and "head" in worker.group(1).lower(), dotted
+
+
+@pytest.mark.t0
+def test_T_U_layout_11_dispatch_pins_them_and_nothing_else(monkeypatch):
+    """T-U-layout-11 (K4, K5): the affinity is hard, and only head nodes get one.
+
+    `soft=False` is the assertion that matters: a soft affinity is a preference
+    and Ray falls back to any node with a free CPU, which is the very placement
+    the set exists to forbid. CHIA's `get` is substituted so that no ObjectRef
+    is collected and no local Ray is started (§0.4). Fixture: none. Tier 0.
+    """
+    from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+    HEAD_ID = "ab" * 28          # Ray validates the length of a node id
+
+    from circt_bug_loop import ledger as ledger_module
+    from circt_bug_loop import probe_task
+
+    seen = {}
+    monkeypatch.setattr(bug_loop, "get", lambda ref: ref)
+
+    def stand_in(fn):
+        """A node with *fn*'s identity, recording the options it is dispatched at."""
+        class _Node:
+            __module__, __name__ = fn.__module__, fn.__name__
+
+            def __init__(self, options=None):
+                self._options = options or {}
+
+            def options(self, **options):
+                return _Node(options)
+
+            def chia_remote(self, *args, **kwargs):
+                seen[bug_loop.node_key(self)] = self._options
+                return "collected"
+
+        return _Node()
+
+    dispatch = bug_loop.Dispatch(remote=True, head_node_id=HEAD_ID)
+    assert dispatch.call(stand_in(ledger_module.accrue)) == "collected"
+    assert dispatch.call(stand_in(probe_task.probe_execute)) == "collected"
+
+    assert set(seen) == {"circt_bug_loop.ledger.accrue",
+                         "circt_bug_loop.probe_task.probe_execute"}
+    strategy = seen["circt_bug_loop.ledger.accrue"]["scheduling_strategy"]
+    assert isinstance(strategy, NodeAffinitySchedulingStrategy)
+    assert strategy.node_id == HEAD_ID and strategy.soft is False
+    assert seen["circt_bug_loop.probe_task.probe_execute"] == {}

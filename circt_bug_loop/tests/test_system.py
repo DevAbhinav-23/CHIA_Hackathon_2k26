@@ -181,6 +181,9 @@ def drive(manifest: RunManifest, budget: BudgetFile, seeds: list, *,
     (root / "results").mkdir(parents=True, exist_ok=True)
     store = LoopStore(str(Path(manifest.artefact_root) / "loop.db"))
     dispatch = bug_loop.Dispatch(remote=remote)
+    # The head placement the driver supplies (K4, K5). Resolved only when a Ray
+    # is running, a `remote=False` campaign having no cluster to pin to.
+    head = dispatch.head_options() if remote else None
     # §6.4's first four tables, as `run_campaign` writes them: the run, the
     # image, the seed rows the seeded-bug validation table is taken over, and
     # the two `shared` occupancies - one of which carries the synthesis date
@@ -196,7 +199,7 @@ def drive(manifest: RunManifest, budget: BudgetFile, seeds: list, *,
         manifest=manifest, budget=budget, store=store,
         stages=bug_loop.recorded_stages(), dispatch=dispatch,
         counters=counters, clone_path=clone_path, image_spec=image_spec(),
-        repair_enabled=False)
+        repair_enabled=False, head_options=head)
     outcome = bug_loop.campaign_drive(campaign, seeds, arms=arms)
     bug_loop.finish_run(store, manifest, bug_loop._utc())
     counters.write()
@@ -534,6 +537,56 @@ def test_system_seed_fixture_is_the_six_and_the_two():
 # ===========================================================================
 # Tier 3: the same mode, dispatched onto the real cluster
 # ===========================================================================
+
+
+@pytest.mark.t3
+@pytest.mark.needs_cluster
+def test_place_01_head_nodes_stay_on_the_head_and_workers_do_not(cluster):
+    """K4, K5, W9: the placement, measured on the cluster and not reasoned about.
+
+    Three facts in one test. A resourced node really is dispatched OFF the
+    head, which is W-19b's own check that `Dispatch` dispatches at all. A
+    `HEAD_NODES` member really lands ON the head, which is K5. And the
+    affinity is HARD, so the second is not luck: a `soft=True` strategy would
+    satisfy this test on an idle cluster and fail on a busy one.
+
+    The two nodes are built here rather than borrowed, so nothing of the
+    campaign's own state is touched and the test leaves no row anywhere.
+    """
+    from chia.base.ChiaFunction import ChiaFunction, get
+
+    def where() -> dict:
+        """The node id and the resources this task actually got."""
+        import ray as _ray
+
+        context = _ray.get_runtime_context()
+        return {"node_id": context.get_node_id(),
+                "resources": dict(context.get_assigned_resources())}
+
+    head_id = cluster.get_runtime_context().get_node_id()
+    worker_node = ChiaFunction(resources={"circt": 1}, max_retries=0)(where)
+    head_node = ChiaFunction(max_retries=0)(where)
+
+    # Off-head: three dispatches at {"circt": 1}, which the head does not offer.
+    landed = [get(worker_node.chia_remote()) for _ in range(3)]
+    assert all(place["node_id"] != head_id for place in landed), landed
+    assert all(place["resources"].get("circt") == 1.0 for place in landed), landed
+    print(f"\nT-S-place-01: head {head_id[:12]}")
+    for place in landed:
+        print(f"  circt worker  {place['node_id'][:12]}  {place['resources']}")
+
+    # On the head: the same unresourced shape every HEAD_NODES member has,
+    # dispatched through `Dispatch` so the pinning under test is the real one.
+    pinned = bug_loop.head_options(head_id)
+    strategy = pinned["scheduling_strategy"]
+    assert strategy.soft is False, "a soft affinity is a preference, not a placement"
+    assert get(head_node.options(**pinned).chia_remote())["node_id"] == head_id
+    print(f"  head node     {head_id[:12]}  pinned soft={strategy.soft}")
+
+    # And the driver's own `Dispatch` resolves the same id for `HEAD_NODES`.
+    assert bug_loop.Dispatch(remote=True).head_options()[
+        "scheduling_strategy"].node_id == head_id
+    assert "circt_bug_loop.ledger.accrue" in bug_loop.HEAD_NODES
 
 
 @pytest.mark.t3
