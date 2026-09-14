@@ -433,3 +433,58 @@ def test_T_U_ledger_15_an_unmetered_turn_counts_at_what_it_authorised(tmp_path: 
     assert ledger_module.stop_reason(
         aggregate, "seeded", budget(campaign_spend_cap_usd=authorised)) \
         == "campaign_spend_cap"
+
+
+def test_a_raised_turn_is_priced_at_its_settlement_not_at_null(tmp_path: Path,
+                                                               monkeypatch):
+    """D-7 (pilot 7): the money of a turn that raised reaches its ledger row."""
+    from circt_bug_loop import bug_loop
+    from circt_bug_loop import llm as llm_module
+
+    def explode(request):
+        raise RuntimeError("the backend refused before it answered")
+
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original", explode)
+    guard = llm_module.SpendGuard(
+        cap_usd=6.0, spend_usd=0.0, price_usd_per_m_input_tokens=0.75,
+        price_usd_per_m_output_tokens=3.75)
+    with pytest.raises(RuntimeError) as raised:
+        llm_module.dispatch_turn("be terse", "ping", [], stage="stage_1",
+                                 timeout_seconds=60, model_id="gemini-3.8-flash",
+                                 guard=guard)
+
+    # The exception carries out what died with the turn's process before.
+    usage = raised.value.turn_usage
+    settled = guard.settled_usd
+    assert settled > 0.0 and guard.in_flight_usd == 0.0
+    assert usage["authorised_usd"] == usage["ceiling_usd"] == settled
+    assert usage["settled_usd"] == settled
+    assert usage["billed_usd"] is None and usage["calls"] is None
+    assert usage["observed"] is False and usage["failed"] == "RuntimeError"
+
+    # Both shapes `_occupancies` reads keep it: stage 1's per-turn dict...
+    block = schema.CounterBlock(stage="stage_1", started=1, completed=0, failed=1,
+                                seconds=18.6)
+    per_turn = bug_loop._occupancies("stage_1", block, {
+        "logs": {"usage": {"seed_read": usage}, "wall_seconds": {"seed_read": 18.6}}})
+    assert [charged for _stage, _seconds, charged in per_turn] == [usage]
+    # ...and stage 6's flat one, which is told apart by `tokens_in` being there.
+    flat = bug_loop._occupancies("stage_6", block, {"logs": {"usage": usage}})
+    assert flat == [("stage_6", 18.6, usage)]
+
+    # And the row the campaign writes from it counts at the settlement.
+    db_path = str(tmp_path / "loop.db")
+    loop = open_store(tmp_path)
+    seed_rows(loop)
+    row = observed(cpu_seconds=None, tokens_in=usage["tokens_in"],
+                   tokens_out=usage["tokens_out"],
+                   authorised_usd=usage["authorised_usd"],
+                   ceiling_usd=usage["ceiling_usd"],
+                   billed_usd=usage["billed_usd"], calls=usage["calls"])
+    assert set(row) == set(_OBSERVED_KEYS)
+    accrue_all(db_path, [entry("e-d7", stage="stage_1", amount=18.6, observed=row)])
+    aggregate = ledger_module.aggregate(_RUN, db_path, today=_DAY)
+    assert aggregate.spend_usd == settled
+    assert ledger_module.stop_reason(
+        aggregate, "seeded", budget(campaign_spend_cap_usd=settled)) \
+        == "campaign_spend_cap"

@@ -925,6 +925,8 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         except PromptContractError as error:
             failure = f"prompt_contract:{error}"
         except Exception as error:                  # noqa: BLE001 - FR-11.8
+            # The turn was settled before it raised: keep that money (D-7).
+            logs["usage"] = getattr(error, "turn_usage", None) or logs["usage"]
             failure = f"turn_failed:{type(error).__name__}"
 
         if dedup is not None and dedup.verdict in _KNOWN_ISSUE_VERDICTS:

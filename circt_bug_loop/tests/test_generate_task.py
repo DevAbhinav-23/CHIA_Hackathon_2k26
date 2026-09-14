@@ -519,3 +519,33 @@ def test_the_stage_two_prompt_carries_the_feedback_and_the_seeds_argv(config):
         schema.FeedbackBundle(run_manifest_id="r", seed_sha="s", arm="seeded",
                               iteration=0, entries=[], abandoned=False)
     ) == "There was no previous iteration."
+
+
+@pytest.mark.t0
+def test_a_raising_turn_records_what_the_guard_settled(monkeypatch, config,
+                                                       tool_servers):  # noqa: F811
+    """D-7 (pilot 7): `usage.json` carries the settlement instead of `{}`."""
+    from circt_bug_loop import llm as llm_module
+
+    def explode(request):
+        raise RuntimeError("backend said no")
+
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original", explode)
+    guard = llm_module.SpendGuard(
+        cap_usd=6.0, spend_usd=0.0,
+        price_usd_per_m_input_tokens=config["price_usd_per_m_input_tokens"],
+        price_usd_per_m_output_tokens=config["price_usd_per_m_output_tokens"])
+    result = run_seeded({**config, "spend_guard": guard})
+
+    assert result["failure"] == "turn_failed:RuntimeError"
+    settled = guard.settled_usd
+    assert settled > 0.0 and guard.in_flight_usd == 0.0
+    usage = result["logs"]["usage"]["seed_read"]
+    assert usage["authorised_usd"] == usage["ceiling_usd"] == settled
+    assert usage["settled_usd"] == settled
+    assert usage["billed_usd"] is None and usage["calls"] is None
+    assert usage["observed"] is False and usage["failed"] == "RuntimeError"
+    # The same numbers on disk: the file was `{}` for every raised turn before.
+    written = json.loads((Path(config["artefact_dir"])
+                          / "llm_seed_read.usage.json").read_text())
+    assert written == usage

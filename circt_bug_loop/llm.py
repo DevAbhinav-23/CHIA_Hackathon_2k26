@@ -274,14 +274,28 @@ def dispatch_turn(system_message: str, prompt: str, tools: list, *, stage: str,
         handle, authorised = guard.authorise(request)
         ceiling = authorised
         request["turn_budget_usd"] = ceiling
+    failure = None
     try:
         out = (get(llm_turn.chia_remote(request)) if ray.is_initialized()
                else llm_turn._chia_original(request))
         usage = dict(out.get("usage") or {})
         billed = guard.billed_usd(usage) if guard is not None else None
+    except BaseException as error:
+        failure = error
+        raise
     finally:
         # A turn that raised settles at its authorisation, not at nothing (D-5).
         settled = None if guard is None else guard.settle(handle, billed)
+        if failure is not None:
+            # The settlement dies with this process otherwise and the ledger
+            # prices a raised turn at null, which is nothing (D-7).
+            try:
+                failure.turn_usage = dict(
+                    turn_usage(None), authorised_usd=authorised,
+                    ceiling_usd=ceiling, billed_usd=None, settled_usd=settled,
+                    calls=None, failed=type(failure).__name__)
+            except Exception:       # an exception that carries no attributes
+                pass
     usage.update(authorised_usd=authorised, ceiling_usd=ceiling,
                  billed_usd=billed, settled_usd=settled,
                  calls=usage.get("num_turns"))

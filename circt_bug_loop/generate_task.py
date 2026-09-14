@@ -502,6 +502,11 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
                              final_tool_names=final_tool_names,
                              final_tool_iterations=final_tool_iterations)
         return turn
+    except BaseException as error:
+        # `turn` is still the placeholder, and the guard has already settled
+        # this turn inside `dispatch_turn`: keep that money (D-7).
+        turn["usage"] = getattr(error, "turn_usage", None) or {}
+        raise
     finally:
         turn["wall_seconds"] = time.monotonic() - started
         logs.setdefault("usage", {})[stage] = turn.get("usage") or {}
