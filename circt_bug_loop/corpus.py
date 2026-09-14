@@ -74,7 +74,14 @@ _DIALECT_INCLUDE = "include/circt/Dialect"
 _UNSUPPORTED_CONSTRUCTS = (";", "&&", "`", "$(", "%{")
 
 #: §3.3's "one normalisation the probe argv needs and the seed record does not".
-_PROBE_ONLY_OPTIONS = ("--split-input-file", "--verify-diagnostics")
+#: Four spellings and not two: LLVM's own option parser accepts one dash or two
+#: for every long option, and CIRCT's tests write both. 46 of M1's 331 corpus
+#: `RUN:` lines carry a single-dash form (`raw/m1-per-runline.csv`), among them
+#: the one `tests/fixtures/crashes/assertion_02/` was mined from, whose
+#: `-verify-diagnostics` survived into its `argv.json` and turned the emitted
+#: diagnostic into exit status 0 (errata W-09 #3).
+_PROBE_ONLY_OPTIONS = ("--split-input-file", "-split-input-file",
+                       "--verify-diagnostics", "-verify-diagnostics")
 
 #: `m1_runlines.py:LANG`, copied. The probe language is the test file's own
 #: extension and nothing else.
@@ -283,8 +290,10 @@ def strip_probe_only_options(argv: list[str]) -> tuple[list[str], list[str]]:
     `--verify-diagnostics` makes the tool succeed when it emits the diagnostics
     an `expected-*` comment predicted, and a generated input carries none;
     `--split-input-file` makes the tool process independent chunks, under which
-    `circt-reduce` can delete nothing. Both spellings of each are removed, bare
-    and `=`-valued, because `circt-opt` accepts both (§4.2, verified).
+    `circt-reduce` can delete nothing. Each is removed in all four spellings
+    the tests use: one dash or two, bare or `=`-valued, because `circt-opt`
+    takes `--split-input-file[=<string>]` and `--verify-diagnostics=<value>`
+    (§4.2, verified) and LLVM's parser takes either dash count.
 
     Returns:
         (surviving_argv, removed_tokens), both in the input's order.

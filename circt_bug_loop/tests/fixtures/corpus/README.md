@@ -31,6 +31,9 @@ git -C <clone> show <rev>:<path> | sed -n '<first>,<last>p'
 | `unsupported_and.txt` | `test/Conversion/ExportVerilog/verilog-errors-prop.mlir` line 9 | `b792c772819d` |
 | `unsupported_semicolon.txt` | `test/Dialect/Arc/insert-runtime.mlir` line 2 | `b792c772819d` |
 | `cont.txt` | `test/Conversion/ImportVerilog/proximate-source-locations.sv` lines 1-2 | `b792c772819d` |
+| `single_dash_verify.txt` | `test/Dialect/SV/sv-trace-iverilog-errors.mlir` line 1 | `88d9a5ad7a3a` |
+| `single_dash_both.txt` | `test/Conversion/CoreToFSM/errors.mlir` line 1 | `838a8bb29106` |
+| `mixed_dash.txt` | `test/Conversion/FIRRTLToHW/lower-to-hw.mlir` line 1 | `3f65acfd617b` |
 | `unsupported_backtick.txt` | constructed | none |
 | `unsupported_dollarparen.txt` | constructed | none |
 | `unsupported_brace.txt` | constructed | none |
@@ -39,6 +42,17 @@ git -C <clone> show <rev>:<path> | sed -n '<first>,<last>p'
 §3.3 both quote. `f2b15a44ec70` is the commit FR-01.2's acceptance criterion
 names, and `9f021153418e` is the one corpus seed whose line carries `%s` twice
 before the pipe.
+
+**The three single-dash lines.** LLVM's option parser takes one dash or two for
+every long option, and 46 of M1's 331 corpus `RUN:` lines spell
+`-verify-diagnostics` or `-split-input-file` with one
+(`analysis/measurements/raw/m1-per-runline.csv`); `corpus.strip_probe_only_options`
+knew only the two-dash forms until errata W-09 #3. `single_dash_verify.txt` is
+the `RUN:` line of the seed `fixtures/crashes/assertion_02/` was mined from,
+whose surviving `-verify-diagnostics` is recorded in that fixture's `argv.json`;
+`single_dash_both.txt` carries both options single-dashed; `mixed_dash.txt`
+carries one of each dash count in one line. `88d9a5ad7a3a`, `838a8bb29106` and
+`3f65acfd617b` are those lines' own seed commits.
 
 **The three constructed lines.** M1 measured 0 lines carrying `%{`, and a
 search of the whole `test/` and `integration_test/` trees at `b792c772` finds

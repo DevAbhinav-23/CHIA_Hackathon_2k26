@@ -299,6 +299,66 @@ def test_T_U_corpus_14():
 
 
 @pytest.mark.t0
+@pytest.mark.parametrize("fixture,survivors,taken", [
+    ("single_dash_verify", ["--sv-trace-iverilog", "%s"],
+     ["-verify-diagnostics"]),
+    ("single_dash_both", ["-convert-core-to-fsm", "%s"],
+     ["-verify-diagnostics", "-split-input-file"]),
+    ("mixed_dash", ["-pass-pipeline=builtin.module(lower-firrtl-to-hw)", "%s"],
+     ["-verify-diagnostics", "--split-input-file"]),
+])
+def test_T_U_corpus_37(fixture: str, survivors: list, taken: list):
+    """T-U-corpus-37 (FR-01.10): the single-dash spellings, on real RUN: lines.
+
+    LLVM's option parser takes one dash or two for every long option and
+    CIRCT's tests write both, so `-verify-diagnostics` is `--verify-diagnostics`
+    and must be stripped alike; the same for `-split-input-file`. 46 of M1's
+    331 corpus `RUN:` lines carry a single-dash form
+    (`analysis/measurements/raw/m1-per-runline.csv`), which is not an edge case
+    (errata W-09 #3). The three lines are recorded verbatim:
+
+    - `single_dash_verify`: `test/Dialect/SV/sv-trace-iverilog-errors.mlir`
+      line 1 at `88d9a5ad7a3a`, the seed `fixtures/crashes/assertion_02/` was
+      mined from;
+    - `single_dash_both`: `test/Conversion/CoreToFSM/errors.mlir` line 1 at
+      `838a8bb29106`, carrying both options single-dashed;
+    - `mixed_dash`: `test/Conversion/FIRRTLToHW/lower-to-hw.mlir` line 1 at
+      `3f65acfd617b`, carrying one of each dash count in the same line.
+    """
+    _t, argv, _p, _s, _e, _n = corpus.normalise_run_line(logical_line(fixture))
+    kept, removed = corpus.strip_probe_only_options(argv)
+    assert kept == survivors
+    assert removed == taken
+
+
+@pytest.mark.t0
+def test_T_U_corpus_38():
+    """T-U-corpus-38 (FR-01.10): the survivor recorded in `crashes/assertion_02/`.
+
+    That fixture's `argv.json` is what the two-spelling strip let through, and
+    its `-verify-diagnostics` is what turned the diagnostic the tool emitted
+    into exit status 0 at the seed commit, which is a probe whose oracle reads
+    the wrong outcome. The recorded argv is fed back through the function: the
+    option is taken now and nothing else is. The `=`-valued single-dash forms
+    are asserted beside it against §4.2's two verified value shapes, with
+    `-split-input-files` as the control that a prefix is not a match.
+    """
+    argv = json.loads((FIXTURES.parent / "crashes" / "assertion_02"
+                       / "argv.json").read_text(encoding="utf-8"))
+    assert "-verify-diagnostics" in argv
+    kept, removed = corpus.strip_probe_only_options(argv[1:])
+    assert kept == ["--sv-trace-iverilog", "input.mlir"]
+    assert removed == ["-verify-diagnostics"]
+
+    kept, removed = corpus.strip_probe_only_options(
+        ["%s", "-split-input-file=// -----", "-verify-diagnostics=only-expected",
+         "-split-input-files", "-canonicalize"])
+    assert kept == ["%s", "-split-input-files", "-canonicalize"]
+    assert removed == ["-split-input-file=// -----",
+                       "-verify-diagnostics=only-expected"]
+
+
+@pytest.mark.t0
 def test_T_U_corpus_25():
     """T-U-corpus-25 (FR-01.1): PIN §2's shape filter, in both directions.
 

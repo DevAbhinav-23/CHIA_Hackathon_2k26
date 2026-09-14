@@ -1,0 +1,1 @@
+// RUN: circt-opt --sv-trace-iverilog %s -verify-diagnostics 
