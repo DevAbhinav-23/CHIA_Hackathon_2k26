@@ -469,11 +469,17 @@ def test_T_U_gen_28_every_turn_is_pre_authorised_against_the_cap(monkeypatch):
     # The system message is re-sent on every call and counts.
     assert (guard.worst_case_usd({**one_call, "system_message": "y" * 1000})
             > guard.worst_case_usd(one_call))
-    # The cap is 32768 tokens, which is the pilot's own measurement doubled:
-    # 14 calls billed 1.58 M input tokens for a 6,087-character prompt, so
-    # 14 * 3044 + 91 * T = 1.58e6 gives T just under 17,000.
-    assert cap == 32768
+    # The cap is 65536 tokens, which is the LARGEST of the three measurements
+    # of one tool result rounded up to the next power of two. Pilot 1's
+    # `stage_1` turn: 14 calls, 1.58 M input tokens, a 6,087-character prompt,
+    # so 14 * 3044 + 91 * T = 1.58e6 gives T just under 17,000. Pilot 2's two
+    # `stage_1` turns, six calls each: 29,378 and 36,286. A constant below any
+    # of them is not a cap, which is why 32768 did not survive pilot 2.
+    assert cap == 65536
     assert cap > (1.58e6 - 14 * 6087 / 2.0) / 91
+    for tokens_in, prompt_chars in ((459484, 6271), (576454, 10722)):
+        measured = (tokens_in - 6 * prompt_chars / 2.0) / 15.0
+        assert cap > measured, f"{cap} does not cover {measured:.0f}"
 
     # W-12c, closing errata row 34. The constant must sit BELOW the one ratio
     # ever measured - 1,509,080 prompt characters billed as 619,603 input

@@ -223,15 +223,21 @@ CHARS_PER_TOKEN = 2.0
 #: prompt plus *i* tool results and the turn's input cost is quadratic in the
 #: iteration count. This constant is what one of those results is bounded at.
 #:
-#: **32768, from the pilot's own measurement doubled.** W-18's `stage_1` turn
-#: made 14 calls and billed 1.58 M input tokens against a 6,087-character
-#: prompt; solving `14 * P + 91 * T = 1.58e6` at `P = 6087 / 2.0` gives
-#: **T = 16,900 tokens** per tool result. 32768 is that rounded up to the next
-#: power of two and doubled, which is the direction a cap must err in. It is NOT
-#: `artefact_inline_cap_bytes / CHARS_PER_TOKEN` (131,072 tokens): that is what
-#: `SourceReadTool` may return at its very largest, and authorising every
-#: iteration at it would refuse the second turn of every campaign.
-TOOL_OUTPUT_TOKENS_CAP = 32768
+#: **65536, from three measurements.** W-18's `stage_1` turn made 14 calls and
+#: billed 1.58 M input tokens against a 6,087-character prompt; solving
+#: `14 * P + 91 * T = 1.58e6` at `P = 6087 / 2.0` gives **T = 16,900** tokens
+#: per tool result. W-18b's pilot 2 then measured the same quantity twice more,
+#: over six calls each: **29,378** and **36,286** tokens
+#: (`analysis/measurements/2026-09-16-pilot.md` § "Pilot 2"). The constant was
+#: 32768 for one commit, chosen from the first measurement alone, and the
+#: second pilot's second seed came in 11 % ABOVE it - so 32768 was not a cap.
+#: 65536 is the largest of the three rounded up to the next power of two, which
+#: is 1.8x it and is the direction a cap must err in.
+#:
+#: It is NOT `artefact_inline_cap_bytes / CHARS_PER_TOKEN` (131,072 tokens):
+#: that is what `SourceReadTool` may return at its very largest, and authorising
+#: every iteration at it would refuse the second turn of a small campaign.
+TOOL_OUTPUT_TOKENS_CAP = 65536
 
 #: The iterations a turn with NO tool can make: exactly one. CHIA's loop breaks
 #: as soon as a response carries no `function_call` part, and a turn that
