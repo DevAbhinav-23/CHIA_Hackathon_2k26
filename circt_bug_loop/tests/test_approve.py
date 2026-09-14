@@ -114,11 +114,16 @@ def _case(store, tmp_path, candidate_id, *, decision="report", report="short.md"
     return candidate_id
 
 
-def _store(tmp_path, **kwargs):
+POSTED = {"forum_post_url": "https://discourse.llvm.org/t/circt-bug-loop/0",
+          "forum_post_date": "2026-09-15"}
+
+
+def _store(tmp_path, posted=True, **kwargs):
     store = LoopStore(str(tmp_path / "loop.db"))
     store.insert("run", {
         "run_manifest_id": "r" * 32, "mode": "discovery", "seed_set": "187",
-        "manifest_json": "{}", "budget_file_sha": "x", "cluster_yaml_sha": "y",
+        "manifest_json": json.dumps(POSTED if posted else {}),
+        "budget_file_sha": "x", "cluster_yaml_sha": "y",
         "artefact_root": str(tmp_path), "started_utc": "2026-09-14T00:00:00+00:00",
         "ended_utc": None})
     store.insert("image", {
@@ -543,3 +548,27 @@ def test_appr_17_the_view_survives_a_missing_patch_and_a_missing_report(tmp_path
     assert "no report was rendered" in text
     assert "no repair attempt" in text
     assert "hw.module @bugloop" in text
+
+
+def test_appr_15_no_filing_before_the_forum_post(tmp_path):
+    """T-U-appr-15 (FR-20.1): a run whose manifest records no forum post cannot approve a filing."""
+    store = _store(tmp_path, posted=False)
+    status, text = _run(tmp_path, "approve", "cand-0001", "--by", "adi", answers=["yes"])
+    assert status == 2 and "FR-20.1" in text and "--forum-post-url" in text
+    assert _filing(store) is None
+
+
+def test_appr_15b_the_post_is_recorded_at_approval_and_the_filing_proceeds(tmp_path):
+    """T-U-appr-15b (FR-20.1): the approver records the post's URL and date on the run, and the same invocation approves."""
+    from circt_bug_loop import approve
+
+    store = _store(tmp_path, posted=False)
+    status, _ = _run(tmp_path, "approve", "cand-0001", "--by", "adi",
+                     "--forum-post-url", POSTED["forum_post_url"],
+                     "--forum-post-date", POSTED["forum_post_date"], answers=["yes"])
+    assert status == 0 and _filing(store) is not None
+    manifest = approve.run_manifest(store, "r" * 32)
+    assert manifest["forum_post_url"] == POSTED["forum_post_url"]
+    assert manifest["forum_post_date"] == POSTED["forum_post_date"]
+    assert approve.forum_posted(manifest)
+    assert not approve.forum_posted({"forum_post_url": "none: not posted", "forum_post_date": "none: not posted"})

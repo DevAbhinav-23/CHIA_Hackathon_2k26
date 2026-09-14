@@ -10,10 +10,14 @@ from pathlib import Path
 from typing import Optional
 
 from circt_bug_loop.store import LoopStore, utc_now
+from circt_bug_loop.contract.schema import canonical_json
 from circt_bug_loop.triage_task import GOOD_FIRST_ISSUE
 
 #: §9.4, FR-13.17, fixed by ADR-D-02.
 PREFILL_URL_CHAR_LIMIT = 6000
+
+#: FR-20.1: the method is posted to CIRCT's forum before the first filing; the run records it.
+FORUM_FIELDS = ("forum_post_url", "forum_post_date")
 
 #: `llvm/circt` has no `.github/ISSUE_TEMPLATE/` directory.
 REPO = "llvm/circt"
@@ -85,6 +89,27 @@ def load_case(store: LoopStore, candidate_id: str) -> dict:
     }
 
 
+def run_manifest(store: LoopStore, run_id: str) -> dict:
+    """The run's stored RunManifest, as a dict."""
+    row = store.query_one("SELECT manifest_json FROM run WHERE run_manifest_id = ?",
+                          (run_id,))
+    return json.loads((row or {}).get("manifest_json") or "{}")
+
+
+def forum_posted(manifest: dict) -> bool:
+    """True when both forum fields hold a real value (FR-20.1)."""
+    return all(isinstance(manifest.get(k), str) and manifest[k]
+               and not manifest[k].startswith("none") for k in FORUM_FIELDS)
+
+
+def record_forum_post(store: LoopStore, run_id: str, url: str, date: str) -> None:
+    """Write the forum post's URL and date into the run's manifest (FR-20.1)."""
+    manifest = run_manifest(store, run_id)
+    manifest.update(forum_post_url=url, forum_post_date=date)
+    store.update("run", {"run_manifest_id": run_id},
+                 {"manifest_json": canonical_json(manifest)})
+
+
 def refusal(store: LoopStore, case: dict, caps: dict) -> Optional[str]:
     """The first refusal that applies, or None, checked BEFORE anything is shown."""
     candidate, filing = case["candidate"], case["filing"]
@@ -131,6 +156,10 @@ def refusal(store: LoopStore, case: dict, caps: dict) -> Optional[str]:
     if decision not in FILEABLE:
         return (f"the gate decided {decision!r}: only {' and '.join(FILEABLE)} "
                 f"reach a human (FR-13.10)")
+    if not forum_posted(run_manifest(store, run_id)):
+        return ("no forum post is recorded for this run: FR-20.1 posts the method "
+                "to CIRCT's forum before the first filing; post it, then pass "
+                "--forum-post-url and --forum-post-date to record it")
     return None
 
 
@@ -220,6 +249,9 @@ def cmd_approve(store: LoopStore, args, out) -> int:
     """Run the refusals, show the view, take the typed approval, write one row."""
     case = load_case(store, args.candidate_id)
     caps = load_budget_caps(args.budget)
+    if args.forum_post_url and args.forum_post_date:
+        record_forum_post(store, case["candidate"]["run_manifest_id"],
+                          args.forum_post_url, args.forum_post_date)
     refused = refusal(store, case, caps)
     if refused:
         print(f"refused: {refused}", file=out)
@@ -366,6 +398,10 @@ def build_parser() -> argparse.ArgumentParser:
         subparsers.add_parser(name).add_argument("candidate_id")
     subparsers.choices["approve"].add_argument(
         "--by", required=True, help="the approving human's name (FR-13.7)")
+    subparsers.choices["approve"].add_argument(
+        "--forum-post-url", help="FR-20.1: the method's forum post, recorded on the run")
+    subparsers.choices["approve"].add_argument(
+        "--forum-post-date", help="FR-20.1: the post's date, YYYY-MM-DD")
     refuse = subparsers.add_parser("refuse")
     refuse.add_argument("candidate_id")
     refuse.add_argument("--reason", required=True)

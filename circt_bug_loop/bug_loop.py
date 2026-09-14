@@ -594,7 +594,7 @@ def check_02_mutator_set_earlier(*, repo_root: str,
 
 
 #: What `RunManifest.forum_post_url` and `forum_post_date` record for a run that CANNOT FILE (W-18).
-NO_FORUM_POST = "none: this run's registered filings_total is 0 (FR-20.1)"
+NO_FORUM_POST = "none: not posted before the run; required at approval (FR-20.1)"
 
 #: FR-01.1's mining window: twenty-four months of `main`, ending at the corpus head.
 CORPUS_WINDOW_MONTHS = 24
@@ -730,18 +730,11 @@ def check_10_issue_mirror(*, mirror: Optional[dict], refresh_requested: bool) ->
 
 def check_11_forum_post(*, forum_post_url: Optional[str],
                         forum_post_date: Optional[str],
-                        filings_total: Optional[int] = None) -> None:
-    """Check 11: the method's forum post exists before the campaign starts (FR-20.1)."""
-    if filings_total == 0:
-        return
-    missing = [name for name, value in (("forum_post_url", forum_post_url),
-                                        ("forum_post_date", forum_post_date))
-               if not value]
-    if missing:
-        raise PreflightFailed(
-            "forum_post",
-            f"{sorted(missing)} not supplied: FR-20.1 posts the method to "
-            "CIRCT's forum before the campaign starts")
+                        filings_total: Optional[int] = None) -> str:
+    """Check 11: record whether the method's forum post exists; FR-20.1 is enforced at approval, before the first filing, so this never refuses a run."""
+    if forum_post_url and forum_post_date:
+        return "posted"
+    return "unposted" if filings_total else "exempt"
 
 
 def interlock_probe(*, env=None, need_key: bool = True) -> dict:

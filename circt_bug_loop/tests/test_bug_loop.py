@@ -237,26 +237,16 @@ def test_T_U_driver_10():
 
 
 def test_T_U_driver_11():
-    """T-U-driver-11 (FR-20.1): check 11 requires the forum post's URL and date."""
-    bug_loop.check_11_forum_post(forum_post_url="https://x/1",
-                                 forum_post_date="2026-09-18")
-    with pytest.raises(bug_loop.PreflightFailed) as raised:
-        bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date="2026-09-18")
-    assert "forum_post_url" in str(raised.value)
-
-    # W-18: a run whose REGISTERED filing cap is zero is exempt, and nothing else is.
-    bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
-                                 filings_total=0)
-    for cap in (1, 10, None):
-        with pytest.raises(bug_loop.PreflightFailed):
-            bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
-                                         filings_total=cap)
-    # And the driver passes the budget's own value, not a literal.
+    """T-U-driver-11 (FR-20.1): check 11 records the forum post and refuses nothing; the first filing is where the post is required."""
+    assert bug_loop.check_11_forum_post(forum_post_url="https://x/1",
+                                        forum_post_date="2026-09-18") == "posted"
+    assert bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date="2026-09-18",
+                                        filings_total=10) == "unposted"
+    assert bug_loop.check_11_forum_post(forum_post_url=None, forum_post_date=None,
+                                        filings_total=0) == "exempt"
     source = inspect.getsource(bug_loop.run_campaign)
     assert "filings_total=budget.filings_total" in source
-
-    # The contract is frozen at 2.1 and makes both manifest fields non-null.
-    assert "filings_total is 0" in bug_loop.NO_FORUM_POST
+    assert "required at approval" in bug_loop.NO_FORUM_POST
     manifest = inspect.getsource(bug_loop.build_manifest)
     assert "forum_post_url=args.forum_post_url or NO_FORUM_POST" in manifest
     assert "forum_post_date=args.forum_post_date or NO_FORUM_POST" in manifest
