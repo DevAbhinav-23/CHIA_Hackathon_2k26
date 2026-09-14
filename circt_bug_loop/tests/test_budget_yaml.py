@@ -203,3 +203,52 @@ def test_T_U_byaml_05_the_registration_rule_holds_on_the_committed_bytes(tmp_pat
         call_node(budget_module.load_budget, str(repo.budget), str(repo.root),
                   run_start_utc=_RUN_START)
     assert "budget.yaml" in str(refused.value)
+
+
+#: W-18's pilot pre-registration, beside the campaign's (§1.1). A separate FILE
+#: and not an edit, FR-14.7 forbidding an edit to a registered one.
+PILOT = COMMITTED.with_name("budget-pilot.yaml")
+
+#: The eight values the pilot changes, and the whole of what it changes.
+PILOT_CHANGES = {"arm_window_seconds": 900.0, "campaign_spend_cap_usd": 5.0,
+                 "generated_inputs_per_day": 200, "filings_per_day": 0,
+                 "filings_total": 0, "per_seed_probe_cap": 3,
+                 "per_seed_iteration_cap": 1, "calibration_sample_size": 0,
+                 "calibration_sample_shas": []}
+
+
+def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_eight_values(tmp_path):
+    """T-U-byaml-06 (W-18, FR-14.1, FR-14.7): a COPY with eight values changed.
+
+    New id, W-18. The pilot is its own pre-registration with its own tag, so it
+    is a second file and never an edit of the first. Its key set is §9.1's to the
+    letter - a key the pilot added would be a key check 2 refuses - and every
+    value it does not change is byte-for-byte the campaign's, including both
+    verified prices, the corpus head and the model id, so the pilot measures the
+    campaign's own parameters wherever it is not deliberately smaller. It files
+    NOTHING: both filing caps are zero. Fixture: both committed files, the pilot
+    landed in a throwaway repository. Tier 0.
+    """
+    campaign = document()
+    pilot = yaml.safe_load(PILOT.read_text(encoding="utf-8"))
+
+    assert set(pilot) == set(campaign), "9.1's key set is closed (check 2)"
+    changed = {key: value for key, value in pilot.items() if value != campaign[key]}
+    assert changed == PILOT_CHANGES
+    assert pilot["filings_per_day"] == 0 and pilot["filings_total"] == 0
+    assert len(pilot["calibration_sample_shas"]) == pilot["calibration_sample_size"]
+    for key in ("price_usd_per_m_input_tokens", "price_usd_per_m_output_tokens",
+                "corpus_head_sha", "model_id", "fingerprint_top_n"):
+        assert pilot[key] == campaign[key], key
+
+    # And it LOADS as a campaign would: §9.2's six checks against a history that
+    # landed it and a `registration/*` tag that reaches that commit.
+    repo = Repo(tmp_path)
+    repo.commit("circt_bug_loop/budget.yaml", PILOT.read_text(encoding="utf-8"),
+                when=_EARLY)
+    repo.register()
+    loaded = call_node(budget_module.load_budget, str(repo.budget), str(repo.root),
+                       run_start_utc=_RUN_START, campaign=True)
+    assert loaded["budget"].campaign_spend_cap_usd == 5.0
+    assert loaded["budget"].arm_window_seconds == 900.0
+    assert loaded["registration"]["tag"] == "registration/campaign-01"
