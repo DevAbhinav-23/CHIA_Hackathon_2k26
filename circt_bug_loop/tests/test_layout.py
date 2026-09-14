@@ -52,8 +52,11 @@ SOURCE_MODULES = {
 #: marker the two-tree layout needs and §1.1 does not list (errata row 14).
 NO_TEST_MODULES = ("contract/__init__.py", "__init__.py")
 
-#: §1.3's two structural test modules, which have no source counterpart.
-STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py")
+#: §1.3's two structural test modules, which have no source counterpart, plus
+#: the THIRD the join added: `test_integration.py` holds §2's seventeen `T-I-*`
+#: tests, whose slugs name a CROSSING and not a module (`04-Test-Plan.md` §0.1),
+#: so it can no more have a source counterpart than `test_layout.py` can.
+STRUCTURAL_TESTS = ("test_layout.py", "test_fixtures.py", "test_integration.py")
 
 #: §1.3's exemption list, compared for EQUALITY so neither document can grow
 #: one the other does not: the five artefact test modules, with
@@ -189,8 +192,9 @@ def test_T_U_layout_01_exemptions():
 def test_T_U_layout_01_twenty_five():
     """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
 
-    Nineteen for the source modules that hold logic, `llm.py` included, two
-    structural, six on the exemption list and one the implementation added
+    Nineteen for the source modules that hold logic, `llm.py` included, THREE
+    structural (`test_integration.py` is the join's, holding §2's seventeen
+    `T-I-*` tests), six on the exemption list and one the implementation added
     (errata row 16). Fixture: none. Tier 0.
     """
     present = {path.name for path in TESTS.glob("test_*.py")}
