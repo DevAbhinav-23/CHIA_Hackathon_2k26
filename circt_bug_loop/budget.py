@@ -1,30 +1,4 @@
-"""budget.yaml: load it, enforce the pre-registration, hand out snapshots.
-
-A6a. Head-side and pure but for one `git` read (03-LLD.md 3.11). The file this
-module loads is the campaign's pre-registration, and every rule here is about
-refusing a file that could have been chosen after the data existed. WHICH commit
-registers it changed at W-12: it is the commit an annotated `registration/*` tag
-names, not the first commit that ever landed the file (`REGISTRATION_TAGS`
-below, and errata rows 30 and 31). `budget_file_sha` is unchanged and is still
-the run's identity (G-32, FR-14.3).
-
-03-LLD.md 9.2's SIX checks, in order, each of which stops a run:
-
-  1. committed, and its commit earlier than the run's start (FR-14.2), the
-     working tree still equal to that commit, and - for a campaign - registered
-     by a tag the file's own commit is an ancestor of (FR-14.3, FR-14.7);
-  2. complete and closed: every key of 9.1, no other, every type as declared;
-  3. equal on the unit and on both safety caps, which is structural: there is
-     one value per key and arm_order names each arm exactly once (FR-14.5);
-  4. unchanged mid-campaign: the SHA still equal to the manifest's (FR-14.7);
-  5. the calibration sample is drawn, and is the declared size (ADR-D-01);
-  6. both prices present, positive and finite; the spend cap positive; the model
-     id non-blank (NFR-08).
-
-Check 1 also carries 8.1's frozen-set rule, which is FR-05.2's and not one of
-the six: a mutator set the registration tag cannot reach would be a campaign
-parameter chosen after the registration.
-"""
+"""budget.yaml: load it, enforce the pre-registration, hand out snapshots."""
 from __future__ import annotations
 
 import dataclasses
@@ -43,39 +17,20 @@ from circt_bug_loop.contract.schema import (Arm, BudgetFile, ContractError,
                                             CounterBlock,
                                             LedgerSnapshot, validate)
 
-#: The committed pre-registration, beside this module in the flow directory
-#: (03-LLD.md 1.1). Derived from this file's own directory and no further:
-#: 1.4 forbids a longer walk, the flow living at two depths in two trees.
+#: The committed pre-registration.
 BUDGET_YAML = str(Path(__file__).resolve().parent / "budget.yaml")
 
-#: 8.1 rule 2's file, relative to the flow directory: the set the RUN hashes,
-#: which since W-12c is the NEWEST frozen one and was `set_v1.json` by name. It
-#: is read off `mutators` and not spelled a second time here, because rule 2
-#: checks the ancestry of the very file `RunManifest.mutator_set_sha` is computed
-#: over: a second spelling could name an older set whose commit is an ancestor of
-#: everything, and would then pass whatever the newest set's commit is.
+#: 8.1 rule 2's file, relative to the flow directory.
 MUTATOR_SET = os.path.join("mutators", mutators.SET_PATH.name)
 
-#: THE PRE-REGISTRATION, since W-12 (architect decision, 2026-09-16): an
-#: ANNOTATED git tag `registration/<campaign-id>` on the commit that lands the
-#: FINAL budget.yaml, and not the first commit that ever touched the file.
-#: 8.3 step 1 and 9.2 check 1 both read "the commit that lands budget.yaml",
-#: which made W-06's own landing commit the registration of a campaign that has
-#: not been registered yet, refused every later edit of the file, and stopped
-#: A7 - whose whole job is to run BEFORE the registration - from running at all.
-#: A tag is the one thing an operator can place deliberately, after the file is
-#: final; the newest tag wins, so a re-registration adds a tag rather than
-#: rewriting one. Erratum rows 30 and 31.
+#: THE PRE-REGISTRATION, since W-12 (architect decision).
 REGISTRATION_TAGS = "refs/tags/registration/*"
 
-#: 9.2's six, named so `len(_CHECKS) == 6` is assertable. The count was five
-#: before 2026-09-14 and six after; 9.2's own heading still says five.
+#: 9.2's six, named so `len(_CHECKS) == 6` is assertable.
 _CHECKS = ("committed_and_earlier", "complete_and_closed", "equal_on_the_unit",
            "unchanged_mid_campaign", "calibration_sample", "prices_and_caps")
 
-#: Every key 9.1 declares: BudgetFile's fields less the two the file does not
-#: carry. contract_version is the package's and budget_file_sha is check 1's
-#: output, so a file carrying either would be declaring what it cannot know.
+#: Every key 9.1 declares: BudgetFile's fields less the two the file does not carry.
 _NOT_IN_FILE = ("contract_version", "budget_file_sha")
 _KEYS = tuple(f.name for f in dataclasses.fields(BudgetFile)
               if f.name not in _NOT_IN_FILE)
@@ -90,15 +45,11 @@ _HEX40 = frozenset("0123456789abcdef")
 
 
 class BudgetError(Exception):
-    """Raised by load_budget. The message names the offending key or commit."""
+    """Raised by load_budget."""
 
 
 def _git(repo_root: str, *args: str) -> str:
-    """Run one read-only `git` command in *repo_root* and return its stdout.
-
-    Raises:
-        BudgetError when git itself fails, naming the command and its stderr.
-    """
+    """Run one read-only `git` command in *repo_root* and return its stdout."""
     done = subprocess.run(("git", "-C", repo_root, *args), capture_output=True,
                           text=True)
     if done.returncode != 0:
@@ -108,11 +59,7 @@ def _git(repo_root: str, *args: str) -> str:
 
 
 def _last_commit(repo_root: str, relative_path: str) -> tuple:
-    """Return (sha, committed datetime) of the last commit touching *relative_path*.
-
-    (None, None) when the path has never been committed, which is what makes
-    FR-14.2's refusal a refusal and not a crash.
-    """
+    """Return (sha, committed datetime) of the last commit touching *relative_path*."""
     line = _git(repo_root, "log", "-1", f"--format={_GIT_FORMAT}", "--",
                 relative_path).strip()
     if not line:
@@ -122,22 +69,7 @@ def _last_commit(repo_root: str, relative_path: str) -> tuple:
 
 
 def registration(repo_root: str) -> tuple:
-    """Return (tag, commit) of the newest `registration/*` tag, or ("", "").
-
-    ("", "") is "this repository holds no pre-registration". That is a STATE and
-    not a failure: A7 synthesises only in it (8.1 rule 3), a dry run and a
-    `--generator recorded` run read the budget file in it, and only a campaign
-    is refused (FR-14.3).
-
-    Returns:
-        tuple[str, str], the short tag name and the commit it names. An
-        annotated tag is dereferenced, so the second member is a commit and
-        never the tag object.
-    Worker:
-        none; head-side, two `git` reads and no write.
-    Raises:
-        BudgetError when `git` itself fails.
-    """
+    """Return (tag, commit) of the newest `registration/*` tag, or ("", "")."""
     tag = _git(repo_root, "for-each-ref", "--sort=-creatordate", "--count=1",
                "--format=%(refname:short)", REGISTRATION_TAGS).strip()
     if not tag:
@@ -146,13 +78,7 @@ def registration(repo_root: str) -> tuple:
 
 
 def _descends_from(repo_root: str, ancestor: str, descendant: str) -> bool:
-    """True when *ancestor* IS *descendant* or one of its ancestors.
-
-    ANCESTRY and not a comparison of two commit dates, which is the second half
-    of W-12's decision: `%cI` is metadata a rebase rewrites and a skewed clock
-    can order either way, while "the set's commit is reachable from the
-    registration tag" is a property of the history the tag actually names.
-    """
+    """True when *ancestor* IS *descendant* or one of its ancestors."""
     done = subprocess.run(("git", "-C", repo_root, "merge-base", "--is-ancestor",
                            ancestor, descendant), capture_output=True)
     if done.returncode not in (0, 1):       # 1 is the answer "no", not a failure
@@ -164,12 +90,7 @@ def _descends_from(repo_root: str, ancestor: str, descendant: str) -> bool:
 
 
 def _iso(text: str) -> datetime:
-    """Parse an ISO 8601 instant, including the trailing Z git writes for UTC.
-
-    Python 3.10's fromisoformat refuses 'Z' (3.11 accepts it), and `git log
-    --format=%cI` emits exactly that for a commit made at offset zero, which is
-    what every test repository here and every CI checkout produces.
-    """
+    """Parse an ISO 8601 instant, including the trailing Z git writes for UTC."""
     return datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith("Z") else text)
 
 
@@ -187,36 +108,12 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
                 exact_pin_shas=None, campaign: bool = False) -> dict:
     """Parse, validate and pre-registration-check one budget.yaml.
 
-    *path* is the file, *repo_root* the repository whose history registers it.
-    The three keyword arguments are the parts of checks 1, 4 and 5 that need a
-    fact from outside the file: the run's start instant (now, by default), the
-    SHA the RunManifest was stamped with, and the exact-pin seed set the
-    calibration sample must be drawn from. Each is optional, and each check
-    that has no fact to compare against is the driver's pre-flight to make
-    (13.1's checks 1 and 3).
-
-    *campaign* is the caller saying that this run is one whose result will be
-    reported, and it is the ONLY thing that makes an absent `registration/*`
-    tag fatal (W-12). It is false by default because the callers that read the
-    file outside a campaign - `--draw-calibration`, which produces a number the
-    registration is then made FROM, a dry run and a `--generator recorded` run -
-    outnumber the one that starts a campaign, and that one names itself:
-    `bug_loop.check_01_budget_registered` passes it.
-
     Returns:
-        {"budget": BudgetFile, "counters": CounterBlock,
-         "registration": {"tag": str, "commit": str}}, the BudgetFile with
-        budget_file_sha set to the commit that landed the file, which stays the
-        run's identity (FR-14.3, G-32); the registration pair is empty when the
-        repository holds no tag. The counters count 9.2's six checks at stage
-        "budget", which 3.11 requires of every node of 3.2.
+        {"budget": BudgetFile, "counters": CounterBlock, "registration": {"tag": str, "commit": str}}, the BudgetFile with budget_file_sha set to the commit that landed the file, which stays the run's identity (FR-14.3); the registration pair is empty when the repository holds no tag.
     Worker:
         none; head-side, one subprocess per `git` read.
     Raises:
-        BudgetError on any of the six checks, naming the key, the commit or the
-        pair of timestamps; ContractError (E002, E003, E004) from
-        contract.validate on a key whose type or value the seam refuses;
-        OSError when *path* cannot be read.
+        BudgetError on any of the six checks, naming the key, the commit or the pair of timestamps.
     """
     started_at = time.monotonic()
     text = Path(path).read_text(encoding="utf-8")
@@ -277,8 +174,6 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
             f"differ from 9.3's {sorted(_ACCEPTANCE_KEYS)}")
 
     # --- check 3: equal on the unit and on both safety caps ------------------
-    # Structural: one value per key, applying to both arms by construction. The
-    # one thing that can still be wrong is the arm list itself.
     if sorted(budget.arm_order) != ["mutation", "seeded"]:
         raise BudgetError(
             f"{relative}'s arm_order {budget.arm_order} must name each arm "
@@ -315,9 +210,7 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
                 f"exact-pin seeds (ADR-D-01(d))")
 
     # --- check 6: the pair of prices, the cap, the model ---------------------
-    # contract.validate has already refused a non-positive or non-finite price,
-    # spend cap or window and a blank model id (2.4's _budget_conditionals),
-    # which is check 6 discharged at the seam so both halves get the same rule.
+    # contract.validate has already refused a bad price, cap, window or model id.
     return {"budget": budget,
             "registration": {"tag": tag, "commit": registered},
             "counters": CounterBlock(
@@ -327,15 +220,7 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
 
 def _check_frozen_set(repo_root: str, flow_dir: str, tag: str,
                       registered: str) -> None:
-    """Refuse a mutator set whose commit the registration tag does not reach.
-
-    FR-05.2 and 8.1 rule 2, as amended by W-12: "before the pre-registration" is
-    ancestry under the tag and no longer a comparison of two commit dates. The
-    set is checked only where it exists - before A7 freezes one there is nothing
-    to place in the history, and 13.1's pre-flight check 2 owns the harder rule
-    that the campaign must have one - and only where a tag exists, an
-    unregistered repository having nothing to be earlier than.
-    """
+    """Refuse a mutator set whose commit the registration tag does not reach."""
     relative = os.path.join(flow_dir, MUTATOR_SET) if flow_dir else MUTATOR_SET
     if not os.path.exists(os.path.join(repo_root, relative)):
         return
@@ -351,20 +236,7 @@ def _check_frozen_set(repo_root: str, flow_dir: str, tag: str,
 
 
 def snapshot(ledger, arm: Arm, budget: BudgetFile) -> LedgerSnapshot:
-    """Return the four numbers a generator may know about its own budget.
-
-    Four fields and no fifth: the generator cannot reach BudgetLedger, cannot
-    read the other arm's spend, cannot read spend_usd, and cannot read any
-    result field (FR-16.4, 2.5).
-
-    Returns:
-        LedgerSnapshot(arm, unit, spent, cap).
-    Worker:
-        pure; no resource, no process, no database handle.
-    Raises:
-        ContractError (E004) when *arm* is not one of the two arms; KeyError
-        never, an arm with no window entry yet having spent nothing.
-    """
+    """Return the four numbers a generator may know about its own budget."""
     if arm not in ("seeded", "mutation"):
         raise ContractError("E004_BAD_ENUM",
                             f"snapshot takes an arm, not {arm!r}")
