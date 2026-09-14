@@ -42,6 +42,9 @@ SYNTHESIS_STAGE = "synthesis"
 BUDGET_TRUNCATED = "reduction_budget_truncated"
 IMAGE_UNAVAILABLE = "image_unavailable"
 
+#: What the windows table reads for an arm whose window never opened.
+NOT_STARTED = "not started"
+
 
 #: FR-10.2's hand-labelled duplicate-pair set, as package DATA.
 LABELLED_PAIRS = Path(__file__).resolve().parent / "data" / "labelled_pairs.json"
@@ -446,20 +449,18 @@ def _windows(facts: dict, store: LoopStore, manifest: RunManifest, ledger_rows: 
              gaps: dict) -> None:
     """FR-18.10's two windows, the binding cap and the unspent balance where one bit."""
     aggregate = ledger_module.aggregate(manifest.run_manifest_id, store.db_path)
-    absent = [arm for arm in ARMS if arm not in aggregate.per_arm_window]
-    if absent:
-        gaps["both_windows"] = (
-            "both arms' windows are printed beside the headline and no arm_window "
-            f"entry exists for {absent}")
-        facts["windows"] = None
-        return
     facts["ledger"] = aggregate
+    # An arm with no `arm_window` entry never opened a window, which is a run
+    # that stopped inside its first arm and NOT a store the artefact cannot be
+    # rendered from (W-18e): its columns say so and the arm that ran says why.
     facts["windows"] = {
         arm: {
-            "elapsed": aggregate.per_arm_window[arm],
+            "started": arm in aggregate.per_arm_window,
+            "elapsed": aggregate.per_arm_window.get(arm),
             "window": manifest.arm_window_seconds,
-            "unspent": max(0.0, manifest.arm_window_seconds
-                           - aggregate.per_arm_window[arm]),
+            "unspent": (max(0.0, manifest.arm_window_seconds
+                            - aggregate.per_arm_window[arm])
+                        if arm in aggregate.per_arm_window else None),
             "stop_reason": aggregate.stop_reason.get(arm),
             "spend_usd": aggregate.per_arm_spend_usd.get(arm, 0.0),
         } for arm in ARMS}
@@ -574,6 +575,22 @@ def _table(lines: list, caption: str, header: list, rows: list, qualifier: str) 
         lines.append("| " + " | ".join("" if cell is None else str(cell)
                                        for cell in row) + " |")
     lines.append("")
+
+
+def _join(phrases) -> str:
+    """Join phrases as "a", "a and b", "a, b and c"."""
+    items = list(phrases)
+    return items[0] if len(items) < 2 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _window_row(arm: str, window: dict) -> list:
+    """One arm's row of the windows table; an arm that never started says so."""
+    if not window["started"]:
+        return [arm, f"{window['window']:.0f}", NOT_STARTED, NOT_STARTED,
+                NOT_STARTED, f"{window['spend_usd']:.2f}"]
+    return [arm, f"{window['window']:.0f}", f"{window['elapsed']:.0f}",
+            f"{window['unspent']:.0f}", window["stop_reason"] or "its own window",
+            f"{window['spend_usd']:.2f}"]
 
 
 def _render(facts: dict) -> str:
@@ -780,31 +797,37 @@ def _render(facts: dict) -> str:
         ]
 
     lines += ["## 6. The budget: both windows and the campaign's spend", ""]
-    if facts["windows"] is None:
-        lines += [f"REFUSED: {gaps['both_windows']}", ""]
-    else:
-        _table(lines, "Both arm windows, on the primary budget unit",
-               ["arm", "window (s)", "elapsed (s)", "unspent (s)", "stopped by",
-                "spend (USD)"],
-               [[arm, f"{facts['windows'][arm]['window']:.0f}",
-                 f"{facts['windows'][arm]['elapsed']:.0f}",
-                 f"{facts['windows'][arm]['unspent']:.0f}",
-                 facts["windows"][arm]["stop_reason"] or "its own window",
-                 f"{facts['windows'][arm]['spend_usd']:.2f}"] for arm in ARMS],
-               qualifier)
+    _table(lines, "Both arm windows, on the primary budget unit",
+           ["arm", "window (s)", "elapsed (s)", "unspent (s)", "stopped by",
+            "spend (USD)"],
+           [_window_row(arm, facts["windows"][arm]) for arm in ARMS],
+           qualifier)
+    unstarted = [arm for arm in ARMS if not facts["windows"][arm]["started"]]
+    if unstarted:
+        ran = [arm for arm in ARMS if facts["windows"][arm]["started"]]
         lines += [
-            f"The campaign spent USD {facts['spend_usd']:.2f} in total, both arms and "
-            "the shared stages together, against the pre-registered cap. Where an arm "
-            "was stopped by a safety cap rather than by its window, the unspent "
-            "balance above is what it did not get to use, and the comparison is "
-            "qualified by exactly that much.",
+            f"{_join(arm + ' never opened a window' for arm in unstarted)}: "
+            + (_join(f"the {arm} arm stopped on "
+                     f"`{facts['windows'][arm]['stop_reason'] or 'its own window'}`"
+                     for arm in ran)
+               if ran else "no arm of this run ever started")
+            + ", and the campaign ended before the rest of it began. There is no "
+              "comparison between the arms in this run.",
             "",
         ]
-        _table(lines, "Shared stages, charged to no arm",
-               ["stage", "seconds"],
-               sorted((stage, f"{seconds:.0f}")
-                      for stage, seconds in facts["shared_stage"].items())
-               or [["none", "0"]], qualifier)
+    lines += [
+        f"The campaign spent USD {facts['spend_usd']:.2f} in total, both arms and "
+        "the shared stages together, against the pre-registered cap. Where an arm "
+        "was stopped by a safety cap rather than by its window, the unspent "
+        "balance above is what it did not get to use, and the comparison is "
+        "qualified by exactly that much.",
+        "",
+    ]
+    _table(lines, "Shared stages, charged to no arm",
+           ["stage", "seconds"],
+           sorted((stage, f"{seconds:.0f}")
+                  for stage, seconds in facts["shared_stage"].items())
+           or [["none", "0"]], qualifier)
 
     lines += ["## 7. Observed, and not the budget", ""]
     if facts["observed"] is None:

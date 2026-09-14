@@ -310,9 +310,25 @@ def test_T_U_results_13(tmp_path):
                                    "generated_inputs_per_day", "0.00"]
     assert "The campaign spent USD 0.30 in total" in text
 
+
+def test_T_U_results_13a(tmp_path):
+    """T-U-results-13a (W-18e): an arm that never started renders, and says why."""
+    store, manifest, pairs = campaign(tmp_path)
+    # Pilot 3's shape: the campaign's spend cap bit inside the first arm, so the
+    # second one never opened a window at all.
     delete(store, "DELETE FROM ledger_entry WHERE scope = 'arm_window' AND arm = ?",
            ("mutation",))
-    only(refuse(store, manifest, pairs), "both arms' windows", "['mutation']")
+    store.transaction([("UPDATE ledger_entry SET stop_reason = ? WHERE arm = ? "
+                        "AND scope = 'arm_window'", ("campaign_spend_cap", "seeded"))])
+
+    text = render(store, manifest, pairs)
+    windows = arm_tables(text)[-2]
+    assert windows["seeded"] == ["14400", "14400", "0", "campaign_spend_cap", "0.13"]
+    assert windows["mutation"] == ["14400", "not started", "not started",
+                                   "not started", "0.00"]
+    assert ("mutation never opened a window: the seeded arm stopped on "
+            "`campaign_spend_cap`" in text)
+    assert "no comparison between the arms in this run" in text.lower()
 
 
 def test_T_U_results_14(tmp_path):
