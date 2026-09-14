@@ -48,7 +48,7 @@ assertions, compiled out of CHIA's published image, in 536 of 555 objects, % 606
 so defects become observable where none could fire before. In pilot
 deployments the loop reproduced a live open CIRCT issue from its first seed and
 withheld it as a duplicate, % pilot 1: 3 of 3 probes fired, dedup known_open_issue #8508, 0 filings: 2026-09-16-pilot.md 0, 4, 5
-at a total inference cost of about ten US dollars across all model calls. % 0.4867 + 0.4906 + 7.1640 + 0.8143 + 0.6416 = 9.60, plus one unmeasured attempt bounded 0.47-0.53: synthesis 9.3/10.4, pilot.md 0 and P2.2, pilot-3.md
+at a total inference cost of about fourteen US dollars across all model calls. % 0.4867 + 0.4906 + 7.1640 + 0.8143 + 0.6416 = 9.60, plus one unmeasured attempt bounded 0.47-0.53: synthesis 9.3/10.4, pilot.md 0 and P2.2, pilot-3.md
 \end{abstract}
 
 % =====================================================================
@@ -84,7 +84,7 @@ most of it.
 
 \begin{figure*}[!t]
 \centering
-\scalebox{0.94}{\input{fig-loop}}
+\scalebox{0.88}{\input{fig-loop}}
 \caption{Seeded CIRCT bug loop. The agent holds the violet band and acts three
 times only, at stages 1, 2 and 6; the blue ribbon below it is fixed apparatus,
 so no number in the result comes from the model. The ribbon is the candidates in
@@ -258,9 +258,8 @@ no threshold can be chosen after the fact. % registration/<run> tag, load_budget
 Safety caps bound damage rather than effort: 2,000 generated inputs per arm per
 day, 3 filings per day and 10 per run, 60 seconds and 4\,GiB per probe, and a
 hard cap on model spending that stops both arms. % the caps: circt_bug_loop/budget.yaml
-A run with a positive filing cap does not start until a human has posted the
-method to the project's forum, and issues marked as good first issues are
-refused. % pre-flight check 11 (FR-20.1), FR-20.2: circt_bug_loop/bug_loop.py check_11_forum_post
+Nothing is filed until a human has posted the method to the project's forum,
+and issues marked as good first issues are refused. % FR-20.1 enforced at approval (python -m circt_bug_loop.approve), FR-20.2
 
 \textbf{Deduplication.} Two candidates are one bug when a single primary
 fingerprint is equal. On a hand-labelled set of 22 candidate pairs the rule
@@ -270,10 +269,9 @@ both rates are printed beside the headline, since a collision inflates
 that count and a false merge deflates it.
 
 \textbf{Known issues.} A mirror of the tracker answers whether a candidate is
-already reported. GitHub stops paginating an issue listing at its hundredth
-page, which the loop met as an error and not as truncation, so the mirror walks
-newest first, then oldest first, and unions the two: the whole tracker, 2,652
-issues, 1,795 closed and 857 open, costs 198 requests and 200 seconds. % 422 at page 100: implementation-errata-log.md W-14 row 21; live mirror 2,652 issues (1,795 closed / 857 open), 198 pages, 200 s: docs/HANDOFF.md W-17 join
+already reported. GitHub stops paginating at its hundredth page, so the mirror
+walks newest first, then oldest first, and unions the two: the whole tracker,
+2,652 issues, 1,795 closed and 857 open, costs 198 requests and 200 seconds. % 422 at page 100: implementation-errata-log.md W-14 row 21; live mirror 2,652 issues (1,795 closed / 857 open), 198 pages, 200 s: docs/HANDOFF.md W-17 join
 
 \textbf{Contamination.} CIRCT's history sits in the training data of any model
 we can use, so the agent may reproduce a fix it memorised. Every candidate is
@@ -285,7 +283,7 @@ excluding it.
 
 % =====================================================================
 \section{Results}\label{sec:res}
-Five live runs have been made and Table~\ref{tab:res} is all of them, read from
+Ten live runs have been made and Table~\ref{tab:res} is all of them, read from
 the loop's own database and ledger; the ledger prices the SDK's own token
 counts at Google's published rates. % ledger = SDK counts x budget.yaml prices: 2026-09-16-pilot.md 7
 
@@ -312,6 +310,19 @@ Pilot 2, seeded, cap 3.00 & 2 & 2 & 0 & 0 & 0 & 0.81 & 0.50 to 0.59 \\
 Pilot 2, mutation & 0 & 2 & 5 & 0 & 0 & 0 & -- \\
 % pilot 3: 1 turn, 13 calls incl. the forced final answer (empty), 1 seed, 0 probes, USD 0.641623, authorised 2.729162: analysis/measurements/2026-09-14-pilot-3.md
 Pilot 3, seeded, cap 3.00 & 1 & 1 & 0 & 0 & 0 & 0.64 & 0.24 \\
+% pilot 4: stage 1 answered (13 calls), stage 2 raised (a 429 on replay), USD 0.594476, ratio 0.218; mutation 3 probes all tool_rejected_input: 2026-09-14-pilot-4.md
+Pilot 4, seeded, cap 6.00 & 1 & 1 & 0 & 0 & 0 & 0.59 & 0.22 \\
+Pilot 4, mutation & 0 & 1 & 3 & 0 & 0 & 0 & -- \\
+% pilot 5: two turns, stage 2 answered with a function call under mode NONE, USD 1.106332, ratios 0.247 / 0.160: 2026-09-14-pilot-5.md
+Pilot 5, seeded, cap 6.00 & 2 & 1 & 0 & 0 & 0 & 1.11 & 0.16 to 0.25 \\
+% pilot 6: stage 2 refused before dispatch by the unsettled guard, USD 0.605893, ratio 0.222: 2026-09-15-pilot-6.md
+Pilot 6, seeded, cap 6.00 & 1 & 1 & 0 & 0 & 0 & 0.61 & 0.22 \\
+% pilot 7: first call refused with HTTP 429, nothing billed: 2026-09-15-pilot-7.md
+Pilot 7, seeded, cap 6.00 & 0 & 1 & 0 & 0 & 0 & 0 & -- \\
+% pilot 8: 13 + 17 calls, 3 probes, 1 firing, 0 filed, USD 1.206442, ratios 0.200 / 0.151, four 429s retried: 2026-09-15-pilot-8.md
+Pilot 8, seeded, cap 6.00 & 2 & 1 & 3 & 1 & 0 & 1.21 & 0.15 to 0.20 \\
+% pilots 5 to 8, mutation arm: the seed's own test does not parse at the build commit, skipped as stale_at_build: pilot-5.md to pilot-8.md
+Pilots 5 to 8, mutation, seed stale at build & 0 & 1 & 0 & 0 & 0 & 0 & -- \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -326,7 +337,8 @@ argument of incompatible type!"} at \texttt{Casting.h:566} in
 \texttt{moore.net} of an open array type; each reproduced in a fresh process on
 another worker, and twenty reduction attempts removed nothing. % 3 of 3, assertion text, site, frame, reduced.mlir, question 1 on another worker, circt-reduce 20 calls no_progress: 2026-09-16-pilot.md 4 and 5
 The oracle Section~\ref{sec:pre} restored found a real, reproducible failure with
-a three-line reproducer at the first attempt.
+a three-line reproducer at the first attempt, and pilot 8 found the same failure
+again from a fresh probe. % pilot 8: 3 probes, 1 fired at Casting.h:566: 2026-09-15-pilot-8.md
 
 \textbf{Withholding works, and the tool outranks the model.} The mirror matched
 all three to open issue 8508 on the assertion text, and nothing was filed. The
@@ -343,23 +355,27 @@ run. % 14/21/37 calls, 19.7x/32.3x/64.1x, 7.163957 vs 5.00, stop_reason campaign
 The guard now prices the whole loop, and a ceiling inside the backend refuses
 the call that would pass it: pilot 2 billed 0.50 and 0.59 of what it
 authorised. % ratios 0.498 and 0.591, no TurnBudgetExceeded, USD 0.814315: same file P2.2
-Spending is bounded before a request leaves the machine, within a factor of two
-of the bill.
+Spending is bounded before a request leaves the machine.
 
-\textbf{The tool budget decides whether the model answers.} At six tool calls a
-turn, both of pilot 2's seed-reading turns spent all six reading source and
-returned no answer, so no probe was written; the turn that read pilot 1's firing
-seed had taken fourteen. % both stage-1 turns exhausted at 6, final_text empty, 0 seeded probes; pilot 1 stage_1 14 calls: implementation-errata-log.md row 47; 2026-09-16-pilot.md 7
-At twelve, with one extra tool-free call demanding an answer, pilot 3's turn
-made thirteen calls and that answer came back empty. % pilot 3: 12 + 1 calls, "[DEBUG] the final answer was empty": 2026-09-14-pilot-3.md
-The cap is registered, and this is the measurement it is chosen with.
+\textbf{Eight pilots, seven defects, then the whole arm.} Every pilot after the
+first stopped on one defect in the model-turn path and was not retried: at six
+tool calls a turn the model read and never answered; a final call with the tools
+removed returned nothing; a turn that raised left no record; the model spent
+every call reading and never called the write tool; the guard held a finished
+turn's worst case against the cap; the provider refused the first call with a
+rate limit CHIA never retries. % pilots 2 to 7, one defect each: 2026-09-16-pilot.md P2, 2026-09-14-pilot-3.md, -4.md, -5.md, 2026-09-15-pilot-6.md, -7.md
+Each was closed by a rule and measured on the next run: a final call that keeps
+the tools declared but forbids calling them, a failure record, a write-only phase
+after the reads, settlement to the bill, retry with backoff. Pilot 8 then ran the
+seeded arm end to end for USD 1.21: three probes, one assertion at
+\texttt{Casting.h:566}, reproduced on another worker, minimal at the reducer's
+fixpoint, valid, and stopped at the fourth question as a duplicate of issue
+8508, with four rate-limit refusals cleared on their first retry. % pilot 8: gate q1 true, q2 already_minimal (22 interestingness calls, fixpoint), q3 valid, q4 known_open_issue #8508; 429s 4, all cleared on retry 1: 2026-09-15-pilot-8.md
 
 \textbf{Seven defects no test could see.} The first run driven end to end on the
 cluster met seven pre-flight defects invisible to 620 passing tests, none about
-the model: among them, the corpus emptied because its date bound was the run's
-start, and a check demanded the head hold a credential the design forbids it. % errata rows 39-45; suite 620 at W-20b: 2026-09-16-pilot.md 3; docs/HANDOFF.md W-20b
-All were fixed before a model call was made: a capped pilot is part of the
-method.
+the model, all fixed before a model call was made. % errata rows 39-45; suite 620 at W-20b: 2026-09-16-pilot.md 3
+A capped pilot is part of the method.
 
 \textbf{Under-billing, and one fact that doubled the yield.} CHIA's Vertex
 backend omits thinking tokens from usage; on the two synthesis turns they were
@@ -368,8 +384,6 @@ the SDK's total exactly, 625{,}478 tokens on the first turn. % 2.3% (USD 0.01115
 That turn returned 22 mutators and 11 survived: ten used look-behinds Python's
 regular-expression engine refuses, because the prompt named no engine. Naming
 it, the second returned 25 and all survived. % v1 22/11, 10 bad_pattern; v2 25/25: same file 9.5, 10.2, 10.4
-In pilot 2 they yielded five probes in under two seconds, four of which failed
-to parse, the loop's own fault; none fired. % 5 probes, 4 parse_error, 1 clean_exit, 0 firings, 1.7 s: 2026-09-16-pilot.md P2 tables
 
 % =====================================================================
 \section{Related Work}
@@ -409,7 +423,7 @@ simulation harness and a Verilator testbench printing identical 112-line
 sequences, and one changed constant makes them disagree at a named cycle and
 signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
 
-\textbf{Limitations.} Model time across the five live runs totals USD 10.1, and
+\textbf{Limitations.} Model time across the ten live runs totals USD 13.6, and
 the repair stage, CHIA's chain, ran in none of them, because it returns no token
 counts and would spend outside the ledger. % 8.96 measured + one unmeasured attempt bounded 0.47-0.53; every pilot --no-repair; TOKEN_CAPTURE unavailable_remote_dispatch: repair_adapter.py
 The second oracle applies to 6 of the 187 seeds. % A-19: analysis/measurements/2026-09-15-a19-differential-applicability.md
