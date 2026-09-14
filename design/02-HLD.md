@@ -761,6 +761,21 @@ price_usd_per_m_output_tokens` from the two committed prices of §2.5. The value
 `metered` false, only on the `claude` fallback, which reports no per-phase usage at all (FR-14.8).
 The cumulative `cost_usd` over an arm is what FR-18.10's third stop condition reads.
 
+**Erratum 2026-09-15 (contract 2.2, the annotated tag `contract-2.2`): `observed` gains four keys,
+about the money a turn was allowed rather than the tokens it used.** `authorised_usd` is what the
+spend guard authorised the turn for against the campaign cap **before** it was dispatched, the worst
+case of its whole tool loop and not of one backend call. `ceiling_usd` is the per-turn ceiling handed
+to the backend with the request, which the backend enforces from the inside by refusing its own next
+call when the priced spend so far plus that call's estimate would pass it. `billed_usd` is what the
+turn actually cost at the two committed prices, and is **null** when no usage came home, which is
+every stage-7 attempt by construction and every turn that raised; such a turn keeps its whole
+authorisation rather than releasing it, so the ledger never prices a dead turn at nothing.
+`calls` is the number of backend calls the turn made. The four exist because a pilot billed up to
+64x its authorisation and no row anywhere in the store said so: the guard bounded one call while a
+turn with tools made up to `max_tool_iterations` of them, each re-sending the whole conversation.
+The key set of §2.11 grows by exactly these four; `BudgetFile` (§2.5) gains `max_tool_iterations`
+and `minimal_case_lines` in the same MINOR bump, and `03-LLD.md` §3.5.1 carries the arithmetic.
+
 ### 2.10 `RunManifest`, direction both
 
 Stamped on every artefact of both halves (FR-17.6), with fields written on both sides. Produced by
