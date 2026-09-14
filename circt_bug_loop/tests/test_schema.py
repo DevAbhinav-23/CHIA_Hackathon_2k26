@@ -510,3 +510,21 @@ def test_T_U_schema_27():
     assert schema.validate(edit(budget(), campaign_spend_cap_usd=200,
                                 price_usd_per_m_input_tokens=1,
                                 price_usd_per_m_output_tokens=4)) is None
+
+
+def test_T_U_schema_24():
+    """W-23: a payload written at an older MINOR still loads at this one."""
+    assert schema.CONTRACT_VERSION == "2.3"
+    document = payload("run_manifest/discovery_01.json") | {"contract_version": "2.2"}
+    # `shard` is contract 2.3's and a 2.2 manifest.json does not carry it.
+    del document["shard"]
+    loaded = schema.from_json(json.dumps(document), schema.RunManifest)
+    assert loaded.shard is None and loaded.contract_version == "2.2"
+    assert schema.validate(loaded) is None
+
+    # A field with NO default is structural and its absence is still E002.
+    structural = payload("run_manifest/discovery_01.json")
+    del structural["pin_sha"]
+    error = raises("E002_MISSING_FIELD", schema.from_json,
+                   json.dumps(structural), schema.RunManifest)
+    assert "['pin_sha']" in str(error)

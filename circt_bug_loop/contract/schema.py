@@ -77,7 +77,13 @@ def from_json(text: str, cls: type) -> Any:
         raise ContractError("E009_UNKNOWN_SCHEMA", f"{cls!r} is not a contract member")
     payload = json.loads(text)
     names = {f.name for f in dataclasses.fields(cls)}
-    missing = sorted(names - set(payload))
+    # A field carrying a DEFAULT is one a later MINOR added, and §2.2's
+    # compatibility rule is that an older instance still loads: the default is
+    # what it loads with. A field without one is structural, and E002 stands.
+    required = {f.name for f in dataclasses.fields(cls)
+                if f.default is dataclasses.MISSING
+                and f.default_factory is dataclasses.MISSING}
+    missing = sorted(required - set(payload))
     if missing:
         raise ContractError("E002_MISSING_FIELD",
                             f"{cls.__name__} payload lacks {missing}")
