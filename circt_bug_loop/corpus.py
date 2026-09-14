@@ -783,14 +783,17 @@ def resolve_sites(clone_path: str, run_commit: str, sites: list[dict],
     """Say which of a turn's sibling sites exist in the tree at the run's commit.
 
     Returns:
-        {"resolved": list[dict], "rejected": list[dict]}, each entry the input
-        site plus "reason" on a rejection, one of "no_such_file" or "no_symbol".
+        {"resolved": list[dict], "rejected": list[dict], "counters":
+        CounterBlock}, each site entry the input site plus "reason" on a
+        rejection, one of "no_such_file" or "no_symbol". The counters count
+        sites, at stage "corpus", A1' being A1's second node (3.11).
     Worker:
         head - the clone is the head's (K5). No model, no CIRCT binary.
     Raises:
         nothing. A git failure marks every site of that call "no_such_file" with
         the git stderr recorded, which rejects rather than accepts.
     """
+    started_at = time.monotonic()
     git = _Git(clone_path, timeout_seconds)
     resolved, rejected = [], []
     for site in sites:
@@ -819,4 +822,8 @@ def resolve_sites(clone_path: str, run_commit: str, sites: list[dict],
             resolved.append(dict(site))
         else:
             rejected.append({**site, "reason": "no_symbol", "stderr": ""})
-    return {"resolved": resolved, "rejected": rejected}
+    return {"resolved": resolved, "rejected": rejected,
+            "counters": CounterBlock(stage="corpus", started=len(sites),
+                                     completed=len(resolved),
+                                     failed=len(rejected),
+                                     seconds=time.monotonic() - started_at)}

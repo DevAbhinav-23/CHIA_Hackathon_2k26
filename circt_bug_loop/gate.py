@@ -36,6 +36,7 @@ import json
 import os
 import shlex
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -43,7 +44,7 @@ from typing import Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.circt_core import CIRCT_ROOTS, circt_exec_probe
-from circt_bug_loop.contract.schema import RunManifest
+from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.probe_task import (PROBE_NOFILE, BinaryMismatch, _last_pass,
                                        _sha256, classify_build, oracle_primary)
 from circt_bug_loop.store import (BuildResult, CandidateRecord, DedupVerdict,
@@ -234,7 +235,8 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
     Returns:
         {"status": str, "oracle_class": str | None, "assertion_text": str | None,
          "assertion_site": str | None, "fingerprint": str | None,
-         "worker": str, "node_id": str, "pid": int}
+         "worker": str, "node_id": str, "pid": int, "counters": CounterBlock},
+        the counters counting one re-run at stage "gate" (3.11).
     Worker:
         {"circt": 1}.
     Raises:
@@ -242,6 +244,7 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
     """
     from types import SimpleNamespace
 
+    started_at = time.monotonic()
     argv = shlex.split(repro_command)
     work = _work_dir(artefact_root, run_manifest_id, candidate_id, "gate")
     out = _run_command(argv[0], argv[1:], image_spec, limits, work)
@@ -272,7 +275,7 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
     # the rule stays B3's own rather than being restated here.
     verdict = oracle_primary._chia_original(
         build, SimpleNamespace(flag_string=image_spec["flag_string"]), work,
-        circt_roots=circt_roots, symbolizer=symbolizer)
+        circt_roots=circt_roots, symbolizer=symbolizer)["verdict"]
     finger = compute_fingerprint(verdict, signal_name, "", top_n)
 
     return {"status": status, "oracle_class": verdict.oracle_class,
@@ -280,7 +283,10 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
             "assertion_site": verdict.assertion_site,
             "fingerprint": finger.value,
             "worker": out["worker_hostname"], "node_id": out["worker_node_id"],
-            "pid": out["child_pid"]}
+            "pid": out["child_pid"],
+            "counters": CounterBlock(
+                stage="gate", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
@@ -295,13 +301,16 @@ def gate_validate(case_path: str, image_spec: dict, limits: dict,
 
     Returns:
         {"argv": list[str], "exit_status": int | None, "stderr_path": str,
-         "checker_fired": bool, "oracle_class": str | None}
+         "checker_fired": bool, "oracle_class": str | None,
+         "counters": CounterBlock}, the counters counting one validity check at
+        stage "gate" (3.11).
     Worker:
         {"circt": 1}; the binaries are the source tree's, at the candidate's own
         commit (§4.8, K14).
     Raises:
         BinaryMismatch, as probe_execute does.
     """
+    started_at = time.monotonic()
     tool, options = validity_command(case_path)
     work = _work_dir(artefact_root, run_manifest_id, candidate_id, "gate")
     out = _run_command(os.path.join(bin_dir, tool), [*options, case_path],
@@ -313,7 +322,10 @@ def gate_validate(case_path: str, image_spec: dict, limits: dict,
     fired = status in ("assertion", "fatal_error", "crash")
     return {"argv": out["argv"], "exit_status": out["exit_status"],
             "stderr_path": str(stderr_path), "checker_fired": fired,
-            "oracle_class": status if fired else None}
+            "oracle_class": status if fired else None,
+            "counters": CounterBlock(
+                stage="gate", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 # ---------------------------------------------------------------------------
@@ -357,11 +369,14 @@ def _q2_stopping_value(reason: Optional[str]) -> str:
 def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 dedup: DedupVerdict, repair: Optional[RepairResult],
                 manifest: RunManifest, db_path: str, *, limits: dict,
-                top_n: int, bin_dir: str) -> GateDecision:
+                top_n: int, bin_dir: str) -> dict:
     """Ask the four mechanical questions in order and stop at the first no.
 
     Returns:
-        GateDecision, defaulting to "nothing" for any unanswered question.
+        {"decision": GateDecision, "counters": CounterBlock}, the decision
+        defaulting to "nothing" for any unanswered question and the counters
+        counting one candidate at stage "gate" (3.11); a candidate the gate
+        decided nothing about is the failed one.
     Worker:
         head - and it holds NO circt resource, so it can never occupy a slot
         while waiting for one (02-HLD.md 3).
@@ -370,6 +385,7 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         ValueError for a `differential` candidate, which FR-13.14 keeps out of
         the gate entirely, so one arriving is a caller defect and not a verdict.
     """
+    started_at = time.monotonic()
     if candidate.oracle_class == "differential":
         raise ValueError(
             f"{candidate.candidate_id}: a 'differential' candidate does not "
@@ -429,9 +445,15 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                 fields["q4_new"], fields["q4_reason"] = _question_4(candidate, dedup)
 
     decision, stopped, bucket = decide(fields, repair)
-    return GateDecision(candidate_id=candidate.candidate_id, **fields,
-                        stopped_at_question=stopped, decision=decision,
-                        taxonomy_bucket=bucket, held_reason=candidate.held_reason)
+    verdict = GateDecision(candidate_id=candidate.candidate_id, **fields,
+                           stopped_at_question=stopped, decision=decision,
+                           taxonomy_bucket=bucket,
+                           held_reason=candidate.held_reason)
+    return {"decision": verdict,
+            "counters": CounterBlock(
+                stage="gate", started=1, completed=int(decision != "nothing"),
+                failed=int(decision == "nothing"),
+                seconds=time.monotonic() - started_at)}
 
 
 #: The four questions in the order FR-13.1 fixes, each with the answer field it

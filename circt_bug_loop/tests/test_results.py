@@ -72,8 +72,15 @@ def campaign(tmp_path, name: str = "full"):
 
 
 def render(store, manifest, pairs) -> str:
-    """Call B11 the way the driver does, through `conftest.call_node` (§0.4)."""
-    return call_node(render_results, store, manifest, labelled_pairs=pairs)
+    """Call B11 the way the driver does, through `conftest.call_node` (§0.4).
+
+    The node returns `{"rendered", "counters"}` since the join (W-17, errata row
+    22); what every test below reads is the artefact, so the helper unwraps it
+    and asserts the block here, at every call site.
+    """
+    out = call_node(render_results, store, manifest, labelled_pairs=pairs)
+    assert out["counters"].stage == "results"
+    return out["rendered"]
 
 
 def refuse(store, manifest, pairs) -> list:

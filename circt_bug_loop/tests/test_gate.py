@@ -271,12 +271,16 @@ def _decide(tmp_path, monkeypatch, *, candidate=None, reduced=_UNSET, dedup=None
     candidate = candidate or _candidate(tmp_path, bin_dir)
     store = store or _store(tmp_path, candidate, argv=argv, frame_file=frame_file)
     seen = _direct(monkeypatch)
-    decision = call_node(
+    # `{"decision", "counters"}` since the join (W-17, errata row 22); what the
+    # tests below read is the GateDecision, so it is unwrapped here and the
+    # block is asserted at every call site.
+    out = call_node(
         gate_decide, candidate,
         _reduced(candidate.reduced_path) if reduced is _UNSET else reduced,
         dedup or _dedup(), repair, _manifest(tmp_path, bin_dir),
         str(tmp_path / "loop.db"), limits=LIMITS, top_n=TOP_N, bin_dir=bin_dir)
-    return decision, store, seen
+    assert out["counters"].stage == "gate"
+    return out["decision"], store, seen
 
 
 # ===========================================================================

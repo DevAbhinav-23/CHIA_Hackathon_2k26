@@ -251,7 +251,7 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
         languages=", ".join(languages), target_count=int(target_count))
     backend = llm.build_llm(SYNTH_SYSTEM_MESSAGE, int(timeout_seconds),
                             cfg["model_id"])
-    turn = llm.dispatch_turn(backend, prompt, [])
+    turn = llm.dispatch_turn(backend, prompt, [], stage="synthesis")
     answer = llm.parse_json_footer(turn.get("result") or "", ("mutators",))
     kept, dropped = parse_mutators(answer)
 

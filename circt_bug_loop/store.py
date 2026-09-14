@@ -18,6 +18,7 @@ import os
 import re
 import sqlite3
 import sys
+import time
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +27,7 @@ from typing import Any, Literal, Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract import schema
-from circt_bug_loop.contract.schema import ContractError
+from circt_bug_loop.contract.schema import ContractError, CounterBlock
 
 #: 03-LLD.md 6.2, the tables, verbatim.
 _DDL_TABLES = """\
@@ -1089,6 +1090,35 @@ def _completed(store: "LoopStore", artefact_dir: str) -> bool:
 
 @ChiaFunction(max_retries=0)
 def artefact_write(artefact_dir: str, relative_path: str, data,
+                   *, mode: int = 0o644,
+                   store: Optional["LoopStore"] = None) -> dict:
+    """Write one file into the artefact tree, and count the write (3.11).
+
+    A four-line wrapper around `write_artefact`, which is 6.5's body unchanged
+    and is what every in-process caller uses, because what a caller needs is the
+    path. The split exists because 3.11 requires every node of 3.2 to return
+    `{"counters": CounterBlock}` and this body has three return statements
+    (W-17, errata row 22).
+
+    Returns:
+        {"path": str, "counters": CounterBlock}, the path written (or, on a
+        removal, the marker's), and one write counted at stage "artefact".
+    Worker:
+        {"num_cpus": 0.1} on the head; the artefact root is one host directory
+        bind-mounted at the identical path on every worker (FR-17.9).
+    Raises:
+        whatever `write_artefact` raises, unchanged.
+    """
+    started_at = time.monotonic()
+    path = write_artefact(artefact_dir, relative_path, data, mode=mode,
+                          store=store)
+    return {"path": path,
+            "counters": CounterBlock(
+                stage="artefact", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
+
+
+def write_artefact(artefact_dir: str, relative_path: str, data,
                    *, mode: int = 0o644, store: Optional["LoopStore"] = None) -> str:
     """Write one file into the artefact tree, under the directory's PARTIAL marker.
 

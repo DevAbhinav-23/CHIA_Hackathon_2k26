@@ -22,10 +22,12 @@ nothing and cmake's configure step is not a safety net (C-01, PIN §5.5).
 """
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 
 from chia.base.ChiaFunction import ChiaFunction
 
+from circt_bug_loop.contract.schema import CounterBlock
 from circt_bug_loop.corpus import (SUBMODULE, TAG_REFSPEC, CorpusError, _Git,
                                    _read_tags, _walk_pins)
 
@@ -80,11 +82,13 @@ def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600,
     Returns:
         {"run_commit": str, "pin_sha": str, "pin_tag": str,
          "tags_sharing_pin": list[str], "lag_commits": int, "lag_days": float,
-         "current_window_has_release": bool, "resolved_utc": str}, where
+         "current_window_has_release": bool, "resolved_utc": str,
+         "counters": CounterBlock}, where
         run_commit is FR-02.7's field, pin_sha is that commit's `llvm` gitlink,
         tags_sharing_pin is newest by tag date first and pin_tag is its head,
         lag_commits and lag_days are FR-02.2's pair measured from *ref*, and
-        current_window_has_release is FR-02.4's boolean for *ref*'s own pin.
+        current_window_has_release is FR-02.4's boolean for *ref*'s own pin,
+        and the counters count the window's commits at stage "pin" (3.11).
     Worker:
         head - it walks 24 months of main in the head's blobless clone, which
         no worker container mounts (K5). No CIRCT binary, no model.
@@ -97,6 +101,7 @@ def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600,
         subprocess.CalledProcessError or subprocess.TimeoutExpired when git
             itself fails, which is a broken clone and not a selection result.
     """
+    started_at = time.monotonic()
     git = _Git(clone_path, timeout_seconds)
     try:
         tags = _read_tags(git)
@@ -152,4 +157,9 @@ def select_release_pinned_main(clone_path: str, timeout_seconds: int = 600,
         "lag_days": (head["date"] - chosen["date"]).total_seconds() / 86400.0,
         "current_window_has_release": head["llvm"] in pin_tags,
         "resolved_utc": datetime.now(timezone.utc).isoformat(),
+        # 3.11: every node of 3.2 returns exactly one of these. A2 examines the
+        # window's commits and chooses one, so the units are commits.
+        "counters": CounterBlock(stage="pin", started=len(commits), completed=1,
+                                 failed=len(commits) - 1,
+                                 seconds=time.monotonic() - started_at),
     }

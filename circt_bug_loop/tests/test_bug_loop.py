@@ -786,10 +786,15 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
             oracle_fired=False, stopping_stage="stage_3",
             stopping_reason="assertion fired" if status == "assertion" else "rc 0",
             artefact_dir=artefact_dir)
-        return {"build_result": build, "probe_result": result}
+        return {"build_result": build, "probe_result": result,
+                "counters": schema.CounterBlock(
+                    stage="stage_3", started=1, completed=1, failed=0,
+                    seconds=0.1)}
 
     def oracle(build, image, artefact_dir, **kwargs):
-        return OracleVerdict(
+        return {"counters": schema.CounterBlock(
+            stage="stage_4", started=1, completed=1, failed=0, seconds=0.1),
+            "verdict": OracleVerdict(
             probe_id=build.probe_id, fired=True, oracle_class="assertion",
             assertion_text="op->getNumResults() == 1",
             assertion_site="LowerTypes.cpp:412", fatal_message=None,
@@ -799,17 +804,20 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
             fingerprint_frame="circt::firrtl::LowerTypes::run LowerTypes.cpp",
             out_of_scope_root=False, repro_command="circt-opt input.mlir",
             flag_string=bug_loop.IMAGE_FLAG_STRING,
-            tool_version_output="circt-opt 1.159.0")
+            tool_version_output="circt-opt 1.159.0")}
 
     def reduce(spec, verdict, limits, artefact_dir, **kwargs):
-        return ReducedCase(
+        return {"counters": schema.CounterBlock(
+            stage="stage_5", started=1, completed=1, failed=0, seconds=0.1),
+            "reduced": ReducedCase(
             probe_id=spec.probe_id, reducer="circt-reduce", reduced=True,
             fixpoint=True, budget_truncated=False, reason=None, lift=None,
             path="/artefacts/reduced.mlir", size_before_bytes=100,
             size_after_bytes=10, size_before_ops=10, size_after_ops=1,
             wall_seconds=1.0, interestingness_calls=3, recheck_class="assertion",
             recheck_assertion_text=verdict.assertion_text,
-            recheck_assertion_site=verdict.assertion_site, recheck_matches=True)
+            recheck_assertion_site=verdict.assertion_site,
+            recheck_matches=True)}
 
     def screen(candidate, seed, verdict, clone_path, db_path, top_n, **kwargs):
         return {"fingerprint": Fingerprint(
@@ -824,11 +832,17 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
                          "issue_url", "issue_state", "issue_labels",
                          "duplicate_of_candidate_id", "fixing_commit"))),
                 "contaminated_symbol": False, "contaminated_file": False,
-                "contamination_lower_bound": "seed_commit", "fixing_commits": []}
+                "contamination_lower_bound": "seed_commit", "fixing_commits": [],
+                "counters": schema.CounterBlock(
+                    stage="stage_6", started=1, completed=1, failed=0,
+                    seconds=0.1)}
 
     def report(candidate, reduced, verdict, dedup, manifest_, cfg, artefact_dir,
                **kwargs):
-        return {"report": object(), "logs": {}, "failure": None}
+        return {"report": object(), "logs": {}, "failure": None,
+                "counters": schema.CounterBlock(
+                    stage="stage_6", started=1, completed=1, failed=0,
+                    seconds=0.1)}
 
     def repair(*args, **kwargs):
         raise RuntimeError("repair is disabled in the dry-run iteration")
@@ -837,7 +851,9 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
              *, limits, top_n, bin_dir):
         from circt_bug_loop.store import GateDecision
 
-        return GateDecision(
+        return {"counters": schema.CounterBlock(
+            stage="gate", started=1, completed=1, failed=0, seconds=0.1),
+            "decision": GateDecision(
             candidate_id=candidate.candidate_id, q1_reproduce=True,
             q1_original_worker="host-a", q1_rerun_worker="host-b",
             q1_original_pid=1, q1_rerun_pid=2, q1_same_worker=False,
@@ -845,7 +861,7 @@ def fake_stages(*, fires: bool = True) -> bug_loop.Stages:
             q3_validity_basis="parsed", q3_after_parse=True, q3_exit_status=0,
             q3_stderr_path="/dev/null", q4_new=True, q4_reason=None,
             stopped_at_question=None, decision="report",
-            taxonomy_bucket="new_bug", held_reason=None)
+            taxonomy_bucket="new_bug", held_reason=None)}
 
     return bug_loop.Stages(
         generate_seeded=generate, generate_mutation=generate, probe_execute=execute,

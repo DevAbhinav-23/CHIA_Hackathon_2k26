@@ -231,13 +231,17 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
     monkeypatch.setitem(sys.modules, "circt_util", util)
     case = tmp_path / "reduced.mlir"
     shutil.copyfile(REPAIR / "case.mlir", case)
-    result = call_node(
+    # `{"result", "counters"}` since the join (W-17, errata row 22); every test
+    # below reads the RepairResult, so it is unwrapped here.
+    out = call_node(
         repair_adapt, _report(), candidate, _reduced(case), _verdict(), manifest,
         dict(cfg or {"repair_backend": "vertex"}),
         local_id=LOCAL_ID_BASE + 7, input_path="/art/probe/input.mlir",
         created_utc="2026-09-14T00:00:00+00:00", bin_dir=bin_dir,
         env=dict(ALLOW_ENV if env is None else env))
-    return types.SimpleNamespace(result=result, chain=chain, util=util,
+    assert out["counters"].stage == "stage_7"
+    return types.SimpleNamespace(result=out["result"], counters=out["counters"],
+                                 chain=chain, util=util,
                                  manifest=manifest, candidate=candidate,
                                  generate=generate, bin_dir=bin_dir)
 

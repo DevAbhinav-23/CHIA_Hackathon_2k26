@@ -106,13 +106,16 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
     anywhere the image is not (erratum candidate against §3.6's signature).
 
     Returns:
-        {"build_result": BuildResult, "probe_result": ProbeResult}
+        {"build_result": BuildResult, "probe_result": ProbeResult, "counters":
+        CounterBlock}, the counters counting one probe at stage_3, as 3.11
+        requires of every node; an `internal_error` status is the failed one.
     Worker:
         {"circt": 1} - it runs the image's own CIRCT binaries.
     Raises:
         BinaryMismatch(tool, expected_sha, actual_sha) when a tool binary's
             SHA-256 differs from image_spec.tool_hashes.
     """
+    started_at = time.monotonic()
     binary = os.path.join(bin_dir, spec.tool)
     actual = _sha256(binary)
     expected = image_spec.tool_hashes.get(spec.tool)
@@ -161,7 +164,12 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
         exit_status=out["exit_status"], signal=signal_name,
         limit_hit=out["limit_hit"])
     schema.validate(result)
-    return {"build_result": build, "probe_result": result}
+    return {"build_result": build, "probe_result": result,
+            "counters": schema.CounterBlock(
+                stage="stage_3", started=1,
+                completed=int(build.status != "internal_error"),
+                failed=int(build.status == "internal_error"),
+                seconds=time.monotonic() - started_at)}
 
 
 def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
@@ -235,7 +243,7 @@ _FIRING = ("crash", "assertion", "fatal_error")
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
                    *, circt_roots: tuple = CIRCT_ROOTS,
-                   symbolizer: str = "llvm-symbolizer") -> OracleVerdict:
+                   symbolizer: str = "llvm-symbolizer") -> dict:
     """Decide whether the probe found a defect, and say which kind.
 
     A pure function of the stored `BuildResult` plus `llvm-symbolizer` on fixed
@@ -250,12 +258,15 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
     every recorded fixture carries a different prefix (erratum candidate).
 
     Returns:
-        OracleVerdict, with fired False and oracle_class None when it did not.
+        {"verdict": OracleVerdict, "counters": CounterBlock}, the verdict with
+        fired False and oracle_class None when the oracle did not fire; the
+        counters count one probe at stage_4, as 3.11 requires of every node.
     Worker:
         {"circt": 1} - it runs llvm-symbolizer against the image's own binary.
     Raises:
         nothing. An unsymbolisable frame is recorded unresolved, not raised.
     """
+    started_at = time.monotonic()
     stderr = _read(build.stderr_path)
     fired = build.status in _FIRING
     oracle_class = build.status if fired else None
@@ -284,7 +295,7 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
     repro_path.write_text(f"#!/bin/sh\n{repro}\n", encoding="utf-8")
     repro_path.chmod(0o755)
 
-    return OracleVerdict(
+    verdict = OracleVerdict(
         probe_id=build.probe_id, fired=fired, oracle_class=oracle_class,
         assertion_text=assertion_text, assertion_site=assertion_site,
         fatal_message=fatal_message, frames=frames,
@@ -296,6 +307,10 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
         out_of_scope_root=bool(fired) and not root_in_scope(stripped),
         repro_command=repro, flag_string=image_spec.flag_string,
         tool_version_output=_tool_version(build.binary_path))
+    return {"verdict": verdict,
+            "counters": schema.CounterBlock(
+                stage="stage_4", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 def strip_prologue(frames: list) -> list:
@@ -1069,7 +1084,40 @@ def _x_confined(left: list, right: list) -> bool:
 def oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
                         artefact_dir: str, *, limits: dict,
                         bin_dir: str = CIRCT_BIN_DIR,
-                        verilator: str = "verilator") -> DifferentialVerdict:
+                        verilator: str = "verilator") -> dict:
+    """Run one design through arcilator and Verilator, and count the run (3.11).
+
+    A four-line wrapper around `_oracle_differential`, which is 3.6.3's body
+    unchanged. The split exists because 3.11 requires every node of 3.2 to
+    return `{"counters": CounterBlock}` and this body has five return
+    statements; wrapping it is one place to add the block, and editing five is
+    five places to lose one (W-17, errata row 22).
+
+    Returns:
+        {"verdict": DifferentialVerdict, "counters": CounterBlock}, always,
+        including the `not_applicable` verdict with its reason. `completed` is
+        1 where the two arms were compared and 0 where the verdict is
+        `harness_failure`.
+    Worker:
+        {"circt": 1} - it runs arcilator, firtool and Verilator.
+    Raises:
+        whatever the body raises, which is nothing it does not record.
+    """
+    started_at = time.monotonic()
+    verdict = _oracle_differential(spec, build, image_spec, artefact_dir,
+                                   limits=limits, bin_dir=bin_dir,
+                                   verilator=verilator)
+    failed = int(verdict.verdict == "harness_failure")
+    return {"verdict": verdict,
+            "counters": schema.CounterBlock(
+                stage="stage_4", started=1, completed=1 - failed, failed=failed,
+                seconds=time.monotonic() - started_at)}
+
+
+def _oracle_differential(spec, build: BuildResult, image_spec: ImageSpec,
+                         artefact_dir: str, *, limits: dict,
+                         bin_dir: str = CIRCT_BIN_DIR,
+                         verilator: str = "verilator") -> DifferentialVerdict:
     """Run one design through arcilator and Verilator from one stimulus.
 
     Five steps and nothing else: decide applicability from the argv alone
@@ -1391,7 +1439,33 @@ def select_reducer(spec) -> dict:
 
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
-                *, bin_dir: str = CIRCT_BIN_DIR) -> ReducedCase:
+                *, bin_dir: str = CIRCT_BIN_DIR) -> dict:
+    """Shrink a firing input, and count the reduction (3.11).
+
+    A four-line wrapper around `_reduce_case`, which is 3.6.4's body unchanged,
+    for the reason `oracle_differential`'s wrapper exists: the body has two
+    return statements and the block belongs in one place (W-17, errata row 22).
+
+    Returns:
+        {"reduced": ReducedCase, "counters": CounterBlock}. `completed` is 1
+        where the case shrank and 0 where it did not, which is what
+        `ReducedCase.reduced` says.
+    Worker:
+        {"circt": 1} - it runs the image's own source-built circt-reduce.
+    Raises:
+        nothing, as the body raises nothing.
+    """
+    started_at = time.monotonic()
+    case = _reduce_case(spec, verdict, limits, artefact_dir, bin_dir=bin_dir)
+    return {"reduced": case,
+            "counters": schema.CounterBlock(
+                stage="stage_5", started=1, completed=int(case.reduced),
+                failed=int(not case.reduced),
+                seconds=time.monotonic() - started_at)}
+
+
+def _reduce_case(spec, verdict: OracleVerdict, limits: dict, artefact_dir: str,
+                 *, bin_dir: str = CIRCT_BIN_DIR) -> ReducedCase:
     """Shrink a firing input under a firing-specific interestingness test.
 
     The reducer is chosen by input language, by FR-09.9's rule and no other, and

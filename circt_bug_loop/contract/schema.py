@@ -420,15 +420,23 @@ class CounterBlock:
     package rather than in store.py for one reason: both halves produce one,
     and a supply-half module may not import store.py (FR-16.1, 14.5's walk).
     """
-    stage: str          # one of _STAGE_IDS, or "image", "corpus", "pin",
-                        # "mirror" or "synthesis" for the five shared stages
+    stage: str          # one of _STAGE_IDS, or one of the ten shared names in
+                        # _COUNTER_STAGES below
     started: int        # units of work this node began: probes, seeds, issues
     completed: int      # of those, the ones that returned a record
     failed: int         # of those, the ones that did not; started == completed + failed
     seconds: float      # this node's own wall clock, start to return
 
 
-_COUNTER_STAGES = _STAGE_IDS + ("image", "corpus", "pin", "mirror", "synthesis")
+#: The eight stage ids, plus a name for every node of 3.2 that is not one of the
+#: eight. FIVE were added at the join (W-17): 3.11 requires a CounterBlock of
+#: EVERY node of 3.2 and this tuple named no stage for A5's feedback bundle
+#: (errata row 22's "real obstacle"), for A6a's budget load, for A6b's ledger
+#: append, for B10b's artefact write or for B11's results render. Adding a name
+#: moves neither MAJOR nor MINOR: CounterBlock is not a contract member.
+_COUNTER_STAGES = _STAGE_IDS + ("image", "corpus", "pin", "mirror", "synthesis",
+                                "feedback", "budget", "ledger", "artefact",
+                                "results")
 
 _MEMBERS = (SeedRecord, BudgetFile, ProbeSpec, ProbeResult, FeedbackBundle,
             LedgerEntry, RunManifest)

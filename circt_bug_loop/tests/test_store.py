@@ -216,7 +216,9 @@ def test_T_U_store_03(tmp_path: Path):
 
     artefact_dir = str(tmp_path / "probe-01")
     big = "x" * (cap + 1)
-    path = call_node(store.artefact_write, artefact_dir, "input.mlir", big)
+    written = call_node(store.artefact_write, artefact_dir, "input.mlir", big)
+    path = written["path"]
+    assert written["counters"].stage == "artefact"
     assert Path(path).stat().st_size == cap + 1
     assert schema.bound_text(big, path, cap) is None       # the row holds the path
     assert schema.bound_text("x" * cap, path, cap) is not None

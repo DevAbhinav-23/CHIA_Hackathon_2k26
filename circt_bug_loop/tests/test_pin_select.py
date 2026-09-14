@@ -42,9 +42,11 @@ W04_TAGS = ["firtool-1.159.0", "firtool-1.158.0", "firtool-1.157.0"]
 W04_LAG_COMMITS = 8
 W04_LAG_DAYS = 4.807
 
-#: The eight fields `03-LLD.md` §3.4's **Returns** paragraph names.
+#: The eight fields `03-LLD.md` §3.4's **Returns** paragraph names, plus the
+#: `counters` block §3.11 requires of every node of §3.2 (added at the join,
+#: W-17; errata row 22).
 FIELDS = {"run_commit", "pin_sha", "pin_tag", "tags_sharing_pin", "lag_commits",
-          "lag_days", "current_window_has_release", "resolved_utc"}
+          "lag_days", "current_window_has_release", "resolved_utc", "counters"}
 
 
 class _RecordedGit:

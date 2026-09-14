@@ -540,7 +540,10 @@ def test_T_U_schema_22():
     assert block.started == block.completed + block.failed
     assert block.stage in schema._COUNTER_STAGES
     assert set(schema._COUNTER_STAGES) == set(schema._STAGE_IDS) | {
-        "image", "corpus", "pin", "mirror", "synthesis"}
+        "image", "corpus", "pin", "mirror", "synthesis",
+        # Five added at the join (W-17, errata row 22): 3.11 requires a block of
+        # EVERY node of 3.2 and none of these five had a stage to name.
+        "feedback", "budget", "ledger", "artefact", "results"}
     assert schema.CONTRACT_VERSION == "2.0"
 
 

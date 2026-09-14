@@ -70,6 +70,10 @@ GENERATE_SYSTEM_MESSAGE = (
 #: supply-half module may not import (1.3's layout rule 2).
 _PARTIAL = "PARTIAL"
 
+#: A3's two turns, by the name their five artefact files take (6.5), to the
+#: stage id their `CounterBlock` carries (2.5's `_COUNTER_STAGES`).
+_TURN_STAGE = {"seed_read": "stage_1", "probe_write": "stage_2"}
+
 
 # ---------------------------------------------------------------------------
 # 3.5 The two agent-facing tools
@@ -591,7 +595,7 @@ def _turn(stage: str, prompt: str, tools: list, cfg: dict, directory: str,
     try:
         llm = build_llm(GENERATE_SYSTEM_MESSAGE,
                         int(cfg.get("timeout_seconds", 2400)), cfg["model_id"])
-        turn = dispatch_turn(llm, prompt, tools)
+        turn = dispatch_turn(llm, prompt, tools, stage=_TURN_STAGE[stage])
         return turn
     finally:
         turn["wall_seconds"] = time.monotonic() - started

@@ -35,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shlex
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Optional
@@ -42,7 +43,7 @@ from typing import Mapping, Optional
 import chia
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop.contract.schema import RunManifest
+from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.llm import MODEL_BACKEND, require_live_model
 from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
                                   RepairResult, Report)
@@ -356,12 +357,14 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
                  local_id: int, input_path: str, created_utc: Optional[str] = None,
                  issue_solver: Optional[Path] = None,
                  bin_dir: str = CIRCT_BUILD_BIN,
-                 env: Optional[Mapping[str, str]] = None) -> RepairResult:
+                 env: Optional[Mapping[str, str]] = None) -> dict:
     """Present one local report to CHIA's chain, then restore the worker.
 
     Returns:
-        RepairResult, for every one of CHIA's six statuses, with the failing
-        phase named, plus the post-attempt restore result.
+        {"result": RepairResult, "counters": CounterBlock}, the RepairResult for
+        every one of CHIA's six statuses, with the failing phase named, plus the
+        post-attempt restore result; the counters count one attempt at stage_7,
+        a status other than `fixed` being the failed one (3.11).
     Worker:
         {"repair": 1} - its own worker type, because the chain rebuilds with the
         agent's diff applied and returns without restoring (FR-12.11).
@@ -377,6 +380,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
         `bug_loop.interlock_probe`'s own parameter applied to the one stage that
         checks the interlock for itself (architect decision 2).
     """
+    started_at = time.monotonic()
     if not cfg.get("repair_enabled", True):
         raise RepairRefused("repair_disabled")
     if candidate.oracle_class not in REPAIR_CLASSES:
@@ -434,8 +438,14 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
                                                             encoding="utf-8")
         restore = _restore(candidate, manifest, chain_cfg, circt_util, bin_dir)
 
-    return _as_repair_result(result, candidate, local_id, repro_dir,
-                             chain_cfg["backend"], before != after, restore, solver)
+    attempt = _as_repair_result(result, candidate, local_id, repro_dir,
+                                chain_cfg["backend"], before != after, restore,
+                                solver)
+    fixed = int(attempt.status == "fixed")
+    return {"result": attempt,
+            "counters": CounterBlock(
+                stage="stage_7", started=1, completed=fixed, failed=1 - fixed,
+                seconds=time.monotonic() - started_at)}
 
 
 def _restore(candidate: CandidateRecord, manifest: RunManifest, chain_cfg: dict,

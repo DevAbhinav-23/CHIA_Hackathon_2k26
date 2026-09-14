@@ -964,5 +964,6 @@ def test_T_U_corpus_24(clone: str):
     assert answer["resolved"] == [sites[0]]
     assert [r["reason"] for r in answer["rejected"]] == ["no_symbol", "no_such_file"]
     assert [r["file"] for r in answer["rejected"]] == [s["file"] for s in sites[1:]]
-    assert call_node(corpus.resolve_sites, clone, CORPUS_HEAD_SHA, []) == {
-        "resolved": [], "rejected": []}
+    empty = call_node(corpus.resolve_sites, clone, CORPUS_HEAD_SHA, [])
+    assert (empty["resolved"], empty["rejected"]) == ([], [])
+    assert empty["counters"].stage == "corpus" and empty["counters"].started == 0

@@ -25,6 +25,7 @@ apparatus does, and this module is the second of them.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
@@ -32,7 +33,7 @@ from typing import Optional
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop import ledger as ledger_module
-from circt_bug_loop.contract.schema import RunManifest
+from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.gate import TAXONOMY, decide
 from circt_bug_loop.probe_task import classify_build
 from circt_bug_loop.store import Fingerprint, LoopStore
@@ -1112,7 +1113,7 @@ _REFUSALS = (_require_headline, _require_secondaries, _require_validation_table,
 
 @ChiaFunction(max_retries=0)
 def render_results(store: LoopStore, manifest: RunManifest, *,
-                   labelled_pairs: Optional[list] = None) -> str:
+                   labelled_pairs: Optional[list] = None) -> dict:
     """Render one run's results artefact as Markdown, or refuse and name what is missing.
 
     Every number is read from `loop.db` and from the artefact tree it points at.
@@ -1128,7 +1129,9 @@ def render_results(store: LoopStore, manifest: RunManifest, *,
     it can compare this loop's count to one (FR-18.9).
 
     Returns:
-        str, the Markdown artefact, ending in exactly one newline.
+        {"rendered": str, "counters": CounterBlock}, the Markdown artefact
+        ending in exactly one newline, and one artefact counted at stage
+        "results", which 3.11 requires of every node of 3.2.
     Worker:
         `@ChiaFunction(max_retries=0)` on the head, 600 s `[DEFAULT]` enforced
         by the driver (§3.2); a pure function of the store, so a re-render is a
@@ -1137,12 +1140,16 @@ def render_results(store: LoopStore, manifest: RunManifest, *,
         ResultsIncomplete carrying every element the store cannot support, with
         no partial artefact returned; sqlite3.Error from any query.
     """
+    started_at = time.monotonic()
     facts = _facts(store, manifest, labelled_pairs)
     text = _render(facts)
     missing = [complaint for check in _REFUSALS for complaint in check(text, facts)]
     if missing:
         raise ResultsIncomplete(missing)
-    return text
+    return {"rendered": text,
+            "counters": CounterBlock(
+                stage="results", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 __all__ = ["render_results", "ResultsIncomplete", "ARMS", "BUCKETS"]

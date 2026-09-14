@@ -297,8 +297,8 @@ def _fake_generate(monkeypatch, turn=None, *, raises=None):
                     model_id=model_id)
         return object()
 
-    def dispatch_turn(llm, user_message, tools):
-        seen.update(prompt=user_message, tools=tools)
+    def dispatch_turn(llm, user_message, tools, *, stage="stage_2"):
+        seen.update(prompt=user_message, tools=tools, stage=stage)
         if raises is not None:
             raise raises
         return {"result": turn or "", "stream": turn or "", "stderr": "",
@@ -1507,8 +1507,9 @@ def test_triage_36_the_source_read_tool_is_constructed_for_real(tmp_path, monkey
     def build_llm(system_message, timeout_seconds, model_id):
         return object()
 
-    def dispatch_turn(backend, user_message, tools):
+    def dispatch_turn(backend, user_message, tools, *, stage="stage_2"):
         seen["tools"] = list(tools)
+        seen["stage"] = stage
         return {"result": _turn_text("report_write_ok"), "stream": "", "stderr": "",
                 "success": True, "usage": {"tokens_in": 11, "tokens_out": 7,
                                            "num_turns": 1,

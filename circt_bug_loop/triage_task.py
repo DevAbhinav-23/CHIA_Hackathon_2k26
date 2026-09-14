@@ -32,6 +32,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from string import Template
@@ -39,14 +40,15 @@ from typing import Literal, Optional
 
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop.contract.schema import RunManifest, SeedRecord
+from circt_bug_loop.contract.schema import (CounterBlock, RunManifest,
+                                            SeedRecord)
 from circt_bug_loop.llm import (PromptContractError,  # noqa: F401
                                 build_llm, dispatch_turn, parse_json_footer)
 from circt_bug_loop.probe_task import _normalise_function, strip_prologue
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, LoopStore,
                                   OracleVerdict, ReducedCase, Report,
-                                  artefact_write, validate_candidate)
+                                  validate_candidate, write_artefact)
 
 #: 03-LLD.md 9.4's two implementation constants of this module.
 TRIAGE_REASON_MAX_SENTENCES = 4
@@ -85,11 +87,12 @@ ARC_TESTS = "circt/arc-tests"
 _SRC_ROOTS = ("lib/", "include/", "tools/", "test/", "frontends/",
               "integration_test/")
 
-#: The undecorated original, as `probe_task` takes the three core additions
-#: (3.10): a plain call to the wrapper routes through `chia.trace.profiler`,
-#: which starts a local Ray. The artefact root is bind-mounted at the identical
+#: 6.5's write, as the plain function and not as B10b's node: a plain call to a
+#: `ChiaFunction` wrapper routes through `chia.trace.profiler`, which starts a
+#: local Ray, and the node's own return is `{"path", "counters"}` while what a
+#: report needs is the path. The artefact root is bind-mounted at the identical
 #: path on every worker (FR-17.9), so the write lands in the same place.
-_artefact_write = artefact_write._chia_original
+_artefact_write = write_artefact
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])(?:\s+|$)")
 _SSA = re.compile(r"%[A-Za-z0-9_$.\-]+")
@@ -688,7 +691,7 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
         {"refreshed_utc": str, "issues_mirrored": int, "issue_cap": int,
          "cap_bound": bool, "state": "all", "comments_mirrored": False,
          "incomplete_reason": str | None, "ceiling_hit": bool, "pages": int,
-         "issues_added": int}. The first six are
+         "issues_added": int, "counters": CounterBlock}. The first six are
         `RunManifest.issue_mirror`'s closed key set (2.7); the rest cannot go
         there, that set being compared exactly by `validate` and the contract
         being frozen at 2.0, so the driver copies the six and records the others
@@ -704,6 +707,7 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
     """
     from chia.github.github_issues_node import GithubIssuesNode
 
+    started_at = time.monotonic()
     token = Path(token_path).read_text().strip()
     node = GithubIssuesNode(repo, token=token, state="all")
     del token
@@ -737,7 +741,11 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
             "issue_cap": issue_cap, "cap_bound": len(seen) >= issue_cap,
             "state": "all", "comments_mirrored": False,
             "incomplete_reason": reason, "ceiling_hit": ceiling_hit,
-            "pages": pages, "issues_added": len(issues)}
+            "pages": pages, "issues_added": len(issues),
+            "counters": CounterBlock(
+                stage="mirror", started=len(seen), completed=len(issues),
+                failed=len(seen) - len(issues),
+                seconds=time.monotonic() - started_at)}
 
 
 # ---------------------------------------------------------------------------
@@ -770,7 +778,9 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     Returns:
         {"fingerprint": Fingerprint, "dedup": DedupVerdict,
          "contaminated_symbol": bool, "contaminated_file": bool,
-         "contamination_lower_bound": str, "fixing_commits": list[str]}
+         "contamination_lower_bound": str, "fixing_commits": list[str],
+         "counters": CounterBlock}, the counters counting one candidate at
+        stage_6, `dedup_unavailable` being the failed one (3.11).
     Worker:
         head - both commit scans walk 24 months of main in the head's blobless
         clone, and the issue mirror is a table in loop.db, which is head-pinned
@@ -782,6 +792,7 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
         undecidable dedup is `dedup_unavailable`, which fails gate question 4
         rather than passing it (FR-10.7), and a git or GitHub failure is caught.
     """
+    started_at = time.monotonic()
     if candidate.oracle_class == "differential":
         raise ValueError(
             f"candidate {candidate.candidate_id!r} is 'differential' and never "
@@ -857,7 +868,12 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     return {"fingerprint": fingerprint, "dedup": dedup,
             "contaminated_symbol": contaminated_symbol,
             "contaminated_file": contaminated_file,
-            "contamination_lower_bound": lower_bound, "fixing_commits": fixing}
+            "contamination_lower_bound": lower_bound, "fixing_commits": fixing,
+            "counters": CounterBlock(
+                stage="stage_6", started=1,
+                completed=int(dedup.verdict != "dedup_unavailable"),
+                failed=int(dedup.verdict == "dedup_unavailable"),
+                seconds=time.monotonic() - started_at)}
 
 
 def _duplicate_of(store: LoopStore, candidate: CandidateRecord,
@@ -1270,9 +1286,10 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     as A3 does.
 
     Returns:
-        {"report": Report, "logs": dict, "failure": str | None}. `logs` carries
-        the turn's five FR-04.6 files by path, its usage, and
-        `reason_truncated`.
+        {"report": Report, "logs": dict, "failure": str | None, "counters":
+        CounterBlock}. `logs` carries the turn's five FR-04.6 files by path, its
+        usage, and `reason_truncated`; the counters count one candidate at
+        stage_6, a failed turn being the failed one (3.11).
     Worker:
         {"circt": 1} for the node; the one turn at {"llm": 1.0}.
     Raises:
@@ -1280,6 +1297,7 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         report; the candidate still receives four mechanical gate answers and is
         held with held_reason=no_report if it passes (FR-11.8).
     """
+    started_at = time.monotonic()
     validate_candidate(candidate)
     template = "differential" if candidate.oracle_class == "differential" else "primary"
     prompt = _render_prompt(candidate, reduced, verdict, dedup,
@@ -1322,7 +1340,10 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                         classification_reason=reason, rendered_sha256="",
                         assisted_by=manifest.model_ids["triage_report"],
                         fields_present=[])
-        return {"report": report, "logs": logs, "failure": failure}
+        return {"report": report, "logs": logs, "failure": failure,
+                "counters": CounterBlock(
+                    stage="stage_6", started=1, completed=0, failed=1,
+                    seconds=time.monotonic() - started_at)}
 
     rendered = render_report(template, candidate, reduced, verdict, differential,
                              dedup, manifest, prose)
@@ -1335,7 +1356,10 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         rendered_sha256=hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
         assisted_by=manifest.model_ids["triage_report"],
         fields_present=list(points))
-    return {"report": report, "logs": logs, "failure": None}
+    return {"report": report, "logs": logs, "failure": None,
+            "counters": CounterBlock(
+                stage="stage_6", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 def _render_prompt(candidate: CandidateRecord, reduced: Optional[ReducedCase],
@@ -1418,7 +1442,7 @@ def _run_turn(prompt: str, cfg: dict, name: str) -> dict:
         cap_bytes=int(cfg.get("artefact_inline_cap_bytes", 262144)),
         task_options=cfg.get("head_options"))
     try:
-        return dispatch_turn(backend, prompt, [tool])
+        return dispatch_turn(backend, prompt, [tool], stage="stage_6")
     finally:
         stop = getattr(tool, "stop", None)
         if callable(stop):

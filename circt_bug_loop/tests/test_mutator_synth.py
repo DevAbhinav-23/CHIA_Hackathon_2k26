@@ -92,9 +92,9 @@ def turn(monkeypatch):
                             lambda system, timeout, model: {"model": model,
                                                             "timeout": timeout})
 
-        def _dispatch(llm, user_message, tools):
+        def _dispatch(llm, user_message, tools, *, stage="stage_2"):
             state["calls"].append({"prompt": user_message, "tools": list(tools),
-                                   "llm": llm})
+                                   "llm": llm, "stage": stage})
             return {"result": text, "stream": text, "stderr": "", "success": True,
                     "usage": {"tokens_in": 900, "tokens_out": 300,
                               "num_turns": 1, "model": MODEL_ID}}

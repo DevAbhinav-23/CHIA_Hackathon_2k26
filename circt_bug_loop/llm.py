@@ -30,10 +30,13 @@ import json
 import os
 import re
 import socket
+import time
 from typing import Mapping, Optional
 
 import ray
 from chia.base.ChiaFunction import ChiaFunction, get
+
+from circt_bug_loop.contract.schema import CounterBlock
 
 # ---------------------------------------------------------------------------
 # 3.5.1 The backend, the interlock and the turn
@@ -137,13 +140,19 @@ def build_llm(system_message: str, timeout_seconds: int, model_id: str, *,
 
 
 @ChiaFunction(resources={"llm": 1.0}, max_retries=0)
-def llm_turn(llm, user_message: str, tools: list) -> dict:
+def llm_turn(llm, user_message: str, tools: list, *,
+             stage: str = "stage_2") -> dict:
     """Run one model turn on an `llm` worker and bring its token counts home.
+
+    *stage* is the caller's, because a turn belongs to the stage that asked for
+    it and this node cannot know which: A3 runs two, B7 runs stage 6 and A7 runs
+    the offline synthesis. It names the `CounterBlock` 3.11 requires and nothing
+    else.
 
     Returns:
         {"result": str, "stream": str, "stderr": str, "success": bool,
          "usage": {"tokens_in": int, "tokens_out": int, "num_turns": int,
-                   "model": str | None}}.
+                   "model": str | None}, "counters": CounterBlock}.
     Worker:
         {"llm": 1.0}; the MCP tool servers stay where their own task_options put
         them and are reached over HTTP from here.
@@ -157,17 +166,24 @@ def llm_turn(llm, user_message: str, tools: list) -> dict:
     # carries none (chia:chia/base/llm_call.py:15-35), so a remote dispatch
     # would count on a copy that dies with the task and FR-14.6 would be
     # unsatisfiable. This node holds {"llm": 1.0} in that copy's place.
+    started = time.monotonic()
     cli = llm.prompt(user_message, tools)
     meta = dict(getattr(llm, "_last_metadata", {}) or {})
+    success = bool(getattr(cli, "success", False))
     return {"result": cli.result, "stream": cli.stream_result, "stderr": cli.stderr,
-            "success": bool(getattr(cli, "success", False)),
+            "success": success,
             "usage": {"tokens_in": meta.get("input_tokens", 0),
                       "tokens_out": meta.get("output_tokens", 0),
                       "num_turns": meta.get("num_turns", 0),
-                      "model": meta.get("model")}}
+                      "model": meta.get("model")},
+            "counters": CounterBlock(stage=stage, started=1,
+                                     completed=int(success),
+                                     failed=int(not success),
+                                     seconds=time.monotonic() - started)}
 
 
-def dispatch_turn(llm, user_message: str, tools: list) -> dict:
+def dispatch_turn(llm, user_message: str, tools: list, *,
+                  stage: str = "stage_2") -> dict:
     """Run one turn at {"llm": 1.0}, which is where 3.5.1 puts every turn.
 
     A3, A7 and B7 all reach a model through this one line. Under Ray the node
@@ -184,8 +200,8 @@ def dispatch_turn(llm, user_message: str, tools: list) -> dict:
         whatever the backend raises, unchanged.
     """
     if ray.is_initialized():
-        return get(llm_turn.chia_remote(llm, user_message, tools))
-    return llm_turn._chia_original(llm, user_message, tools)
+        return get(llm_turn.chia_remote(llm, user_message, tools, stage=stage))
+    return llm_turn._chia_original(llm, user_message, tools, stage=stage)
 
 
 # ---------------------------------------------------------------------------

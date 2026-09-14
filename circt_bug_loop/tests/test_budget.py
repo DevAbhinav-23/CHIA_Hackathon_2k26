@@ -63,10 +63,17 @@ class Repo:
         return self.git("log", "-1", "--format=%H", "--", relative).strip()
 
     def load(self, **kwargs):
-        """`load_budget` against this repository's budget file."""
+        """`load_budget` against this repository's budget file.
+
+        The node returns `{"budget", "counters"}` since the join (W-17, errata
+        row 22) and what every test below reads is the `BudgetFile`, so the
+        helper unwraps it and asserts the block here, at every call site.
+        """
         kwargs.setdefault("run_start_utc", _RUN_START)
-        return call_node(budget_module.load_budget, str(self.budget), str(self.root),
-                         **kwargs)
+        out = call_node(budget_module.load_budget, str(self.budget),
+                        str(self.root), **kwargs)
+        assert out["counters"].stage == "budget"
+        return out["budget"]
 
 
 def edited(**changes) -> str:

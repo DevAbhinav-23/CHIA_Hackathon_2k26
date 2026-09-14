@@ -592,7 +592,7 @@ def check_01_budget_registered(*, budget_path: str, repo_root: str,
     try:
         return budget_module.load_budget._chia_original(
             budget_path, repo_root, run_start_utc=run_start_utc,
-            exact_pin_shas=exact_pin_shas)
+            exact_pin_shas=exact_pin_shas)["budget"]
     except budget_module.BudgetError as error:
         raise PreflightFailed("budget_registered", str(error)) from error
 
@@ -1549,7 +1549,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     try:
         verdict = campaign.call("oracle_primary", campaign.stages.oracle_primary,
                                 build, campaign.image_spec, artefact_dir,
-                                _arm=spec.arm)
+                                _arm=spec.arm)["verdict"]
     except Exception as error:
         out["stages"].append("stage_4")
         return stop("stage_4", f"stage_4_error:{type(error).__name__}")
@@ -1565,7 +1565,8 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
 
     try:
         reduced = campaign.call("reduce_case", campaign.stages.reduce_case, spec,
-                                verdict, campaign.limits, artefact_dir, _arm=spec.arm)
+                                verdict, campaign.limits, artefact_dir,
+                                _arm=spec.arm)["reduced"]
     except Exception as error:
         out["stages"].append("stage_5")
         return stop("stage_5", f"stage_5_error:{type(error).__name__}")
@@ -1622,7 +1623,8 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
                               clone_path=campaign.clone_path,
                               iteration=spec.iteration),
                 local_id=mint_local_id(campaign.store, candidate.candidate_id),
-                input_path=reduced.path or spec.input_path, _arm=spec.arm)
+                input_path=reduced.path or spec.input_path,
+                _arm=spec.arm)["result"]
             out["verdicts"]["stage_7"] = repair.status
         except Exception as error:
             out["verdicts"]["stage_7"] = f"refused:{type(error).__name__}"
@@ -1635,7 +1637,8 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
                                  campaign.manifest, campaign.store.db_path,
                                  limits=campaign.limits,
                                  top_n=campaign.budget.fingerprint_top_n,
-                                 bin_dir=campaign.bin_dir, _arm=spec.arm)
+                                 bin_dir=campaign.bin_dir,
+                                 _arm=spec.arm)["decision"]
     except Exception as error:
         out["stages"].append("gate")
         return stop("gate", f"gate_error:{type(error).__name__}")
@@ -1721,7 +1724,7 @@ def _next_feedback(campaign: Campaign, results: list, previous: FeedbackBundle,
         iteration + 1, dispatched,
         run_manifest_id=campaign.manifest.run_manifest_id,
         budget=campaign.budget, remaining=snapshot,
-        probes_this_seed=probes_this_seed)
+        probes_this_seed=probes_this_seed)["bundle"]
 
 
 def campaign_drive(campaign: Campaign, seeds: list, *, arms=None) -> dict:
@@ -2111,7 +2114,7 @@ def run_campaign(args, out) -> int:
 
     from circt_bug_loop import results as results_module
 
-    rendered = results_module.render_results(store, manifest)
+    rendered = results_module.render_results(store, manifest)["rendered"]
     (run_root / "results").mkdir(parents=True, exist_ok=True)
     (run_root / "results" / "results.md").write_text(rendered, encoding="utf-8")
     print(json.dumps(outcome["arms"], sort_keys=True, indent=2), file=out)
@@ -2159,7 +2162,7 @@ def main(argv: Optional[list] = None, out=None) -> int:
         from circt_bug_loop import corpus
 
         budget = budget_module.load_budget._chia_original(
-            args.budget, str(FLOW_DIR.parent))
+            args.budget, str(FLOW_DIR.parent))["budget"]
         mined = corpus.build_corpus._chia_original(
             args.clone, budget.corpus_head_sha, budget.campaign_start_utc[:10],
             budget.artefact_inline_cap_bytes)

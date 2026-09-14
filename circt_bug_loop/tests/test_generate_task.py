@@ -114,10 +114,10 @@ def replay(monkeypatch, tool_servers):  # noqa: F811
         monkeypatch.setattr(generate_task, "build_llm",
                             lambda system, timeout, model: {"model": model})
 
-        def _dispatch(llm, user_message, tools):
+        def _dispatch(llm, user_message, tools, *, stage="stage_2"):
             turn = state["pending"].pop(0)
             state["calls"].append({"prompt": user_message, "tools": list(tools),
-                                   "llm": llm})
+                                   "llm": llm, "stage": stage})
             for name, content in (turn.get("files") or {}).items():
                 tools[-1].write_probe(name, content)
             if turn.get("raises") is not None:

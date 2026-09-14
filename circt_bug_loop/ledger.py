@@ -29,12 +29,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop.contract.schema import (BudgetFile, ContractError, LedgerEntry,
+from circt_bug_loop.contract.schema import (BudgetFile, ContractError,
+                                            CounterBlock, LedgerEntry,
                                             validate)
 from circt_bug_loop.store import BudgetLedger, LoopStore
 
@@ -78,7 +80,7 @@ def price(tokens_in: Optional[int], tokens_out: Optional[int],
 
 
 @ChiaFunction(max_retries=0)
-def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None:
+def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> dict:
     """Price *entry* and append it to ledger_entry. Nothing ever updates a row.
 
     `observed.cost_usd` is overwritten with `price`'s answer before the write,
@@ -90,7 +92,9 @@ def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None:
     copy of the LLM dies on the worker.
 
     Returns:
-        None.
+        {"counters": CounterBlock}, one entry appended at stage "ledger". The
+        node has nothing else to return, and 3.11 requires the block of every
+        node of 3.2, so the block is the whole return.
     Worker:
         {"num_cpus": 0.1} per statement, on the head where loop.db lives.
     Raises:
@@ -99,6 +103,7 @@ def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None:
         on a repeated entry_id, which is how a double charge is detected rather
         than absorbed (6.4 rule 3).
     """
+    started_at = time.monotonic()
     entry.observed = dict(entry.observed)
     entry.observed["cost_usd"] = price(entry.observed.get("tokens_in"),
                                        entry.observed.get("tokens_out"), budget)
@@ -127,6 +132,9 @@ def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> None:
         "timestamp_utc": entry.timestamp_utc,
         "stop_reason": entry.stop_reason,
     })
+    return {"counters": CounterBlock(
+        stage="ledger", started=1, completed=1, failed=0,
+        seconds=time.monotonic() - started_at)}
 
 
 def aggregate(run_manifest_id: str, db_path: str, *, today: str = None) -> BudgetLedger:

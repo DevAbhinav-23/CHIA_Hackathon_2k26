@@ -33,14 +33,16 @@ them nor needs them (FR-16.1).
 """
 from __future__ import annotations
 
+import time
 from collections import Counter
 from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
 
-from circt_bug_loop.contract.schema import (BudgetFile, FeedbackBundle,
-                                            FeedbackEntry, LedgerSnapshot,
-                                            ProbeResult, bound_text, validate)
+from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock,
+                                            FeedbackBundle, FeedbackEntry,
+                                            LedgerSnapshot, ProbeResult,
+                                            bound_text, validate)
 
 #: FR-16.4's deny-list, `03-LLD.md` §3.11 verbatim: the twenty-one result-field
 #: names no field of `FeedbackBundle` or `FeedbackEntry` may carry, at any
@@ -193,7 +195,7 @@ def build_feedback(results: list, previous: Optional[FeedbackBundle], seed_sha: 
                    iteration: int, dispatched_probe_ids: list, *,
                    run_manifest_id: str, budget: BudgetFile,
                    remaining: LedgerSnapshot,
-                   probes_this_seed: int) -> FeedbackBundle:
+                   probes_this_seed: int) -> dict:
     """Build one seed's feedback bundle for *iteration* from the previous one's results.
 
     One entry per dispatched probe id, in the dispatched order, carrying only
@@ -209,7 +211,11 @@ def build_feedback(results: list, previous: Optional[FeedbackBundle], seed_sha: 
     FR-16.2's and not this function's.
 
     Returns:
-        FeedbackBundle, validated, with `entries` one per dispatched probe id
+        {"bundle": FeedbackBundle, "counters": CounterBlock}. §3.11 requires a
+        block of every node of §3.2 and §2.5's stage list named none a bundle
+        belongs to, which errata row 22 called A5's real obstacle; "feedback" is
+        that name, added to `_COUNTER_STAGES` at the join. The bundle is
+        validated, with `entries` one per dispatched probe id
         (empty on iteration 1 and on the mutation arm), `abandoned` and its
         `abandon_reason` per FR-16.6, and `terminating_condition` one of
         TERMINATING_CONDITIONS or None.
@@ -222,6 +228,7 @@ def build_feedback(results: list, previous: Optional[FeedbackBundle], seed_sha: 
         ValueError when *results* holds two results for one probe id or a
         result for a probe that was never dispatched.
     """
+    started_at = time.monotonic()
     by_id: dict = {}
     for result in results:
         if result.probe_id in by_id:
@@ -251,7 +258,12 @@ def build_feedback(results: list, previous: Optional[FeedbackBundle], seed_sha: 
             abandoned, iteration, probes_this_seed, budget, remaining),
         abandon_reason=reason)
     validate(bundle)
-    return bundle
+    return {"bundle": bundle,
+            "counters": CounterBlock(
+                stage="feedback", started=len(dispatched_probe_ids),
+                completed=len(entries),
+                failed=len(dispatched_probe_ids) - len(entries),
+                seconds=time.monotonic() - started_at)}
 
 
 __all__ = ["build_feedback", "RESULT_MISSING", "TERMINATING_CONDITIONS"]

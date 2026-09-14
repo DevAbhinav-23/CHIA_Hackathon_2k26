@@ -429,19 +429,25 @@ def returns_counters(dotted: str) -> bool:
     return "counters" in (inspect.getdoc(node_object(dotted)) or "")
 
 
-@pytest.mark.xfail(reason="errata row 22: only corpus, generate_task, "
-                          "mutator_synth and bug_loop return a CounterBlock; "
-                          "the other nine node modules return bare records")
 @pytest.mark.t0
 def test_T_U_layout_07():
     """T-U-layout-07 (FR-17.4, FR-19.4): every node returns a `CounterBlock`.
 
-    §3.11 makes it every node of §3.2, a node whose return is a bare dataclass
-    returning `(record, counters)` instead, and `CounterBlock.stage` drawn from
-    `_COUNTER_STAGES` and from nothing else. Fixture: none. Tier 0.
+    §3.11 makes it every node of §3.2. Two halves, both static: the documented
+    **Returns** paragraph names the key `counters`, and the node's own return
+    annotation is `dict`, because a node returning a bare record has nowhere to
+    put the block. Errata row 22 recorded nine node modules that returned none;
+    the join gave every one of them the block, and `_COUNTER_STAGES` gained the
+    five names none of them had (feedback, budget, ledger, artefact, results).
+    Fixture: none. Tier 0.
     """
     missing = [dotted for dotted in NODES if not returns_counters(dotted)]
     assert missing == []
+    bare = [dotted for dotted in NODES
+            if inspect.signature(
+                getattr(node_object(dotted), "_chia_original",
+                        node_object(dotted))).return_annotation != "dict"]
+    assert bare == []
 
 
 @pytest.mark.t0
@@ -452,10 +458,15 @@ def test_T_U_layout_07_stages():
     else, whoever produced it. Fixture: none. Tier 0.
     """
     assert set(schema._COUNTER_STAGES) == set(schema._STAGE_IDS) | {
-        "image", "corpus", "pin", "mirror", "synthesis"}
+        "image", "corpus", "pin", "mirror", "synthesis",
+        # Five added at the join (W-17, errata row 22): 3.11 requires a block of
+        # EVERY node of 3.2 and none of these five had a stage to name.
+        "feedback", "budget", "ledger", "artefact", "results"}
     log = bug_loop.CounterLog("run", None)
+    # "feedback" was the invented name here until the join made it a real stage
+    # (errata row 22); the rule is unchanged and the name that is not a stage is.
     with pytest.raises(ValueError):
-        log.record("seeded", schema.CounterBlock(stage="feedback", started=1,
+        log.record("seeded", schema.CounterBlock(stage="stage_9", started=1,
                                                  completed=1, failed=0, seconds=0.0))
 
 

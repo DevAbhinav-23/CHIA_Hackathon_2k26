@@ -79,11 +79,18 @@ def assertion_result(probe_id: str, **overrides) -> schema.ProbeResult:
 def build(results, previous=None, *, iteration: int = 2, dispatched=None,
           arm: str = "seeded", funds=None, spent: float = 0.0, cap: float = 14400.0,
           probes: int = 0) -> schema.FeedbackBundle:
-    """Call A5 the way the driver does, through `conftest.call_node` (§0.4)."""
+    """Call A5 the way the driver does, through `conftest.call_node` (§0.4).
+
+    The node returns `{"bundle", "counters"}` since the join (W-17, errata row
+    22); what every test below reads is the bundle, so the helper unwraps it
+    and asserts the block here, at every call site.
+    """
     ids = dispatched if dispatched is not None else [r.probe_id for r in results]
-    return call_node(build_feedback, list(results), previous, _SEED, iteration, ids,
-                     run_manifest_id=_RUN, budget=funds or budget(),
-                     remaining=snapshot(arm, spent, cap), probes_this_seed=probes)
+    out = call_node(build_feedback, list(results), previous, _SEED, iteration,
+                    ids, run_manifest_id=_RUN, budget=funds or budget(),
+                    remaining=snapshot(arm, spent, cap), probes_this_seed=probes)
+    assert out["counters"].stage == "feedback"
+    return out["bundle"]
 
 
 def stage_3(probe_id: str, status: str, reason: str) -> schema.ProbeResult:

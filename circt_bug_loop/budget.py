@@ -26,6 +26,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +35,7 @@ import yaml
 from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.contract.schema import (Arm, BudgetFile, ContractError,
+                                            CounterBlock,
                                             LedgerSnapshot, validate)
 
 #: The committed pre-registration, beside this module in the flow directory
@@ -118,7 +120,7 @@ def _relative(path: str, repo_root: str) -> str:
 @ChiaFunction(max_retries=0)
 def load_budget(path: str, repo_root: str, *, run_start_utc=None,
                 manifest_budget_file_sha: str = None,
-                exact_pin_shas=None) -> BudgetFile:
+                exact_pin_shas=None) -> dict:
     """Parse, validate and pre-registration-check one budget.yaml.
 
     *path* is the file, *repo_root* the repository whose history registers it.
@@ -130,8 +132,10 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
     (13.1's checks 1 and 3).
 
     Returns:
-        BudgetFile, with budget_file_sha set to the commit that landed the file,
-        which is the pre-registration (FR-14.3, G-32).
+        {"budget": BudgetFile, "counters": CounterBlock}, the BudgetFile with
+        budget_file_sha set to the commit that landed the file, which is the
+        pre-registration (FR-14.3, G-32), and the counters counting 9.2's six
+        checks at stage "budget", which 3.11 requires of every node of 3.2.
     Worker:
         none; head-side, one subprocess per `git` read.
     Raises:
@@ -140,6 +144,7 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
         contract.validate on a key whose type or value the seam refuses;
         OSError when *path* cannot be read.
     """
+    started_at = time.monotonic()
     text = Path(path).read_text(encoding="utf-8")
     document = yaml.safe_load(text)
     if not isinstance(document, dict):
@@ -225,7 +230,10 @@ def load_budget(path: str, repo_root: str, *, run_start_utc=None,
     # contract.validate has already refused a non-positive or non-finite price,
     # spend cap or window and a blank model id (2.4's _budget_conditionals),
     # which is check 6 discharged at the seam so both halves get the same rule.
-    return budget
+    return {"budget": budget,
+            "counters": CounterBlock(
+                stage="budget", started=len(_CHECKS), completed=len(_CHECKS),
+                failed=0, seconds=time.monotonic() - started_at)}
 
 
 def _check_frozen_set(repo_root: str, flow_dir: str, budget_sha: str,

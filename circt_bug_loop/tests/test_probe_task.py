@@ -127,9 +127,17 @@ def _build(status: str, stderr_name: str, tmp_path: Path, **over) -> BuildResult
 
 
 def _oracle(build: BuildResult, tmp_path: Path, **over):
+    """B3 through §0.4's plain call, unwrapped.
+
+    The node returns `{"verdict", "counters"}` since the join (W-17, errata row
+    22); what the tests below read is the `OracleVerdict`, and the block is
+    asserted here, at every call site.
+    """
     kwargs = dict(circt_roots=TRACE_ROOTS, symbolizer=str(tmp_path / "absent"))
     kwargs.update(over)
-    return call_node(oracle_primary, build, _image_spec(), str(tmp_path), **kwargs)
+    out = call_node(oracle_primary, build, _image_spec(), str(tmp_path), **kwargs)
+    assert out["counters"].stage == "stage_4"
+    return out["verdict"]
 
 
 @pytest.fixture
@@ -989,7 +997,8 @@ def test_u_probe_34_an_input_the_oracle_never_fired_on(tmp_path) -> None:
     case = call_node(probe_task.reduce_case, spec,
                      _verdict(tmp_path, "clean.txt", "clean_exit", signal=None,
                               exit_status=0),
-                     {**LIMITS, **REDUCTION}, str(tmp_path), bin_dir="/nonexistent")
+                     {**LIMITS, **REDUCTION}, str(tmp_path),
+                     bin_dir="/nonexistent")["reduced"]
     assert case.reducer == "none" and case.reduced is False
     assert case.reason == "oracle_did_not_fire"
     assert case.size_before_bytes == case.size_after_bytes
@@ -1049,7 +1058,7 @@ def test_u_probe_33_38_circt_reduce_shrinks_and_the_recheck_matches(
     spec = _spec("crasher.sh", [str(source)], tmp_path, input_path=str(source))
     case = call_node(probe_task.reduce_case, spec, _verdict(tmp_path),
                      {**LIMITS, **REDUCTION}, str(tmp_path / "probe"),
-                     bin_dir=str(binaries))
+                     bin_dir=str(binaries))["reduced"]
     assert case.reducer == "circt-reduce" and case.lift is None
     assert case.reduced is True and case.fixpoint is True
     assert case.budget_truncated is False
@@ -1077,7 +1086,7 @@ def test_u_probe_33b_a_changed_failure_is_not_a_match(tmp_path, sdk_env) -> None
     spec = _spec("crasher.sh", [str(source)], tmp_path, input_path=str(source))
     case = call_node(probe_task.reduce_case, spec, _verdict(tmp_path),
                      {**LIMITS, **REDUCTION}, str(tmp_path / "probe"),
-                     bin_dir=str(binaries))
+                     bin_dir=str(binaries))["reduced"]
     assert case.recheck_class == "clean_exit"
     assert case.recheck_matches is False
 
@@ -1143,7 +1152,8 @@ def test_u_probe_35_reducer_aborted_routes_to_the_textual_reducer(
     assert len(modules) >= 2, modules      # one symboliser call per module
 
     case = call_node(probe_task.reduce_case, spec, verdict,
-                     {**LIMITS, **REDUCTION}, str(probe), bin_dir=str(BASSERT_G))
+                     {**LIMITS, **REDUCTION}, str(probe),
+                     bin_dir=str(BASSERT_G))["reduced"]
     assert case.reason.startswith("reducer_aborted:"), case.reason
     assert case.reducer == "textual-ddmin" and case.lift is None
     assert case.reduced is True and case.fixpoint is True
@@ -1353,11 +1363,12 @@ def _differential_spec(tmp_path: Path, design: str, name: str = "input.mlir"):
 
 
 def _run_differential(spec, tmp_path: Path, directory: str, **over):
+    """B4 through §0.4's plain call, unwrapped (W-17, errata row 22)."""
     kwargs = {"limits": LIMITS, "bin_dir": str(BASSERT_G), **over}
     return call_node(probe_task.oracle_differential, spec,
                      _build("clean_exit", "clean.txt", tmp_path, signal=None,
                             exit_status=0),
-                     _image_spec(), directory, **kwargs)
+                     _image_spec(), directory, **kwargs)["verdict"]
 
 
 @pytest.mark.t0
