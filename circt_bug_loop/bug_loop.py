@@ -531,7 +531,7 @@ def manifest_digest(manifest: dict) -> str:
 
 
 def image_tag(manifest: dict) -> str:
-    """Return `chia-circt-assert:<CIRCT_SHA[:12]>`, the Dockerfile's own scheme.
+    """Return `<IMAGE_NAME>:<CIRCT_SHA[:12]>`, the Dockerfile's own scheme.
 
     K1: this returned `<registry>/chia-circt-assert:<manifest digest[:12]>`
     until 2026-09-15, and the Dockerfile's header has always said
@@ -548,7 +548,7 @@ def image_tag(manifest: dict) -> str:
     Raises:
         KeyError when *manifest* carries no `circt_sha`.
     """
-    return f"chia-circt-assert:{manifest['circt_sha'][:12]}"
+    return f"{IMAGE_NAME}:{manifest['circt_sha'][:12]}"
 
 
 def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
@@ -578,6 +578,12 @@ def build_argv(dockerfile: str, tag: str, manifest: dict, context: str) -> list:
 
 #: B1's Dockerfile, by name. It lives at two paths in the two trees of 1.4.
 DOCKERFILE_NAME = "ChiaCirctAssertDockerfile"
+
+#: The image's repository name, which is the Dockerfile's own and is what tells
+#: a cluster YAML's worker types apart: a type running this image has the six
+#: tool binaries and Verilator, and checks 7 and 8 ask it; a type running
+#: CHIA's plain `chia:latest` has neither and is not asked.
+IMAGE_NAME = "chia-circt-assert"
 
 
 def dockerfile_and_context() -> tuple:
@@ -1213,6 +1219,96 @@ def check_12_live_model(*, head: dict, workers: dict) -> None:
                 "live_model", f"{where}: {API_KEY_ENV} is empty or unexpanded")
 
 
+def tool_probe(bin_dir: str, targets: tuple) -> dict:
+    """Hash every tool binary on THIS worker and report Verilator's version.
+
+    Dispatched once per image-bearing worker type by checks 7 and 8. It is what
+    those checks were missing: their `observed` mapping was built from the
+    `ImageSpec` itself (W2), so both compared a value to itself and could never
+    fail, and FR-06.1's "every tool binary's SHA-256 on every worker" and
+    FR-03.15's Verilator check had no pre-flight at all.
+
+    Returns:
+        {"worker": str, "tool_hashes": dict, "verilator_version": str,
+         "unreadable": list[str]}. A binary this worker cannot read yields no
+        entry in `tool_hashes`, which is what makes check 7 refuse rather than
+        pass on a missing tool.
+    Worker:
+        one per worker type whose container is the assertions-on image.
+    Raises:
+        nothing; every failure is a field.
+    """
+    import socket
+    import subprocess as sp
+
+    hashes, unreadable = {}, []
+    for target in targets:
+        path = os.path.join(bin_dir, target)
+        digest = hashlib.sha256()
+        try:
+            with open(path, "rb") as handle:
+                for block in iter(lambda: handle.read(1 << 20), b""):
+                    digest.update(block)
+        except OSError as error:
+            unreadable.append(f"{target}: {error}")
+            continue
+        hashes[target] = digest.hexdigest()
+    try:
+        version = sp.run(["verilator", "--version"], capture_output=True,
+                         timeout=120).stdout.decode(
+                             "utf-8", errors="backslashreplace").strip()
+    except (OSError, sp.SubprocessError) as error:
+        version = f"unavailable: {error}"
+    return {"worker": socket.gethostname(), "tool_hashes": hashes,
+            "verilator_version": version, "unreadable": unreadable}
+
+
+def tool_probes(dispatch: Dispatch, resources: dict, bin_dir: str,
+                targets: tuple) -> dict:
+    """Dispatch `tool_probe` once per image-bearing worker type (W2)."""
+    node = ChiaFunction(max_retries=0)(tool_probe)
+    probes = {}
+    for worker_type, resource in sorted(resources.items()):
+        probes[worker_type] = Dispatch(
+            remote=dispatch.remote, options={"resources": dict(resource)},
+            head_node_id=dispatch.head_node_id).call(node, bin_dir, targets)
+    return probes
+
+
+def check_15_entrypoint_imports(*, flow_dir: str = str(FLOW_DIR),
+                                python: Optional[str] = None) -> None:
+    """Check 15 (W-19b #3): the driver's own entrypoint can import its package.
+
+    `bug_loop_submit.sh` runs `python <flow dir>/bug_loop.py`, which puts the
+    FLOW directory on `sys.path` and not its parent; in this tree every import
+    in `bug_loop.py` is `circt_bug_loop.<module>`, so a real `chia job submit`
+    died with `ModuleNotFoundError` before its first line of work. The wrapper
+    fixes it with `env PYTHONPATH=<flow dir's parent>` on the entrypoint, and
+    this is the check that the fix is still there: a SUBPROCESS with exactly
+    that path, importing exactly that name, before anything is dispatched.
+
+    Returns:
+        None.
+    Worker:
+        head; one short-lived subprocess.
+    Raises:
+        PreflightFailed("entrypoint_import", detail) carrying the interpreter's
+        own message.
+    """
+    parent = str(Path(flow_dir).resolve().parent)
+    proc = subprocess.run(
+        [python or sys.executable, "-c",
+         "import circt_bug_loop, circt_bug_loop.bug_loop"],
+        env={**os.environ, "PYTHONPATH": parent},
+        capture_output=True, timeout=300, cwd="/")
+    if proc.returncode != 0:
+        message = proc.stderr.decode("utf-8", errors="backslashreplace").strip()
+        raise PreflightFailed(
+            "entrypoint_import",
+            f"`import circt_bug_loop` fails with PYTHONPATH={parent}: "
+            f"{message.splitlines()[-1] if message else 'no message'}")
+
+
 def check_13_vertex_branch(*, issue_task_path: str, repair_backend: str,
                            repair_enabled: bool) -> str:
     """Check 13 (K7): the backend the SHIPPED `issue_task.py` can actually run.
@@ -1277,12 +1373,14 @@ def check_14_vertex_usage_patch(*, vertex_path: str, metered: bool) -> None:
 
 
 #: The pre-flight checks in 13.1's order, cheapest first, named for the log.
-#: Twelve until W-20b; K7 and K11 add two that read the STAGED package.
+#: Twelve until W-20b; K7 and K11 add two that read the STAGED package and
+#: W-19b #3 adds one that imports the flow the way the submitted job does.
 PREFLIGHT_CHECKS = (
     "budget_registered", "mutator_set_earlier", "clone_head",
     "artefact_root_head", "artefact_root_unmounted", "image_lit_discovery",
     "tool_hashes", "verilator_version", "pin_stamped", "issue_mirror",
-    "forum_post", "live_model", "vertex_branch", "vertex_usage_patch")
+    "forum_post", "live_model", "vertex_branch", "vertex_usage_patch",
+    "entrypoint_import")
 
 
 # ---------------------------------------------------------------------------
@@ -1293,9 +1391,15 @@ PREFLIGHT_CHECKS = (
 def cluster_summary(cluster_yaml: str) -> dict:
     """Return the four manifest fields the cluster YAML produces, plus its digest.
 
+    `image_worker_types` is the sixth and is not a manifest field: it is the
+    worker types whose container IS the assertions-on image, which is who
+    checks 7 and 8 have anything to ask (W2). Read off the YAML's own
+    `docker.image` rather than assumed from a resource name, so a cluster that
+    moves the image to another type is followed and not guessed at.
+
     Returns:
         {"cluster_yaml_sha", "worker_type", "apparatus_concurrency",
-         "llm_concurrency", "deployment"}.
+         "llm_concurrency", "deployment", "image_worker_types"}.
     Worker:
         head; it reads one file through CHIA's own loader.
     Raises:
@@ -1318,7 +1422,10 @@ def cluster_summary(cluster_yaml: str) -> dict:
     return {"cluster_yaml_sha": digest, "worker_type": circt[0],
             "apparatus_concurrency": circt[1], "llm_concurrency": llm[1],
             "deployment": "gcp" if "gcp" in Path(cluster_yaml).name
-                          else "single_machine"}
+                          else "single_machine",
+            "image_worker_types": sorted(
+                name for name, node_type in config.node_types.items()
+                if IMAGE_NAME in (getattr(node_type.docker, "image", "") or ""))}
 
 
 def model_ids(*, model_id: str, repair_backend: str,
@@ -3388,6 +3495,7 @@ def run_campaign(args, out) -> int:
     repo_root = str(FLOW_DIR.parent)
 
     check_issue_solver(args.chia_root)
+    check_15_entrypoint_imports()
     # Before anything is dispatched: the staged package is what every worker
     # imports, and checks 13 and 14 read it (K3, K6, K7, K11, W6).
     shipped = stage_shipped()
@@ -3428,22 +3536,39 @@ def run_campaign(args, out) -> int:
             f"({image_spec.image_tag!r}): the cluster would run a different "
             "image from the one this run records")
     check_06_image_lit_discovery(image_spec=image_spec)
-    check_07_tool_hashes(image_spec=image_spec,
-                         observed={cluster["worker_type"]: image_spec.tool_hashes})
+    # W2: the observations are the WORKERS' own. Both checks used to build
+    # `observed` from the `ImageSpec` they were comparing against, so each
+    # compared a value to itself and neither could ever fail.
+    observations = tool_probes(
+        dispatch,
+        {name: resources[name] for name in cluster["image_worker_types"]},
+        CIRCT_BIN_DIR, IMAGE_TARGETS)
+    check_07_tool_hashes(
+        image_spec=image_spec,
+        observed={name: probe["tool_hashes"] for name, probe in observations.items()})
     check_08_verilator_version(
         image_spec=image_spec,
-        observed={cluster["worker_type"]: image_spec.verilator_version})
+        observed={name: probe["verilator_version"]
+                  for name, probe in observations.items()})
 
     store = LoopStore(DB_PATH)
     mirror = _mirror(store, budget, args, dispatch, triage_task)
     check_10_issue_mirror(mirror=mirror, refresh_requested=args.refresh_mirror)
     check_11_forum_post(forum_post_url=args.forum_post_url,
                         forum_post_date=args.forum_post_date)
-    model_resources = {name: resource for name, resource in resources.items()
-                       if "llm" in resource
-                       or ("repair" in resource and repair_enabled(args))}
-    check_12_live_model(head=interlock_probe(),
-                        workers=interlock_probes(dispatch, model_resources))
+    # W4: `--generator recorded` exists so the whole dispatch path can be
+    # exercised ON THE CLUSTER with no model turn and no credential, and
+    # check 12 refused such a run unless the head and both llm workers carried
+    # the interlock and a usable key - the opposite of what the mode is for.
+    if args.generator == "recorded":
+        print("generator recorded: check 12 is skipped, no turn is made and no "
+              "credential is needed anywhere", file=out)
+    else:
+        model_resources = {name: resource for name, resource in resources.items()
+                           if "llm" in resource
+                           or ("repair" in resource and repair_enabled(args))}
+        check_12_live_model(head=interlock_probe(),
+                            workers=interlock_probes(dispatch, model_resources))
     repair_backend = check_13_vertex_branch(
         issue_task_path=shipped["issue_task"],
         repair_backend=args.repair_backend,

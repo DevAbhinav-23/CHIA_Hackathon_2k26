@@ -14,6 +14,7 @@ of this module are what make that possible and each is a decision recorded in
     iteration runs in this process against a fixture store and a fake
     generator, which is the dry-run iteration this module's last test drives.
 """
+import hashlib
 import dataclasses
 import inspect
 import json
@@ -330,19 +331,29 @@ def test_T_U_driver_27():
 def test_T_U_driver_28a():
     """T-U-driver-28 (13.1, K7, K11): the checks are named functions, in order.
 
-    Twelve until W-20b, fourteen since: check 13 greps the STAGED
+    Twelve until W-20b, fifteen since: check 13 greps the STAGED
     `issue_task.py` for the vertex branch, because `model_ids["repair_adapt"]`
-    was a claim about a file nothing had read, and check 14 greps the staged
+    was a claim about a file nothing had read; check 14 greps the staged
     `vertex.py` for the two billed usage fields, because without them every
-    priced turn and the USD cap are low by whatever the model thinks.
-    Fixture: none. Tier 0.
+    priced turn and the USD cap are low by whatever the model thinks; and
+    check 15 imports `circt_bug_loop` in a subprocess with the wrapper's own
+    PYTHONPATH, which is the failure that killed the first real
+    `chia job submit` before its first line of work. Fixture: none. Tier 0.
     """
-    assert len(bug_loop.PREFLIGHT_CHECKS) == 14
-    assert bug_loop.PREFLIGHT_CHECKS[-2:] == ("vertex_branch", "vertex_usage_patch")
+    assert len(bug_loop.PREFLIGHT_CHECKS) == 15
+    assert bug_loop.PREFLIGHT_CHECKS[-3:] == ("vertex_branch", "vertex_usage_patch",
+                                              "entrypoint_import")
     names = [n for n in dir(bug_loop) if n.startswith("check_")]
     numbered = sorted(n for n in names if n[6:8].isdigit())
-    assert len(numbered) == 14
-    assert [int(n[6:8]) for n in numbered] == list(range(1, 15))
+    assert len(numbered) == 15
+    assert [int(n[6:8]) for n in numbered] == list(range(1, 16))
+
+    # Check 15 passes in this tree, and names what failed when it does not.
+    assert bug_loop.check_15_entrypoint_imports() is None
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_15_entrypoint_imports(flow_dir="/nonexistent/circt_bug_loop")
+    assert raised.value.check == "entrypoint_import"
+    assert "ModuleNotFoundError" in str(raised.value)
 
 
 # ---------------------------------------------------------------------------
@@ -1530,3 +1541,88 @@ def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
     assert "budget_module.snapshot(" not in source.split("for iteration in range")[0]
     assert handed and all(s.arm in ("seeded", "mutation") for s in handed)
     assert len({id(s) for s in handed}) == len(handed), "one object per iteration"
+
+
+def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
+    """T-U-driver-38 (W2, FR-06.1, FR-03.15): the observations are the workers' own.
+
+    New id, W-20b. Both call sites built `observed` FROM the `ImageSpec` they
+    were comparing against, so each compared a value to itself and neither
+    could ever fail: FR-06.1's "every tool binary's SHA-256 on every worker"
+    and FR-03.15's Verilator check had no pre-flight at all, and the only real
+    hash check left was `probe_execute`'s per-probe one, which turns a wrong
+    image into `BinaryMismatch` on every probe rather than one refusal at
+    start-up. `tool_probe` is the node that asks; this runs it against a
+    throwaway bin directory and feeds both checks what it returns.
+
+    Fixture: a throwaway bin directory. Tier 0.
+    """
+    spec = image_spec("ok")
+    directory = tmp_path / "bin"
+    directory.mkdir()
+    for tool, digest in spec.tool_hashes.items():
+        (directory / tool).write_bytes(b"")
+
+    probe = bug_loop.tool_probe(str(directory), tuple(spec.tool_hashes))
+    # Every target was readable, and every hash is the FILE's and not the spec's.
+    assert probe["unreadable"] == []
+    assert set(probe["tool_hashes"]) == set(spec.tool_hashes)
+    empty = hashlib.sha256(b"").hexdigest()
+    assert set(probe["tool_hashes"].values()) == {empty}
+    assert probe["worker"]
+
+    # So check 7 REFUSES on this worker, naming the tool and both hashes...
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_07_tool_hashes(
+            image_spec=spec, observed={"bugloop_circt": probe["tool_hashes"]})
+    assert raised.value.check == "tool_hashes"
+    assert "bugloop_circt" in str(raised.value) and empty in str(raised.value)
+
+    # ...and passes only when the worker's own hashes ARE the recorded ones.
+    assert bug_loop.check_07_tool_hashes(
+        image_spec=spec, observed={"bugloop_circt": dict(spec.tool_hashes)}) is None
+
+    # A tool the worker cannot read leaves no entry, so check 7 sees None and
+    # refuses rather than passing over a missing binary.
+    (directory / next(iter(spec.tool_hashes))).unlink()
+    gapped = bug_loop.tool_probe(str(directory), tuple(spec.tool_hashes))
+    assert len(gapped["unreadable"]) == 1
+    with pytest.raises(bug_loop.PreflightFailed):
+        bug_loop.check_07_tool_hashes(
+            image_spec=spec, observed={"bugloop_circt": gapped["tool_hashes"]})
+
+    # Check 8 takes the same probe's version string, and a difference refuses.
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.check_08_verilator_version(
+            image_spec=spec, observed={"bugloop_circt": "Verilator 4.999"})
+    assert raised.value.check == "verilator_version"
+
+    # And the cluster YAML says WHICH types are asked: the ones running the
+    # image, read off `docker.image` rather than guessed from a resource name.
+    cluster = bug_loop.cluster_summary(str(Path(bug_loop.FLOW_DIR)
+                                           / "cluster_single.yaml"))
+    assert cluster["image_worker_types"] == ["bugloop_circt", "bugloop_repair"]
+    assert "bugloop_llm" not in cluster["image_worker_types"]
+
+
+def test_T_U_driver_39_recorded_mode_needs_no_credential(monkeypatch, capsys):
+    """T-U-driver-39 (W4): `--generator recorded` skips check 12 entirely.
+
+    New id, W-20b. The mode exists so that the whole of `campaign_drive` can be
+    exercised ON THE CLUSTER with no model turn and no credential; check 12
+    refused the run unless the head AND both llm workers carried
+    BUGLOOP_ALLOW_LIVE_MODEL=1 and a usable key, which is the opposite of what
+    the mode is for. Fixture: none. Tier 0.
+    """
+    import inspect as _inspect
+
+    source = _inspect.getsource(bug_loop.run_campaign)
+    guarded = source.split('if args.generator == "recorded":')[1]
+    assert "check_12_live_model" not in guarded.split("else:")[0]
+    assert "check_12_live_model" in guarded.split("else:")[1]
+    # And `repair_enabled` is already false in the mode, so no `repair` worker
+    # is asked for a key either (§3.8: stage 7 IS a turn, whatever the backend).
+    args = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--generator", "recorded"])
+    assert bug_loop.repair_enabled(args) is False
+    assert bug_loop.resolved_config(args)["repair_enabled"] is False
