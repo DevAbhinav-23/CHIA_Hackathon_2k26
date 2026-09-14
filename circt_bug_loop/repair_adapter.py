@@ -1,35 +1,4 @@
-"""B8: one local report into CHIA's own phase chain, unchanged (`03-LLD.md` §3.8, F-12).
-
-Three things happen here and nothing else. The refusals of FR-12.4 and FR-12.5
-run first, so a class repair is not scoped to never reaches a model. The chain is
-then handed a whole `GithubIssue`-shaped object, a pre-written `repro.sh` and the
-sixteen-key `cfg` it reads, and is called **inline** by its bare name, because
-`run_issue_remote` carries its own `@ChiaFunction(resources={"circt": 1})` and
-dispatching it would land the chain on a `circt` worker and defeat the whole
-reason `bugloop_repair` exists (§3.8, W2). Last, whatever the outcome, the worker
-is restored and every tool binary re-hashed (FR-12.11).
-
-CHIA's own worker modules, `issue_task` and `circt_util`, are shipped to the
-repair worker by `bug_loop.py`'s `_PY_MODULES` (§13.1) and are therefore imported
-**inside** the node rather than at module scope: this module is also imported on
-the head, where CHIA's `examples/` directory is not on `sys.path`. The same lazy
-shape is what lets a unit test install a recording stand-in for both.
-
-Deviations from §3.8, each recorded in
-`design/reviews/implementation-errata-log.md` rather than absorbed:
-
-  * `local_id`, `input_path` and `created_utc` are keyword-only parameters. The
-    identifier is `LOCAL_ID_BASE + <the candidate's rowid>`, which is a query
-    against the head's `loop.db` and not something a `repair` worker can run, so
-    `mint_local_id` below is the head's half and the node takes the minted value.
-    `repro.sh` cannot be written without the probe's own input path, which no
-    record in §3.8's signature carries; and `CandidateRecord` has no creation
-    timestamp, although the `candidate` TABLE does.
-  * FR-12.8's "stops the run" is the caller's. §3.8's `Raises` paragraph closes
-    the exception set at `RepairRefused` and `LiveModelRefused`, so a lit run
-    that discovered nothing is **recorded** here, `lit_unusable` true and
-    `lit_ok` None, and B12 stops on the field.
-"""
+"""B8: one local report into CHIA's own phase chain, unchanged (`03-LLD.md` §3.8)."""
 from __future__ import annotations
 
 import hashlib
@@ -48,63 +17,38 @@ from circt_bug_loop.llm import MODEL_BACKEND, require_live_model
 from circt_bug_loop.store import (CandidateRecord, OracleVerdict, ReducedCase,
                                   RepairResult, Report, sha256_file)
 
-#: §9.4, FR-12.2. `RunManifest.local_id_range` is exactly this pair. The floor is
-#: four orders of magnitude beyond `llvm/circt`'s own issue numbers, which are
-#: five digits in 2026, so no minted identifier can collide with a real one.
+#: §9.4, FR-12.2.
 LOCAL_ID_BASE = 900_000_000
 LOCAL_ID_MAX = 999_999_999
 
-#: §9.4 took CHIA's own two verbatim, and `bugloop_repair`'s `--cpus=8` was what
-#: bounded the sixteen (`chia:examples/circt_issue_solver/circt_issue_loop.py:77`,
-#: `98`). FOUR, not sixteen, since W-19b: the bound that binds on the
-#: implementation machine is MEMORY and not cores. A `ninja -j16` link of the
-#: CIRCT targets peaks far past the 4 GiB `cluster_single.yaml` gives
-#: `bugloop_repair` on its 15 GiB host, and an OOM-killed link fails the `fix`
-#: phase with a build error that is not the agent's diff's fault - the one
-#: failure mode FR-12.7's `failing_phase` cannot tell apart from a real one.
-#: `cluster_single.yaml`'s `--cpus=4` on that container matches, so the CPU
-#: bound and the job count say the same thing.
+#: §9.4 took CHIA's own two verbatim.
 BUILD_JOBS = 4
 PHASE_TIMEOUTS = {"assess": 1800, "repro": 1800, "fix": 7200,
                   "regression": 3600, "writeup": 1200}
 
-#: FR-12.4: only these two enter repair. `fatal_error` is a deliberate refusal
-#: path often enough that "what the right answer was" is the argument repair is
-#: scoped to avoid, and `differential` is report-only (FR-08.10).
+#: FR-12.4: only these two enter repair.
 REPAIR_CLASSES = ("crash", "assertion")
 
-#: §3.8's last paragraph: stage 7's tokens are unobservable because CHIA's
-#: `_turn` dispatches the turn with `chia_remote`, so the LLM copy that
-#: accumulates `_last_metadata` dies on the `llm` worker and `QueryResult`
-#: carries no usage. Recorded as a reason, never as a zero.
+#: §3.8's last paragraph.
 TOKEN_CAPTURE = "unavailable_remote_dispatch"
 
 #: The six prompt bodies of the `cfg`, mapped to the files they are read from.
-#: The key is not the file name for `repro_prompt`, whose file is `reproduce.md`
-#: (`chia:examples/circt_issue_solver/circt_issue_loop.py:88`).
 PROMPT_FILES = {"system_prompt": "system.md", "assess_prompt": "assess.md",
                 "repro_prompt": "reproduce.md", "fix_prompt": "fix.md",
                 "regression_prompt": "regression.md",
                 "writeup_prompt": "writeup.md"}
 
-#: Every key `run_issue_remote` reads: ten values and the six prompt bodies
-#: (§3.8's table, grepped from `issue_task.py` and assembled at
-#: `circt_issue_loop.py:84-96`).
+#: Every key `run_issue_remote` reads.
 CFG_KEYS = frozenset({"tag", "tool_targets", "repro_dir", "repro_path",
                       "require_repro", "backend", "model", "vertex",
                       "build_jobs", "timeouts", *PROMPT_FILES})
 
-#: The CIRCT source tree inside the image, which is where `circt_git_reset` and
-#: `circt_ninja_build` work and where the restored binaries are re-hashed.
+#: The CIRCT source tree inside the image.
 CIRCT_BUILD_BIN = "/workspace/circt/build/bin"
 
 
 class RepairRefused(Exception):
-    """A candidate refused by class or scope, before the chain is invoked (F-12).
-
-    The caller records `reason` and counts it; nothing has been written and no
-    model has been reached.
-    """
+    """A candidate refused by class or scope, before the chain is invoked (F-12)."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -112,21 +56,7 @@ class RepairRefused(Exception):
 
 
 def issue_solver_dir() -> Path:
-    """CHIA's own `examples/circt_issue_solver/`, derived from the imported package.
-
-    `chia.__path__[0]` and never `chia.__file__`, which is None for a namespace
-    package, and never a walk up from this file: the flow lives at two different
-    depths in two trees (§1.4), so `Path(__file__).parents[2]` is a CHIA checkout
-    in one and the team repository's root in the other.
-
-    Returns:
-        Path to the directory holding `issue_task.py` and `prompts/`.
-    Worker:
-        pure; it reads `chia.__path__` and one `os.path.isfile`.
-    Raises:
-        RuntimeError when the directory is absent, which is what a wheel install
-        of CHIA gives: `examples/` ships beside the package only in a checkout.
-    """
+    """CHIA's own `examples/circt_issue_solver/`, derived from the imported package."""
     directory = Path(chia.__path__[0]).resolve().parent / "examples" / "circt_issue_solver"
     if not (directory / "issue_task.py").is_file():
         raise RuntimeError(
@@ -137,21 +67,7 @@ def issue_solver_dir() -> Path:
 
 
 def mint_local_id(store, candidate_id: str) -> int:
-    """FR-12.2's synthetic identifier: `LOCAL_ID_BASE` plus the candidate's rowid.
-
-    Unique by construction, monotonic, and reproducible from the store, which is
-    what makes it a key rather than a nonce. The head's half of B8: a `repair`
-    worker holds no `loop.db` handle, so `repair_adapt` takes the minted value.
-
-    Returns:
-        int, in `[LOCAL_ID_BASE, LOCAL_ID_MAX]`.
-    Worker:
-        head; one `{"num_cpus": 0.1}` query through the store.
-    Raises:
-        LookupError when no candidate row carries *candidate_id*; OverflowError
-        when the range is exhausted, which is a hundred million candidates and
-        is raised rather than silently colliding with the tracker.
-    """
+    """FR-12.2's synthetic identifier: `LOCAL_ID_BASE` plus the candidate's rowid."""
     row = store.query_one("SELECT rowid AS rid FROM candidate WHERE candidate_id = ?",
                           (candidate_id,))
     if row is None:
@@ -166,23 +82,7 @@ def mint_local_id(store, candidate_id: str) -> int:
 
 def as_github_issue(report: Report, candidate: CandidateRecord, local_id: int,
                     created_utc: str) -> "object":
-    """Build the `GithubIssue`-shaped object CHIA's chain and `db` both read.
-
-    Every one of `state_def.GithubIssue`'s eleven required fields is populated;
-    `comments` is left at its default empty list, which is the only field with a
-    default and the only one no CHIA caller reads for this flow. `url` is a
-    `local://` URI and deliberately not an `https://` one: it is written into
-    CHIA's `issues.db` and into artefacts, and a plausible-looking GitHub URL for
-    an issue that does not exist is the kind of thing that later gets pasted
-    somewhere.
-
-    Returns:
-        chia.github.state_def.GithubIssue.
-    Worker:
-        pure but for one read of the rendered report.
-    Raises:
-        OSError when `report.path` cannot be read.
-    """
+    """Build the `GithubIssue`-shaped object CHIA's chain and `db` both read."""
     from chia.github.state_def import GithubIssue
 
     return GithubIssue(
@@ -200,11 +100,7 @@ def as_github_issue(report: Report, candidate: CandidateRecord, local_id: int,
     )
 
 
-#: FR-12.3's script. The polarity is the INVERSE of §10.2's interestingness
-#: test, and it is not the naive one: exit 0 iff the run terminates without a
-#: crash signal, without an assertion or `UNREACHABLE executed` message and
-#: without an `LLVM ERROR:` abort, WHATEVER the tool's own exit status, so that a
-#: fix which turns a crash into a proper diagnostic scores as fixed.
+#: FR-12.3's script.
 _REPRO_TEMPLATE = """#!/bin/sh
 # repro.sh for one recorded CIRCT failure, PRE-WRITTEN by the closed bug loop.
 # Your job in the reproduce phase is to CONFIRM this, not to invent it.
@@ -236,23 +132,7 @@ exit 0
 
 
 def repro_script(verdict: OracleVerdict, *, input_path: str, case_name: str) -> str:
-    """Render FR-12.3's `repro.sh` for one recorded firing.
-
-    The tool and its arguments come from `OracleVerdict.repro_command`, which B3
-    built as `shlex.join([binary_path, *argv])` with the `prlimit` prefix already
-    removed; *input_path* is the probe's own input, dropped from the arguments so
-    that the reduced case beside the script takes its place, which is
-    `probe_task._test_args`' rule and `circt-reduce`'s own calling convention.
-
-    Returns:
-        the script text. The caller writes it, because `circt_write_files` is
-        what chmods it 0755 (`chia:examples/circt_issue_solver/circt_util.py:107-123`).
-    Worker:
-        pure; it renders a string and runs nothing.
-    Raises:
-        ValueError on an empty `repro_command`, which would leave the script with
-        no tool to run.
-    """
+    """Render FR-12.3's `repro.sh` for one recorded firing."""
     argv = shlex.split(verdict.repro_command)
     if not argv:
         raise ValueError("OracleVerdict.repro_command is empty: no tool to run")
@@ -265,26 +145,7 @@ def repro_script(verdict: OracleVerdict, *, input_path: str, case_name: str) -> 
 
 def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
               local_id: int, issue_solver: Optional[Path] = None) -> dict:
-    """Assemble every one of the sixteen keys `run_issue_remote` reads (§3.8).
-
-    The backend and the model id are one recorded pair,
-    `RunManifest.model_ids["repair_adapt"]`, spelled `"<backend>:<model id>"`,
-    which on a default run is `vertex:gemini-3.8-flash`; splitting it here is
-    what keeps `cfg["backend"]` and the ledger's `stages_metered["stage_7"]`
-    from ever disagreeing. `tag` is `candidate.run_commit` and never
-    `manifest.run_commit[0]`, which in calibration mode is an arbitrary sampled
-    seed's (K14, FR-12.6). `repro_dir` is under the artefact root and OUTSIDE
-    `/workspace/circt`, which the chain's own `git clean -fd` would delete (K9).
-
-    Returns:
-        dict whose key set is exactly `CFG_KEYS`.
-    Worker:
-        pure but for six prompt reads from CHIA's own directory, which is what
-        makes FR-12.9's byte comparison one of the file actually passed.
-    Raises:
-        RuntimeError from `issue_solver_dir`; KeyError when the manifest carries
-        no `repair_adapt` model id; OSError from a prompt read.
-    """
+    """Assemble every one of the sixteen keys `run_issue_remote` reads (§3.8)."""
     prompts = (issue_solver or issue_solver_dir()) / "prompts"
     backend, _, model = manifest.model_ids["repair_adapt"].partition(":")
     repro_dir = os.path.join(manifest.artefact_root, manifest.run_manifest_id,
@@ -297,9 +158,7 @@ def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
         "require_repro": True,
         "backend": backend,
         "model": model,
-        # Read only on the `opencode` backend (`circt_issue_loop.py:71-72`). The
-        # `vertex` arm does not read it at all: express mode takes an API key and
-        # no project and no location, and the branch nulls both.
+        # Read only on the `opencode` backend (`circt_issue_loop.py:71-72`).
         "vertex": {"project": os.environ.get("GOOGLE_CLOUD_PROJECT"),
                    "location": "global"},
         "build_jobs": BUILD_JOBS,
@@ -311,18 +170,7 @@ def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
 
 
 def failing_phase(logs: dict) -> Optional[str]:
-    """The first phase CHIA's chain recorded as unsuccessful, or None (FR-12.7).
-
-    `logs` is CHIA's own per-phase dict, insertion-ordered by the order the
-    phases ran (`chia:examples/circt_issue_solver/issue_task.py:125-137`).
-
-    Returns:
-        the phase name, or None when every phase that ran succeeded.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The first phase CHIA's chain recorded as unsuccessful, or None (FR-12.7)."""
     for phase, entry in (logs or {}).items():
         if not (entry or {}).get("success"):
             return phase
@@ -330,23 +178,7 @@ def failing_phase(logs: dict) -> Optional[str]:
 
 
 def stage7_observed(elapsed: float) -> dict:
-    """The stage-7 `LedgerEntry.observed`, whose three money fields are NULL (§3.8).
-
-    Null and never zero: zero is a number a reader will add up, and the counts
-    are not merely zero but unobserved. The reason lives on `RepairResult`, not
-    here: `_DICT_KEYS[("LedgerEntry", "observed")]` is exactly these EIGHT keys
-    (contract 2.2) and a ninth fails validation as loudly as a missing one
-    (§2.2, §2.6). The four money fields are `dispatch_turn`'s and stage 7 makes
-    no turn through it - CHIA's chain dispatches its own - so all four are null
-    here for the same reason the token counts are.
-
-    Returns:
-        {"cpu_seconds": float, and the seven others at None}.
-    Worker:
-        pure.
-    Raises:
-        nothing.
-    """
+    """The stage-7 `LedgerEntry.observed`, whose three money fields are NULL (§3.8)."""
     return {"cpu_seconds": elapsed, "tokens_in": None, "tokens_out": None,
             "cost_usd": None, "authorised_usd": None, "ceiling_usd": None,
             "billed_usd": None, "calls": None}
@@ -359,42 +191,15 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
                  chia_artifact_dir: str = "",
                  bin_dir: str = CIRCT_BUILD_BIN,
                  env: Optional[Mapping[str, str]] = None) -> dict:
-    """Present one local report to CHIA's chain, then restore the worker.
-
-    *cfg* is COMPLETE and is assembled on the head (K3, K6): `build_cfg`'s
-    sixteen keys - the six prompt bodies included - plus the two keys the loop
-    itself reads, `repair_enabled` and `repair_backend`. It used to be the
-    GENERATOR's cfg, which carries neither, so `cfg["repair_backend"]` raised
-    `KeyError` on every candidate before any other line could run; and
-    `build_cfg` used to run HERE, where `chia.__path__[0]`'s parent holds no
-    `examples/` at all, so the six prompts could not have been read even after
-    that. The head has both.
-
-    *chia_artifact_dir* is the head's too, for the same reason: it is where
-    CHIA's own head driver persists an attempt (`circt_issue_loop.py:81`), a
-    path derived from a directory this worker cannot see.
+    """Present one local report to CHIA's chain, then restore the worker (FR-12.7).
 
     Returns:
-        {"result": RepairResult, "counters": CounterBlock}, the RepairResult for
-        every one of CHIA's six statuses, with the failing phase named, plus the
-        post-attempt restore result; the counters count one attempt at stage_7,
-        a status other than `fixed` being the failed one (3.11).
+        {"result": RepairResult, "counters": CounterBlock}, one attempt at stage_7.
     Worker:
-        {"repair": 1} - its own worker type, because the chain rebuilds with the
-        agent's diff applied and returns without restoring (FR-12.11).
+        {"repair": 1}, because the chain rebuilds with the agent's diff applied.
     Raises:
-        RepairRefused(reason) for a candidate refused by class or scope, and for
-        a run started with --no-repair, before the chain is invoked at all. The
-        caller records the reason and counts it.
-        ValueError when *cfg* is missing a key `run_issue_remote` reads, or when
-        its backend disagrees with the manifest's.
-        LiveModelRefused when the interlock of 3.5.1 is not set, or when the
-        repair backend is vertex and GEMINI_API_KEY is unusable. Checked here
-        because CHIA's _turn builds its own backend and cannot carry the loop's
-        refusal (3.5.1, 2026-09-14). The caller stops the run. `env` is the
-        mapping that refusal reads, defaulting to the process environment; it is
-        `bug_loop.interlock_probe`'s own parameter applied to the one stage that
-        checks the interlock for itself (architect decision 2).
+        RepairRefused for a candidate refused by class or scope, ValueError for a
+        *cfg* `run_issue_remote` cannot read, LiveModelRefused for an unset interlock.
     """
     started_at = time.monotonic()
     if not cfg.get("repair_enabled", True):
@@ -404,12 +209,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
     if candidate.out_of_scope_root:
         raise RepairRefused("out_of_scope_root")
 
-    # The interlock, unconditionally and BEFORE the chain is reached: CHIA's
-    # _turn builds its own backend inside CHIA's file, which cannot carry the
-    # loop's refusal, so stage 7 would otherwise be the one path to a model that
-    # the gate of 3.5.1 does not cover (3.8, T-U-layout-08). It is `llm.py`'s
-    # and is imported at module scope: that module is neither half (architect
-    # decision 3), so reaching it crosses no seam.
+    # The interlock, unconditionally and BEFORE the chain is reached.
     require_live_model(
         f"stage 7 repair of {candidate.candidate_id}",
         need_key=(cfg["repair_backend"] == MODEL_BACKEND), env=env)
@@ -437,9 +237,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
         {"repro.sh": script,
          case_name: Path(reduced.path).read_text(encoding="utf-8")}, repro_dir)
 
-    # Measured rather than assumed (FR-12.3, W3): the reproduce turn's prompt
-    # tells the agent to write <repro_path> itself and the prompt may not be
-    # edited, so whether our script survived is reported per attempt.
+    # Measured rather than assumed (FR-12.3).
     before = sha256_file(chain_cfg["repro_path"])
     Path(repro_dir, "repro.sh.sha256.before").write_text(before + "\n", encoding="utf-8")
 
@@ -470,14 +268,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
 
 def _restore(candidate: CandidateRecord, manifest: RunManifest, chain_cfg: dict,
              circt_util, bin_dir: str) -> dict:
-    """FR-12.11's restore: reset, rebuild, and RE-HASH every tool binary.
-
-    A successful `ninja` is not evidence of bit-identity: the `ImageSpec` hashes
-    are computed from a freshly started container (§5.2) while the restore
-    rebuilds locally, so whether a revert-and-rebuild reproduces the published
-    binaries byte for byte is `[UNVERIFIED]` (§15). Doing the comparison is what
-    makes the answer a recorded fact rather than an assumption.
-    """
+    """FR-12.11's restore: reset, rebuild, and RE-HASH every tool binary."""
     targets = tuple(manifest.image_spec["targets"])
     reset = circt_util.circt_git_reset(candidate.run_commit)
     build = circt_util.circt_ninja_build(targets, num_cpus=chain_cfg["build_jobs"])
@@ -510,12 +301,8 @@ def _as_repair_result(result: dict, candidate: CandidateRecord, local_id: int,
                       restore: dict, chia_artifact_dir: str) -> RepairResult:
     """Map CHIA's own result dict onto `RepairResult`, unchanged in shape (FR-12.7).
 
-    FR-12.8's erratum is applied here and nowhere else: a `lit` run reporting
-    zero passed and zero failed over a non-empty path list did not discover a
-    suite, and an absent gate is not a red one. Such an attempt records
-    `lit_unusable` with `lit_ok` NULL, so no patch can be attached to it and no
-    red gate is charged to the agent's diff; B12 stops the run on the field,
-    naming FR-03.17.
+    A lit run that discovered no suite records `lit_unusable` with `lit_ok` NULL,
+    and B12 stops the run on the field, naming FR-03.17.
     """
     passed, failed = result.get("lit_passed"), result.get("lit_failed")
     unusable = bool(result.get("test_paths") and passed == 0 and failed == 0)
