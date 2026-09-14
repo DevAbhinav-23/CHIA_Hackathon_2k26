@@ -1,23 +1,4 @@
-"""A1, feature F-01: mine `llvm/circt` and emit the loop's seed corpus.
-
-`03-LLD.md` §3.3 is normative for the callables, §4.12's table for the git
-commands and `01-FRD.md` F-01 for the behaviour. The mining rule itself is
-`analysis/pin-window-analysis.md` §2 lines 74-79, quoted verbatim by FR-01.1 and
-reproduced in `_SUBJECT_RE` and `mining_filter` below.
-
-**What is reused and how.** `analysis/pin_window.py` and
-`analysis/measurements/m1_runlines.py` are scripts, not modules: both run their
-whole analysis at import time and the second writes files, so neither can be
-imported. The pieces this module needs are therefore **copied**, each with the
-line it came from: the subject regex (`pin_window.py:107-108`), the file-shape
-filter (`pin_window.py:131-137`), the `--name-status` parse
-(`pin_window.py:114-124`), the pin walk (`pin_window.py:60-77`), the window
-numbering and the nearest-tag rule (`pin_window.py:80-99`, `142-163`), the
-`RUN:` continuation joiner and the entry-tool regex
-(`m1_runlines.py:run_lines`, `m1_runlines.py:TOOLS` and `entry_tool`) and the
-language map (`m1_runlines.py:LANG`). Nothing else is taken, and no analysis
-file is imported at run time.
-"""
+"""A1, feature F-01: mine `llvm/circt` and emit the loop's seed corpus."""
 from __future__ import annotations
 
 import os
@@ -36,8 +17,7 @@ from circt_bug_loop.contract.schema import (CounterBlock, Polarity, SeedRecord,
 #: The `llvm` submodule path, from CIRCT's own `.gitmodules` (PIN §1).
 SUBMODULE = "llvm"
 
-#: The refspec FR-01.8 names. Passed as ONE element of an argument list, never
-#: through a shell, which is what makes FR-01.8's failure mode unreachable here.
+#: The refspec FR-01.8 names.
 TAG_REFSPEC = "refs/tags/firtool-*"
 
 #: `analysis/pin_window.py:107-108`, verbatim. PIN §2's "Candidate (filtered)".
@@ -54,11 +34,6 @@ _ENTRY_TOOLS = ("circt-opt", "firtool", "circt-verilog", "circt-translate",
                 "arcilator")
 
 #: `m1_runlines.py:TOOLS`, copied: every tool name CIRCT's `test/` tree invokes.
-#: FR-01.2's "the first CIRCT tool name each line invokes" is this list searched
-#: over the line's first pipeline segment, and FR-01.3 then maps the answer into
-#: the six values above. The list is wider than those six deliberately: a seed
-#: entering through `circt-reduce` or `circt-lec` is then classified `other`
-#: knowingly, rather than by failing to recognise the name at all.
 _TOOLS = ("circt-opt", "firtool", "circt-verilog", "circt-translate", "arcilator",
           "circt-reduce", "circt-lec", "circt-bmc", "circt-test", "circt-synth",
           "circt-as", "circt-dis", "circt-lsp-server", "hlstool", "kanagawatool",
@@ -66,76 +41,39 @@ _TOOLS = ("circt-opt", "firtool", "circt-verilog", "circt-translate", "arcilator
           "ibistool", "circt-cocotb-driver.py", "circt-rtl-sim.py")
 _TOOL_RE = re.compile(r"(?<![\w./-])(" + "|".join(_TOOLS) + r")(?![\w-])")
 
-#: FR-01.4's one special prefix: the unmerged bucketing keeps it whole, the
-#: normative dialect-level one replaces it with the dialect under it.
+#: FR-01.4's one special prefix.
 _DIALECT_INCLUDE = "include/circt/Dialect"
 
 #: §3.3 step 6's shell constructs, and §3.3 step 5's untouched substitution.
 _UNSUPPORTED_CONSTRUCTS = (";", "&&", "`", "$(", "%{")
 
 #: §3.3's "one normalisation the probe argv needs and the seed record does not".
-#: Four spellings and not two: LLVM's own option parser accepts one dash or two
-#: for every long option, and CIRCT's tests write both. 46 of M1's 331 corpus
-#: `RUN:` lines carry a single-dash form (`raw/m1-per-runline.csv`), among them
-#: the one `tests/fixtures/crashes/assertion_02/` was mined from, whose
-#: `-verify-diagnostics` survived into its `argv.json` and turned the emitted
-#: diagnostic into exit status 0 (errata W-09 #3).
 _PROBE_ONLY_OPTIONS = ("--split-input-file", "-split-input-file",
                        "--verify-diagnostics", "-verify-diagnostics")
 
-#: `m1_runlines.py:LANG`, copied. The probe language is the test file's own
-#: extension and nothing else.
+#: `m1_runlines.py:LANG`, copied.
 _LANGUAGES = {".mlir": ".mlir", ".fir": ".fir", ".sv": ".sv", ".v": ".sv",
               ".svh": ".sv", ".vh": ".sv"}
 
-#: The second slang entry point (§4.5): `circt-translate` registers
-#: `--import-verilog` only under `CIRCT_SLANG_FRONTEND_ENABLED`, so a line
-#: carrying it needs a slang build whatever else it says (M1's D-13 cross-check,
-#: and §5.3's `sv_seeds_excluded`).
+#: The second slang entry point (§4.5).
 _SLANG_OPTION = "--import-verilog"
 
 
 class CorpusError(Exception):
-    """Raised by build_corpus. Carries a stable reason so tests assert on it.
-
-    The two reasons are FR-01.8's `no_tags` and FR-01.11's `head_moved`; both
-    are preconditions that make a run meaningless, so B12 exits non-zero on
-    either and the run does not start (`02-HLD.md` §6).
-    """
+    """Raised by build_corpus."""
 
     def __init__(self, reason: str, message: str):
         self.reason = reason
         super().__init__(f"{reason}: {message}")
 
 
-# --------------------------------------------------------------------------
-# The pure functions: no git, no clone, no model. Tier 0 in full.
-# --------------------------------------------------------------------------
-
 def extract_run_lines(text: str) -> list[str]:
-    """Return every lit `RUN:` line of *text*, verbatim, continuations grouped.
-
-    An entry is the text following `RUN:` on one physical line, stripped; a line
-    whose text ends in `\\` absorbs the next physical line, and the entry then
-    carries both, backslashes retained, joined by a newline. That is FR-01.2's
-    "verbatim" for a construct that has no single-line spelling, and step 0 of
-    `normalise_run_line` is what folds it back into one logical line. The
-    continuation rule is `m1_runlines.py:run_lines`, which is how M1 counted 331
-    logical lines over the corpus.
-
-    Returns:
-        a list of strings, one per logical `RUN:` line, in file order.
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Return every lit `RUN:` line of *text*, verbatim, continuations grouped."""
     out: list[str] = []
     pending: list[str] | None = None
     for physical in text.splitlines():
         if pending is not None:
-            # A continuation line: drop its comment marker and its own `RUN:`
-            # prefix if it repeats one, which CIRCT's tests do.
+            # A continuation line: drop its comment marker and its own `RUN:` prefix if it repeats one.
             body = physical.strip().lstrip("/;#*! ").strip()
             body = re.sub(r"^RUN:\s*", "", body)
             pending.append(body)
@@ -157,11 +95,7 @@ def extract_run_lines(text: str) -> list[str]:
 
 
 def _split_at_unquoted_pipe(text: str) -> tuple[str, str]:
-    """Split *text* at its first `|` that is outside quotes (§3.3 step 4).
-
-    The scanner is two-state over `'` and `"`, so a pipe inside a quoted
-    FileCheck pattern does not truncate the line.
-    """
+    """Split *text* at its first `|` that is outside quotes (§3.3 step 4)."""
     quote: str | None = None
     for i, char in enumerate(text):
         if quote is not None:
@@ -177,44 +111,18 @@ def _split_at_unquoted_pipe(text: str) -> tuple[str, str]:
 def normalise_run_line(
         line: str, *, subs: Optional[dict[str, str]] = None
 ) -> tuple[str, list[str], Polarity, Shape, dict[str, str], dict]:
-    """Turn one verbatim lit RUN: line into a tool, an argv and its properties.
-
-    The six steps of `03-LLD.md` §3.3 are performed in that order. *subs* binds
-    lit's substitutions when the caller has a probe directory to bind them to:
-    keys `s`, `t` and `S` for FR-01.10's `%s`, `%t` and `%S`. With *subs* unset,
-    which is how `build_corpus` calls it, the three are left as themselves, so
-    the emitted `argv_template` stays a template and the probe emitter binds
-    them (§7.3). Substitution is textual, not token-wise, because lit's `%t` is
-    a prefix and `%t.dir` must become `<probe dir>/t.dir`.
-
-    Returns:
-        (tool, argv, polarity, shape, env, notes). `argv` EXCLUDES the tool,
-        which is §4.1's splat and §4.2's worked example. `env` maps NAME to
-        VALUE for a stripped `env` wrapper. `notes` carries §3.3's five keys:
-        lines_joined (int), not_crash (bool), dropped_tail (str), substitutions
-        (dict of placeholder to count) and unsupported_construct (str or None).
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing. An unparseable line returns shape="unsupported" with the
-        construct recorded, which excludes the seed rather than aborting.
-    """
+    """Turn one verbatim lit RUN: line into a tool, an argv and its properties."""
     notes: dict = {"lines_joined": 1, "not_crash": False, "dropped_tail": "",
                    "substitutions": {}, "unsupported_construct": None}
     env: dict[str, str] = {}
 
-    # Step 0 - join lit's `\` continuations into one logical line and strip a
-    # `// RUN:` or `; RUN:` prefix that a caller passed through unstripped.
+    # Step 0 - join lit's `\` continuations into one logical line and strip a `// RUN:` or `; RUN:` prefix that a caller passed through unstripped.
     physical = line.split("\n")
     notes["lines_joined"] = len(physical)
     body = " ".join(part.strip().rstrip("\\").strip() for part in physical).strip()
     body = re.sub(r"^[/;#*!\s]*RUN:\s*", "", body)
 
-    # Steps 1 and 2 - the `not` and `env` wrappers. FR-01.10 orders them `not`
-    # then `env`, but CIRCT's own tree spells the other order too
-    # (integration_test/circt-test/basic-circt-bmc.mlir is `env NAME=V not
-    # circt-test ...`), so both are stripped until neither leads. Stripping is
-    # order-free; what each step records is not, and each still records its own.
+    # Steps 1 and 2 - the `not` and `env` wrappers.
     polarity: Polarity = "expect_zero"
     while True:
         tokens = body.split(None, 1)
@@ -252,8 +160,7 @@ def normalise_run_line(
     body, tail = _split_at_unquoted_pipe(body)
     notes["dropped_tail"] = tail
 
-    # Step 5 - resolve lit's substitutions. `%S` before `%s` is unnecessary (the
-    # two differ in case) but the order is fixed so the recorded counts are too.
+    # Step 5 - resolve lit's substitutions.
     bindings = {"%S": (subs or {}).get("S"), "%s": (subs or {}).get("s"),
                 "%t": (subs or {}).get("t")}
     for placeholder, value in bindings.items():
@@ -264,9 +171,6 @@ def normalise_run_line(
                 body = body.replace(placeholder, value)
 
     # Step 6 - any surviving shell construct, or a `%{...}` step 5 left alone.
-    # The scan is over the whole line and not over its tokens: FR-01.10 says
-    # "still carrying", and a `;` inside a quoted option value is still a `;`
-    # this loop will not run under a shell.
     for construct in _UNSUPPORTED_CONSTRUCTS:
         if construct in body:
             notes["unsupported_construct"] = construct
@@ -285,23 +189,7 @@ def normalise_run_line(
 
 
 def strip_probe_only_options(argv: list[str]) -> tuple[list[str], list[str]]:
-    """Remove the two options that mean nothing for a single probing input.
-
-    `--verify-diagnostics` makes the tool succeed when it emits the diagnostics
-    an `expected-*` comment predicted, and a generated input carries none;
-    `--split-input-file` makes the tool process independent chunks, under which
-    `circt-reduce` can delete nothing. Each is removed in all four spellings
-    the tests use: one dash or two, bare or `=`-valued, because `circt-opt`
-    takes `--split-input-file[=<string>]` and `--verify-diagnostics=<value>`
-    (§4.2, verified) and LLVM's parser takes either dash count.
-
-    Returns:
-        (surviving_argv, removed_tokens), both in the input's order.
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Remove the two options that mean nothing for a single probing input."""
     kept, removed = [], []
     for token in argv:
         if any(token == opt or token.startswith(opt + "=")
@@ -313,23 +201,7 @@ def strip_probe_only_options(argv: list[str]) -> tuple[list[str], list[str]]:
 
 
 def entry_tool_of_line(line: str) -> str:
-    """Return the first CIRCT tool name *line* invokes, or "" if it invokes none.
-
-    `m1_runlines.py:entry_tool`, copied, minus its `(downstream)` annotation:
-    the search is over the line's first pipeline segment, so `| FileCheck` and
-    every other downstream filter is out of scope, and it is a search rather
-    than a look at the first token because CIRCT's own tests wrap the tool in
-    `not`, in `env`, in `split-file ... &&` and in `%python`. The line handed in
-    is the VERBATIM one, which is what M1 counted, so what this produces is
-    comparable with M1's table seed for seed.
-
-    Returns:
-        one of `_TOOLS`, or "" when the line invokes no CIRCT tool at all.
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Return the first CIRCT tool name *line* invokes, or "" if it invokes none."""
     match = _TOOL_RE.search(line.split("|")[0]) or _TOOL_RE.search(line)
     return match.group(1) if match else ""
 
@@ -340,18 +212,7 @@ def classify_entry_tool(tool: str) -> str:
 
 
 def dialect_buckets(path: str) -> tuple[str, str]:
-    """Bucket one `lib/` or `include/` path under both rules of FR-01.4.
-
-    Returns:
-        (dialect_bucket, dialect_bucket_unmerged). The first is normative: a
-        path under `include/circt/Dialect/<X>` buckets as `<X>`. The second
-        keeps `include/circt/Dialect` whole, which is FINAL Appendix A's rule.
-        Every other path buckets as its third component under both.
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Bucket one `lib/` or `include/` path under both rules of FR-01.4."""
     parts = path.split("/")
     if path.startswith(_DIALECT_INCLUDE + "/") and len(parts) > 3:
         return parts[3], _DIALECT_INCLUDE
@@ -360,18 +221,7 @@ def dialect_buckets(path: str) -> tuple[str, str]:
 
 
 def parse_name_status(text: str) -> dict[str, list[tuple[str, str]]]:
-    """Parse `git log --first-parent --name-status --format=COMMIT %H` output.
-
-    `analysis/pin_window.py:114-124`, copied. A rename or copy line carries two
-    paths and the DESTINATION is the one kept, which is what `parts[-1]` means.
-
-    Returns:
-        commit SHA -> list of (status, path), in git's order.
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Parse `git log --first-parent --name-status --format=COMMIT %H` output."""
     files: dict[str, list[tuple[str, str]]] = {}
     current = None
     for line in text.splitlines():
@@ -385,22 +235,7 @@ def parse_name_status(text: str) -> dict[str, list[tuple[str, str]]]:
 
 
 def mining_filter(files: list[tuple[str, str]]) -> Optional[tuple[list[str], list[str]]]:
-    """Apply PIN §2's shape filter to one commit's `--name-status` entries.
-
-    The rule, quoted by FR-01.1 and normative in that form: a first-parent
-    commit touching 1-2 files under `lib/` or `include/` AND adding or modifying
-    at least 1 file under `test/` or `integration_test/`. "Adding or modifying"
-    is `pin_window.py:135`'s `st in ("A", "M", "R", "C")`.
-
-    Returns:
-        (source_paths, test_paths) when the commit passes, None when it does
-        not. Both lists are in git's own order and neither is ever collapsed
-        (FR-01.12).
-    Worker:
-        pure; no resource, no git, no model.
-    Raises:
-        nothing.
-    """
+    """Apply PIN §2's shape filter to one commit's `--name-status` entries."""
     src = [p for _, p in files if p.startswith(_SRC_DIRS)]
     test = [p for st, p in files
             if p.startswith(_TEST_DIRS) and st in ("A", "M", "R", "C")]
@@ -419,18 +254,8 @@ def language_of(path: str) -> str:
     return _LANGUAGES.get(os.path.splitext(path)[1], "other")
 
 
-# --------------------------------------------------------------------------
-# The git layer and the two nodes.
-# --------------------------------------------------------------------------
-
 class _Git:
-    """Every git call of §4.12, against one clone, under one overall deadline.
-
-    `capture_output=True, text=True, check=True` plus a per-call timeout is the
-    shape `analysis/pin_window.py:29-31` already uses. Nothing here takes a
-    shell and every argument is one element of an argument list. `calls` counts
-    the subprocesses launched, which is what `T-U-corpus-22` asserts on.
-    """
+    """Every git call of §4.12, against one clone, under one overall deadline."""
 
     def __init__(self, clone_path: str, timeout_seconds: int):
         self.clone_path = clone_path
@@ -447,7 +272,7 @@ class _Git:
                               timeout=self._remaining()).stdout
 
     def batch(self, specs: list[str]) -> dict[str, Optional[str]]:
-        """Read many blobs in ONE `git cat-file --batch` (§3.3, M1's method)."""
+        """Read many blobs in ONE `git cat-file --batch` (§3.3)."""
         self.calls += 1
         proc = subprocess.run(["git", "-C", self.clone_path, "cat-file", "--batch"],
                               input=("\n".join(specs) + "\n").encode(),
@@ -458,11 +283,7 @@ class _Git:
             if newline < 0:
                 blobs[spec] = None
                 continue
-            # `errors="backslashreplace"` and NOT "replace", and the keyword
-            # form and not the positional one: the destructive decoder maps
-            # every undecodable byte to one U+FFFD and a seed text that went
-            # through it cannot be written back as the bytes CIRCT parsed
-            # (W-08 erratum 20; T-U-schema-18 asserts the rule over the tree).
+            # `errors="backslashreplace"` and NOT "replace", and the keyword form and not the positional one.
             header = out[pos:newline].decode(
                 "utf-8", errors="backslashreplace").split()
             pos = newline + 1
@@ -502,17 +323,7 @@ def _read_tags(git: _Git) -> list[dict]:
 
 
 def _walk_pins(git: _Git, ref: str = "HEAD") -> list[dict]:
-    """§4.12 rows 5 to 7: the first-parent history with the pin at each commit.
-
-    `analysis/pin_window.py:52-77`, copied. In a `--first-parent` log each entry
-    is the previous entry's first parent, which is where `parent_sha` comes from
-    without a further git command.
-
-    *ref* is the walk's starting point and defaults to `HEAD`, which is the
-    table's own spelling and the only one A1 uses: FR-01.11 pins the clone to
-    `corpus_head_sha` first, so `HEAD` is the corpus head by construction. A2
-    passes `origin/main` instead, because its clone is not detached (§3.4).
-    """
+    """§4.12 rows 5 to 7: the first-parent history with the pin at each commit."""
     commits = []
     for line in git("log", "--first-parent", "--format=%H\t%ct\t%s",
                     ref).splitlines():
@@ -541,13 +352,7 @@ def _walk_pins(git: _Git, ref: str = "HEAD") -> list[dict]:
 
 
 def _pin_windows(commits: list[dict]) -> dict[str, int]:
-    """Number the maximal contiguous same-pin ranges oldest to newest (PIN §2).
-
-    A window id difference IS the number of LLVM bumps apart, which is what
-    FR-01.7's `bumps_away` counts (`analysis/pin_window.py:80-99`). A pin that
-    recurs in two non-contiguous windows keeps the OLDEST id, which is
-    `pin_window.py:101-103`'s `setdefault`.
-    """
+    """Number the maximal contiguous same-pin ranges oldest to newest (PIN §2)."""
     order: list[str] = []
     for commit in reversed(commits):              # oldest -> newest
         if not order or order[-1] != commit["llvm"]:
@@ -560,13 +365,7 @@ def _pin_windows(commits: list[dict]) -> dict[str, int]:
 
 def _match_sdk(parent_pin: str, commit_date: datetime, tags: list[dict],
                window_of: dict[str, int]) -> dict:
-    """FR-01.7's pairing: exact tag, else the nearest by LLVM bumps then days.
-
-    `analysis/pin_window.py:142-163`, copied. The bug state is the FIRST PARENT,
-    so the pin matched is the parent's and never the seed's own (PIN §2). Where
-    several tags share the pin the oldest by tag date wins, which is
-    `pin_window.py:147-149`.
-    """
+    """FR-01.7's pairing: exact tag, else the nearest by LLVM bumps then days."""
     exact = sorted((t for t in tags if t["llvm"] == parent_pin),
                    key=lambda t: t["date"])
     if exact:
@@ -596,32 +395,11 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
     """Mine llvm/circt by PIN section 2's rule and emit the loop's seed corpus.
 
     Returns:
-        {"seeds": list[SeedRecord], "sdk_map": dict[str, list[str]],
-         "counts": {"filtered": int, "exact_pin": int, "no_run_line": int,
-                    "unsupported_shape": int, "seed_text_over_cap": int,
-                    "missing_blobs": int, "run_lines": int, "test_files": int,
-                    "tags": int, "git_calls": int, "polarity": dict, "shape": dict,
-                    "entry_tool": dict, "entry_tool_seeds": dict,
-                    "language": dict, "dialect_bucket": dict,
-                    "dialect_bucket_unmerged": dict, "other_tool_shas": list},
-         "exclusions": {seed_sha: reason}, one of no_run_line,
-             unsupported_shape or seed_text_over_cap,
-         "nearest_tag": {seed_sha: tag}, the non-exact seeds only (FR-01.7),
-         "sv_seeds": list[str], the seeds ADR-D-13 branch (b) excludes (§5.3),
-         "inputs": {"clone_head_sha": str, "since": str, "git_version": str},
-         "counters": CounterBlock}
+        {"seeds": list[SeedRecord], "sdk_map": dict[str, list[str]], "counts": {"filtered": int, "exact_pin": int, "no_run_line": int, "unsupported_shape": int, "seed_text_over_cap": int, "missing_blobs": int, "run_lines": int, "test_files": int, "tags": int, "git_calls": int, "polarity": dict, "shape": dict, "entry_tool": dict, "entry_tool_seeds": dict, "language": dict, "dialect_bucket": dict, "dialect_bucket_unmerged": dict, "other_tool_shas": list}, "exclusions": {seed_sha: reason}, one of no_run_line, unsupported_shape or seed_text_over_cap, "nearest_tag": {seed_sha: tag}, the non-exact seeds only (FR-01.7), "sv_seeds": list[str], the seeds ADR-D-13 branch (b) excludes (§5.3), "inputs": {"clone_head_sha": str, "since": str, "git_version": str}, "counters": CounterBlock}.
     Worker:
-        head - it runs git against the head's blobless clone, which is the only
-        repository in the deployment holding 24 months of main (K5).
+        head - it runs git against the head's blobless clone.
     Raises:
-        CorpusError("no_tags") when for-each-ref returns nothing for
-            refs/tags/firtool-*, with the refspec and the quoting note (FR-01.8);
-        CorpusError("head_moved") when the clone's HEAD differs from
-            corpus_head_sha, naming both (FR-01.11);
-        ContractError from contract.validate when a record built here is not a
-            valid SeedRecord, which is a defect here and never in the clone;
-        ValueError when `since` is not an ISO 8601 date;
-        subprocess.CalledProcessError or subprocess.TimeoutExpired from git.
+        CorpusError("no_tags") when for-each-ref returns nothing for refs/tags/firtool-*.
     """
     started_at = time.monotonic()
     git = _Git(clone_path, timeout_seconds)
@@ -652,9 +430,7 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
         if shaped is not None:
             mined.append((commit, shaped[0], shaped[1]))
 
-    # One batched read for every changed test file of every mined seed: the
-    # blobs serve FR-01.2's RUN: extraction and FR-05.1's starting inputs at
-    # once, and a blobless clone does one lazy fetch pass instead of hundreds.
+    # One batched read for every changed test file of every mined seed.
     specs = [f"{c['sha']}:{p}" for c, _, tests in mined for p in tests]
     blobs = git.batch(specs) if specs else {}
 
@@ -702,11 +478,7 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
                 _bump(counts["shape"], shp)
         counts["run_lines"] += len(run_lines)
 
-        # FR-01.3 wants ONE value per seed and does not say which line's tool a
-        # multi-tool seed takes, so it is the first line's, in test_paths order.
-        # M1's per-tool seed membership is counted beside it, because that is
-        # the table FR-01.3's acceptance compares against and it does not sum
-        # to 187: 27 seeds enter through more than one tool.
+        # FR-01.3 wants ONE value per seed and does not say which line's tool a multi-tool seed takes.
         entry_tool = classify_entry_tool(tools[0]) if tools else "other"
         if entry_tool == "other":
             counts["other_tool_shas"].append(sha)
@@ -727,15 +499,11 @@ def build_corpus(clone_path: str, corpus_head_sha: str, since: str,
         elif match["tag"] is not None:
             nearest_tag[sha] = match["tag"]       # FR-01.7's nearest, by date
 
-        # §3.3's sixth command: the seed's diff of its lib/ and include/ paths
-        # only, the test half being in test_files already.
+        # §3.3's sixth command.
         diff = git("show", "--format=", "--unified=3", "--no-renames", sha,
                    "--", *source_paths)
 
-        # The cap is measured, never applied: bound_text would return None and
-        # `diff` and `test_files` are REQUIRED fields (contract 2.0, §2.4). A
-        # truncated diff in a prompt is a worse input than no seed, so an
-        # over-cap seed is excluded from BOTH arms and counted instead.
+        # The cap is measured, never applied.
         text_bytes = len(diff.encode("utf-8")) + sum(
             len(t.encode("utf-8")) for t in test_files.values())
         if text_bytes > inline_cap_bytes:
@@ -790,15 +558,11 @@ def resolve_sites(clone_path: str, run_commit: str, sites: list[dict],
     """Say which of a turn's sibling sites exist in the tree at the run's commit.
 
     Returns:
-        {"resolved": list[dict], "rejected": list[dict], "counters":
-        CounterBlock}, each site entry the input site plus "reason" on a
-        rejection, one of "no_such_file" or "no_symbol". The counters count
-        sites, at stage "corpus", A1' being A1's second node (3.11).
+        {"resolved": list[dict], "rejected": list[dict], "counters": CounterBlock}, each site entry the input site plus "reason" on a rejection, one of "no_such_file" or "no_symbol".
     Worker:
-        head - the clone is the head's (K5). No model, no CIRCT binary.
+        head - the clone is the head's (K5).
     Raises:
-        nothing. A git failure marks every site of that call "no_such_file" with
-        the git stderr recorded, which rejects rather than accepts.
+        nothing.
     """
     started_at = time.monotonic()
     git = _Git(clone_path, timeout_seconds)
@@ -816,8 +580,7 @@ def resolve_sites(clone_path: str, run_commit: str, sites: list[dict],
             rejected.append({**site, "reason": "no_such_file", "stderr": ""})
             continue
         try:
-            # `git grep` exits 1 on "no match", which is an answer and not a
-            # failure, so that one return code is read rather than raised on.
+            # `git grep` exits 1 on "no match".
             found = git("grep", "-n", "-F", "--", symbol, run_commit, "--", path)
         except subprocess.CalledProcessError as exc:
             found = exc.stdout or ""
