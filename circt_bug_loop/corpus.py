@@ -485,29 +485,34 @@ def _read_tags(git: _Git) -> list[dict]:
     return tags
 
 
-def _walk_pins(git: _Git) -> list[dict]:
+def _walk_pins(git: _Git, ref: str = "HEAD") -> list[dict]:
     """§4.12 rows 5 to 7: the first-parent history with the pin at each commit.
 
     `analysis/pin_window.py:52-77`, copied. In a `--first-parent` log each entry
     is the previous entry's first parent, which is where `parent_sha` comes from
     without a further git command.
+
+    *ref* is the walk's starting point and defaults to `HEAD`, which is the
+    table's own spelling and the only one A1 uses: FR-01.11 pins the clone to
+    `corpus_head_sha` first, so `HEAD` is the corpus head by construction. A2
+    passes `origin/main` instead, because its clone is not detached (§3.4).
     """
     commits = []
     for line in git("log", "--first-parent", "--format=%H\t%ct\t%s",
-                    "HEAD").splitlines():
+                    ref).splitlines():
         sha, when, subject = line.split("\t", 2)
         commits.append({"sha": sha, "date": _utc(when), "subject": subject})
 
     bumps, current = {}, None
     for line in git("log", "--first-parent", "--raw", "--no-abbrev",
-                    "--format=COMMIT %H", "HEAD", "--", SUBMODULE).splitlines():
+                    "--format=COMMIT %H", ref, "--", SUBMODULE).splitlines():
         if line.startswith("COMMIT "):
             current = line.split()[1]
         elif line.startswith(":160000"):
             parts = line.replace("\t", " ").split()
             bumps[current] = (parts[2], parts[3])
 
-    pin = git("ls-tree", "HEAD", SUBMODULE).split()[2]
+    pin = git("ls-tree", ref, SUBMODULE).split()[2]
     for i, commit in enumerate(commits):
         commit["llvm"] = pin
         if commit["sha"] in bumps:

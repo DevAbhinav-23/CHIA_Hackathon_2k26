@@ -1,0 +1,13 @@
+{
+ "recorded_utc": "2026-09-14",
+ "clone": "~/.cache/chia-pin-smoke/circt",
+ "origin_main": "eab8d18294469806fa48998f44da5c96eafe1d1b",
+ "ref": "origin/main",
+ "note": "The same twelve commits with an empty for-each-ref, which is a clone holding no firtool release at all (FR-02.5's unit case).",
+ "commands": {
+  "for-each-ref --format=%(refname:short)\t%(creatordate:unix) --sort=creatordate refs/tags/firtool-*": "",
+  "log --first-parent --format=%H\t%ct\t%s origin/main": "eab8d18294469806fa48998f44da5c96eafe1d1b\t1789212630\t[MoreToCore] Add lowering for string comparison and case conversion methods (#11088)\nb792c772819df723628d1fe6073269b85a8ade5d\t1789140293\t[PyCDE] Fix the nightly \"Test PyCDE and the ESI runtime\" workflow (#11103)\nd7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2\t1789115770\t[AXI4] Add verify-axi4-networks pass (#11052)\nbad3f7bb565c8ba0ea04cc1dc0655422c81aacb3\t1789113928\t[AXI4] Add xbar op (#10991)\n9b7d63b4cde4d079b54ad2e9cb893901d7fd21f7\t1789042881\t[datapath] Lower Product of Sum to a Booth Encoded Partial Product Array (#11039)\n9de24b873409b154c977a015dff1a40f02ef020b\t1788987980\t[ImportVerilog] Support enum next, prev, name methods (#11042)\n97ac568f5058e8570e2cdf4b4768a614146dccea\t1788940541\t[AXI4] Add concurrent read/write count to subordinate-like ops (#11062)\nddb3d1bd431727b0049da5307ecd35131cd74b88\t1788904964\tBump LLVM (#11071)\neade0de61bc5a0d2ba1b9da951b69efcab19f8ce\t1788797297\t[HW] Preserve attributes in PortConverter (#11082)\ne7f97d48cfd1e85f3c6fa7aa1a603b4a4cdee908\t1788485375\t[FIRRTL] Replace \"sym_name\" lookup with OpInterface (#11080)\n4e3e8eed2e5bdcc4b193bb1660192d13c0cf3e51\t1788475759\t[ExportVerilog][NFC] Use SymbolOpInterface instead of looking for \"sym_name\" attribute (#11078)\nf1a41b921d8d367d1b5990c9fa4410157ab3aada\t1788451503\t[circt-bmc] Print only first counterexample by default (#11074)\n",
+  "log --first-parent --raw --no-abbrev --format=COMMIT %H origin/main -- llvm": "COMMIT ddb3d1bd431727b0049da5307ecd35131cd74b88\n\n:160000 160000 6279700538792da0c5a08e17babfe9b6e824c69f e297b52ec9d8b5c38042e53ae5650922717970cd M\tllvm\n",
+  "ls-tree origin/main llvm": "160000 commit e297b52ec9d8b5c38042e53ae5650922717970cd\tllvm\n"
+ }
+}

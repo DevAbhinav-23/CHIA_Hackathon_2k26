@@ -1,0 +1,17 @@
+{
+ "recorded_utc": "2026-09-14",
+ "clone": "~/.cache/chia-pin-smoke/circt",
+ "origin_main": "eab8d18294469806fa48998f44da5c96eafe1d1b",
+ "ref": "eade0de61bc5a0d2ba1b9da951b69efcab19f8ce",
+ "note": "The same history read from eade0de61bc5 instead: the ref's own pin has a release, so the selector stops at the ref and the lag is zero.",
+ "commands": {
+  "for-each-ref --format=%(refname:short)\t%(creatordate:unix) --sort=creatordate refs/tags/firtool-*": "firtool-1.157.0\t1787435438\nfirtool-1.158.0\t1787967295\nfirtool-1.159.0\t1788797297\n",
+  "ls-tree firtool-1.157.0 llvm": "160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f\tllvm\n",
+  "ls-tree firtool-1.158.0 llvm": "160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f\tllvm\n",
+  "ls-tree firtool-1.159.0 llvm": "160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f\tllvm\n",
+  "log --first-parent --format=%H\t%ct\t%s eade0de61bc5a0d2ba1b9da951b69efcab19f8ce": "eade0de61bc5a0d2ba1b9da951b69efcab19f8ce\t1788797297\t[HW] Preserve attributes in PortConverter (#11082)\ne7f97d48cfd1e85f3c6fa7aa1a603b4a4cdee908\t1788485375\t[FIRRTL] Replace \"sym_name\" lookup with OpInterface (#11080)\n4e3e8eed2e5bdcc4b193bb1660192d13c0cf3e51\t1788475759\t[ExportVerilog][NFC] Use SymbolOpInterface instead of looking for \"sym_name\" attribute (#11078)\nf1a41b921d8d367d1b5990c9fa4410157ab3aada\t1788451503\t[circt-bmc] Print only first counterexample by default (#11074)\nab421d8aca1599ef377cc1e842c25768d3ca676f\t1788430733\t[NFC][Slang] Export BOOST_REGEX_STANDALONE when Slang is enabled\n5eaa0199b5175150f8eb605cc11fdf3bf448197f\t1788423804\t[BMC] Run PrepareForBMC in circt-bmc (#10983)\nde61bb5d904aa3806401e6af1e8129da723c662b\t1788376099\t[Moore][ImportVerilog] Support implicit conversion from unpacked array to dynamic array (#11049)\nf2b15a44ec70f99fbc2a36f0de1b99d6c0f48af3\t1788226378\t[HWToLLVM] Use correctly typed constant attributes (#11068)\n",
+  "log --first-parent --raw --no-abbrev --format=COMMIT %H eade0de61bc5a0d2ba1b9da951b69efcab19f8ce -- llvm": "",
+  "ls-tree eade0de61bc5a0d2ba1b9da951b69efcab19f8ce llvm": "160000 commit 6279700538792da0c5a08e17babfe9b6e824c69f\tllvm\n",
+  "rev-list --first-parent --count eade0de61bc5a0d2ba1b9da951b69efcab19f8ce..eade0de61bc5a0d2ba1b9da951b69efcab19f8ce": "0\n"
+ }
+}
