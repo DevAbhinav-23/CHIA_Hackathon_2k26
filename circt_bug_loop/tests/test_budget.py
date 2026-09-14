@@ -287,7 +287,9 @@ def test_T_U_budget_09(repo: Repo):
         stop_reason={"seeded": None})
     view = budget_module.snapshot(ledger, "seeded", loaded)
     assert view == schema.LedgerSnapshot(arm="seeded", unit="wall_clock_seconds",
-                                         spent=3600.0, cap=14400.0)
+                                         spent=3600.0,
+                                         cap=loaded.arm_window_seconds)
+    assert loaded.arm_window_seconds == 7200.0, "the committed window (W-22)"
     assert budget_module.snapshot(ledger, "mutation", loaded).spent == 0.0
     assert not hasattr(view, "spend_usd")
     with pytest.raises(schema.ContractError) as caught:
@@ -309,7 +311,9 @@ def test_T_U_budget_10(repo: Repo):
     assert loaded.reduction_wall_seconds == 600
     assert loaded.artefact_inline_cap_bytes == 262144
     assert loaded.arm_order == ["seeded", "mutation"]
-    assert isinstance(loaded.arm_window_seconds, float) and loaded.arm_window_seconds == 14400.0
+    # 7200 since W-22: the pilot measured about USD 0.6 a minute on the seeded
+    # arm, so a four-hour arm run twice cannot be paid for out of a cap of 200.
+    assert isinstance(loaded.arm_window_seconds, float) and loaded.arm_window_seconds == 7200.0
     assert set(loaded.acceptance) == budget_module._ACCEPTANCE_KEYS
 
     repo.commit("circt_bug_loop/budget.yaml", edited(arm_order=["seeded", "seeded"]))
@@ -322,38 +326,56 @@ def test_T_U_budget_11(repo: Repo):
     """T-U-budget-11 (FR-14.1, FR-14.2): check 5, the calibration sample.
 
     The sample is part of the pre-registration, so a file whose declared size
-    and drawn list disagree is refused, and the empty list §9.5 once shipped is
-    refused with them.
+    and drawn list disagree is refused.
+
+    THE COMMITTED FILE'S OWN SAMPLE IS EMPTY since W-22, and legitimately: 0 of
+    the 187 seed parents carry this deployment's pin (`bug_loop.calibratable`,
+    measured 2026-09-15), so the eligible set is empty and the campaign is
+    registered as discovery mode. The check is therefore exercised here over a
+    drawn sample this test supplies, rather than over the file's own.
     """
-    drawn = yaml.safe_load(COMPLETE.read_text(encoding="utf-8"))["calibration_sample_shas"]
+    empty = yaml.safe_load(COMPLETE.read_text(encoding="utf-8"))
+    assert empty["calibration_sample_shas"] == [] == empty["calibration_sample_size"] * []
+    assert empty["calibration_sample_size"] == 0
+    drawn = [f"{n:040x}" for n in range(1, 21)]
     assert len(drawn) == 20
 
-    repo.commit("circt_bug_loop/budget.yaml", edited(calibration_sample_shas=[]))
+    repo.commit("circt_bug_loop/budget.yaml",
+                edited(calibration_sample_size=20, calibration_sample_shas=[]))
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load()
     assert "calibration_sample_size" in str(caught.value)
 
-    repo.commit("circt_bug_loop/budget.yaml", edited(calibration_sample_shas=drawn[:19]))
+    repo.commit("circt_bug_loop/budget.yaml",
+                edited(calibration_sample_size=20, calibration_sample_shas=drawn[:19]))
     with pytest.raises(budget_module.BudgetError):
         repo.load()
 
     repo.commit("circt_bug_loop/budget.yaml",
-                edited(calibration_sample_shas=drawn[:19] + ["not-a-sha"]))
+                edited(calibration_sample_size=20,
+                       calibration_sample_shas=drawn[:19] + ["not-a-sha"]))
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load()
     assert "40 hex" in str(caught.value)
 
     repo.commit("circt_bug_loop/budget.yaml",
-                edited(calibration_sample_shas=drawn[:19] + [drawn[0]]))
+                edited(calibration_sample_size=20,
+                       calibration_sample_shas=drawn[:19] + [drawn[0]]))
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load()
     assert "repeat" in str(caught.value)
 
-    repo.commit("circt_bug_loop/budget.yaml", COMPLETE.read_text(encoding="utf-8"))
+    repo.commit("circt_bug_loop/budget.yaml",
+                edited(calibration_sample_size=20, calibration_sample_shas=drawn))
     assert repo.load(exact_pin_shas=set(drawn)).calibration_sample_shas == drawn
     with pytest.raises(budget_module.BudgetError) as caught:
         repo.load(exact_pin_shas=set(drawn[:19]))
     assert "exact-pin" in str(caught.value)
+
+    # And the COMMITTED file, whose sample is empty, loads against any pin set:
+    # an empty sample has no entry that could fail check 5 (W-22, errata 52).
+    repo.commit("circt_bug_loop/budget.yaml", COMPLETE.read_text(encoding="utf-8"))
+    assert repo.load(exact_pin_shas=set()).calibration_sample_shas == []
 
 
 def test_T_U_budget_12(repo: Repo):

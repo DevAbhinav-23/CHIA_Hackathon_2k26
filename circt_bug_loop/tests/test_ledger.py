@@ -189,7 +189,9 @@ def test_T_U_ledger_06(tmp_path: Path):
     seed_rows(open_store(tmp_path))
     funds = budget(generated_inputs_per_day=5)
 
-    accrue_all(db_path, [entry("w-s", scope="arm_window", amount=14399.0)], funds)
+    # One second short of the committed window, whatever the committed window is.
+    accrue_all(db_path, [entry("w-s", scope="arm_window",
+                               amount=funds.arm_window_seconds - 1.0)], funds)
     aggregated = ledger_module.aggregate(_RUN, db_path, today=_DAY)
     assert ledger_module.stop_reason(aggregated, "seeded", funds) is None
 

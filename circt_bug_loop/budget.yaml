@@ -10,7 +10,17 @@
 # campaign driver on the head. The arms run SEQUENTIALLY, each for this same W,
 # in the order below, on the same fixed-size cluster at the same apparatus
 # concurrency. Nothing else is the budget.
-arm_window_seconds: 14400.0            # 4 hours per arm, 8 hours for the campaign
+# 7200, not 14400 (W-22, 2026-09-16). The pilot's SEEDED arm spent about
+# USD 0.6 a minute of wall clock, so a four-hour arm run twice is USD 288 against
+# a cap of 200 and the money would stop the campaign inside its first arm - which
+# is exactly what happened to pilot 1, at 43.3 % over. Two hours an arm, four for
+# the campaign, is what the cap can pay for at the measured rate with the head
+# room the fixes of W-18b are expected to open: the tool-loop cap, the per-turn
+# ceiling and stage 6's skipped turn all cut the rate and none of them was
+# measured at campaign scale when this number was chosen. The window is the
+# BUDGET (G-48) and must not be chosen to fit a result, so it is fixed here,
+# before the campaign, from the pilot's own rate and the registered cap.
+arm_window_seconds: 7200.0             # 2 hours per arm, 4 hours for the campaign
 arm_order: [seeded, mutation]
 
 # --- the model, and the money cap (ADR-D-03, superseding section 2026-09-14) --
@@ -79,33 +89,25 @@ fingerprint_top_n: 5
 # len(calibration_sample_shas) == calibration_sample_size and that every entry
 # is an exact-pin seed.
 #
-# THE DRAW, 2026-09-14 (W-17). The twenty illustrative placeholders this file
-# shipped until the join are gone: the sample below is the real one, drawn from
-# the 171 exact-pin seeds of analysis/filtered_187.json at the corpus head above
-# and REPRODUCIBLE from this file alone, the seed of the generator being
-# corpus_head_sha itself. Sorted, so the order carries no information either.
-calibration_sample_size: 20
-calibration_sample_shas:
-  - "23abfba6006b9581a537632ab31f162f0213d3dd"
-  - "2867b37b5415f91bcff4e48da96ec4865b6eda77"
-  - "3daad646aa920859204345e9527013f2413dd306"
-  - "3df813fd7e65fbca66ffd1fe83395b7c726b4b2a"
-  - "3f0aa622f0ca59877dececf8631bf7028b59b051"
-  - "671dec51619c13b0812614212ba77d5ae1746308"
-  - "681992b3a872f25713b2778bc9f570fd973ac5e8"
-  - "73e28e09a3b5ba17ab4eba999d5bbff7031b11ee"
-  - "765883a3939828b80d5de0c509f1f7b43656567b"
-  - "7fff704e9e84e35b4aa653b5424272bad1343138"
-  - "838a8bb2910695c4b8b42eb0a20406c5fb6cf532"
-  - "a14ce3078b4c083e0db4e14a69d1cbf1b2532611"
-  - "b3b407b37bb255aee5cfd559dc32988b88c6e43d"
-  - "be870d5d5d54f3463b341b6adda295dd19de9f8d"
-  - "c14279dcbf73029dc470ae45d90e951fe2067c23"
-  - "cc71d34ab52f556fe58e85143b38a6432b3c3af2"
-  - "dc524e9ea04f496cfbefbbdf505b414c9b164626"
-  - "e2e5cca7355c1ffe3fae98284004331ee7cc437f"
-  - "e36f5695723e46a6d8463a521452dcda8aff2c4b"
-  - "ef82ef1b1e33a8ec4d9a74a134e4ecfb4d8256a6"
+# THE SAMPLE IS EMPTY, AND IT IS EMPTY BECAUSE NOTHING IS ELIGIBLE (W-22).
+# A seed can be calibrated only when its parent's `llvm` gitlink IS the run's own
+# pin, which is the equality FR-03.2 makes the image's build condition, and when
+# its SDK tag is exact. MEASURED 2026-09-15 and recorded in
+# `bug_loop.calibratable`'s own docstring: **0 of the 187 seed parents carry this
+# deployment's pin** `6279700538792da0c5a08e17babfe9b6e824c69f`, and the 187
+# parents are spread over 44 distinct pins, the commonest covering 27 seeds. So
+# the eligible set on this deployment is EMPTY; a sample of twenty drawn from the
+# 171 exact-pin seeds - which is what this file carried until W-22, drawn at the
+# join with `random.Random(corpus_head_sha)` - names twenty seeds calibration
+# mode would refuse to probe, because probing them would mean building a CIRCT
+# commit the image's SDK does not match.
+#
+# The campaign is therefore registered as DISCOVERY MODE with no calibration
+# sample, and the six host-built crash fixtures of W-09 remain the oracle and
+# reducer calibration, as they were recorded. `budget.py` check 5 asserts the
+# length agrees with the size, which it does at zero.
+calibration_sample_size: 0
+calibration_sample_shas: []
 
 # --- the model's own tool loop (errata row 38) -------------------------------
 # How many `generate_content` calls ONE turn of each model-bearing stage may

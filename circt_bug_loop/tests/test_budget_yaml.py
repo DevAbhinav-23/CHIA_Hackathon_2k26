@@ -143,29 +143,28 @@ def test_T_U_byaml_03_the_acceptance_block_is_9_3s_seven(registered):
 
 
 def test_T_U_byaml_04_the_calibration_sample_is_drawn(registered):
-    """T-U-byaml-04 (FR-14.1, FR-14.3): the sample is in the file, and is real.
+    """T-U-byaml-04 (FR-14.1, FR-14.3): the sample agrees with its size, and is real.
 
-    `calibration_sample_shas` holds exactly `calibration_sample_size` entries,
-    each a 40-character hex SHA, and the list is **not** the twenty illustrative
-    placeholders §9.5 ships, which this test names and rejects: the committed
-    file's own commit is the registration, so a sample drawn afterwards would
-    invalidate the campaign. Fixture: the committed file. Tier 0.
+    **THE COMMITTED SAMPLE IS EMPTY, and that is a measurement** (W-22): a seed
+    is calibratable only when its parent's `llvm` gitlink IS the run's pin, and
+    0 of the 187 seed parents carry this deployment's pin, the 187 being spread
+    over 44 distinct pins (`bug_loop.calibratable`, measured 2026-09-15). A
+    sample of twenty would name twenty seeds calibration mode refuses to probe.
+    So the file declares a size of zero and an empty list, check 5 agrees them,
+    and the campaign is registered as discovery mode.
+
+    The draw itself is still asserted, here over the size the file USED to
+    carry, so that `draw_calibration` remains pinned to
+    `random.Random(corpus_head_sha)` and to the committed corpus measurement.
+    Fixture: the committed file and the 187-seed corpus. Tier 0.
     """
     doc = document()
     sample = doc["calibration_sample_shas"]
-    assert len(sample) == doc["calibration_sample_size"]
-    assert len(set(sample)) == len(sample), "no seed is sampled twice"
-    for sha in sample:
-        assert len(sha) == 40 and all(c in "0123456789abcdef" for c in sha)
-    # §9.5's placeholders are runs of one repeated hex digit; a drawn sample is
-    # not, and a file still carrying them has not had the draw run against it.
-    placeholders = [sha for sha in sample if len(set(sha)) <= 2]
-    assert placeholders == [], f"{placeholders} look like §9.5's placeholders"
+    assert len(sample) == doc["calibration_sample_size"] == 0
     assert registered.calibration_sample_shas == sample
 
-    # And it is THE draw, not A draw: `random.Random(corpus_head_sha)` is seeded
-    # by a value already in the file, so the sample is re-derivable here from
-    # the committed 187-seed corpus measurement and from nothing else.
+    # The draw is re-derivable from this file alone: `random.Random` is seeded
+    # by `corpus_head_sha`, which is a value the file carries.
     import json
 
     from circt_bug_loop import bug_loop
@@ -176,10 +175,17 @@ def test_T_U_byaml_04_the_calibration_sample_is_drawn(registered):
     assert mined["corpus_head_sha"] == doc["corpus_head_sha"]
     exact = [c["sha"] for c in mined["candidates"] if c.get("exact")]
     assert len(exact) == 171, "FR-01.1's exact-pin count, at the corpus head"
-    assert sample == bug_loop.draw_calibration(
-        corpus_head_sha=doc["corpus_head_sha"],
-        sample_size=doc["calibration_sample_size"], exact_pin_shas=exact)
-    assert set(sample) <= set(exact), "check 5: every entry is an exact-pin seed"
+    assert bug_loop.draw_calibration(corpus_head_sha=doc["corpus_head_sha"],
+                                     sample_size=0, exact_pin_shas=exact) == []
+    twenty = bug_loop.draw_calibration(corpus_head_sha=doc["corpus_head_sha"],
+                                       sample_size=20, exact_pin_shas=exact)
+    assert len(twenty) == len(set(twenty)) == 20
+    assert set(twenty) <= set(exact), "check 5: every entry is an exact-pin seed"
+    for sha in twenty:
+        assert len(sha) == 40 and all(c in "0123456789abcdef" for c in sha)
+    assert twenty == bug_loop.draw_calibration(
+        corpus_head_sha=doc["corpus_head_sha"], sample_size=20,
+        exact_pin_shas=exact), "the draw is reproducible"
 
 
 def test_T_U_byaml_05_the_registration_rule_holds_on_the_committed_bytes(tmp_path):
@@ -219,12 +225,11 @@ PILOT = COMMITTED.with_name("budget-pilot.yaml")
 PILOT_CHANGES = {"arm_window_seconds": 600.0, "campaign_spend_cap_usd": 3.0,
                  "generated_inputs_per_day": 200, "filings_per_day": 0,
                  "filings_total": 0, "per_seed_probe_cap": 3,
-                 "per_seed_iteration_cap": 1, "calibration_sample_size": 0,
-                 "calibration_sample_shas": []}
+                 "per_seed_iteration_cap": 1}
 
 
-def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_eight_values(tmp_path):
-    """T-U-byaml-06 (W-18, FR-14.1, FR-14.7): a COPY with eight values changed.
+def test_T_U_byaml_06_the_pilot_file_is_the_campaigns_less_seven_values(tmp_path):
+    """T-U-byaml-06 (W-18, FR-14.1, FR-14.7): a COPY with seven values changed.
 
     New id, W-18. The pilot is its own pre-registration with its own tag, so it
     is a second file and never an edit of the first. Its key set is §9.1's to the

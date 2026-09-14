@@ -1941,9 +1941,15 @@ def test_T_U_driver_45_the_corpus_window_opens_two_years_before_the_head(tmp_pat
     assert bug_loop.CORPUS_WINDOW_MONTHS == 24
 
     # And it is NOT the campaign start, which is what the driver used to pass.
-    budget = budget_module.load_budget._chia_original(
-        budget_module.BUDGET_YAML, str(bug_loop.FLOW_DIR.parent))["budget"]
-    assert budget.campaign_start_utc[:10] > "2024-09-11"
+    # Read off the committed BYTES rather than through `load_budget`, which
+    # would also run check 1's registration ancestry: between W-22 landing the
+    # final `budget.yaml` and the architect cutting `registration/campaign-1`
+    # on that commit, the newest tag is `registration/pilot-2` and the campaign
+    # file is a DESCENDANT of it, which check 1 refuses and is meant to. This
+    # test is about the corpus window and not about the registration.
+    document = yaml.safe_load(
+        Path(budget_module.BUDGET_YAML).read_text(encoding="utf-8"))
+    assert document["campaign_start_utc"][:10] > "2024-09-11"
     source = inspect.getsource(bug_loop.run_campaign)
     assert "corpus_since(args.clone, budget.corpus_head_sha)" in source
     assert "budget.campaign_start_utc[:10]" not in source
