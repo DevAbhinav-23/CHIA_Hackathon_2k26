@@ -1,0 +1,51 @@
+# DEFERRED under ADR-D-14. Written only if the credits are confirmed by the date
+# 05-Work-Plan.md names. Same three worker types, same resource names, same
+# images as cluster_single.yaml; only the provider section and the artefact tree
+# differ.
+cluster_name: circt_bug_loop_gcp
+
+# provider.head_ip is required by chia.cluster.config.load_config, which raises
+# KeyError 'head_ip' without it, so the placeholder is here and the file parses
+# even while the rest is deferred (W28). It resolves from the environment, as
+# CHIA_HEAD does in cluster_single.yaml.
+provider:
+    head_ip: ${BUGLOOP_GCP_HEAD_IP}
+
+auth:
+    ssh_user: chia
+
+gcp_nodes:
+    project: ${BUGLOOP_GCP_PROJECT}      # required
+    zone: us-central1-a                  # the reference's default
+    bugloop_circt:
+        machine_type: n2-standard-8
+        count: 2
+        ssh_user: chia
+        ssh_public_key: ${HOME}/.ssh/id_ed25519.pub
+        ssh_private_key: ${HOME}/.ssh/id_ed25519
+        disk_size_gb: 200                # the image is measured at 4.79 GB plus a 1.3 GB build tree
+    bugloop_repair:
+        machine_type: n2-standard-8
+        count: 1
+        ssh_user: chia
+        ssh_public_key: ${HOME}/.ssh/id_ed25519.pub
+        ssh_private_key: ${HOME}/.ssh/id_ed25519
+        disk_size_gb: 200
+    bugloop_llm:
+        machine_type: n2-standard-2
+        count: 2
+        ssh_user: chia
+        ssh_public_key: ${HOME}/.ssh/id_ed25519.pub
+        ssh_private_key: ${HOME}/.ssh/id_ed25519
+        disk_size_gb: 50
+
+# available_node_types: identical to cluster_single.yaml except that the artefact
+# bind mount is replaced, see below.
+#
+# THE ONE THING GCP DEFERS. Section 4.1's `-v <host>:<same path>` is a
+# single-machine mechanism: on GCP the workers are other machines and a host path
+# is not shared. The GCP deployment therefore needs shared storage mounted at
+# RunManifest.artefact_root on every node AND on the head - a bucket via gcsfuse,
+# or a Filestore export - and that work is deferred with GCP under ADR-D-14.
+# Nothing in the Must depends on it, and FR-17.9's "a worker that cannot open it
+# shall fail the run" is what stops a GCP run starting without it.

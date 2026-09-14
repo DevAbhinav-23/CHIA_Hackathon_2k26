@@ -1,0 +1,192 @@
+# Ray cluster for the closed CIRCT bug loop - SINGLE MACHINE, 5 containers.
+#
+#   bugloop_llm    : 2 x chia:latest,          llm:1    -> 2 concurrent prompts
+#   bugloop_circt  : 2 x chia-circt-assert,    circt:1  -> 2 concurrent probes
+#   bugloop_repair : 1 x chia-circt-assert,    repair:1 -> 1 repair attempt
+#
+# llm:1 per container, not llm:2. The concurrent-prompt cap is then exactly the
+# container count, which is what RunManifest.llm_concurrency records and what
+# FR-14.5 requires the manifest to name.
+#
+# bugloop_repair exists because CHIA's phase chain rebuilds WITH THE AGENT'S DIFF
+# APPLIED and returns without restoring, and the next task's reset is `git reset
+# --hard` then `git clean -fd`, explicitly NOT -x, so the build tree survives. On
+# a shared pool every verdict after the first repair attempt could be taken
+# against a binary that is not the image's (FR-12.11).
+#
+# The SAME `git clean -fd` is what deletes CHIA's default repro directory,
+# /workspace/circt/.circtissues, which is untracked and not gitignored. That is
+# why section 3.8 puts the loop's repro directory under the artefact root
+# instead, outside the tree the clean touches (K9). One mechanism, two
+# consequences, and the design now names both in the same place.
+#
+# min_workers == max_workers on all three types, so the cluster is fixed-size and
+# apparatus_concurrency is exactly the bugloop_circt count. BOTH ARMS RUN FROM
+# THIS ONE YAML AT THIS ONE CONCURRENCY, one after the other, which is what makes
+# the wall-clock equality of FR-14.5 mean anything.
+#
+# Everything runs on ONE machine. The host is read from CHIA_HEAD:
+#   set -a; . ~/.config/bugloop/gemini.env; set +a
+#   export CHIA_HEAD=$(hostname)
+#   export BUGLOOP_ARTEFACTS=$HOME/circt_bug_loop_artefacts
+#   export BUGLOOP_IMAGE_TAG=<the tag B1 published>
+# before `chia up`. No GITHUB_TOKEN appears anywhere in this file, by design
+# (NFR-06, NFR-07): the token lives in one 0600 file on the head and the two
+# components that read it are head nodes.
+#
+# GEMINI_API_KEY DOES appear, as a ${...} REFERENCE and never as a value.
+# chia.cluster.config._expand_env_vars substitutes ${VAR} from the operator's
+# shell over the whole document at load (chia:chia/cluster/config.py:300-309,
+# 694-710, 951-957), so the key lands in the host's `docker run` command and in
+# the llm container's environment, and NEVER in `chia job submit` runtime-env
+# metadata, which is visible in `chia job` output and the dashboard. CHIA's own
+# all_models.yaml passes OPENAI_API_KEY the same way (chia/models/tests/cluster/
+# all_models.yaml:143-152). Section 11.2 is normative.
+cluster_name: circt_bug_loop
+
+available_node_types:
+    bugloop_llm:
+        resources: {"llm": 1}
+        balance_level: cluster
+        min_workers: 2
+        max_workers: 2
+        docker:
+            # The vertex backend is a PYTHON client in the chia package, not a
+            # CLI, so the canonical chia base is the whole image requirement:
+            # "rayproject/ray:2.54.0-cpu with the chia package pip-installed on
+            # top" (chia:docs/user_guides/docker_images.rst:45-49), which brings
+            # google-genai>=1.64.0 and mcp==1.27.1 with it
+            # (chia:pyproject.toml:24-35). Nothing is layered on at setup.
+            image: "ghcr.io/ucb-bar/chia:latest"
+            container_name: "circt_bug_loop_llm_${USER}"
+            pull_before_run: True
+            run_options:
+                # No --cpus / --memory here, unlike the other two types, and that
+                # is deliberate rather than an omission: this container makes
+                # HTTPS calls and holds no CIRCT tree, so NFR-05's outer level
+                # has nothing to protect the machine from. The concurrency cap is
+                # the llm:1 resource and the container count, which is what
+                # RunManifest.llm_concurrency records.
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                - "--user $(id -u):$(id -g)"
+                # The ONE credential line. A reference, expanded from the
+                # operator's shell at `chia up`; see the header and 11.2.
+                - "-e GEMINI_API_KEY=${GEMINI_API_KEY}"
+                # The live-call interlock travels with it, so a worker that has
+                # the key and not this still cannot reach Vertex (3.5.1). Unset
+                # in every tier below T3, and set only for the pilot onward.
+                - "-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+            run_setup_commands:
+                # One line, down from four. The two Claude lines are gone with
+                # the CLI: no ~/.claude mount, no .claude.json copy, no
+                # skipDangerousModePermissionPrompt write into the operator's
+                # real configuration directory.
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                - mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+        compatible_ips: ["${CHIA_HEAD}"]
+
+    bugloop_circt:
+        resources: {"circt": 1}
+        balance_level: cluster
+        min_workers: 2
+        max_workers: 2
+        docker:
+            image: "ghcr.io/ucb-bar/chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            container_name: "circt_bug_loop_circt_${USER}"
+            pull_before_run: True
+            run_options:
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                # --user, on EVERY worker type and not only bugloop_llm. The
+                # artefact root below is bind-mounted from a host directory the
+                # OPERATOR owns; a container running as the image's own user
+                # writes into it as that user and pre-flight check 5 fails on the
+                # first worker that tries. Matching uid and gid is what makes the
+                # mount writable from both sides (FR-17.9).
+                - "--user $(id -u):$(id -g)"
+                # NFR-05's OUTER level: these protect the worker and the machine.
+                # The probe's own rlimits, set by prlimit on its argv, are what
+                # classify the probe. A container-level kill removes the worker and,
+                # under max_retries=0, fails the task with no probe status at all,
+                # which section 6 of 02-HLD.md has a row for.
+                - --cpus=6
+                - --memory=24g
+                - --memory-swap=24g
+                # FR-17.9's artefact mount: one host directory, bind-mounted at the
+                # IDENTICAL absolute path in every container, so a worker-produced
+                # file reaches the head's tree with no copy step and
+                # RunManifest.artefact_root means one thing everywhere.
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+            run_setup_commands:
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                - git config --global user.email 'circt_bug_loop@chia' || true
+                - git config --global user.name  'circt_bug_loop'       || true
+                - git config --global --add safe.directory /workspace/circt || true
+                # NO `pip install lit` line. lit is baked into the image exactly
+                # once, at /home/ray/anaconda3/envs/py_worker/bin/lit, which is the
+                # path circt_warm_build checks, so a conditional install finds it
+                # present and does nothing (FR-03.8).
+        compatible_ips: ["${CHIA_HEAD}"]
+
+    bugloop_repair:
+        resources: {"repair": 1}
+        balance_level: cluster
+        min_workers: 1
+        max_workers: 1
+        docker:
+            image: "ghcr.io/ucb-bar/chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            container_name: "circt_bug_loop_repair_${USER}"
+            pull_before_run: True
+            run_options:
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                - "--user $(id -u):$(id -g)"
+                - --cpus=8
+                - --memory=32g
+                - --memory-swap=32g
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+                - "-e GEMINI_API_KEY=${GEMINI_API_KEY}"
+                - "-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}"
+            run_setup_commands:
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                - git config --global user.email 'circt_bug_loop@chia' || true
+                - git config --global user.name  'circt_bug_loop'       || true
+                - git config --global --add safe.directory /workspace/circt || true
+        compatible_ips: ["${CHIA_HEAD}"]
+
+provider:
+    head_ip: ${CHIA_HEAD}
+
+auth:
+    ssh_user: ${USER}
+
+# 2 llm + 2 circt + 1 repair = 5 workers, all on the one machine.
+min_workers: 5
+max_workers: 5
+upscaling_speed: 1.0
+idle_timeout_minutes: 5
+
+file_mounts: {}
+cluster_synced_files: []
+file_mounts_sync_continuously: False
+rsync_exclude: ["**/.git", "**/.git/**"]
+rsync_filter: [".gitignore"]
+initialization_commands: []
+setup_commands: []
+worker_setup_commands: []
+
+head_setup_commands:
+    - "source ~/.bashrc && conda activate circtbugloop"
+head_start_ray_commands:
+    - "source ~/.bashrc && conda activate circtbugloop && ray stop"
+    - "source ~/.bashrc && conda activate circtbugloop && ulimit -c unlimited && ray start --head --port=6379 --include-dashboard=True --dashboard-agent-listen-port=0"
+worker_start_ray_commands:
+    - ray stop
+    - ray start --address=$RAY_HEAD_IP:6379 --dashboard-agent-listen-port=0
