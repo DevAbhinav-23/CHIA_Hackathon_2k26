@@ -58,34 +58,40 @@ corpus_head_sha: "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2"
 fingerprint_top_n: 5
 
 # --- calibration (ADR-D-01, D-01(d)) ----------------------------------------
-# DRAWN BEFORE THIS FILE IS COMMITTED, by `bug_loop.py --draw-calibration`, which
+# DRAWN BEFORE THIS FILE IS COMMITTED, by `bug_loop.draw_calibration`, which
 # samples 20 of the 171 exact-pin seeds with random.Random(corpus_head_sha). The
 # commit that lands this file is the registration, so a sample drawn afterwards
 # would invalidate the campaign (FR-14.3, FR-14.7). budget.py check 5 asserts
-# len(calibration_sample_shas) == calibration_sample_size.
-# The twenty below are an ILLUSTRATION of the shape and not the campaign's draw.
+# len(calibration_sample_shas) == calibration_sample_size and that every entry
+# is an exact-pin seed.
+#
+# THE DRAW, 2026-09-14 (W-17). The twenty illustrative placeholders this file
+# shipped until the join are gone: the sample below is the real one, drawn from
+# the 171 exact-pin seeds of analysis/filtered_187.json at the corpus head above
+# and REPRODUCIBLE from this file alone, the seed of the generator being
+# corpus_head_sha itself. Sorted, so the order carries no information either.
 calibration_sample_size: 20
 calibration_sample_shas:
-  - "0000000000000000000000000000000000000001"
-  - "0000000000000000000000000000000000000002"
-  - "0000000000000000000000000000000000000003"
-  - "0000000000000000000000000000000000000004"
-  - "0000000000000000000000000000000000000005"
-  - "0000000000000000000000000000000000000006"
-  - "0000000000000000000000000000000000000007"
-  - "0000000000000000000000000000000000000008"
-  - "0000000000000000000000000000000000000009"
-  - "0000000000000000000000000000000000000010"
-  - "0000000000000000000000000000000000000011"
-  - "0000000000000000000000000000000000000012"
-  - "0000000000000000000000000000000000000013"
-  - "0000000000000000000000000000000000000014"
-  - "0000000000000000000000000000000000000015"
-  - "0000000000000000000000000000000000000016"
-  - "0000000000000000000000000000000000000017"
-  - "0000000000000000000000000000000000000018"
-  - "0000000000000000000000000000000000000019"
-  - "0000000000000000000000000000000000000020"
+  - "23abfba6006b9581a537632ab31f162f0213d3dd"
+  - "2867b37b5415f91bcff4e48da96ec4865b6eda77"
+  - "3daad646aa920859204345e9527013f2413dd306"
+  - "3df813fd7e65fbca66ffd1fe83395b7c726b4b2a"
+  - "3f0aa622f0ca59877dececf8631bf7028b59b051"
+  - "671dec51619c13b0812614212ba77d5ae1746308"
+  - "681992b3a872f25713b2778bc9f570fd973ac5e8"
+  - "73e28e09a3b5ba17ab4eba999d5bbff7031b11ee"
+  - "765883a3939828b80d5de0c509f1f7b43656567b"
+  - "7fff704e9e84e35b4aa653b5424272bad1343138"
+  - "838a8bb2910695c4b8b42eb0a20406c5fb6cf532"
+  - "a14ce3078b4c083e0db4e14a69d1cbf1b2532611"
+  - "b3b407b37bb255aee5cfd559dc32988b88c6e43d"
+  - "be870d5d5d54f3463b341b6adda295dd19de9f8d"
+  - "c14279dcbf73029dc470ae45d90e951fe2067c23"
+  - "cc71d34ab52f556fe58e85143b38a6432b3c3af2"
+  - "dc524e9ea04f496cfbefbbdf505b414c9b164626"
+  - "e2e5cca7355c1ffe3fae98284004331ee7cc437f"
+  - "e36f5695723e46a6d8463a521452dcda8aff2c4b"
+  - "ef82ef1b1e33a8ec4d9a74a134e4ecfb4d8256a6"
 
 # --- per-seed caps ----------------------------------------------------------
 per_seed_probe_cap: 5                  # FR-04.5, and the mutation arm's cap too

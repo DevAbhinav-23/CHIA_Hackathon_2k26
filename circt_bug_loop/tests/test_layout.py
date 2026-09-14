@@ -185,9 +185,6 @@ def test_T_U_layout_01_exemptions():
         assert test in EXEMPT_TESTS
 
 
-@pytest.mark.xfail(reason="errata row 18: tests/test_prompts.py and "
-                          "tests/test_budget_yaml.py are not written yet; "
-                          "the prompts are W-13's and budget.yaml is W-06's")
 @pytest.mark.t0
 def test_T_U_layout_01_twenty_five():
     """T-U-layout-01 (FR-19.5): the test directory holds exactly the expected modules.
