@@ -257,6 +257,13 @@ def synthesise_mutators(db_path: str, repo_root: str, set_version: str,
     document = {
         "format_version": 1,
         "set_version": set_version,
+        # 8.1's field, and the one this step exists to set (W-12). It was
+        # missing: `load_set` refuses a set whose `frozen` is FALSE, and a set
+        # with no such field at all slipped through that guard by accident
+        # rather than by being frozen. The freeze is write-once, so a set
+        # written without it could only be corrected by bumping `set_version`
+        # and running the synthesis - and the model turn - a second time.
+        "frozen": True,
         "synthesised_utc": cfg.get("synthesised_utc") or time.strftime(
             "%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
         "synthesis_input": {

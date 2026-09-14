@@ -227,9 +227,16 @@ def test_T_U_msyn_05_the_freeze_is_canonical_json_and_records_the_count(
     assert result["mutators_written"] == 3 and result["dropped"] == {}
     assert Path(result["path"]).name == "set_v1.json"
     assert document["format_version"] == 1 and document["set_version"] == "v1"
+    # 8.1's `frozen`, which A7 is the only thing that sets (W-12). `load_set`
+    # refuses a set declaring itself unfrozen once a run names a digest, and a
+    # set carrying no such field at all passed that guard only because `is
+    # False` is not `is not True`. The freeze is write-once, so the field has to
+    # be right the first time or the model turn is paid for twice.
+    assert document["frozen"] is True
     assert result["counters"].stage == "synthesis"
-    # The written set is loadable by the arm that will run it.
-    loaded = mutators.load_set(result["path"])
+    # The written set is loadable by the arm that will run it, digest and all,
+    # which is the check a campaign makes (8.1 rule 1).
+    loaded = mutators.load_set(result["path"], expected_sha=result["set_sha256"])
     assert [mutator["id"] for mutator in loaded["mutators"]] == [
         "mlir.attr.int.off_by_one", "sv.range.msb.zero", "any.line.duplicate"]
 
