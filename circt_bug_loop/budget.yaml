@@ -20,7 +20,12 @@
 # measured at campaign scale when this number was chosen. The window is the
 # BUDGET (G-48) and must not be chosen to fit a result, so it is fixed here,
 # before the campaign, from the pilot's own rate and the registered cap.
-arm_window_seconds: 7200.0             # 2 hours per arm, 4 hours for the campaign
+# 150000 for campaign 3 (2026-09-16): the whole corpus. Campaign 2's two shards
+# probed 5 and 4 seeds in their 7200 s windows, 2.25 seeds an hour a shard; 184
+# eligible seeds over two shards is 92 a shard, about 41 hours. The window covers
+# the corpus at the measured rate. The money cap below is expected to stop each
+# shard first, at about 35 seeds, and the run then reports `campaign_spend_cap`.
+arm_window_seconds: 150000.0           # 41.7 hours per arm, sized to the 184 eligible seeds
 arm_order: [seeded, mutation]
 
 # --- the model, and the money cap (ADR-D-03, superseding section 2026-09-14) --
@@ -35,7 +40,10 @@ model_id: gemini-3.8-flash
 # (FR-18.10's third stop condition), and the results artefact states the spend.
 # 200 against the user's USD 300 credit, leaving headroom for the pilot and for
 # a re-run.
-campaign_spend_cap_usd: 100.0
+# 175 per job for campaign 3, two seeded shards and one mutation job: 350 of list
+# price at most. Campaign 2 billed about 45 % of list (68 % of input tokens were
+# cache hits, priced at list by the ledger), and USD 30 of the 300 credit is spent.
+campaign_spend_cap_usd: 175.0
 
 # The two prices the ledger turns tokens into money with. The backend reports
 # usage_metadata token counts and no price, so the arithmetic is the ledger's:

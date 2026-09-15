@@ -249,7 +249,7 @@ def test_T_U_budget_09(repo: Repo):
     assert view == schema.LedgerSnapshot(arm="seeded", unit="wall_clock_seconds",
                                          spent=3600.0,
                                          cap=loaded.arm_window_seconds)
-    assert loaded.arm_window_seconds == 7200.0, "the committed window (W-22)"
+    assert loaded.arm_window_seconds == 150000.0, "the committed window (campaign 3)"
     assert budget_module.snapshot(ledger, "mutation", loaded).spent == 0.0
     assert not hasattr(view, "spend_usd")
     with pytest.raises(schema.ContractError) as caught:
@@ -266,8 +266,8 @@ def test_T_U_budget_10(repo: Repo):
     assert loaded.reduction_wall_seconds == 600
     assert loaded.artefact_inline_cap_bytes == 262144
     assert loaded.arm_order == ["seeded", "mutation"]
-    # 7200 since W-22: the pilot measured about USD 0.6 a minute on the seeded arm.
-    assert isinstance(loaded.arm_window_seconds, float) and loaded.arm_window_seconds == 7200.0
+    # 150000 for campaign 3: the 184 eligible seeds at campaign 2's 2.25 seeds an hour a shard.
+    assert isinstance(loaded.arm_window_seconds, float) and loaded.arm_window_seconds == 150000.0
     assert set(loaded.acceptance) == budget_module._ACCEPTANCE_KEYS
 
     repo.commit("circt_bug_loop/budget.yaml", edited(arm_order=["seeded", "seeded"]))

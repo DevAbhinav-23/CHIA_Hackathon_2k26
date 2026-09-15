@@ -187,7 +187,7 @@ def test_T_U_ledger_06(tmp_path: Path):
         == {"seeded": 0, "mutation": 0}
 
     window = ledger_module.aggregate(_RUN, db_path, today="2026-09-21")
-    window.per_arm_window["seeded"] = 14400.0
+    window.per_arm_window["seeded"] = 150000.0
     assert ledger_module.stop_reason(window, "seeded", funds) == "arm_window"
 
     with pytest.raises(schema.ContractError) as caught:
