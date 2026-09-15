@@ -2345,6 +2345,129 @@ def rescreen(store: LoopStore, run_id: str, *, clone_path: str, top_n: int,
     return 0
 
 
+def render(store: LoopStore, run_id: str, *, top_n: int, out) -> int:
+    """Render one stored run's results artefact again, which `--rescreen` left stale."""
+    from circt_bug_loop import results as results_module
+
+    manifest = manifest_of(store, run_id)
+    results_dir = Path(manifest.artefact_root) / run_id / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        rendered = results_module.render_results._chia_original(
+            store, manifest,
+            labelled_pairs=results_module.load_labelled_pairs(),
+            fingerprint_top_n=top_n)["rendered"]
+    except results_module.ResultsIncomplete as refusal:
+        refused = results_dir / "results_refused.txt"
+        refused.write_text("\n".join(refusal.missing) + "\n", encoding="utf-8")
+        print(f"the results artefact refused to render; "
+              f"{len(refusal.missing)} element(s) named in {refused}", file=out)
+        return 3
+    rendered_path = results_dir / "results.md"
+    rendered_path.write_text(rendered, encoding="utf-8")
+    print(str(rendered_path), file=out)
+    return 0
+
+
+#: What a dry `--report-turns` prints above the candidates a live one would send a turn for.
+TURNS_WOULD_RUN = "stage-6 turns --report-turns would make"
+
+
+def turns_owed(store: LoopStore, run_id: str) -> list:
+    """Every candidate of *run_id* the screen now calls `new` whose report was written with no turn."""
+    from circt_bug_loop.store import latest
+
+    return [row["candidate_id"] for row in store.query(
+        "SELECT candidate_id FROM candidate WHERE run_manifest_id = ? "
+        "ORDER BY candidate_id", (run_id,))
+        if (latest(store, "dedup_verdict", row["candidate_id"]) or {}).get(
+            "verdict") == "new" and _turn_owed(store, row["candidate_id"])]
+
+
+def reduced_case_of(store: LoopStore, probe_id: str):
+    """Stage 5's stored row, back as the `ReducedCase` the report takes."""
+    from circt_bug_loop.store import ReducedCase
+
+    row = store.query_one("SELECT * FROM reduced_case WHERE probe_id = ?",
+                          (probe_id,))
+    if row is None:
+        raise LookupError(f"no reduced_case row for probe {probe_id!r}")
+    row.update({name: bool(row[name]) for name in
+                ("reduced", "fixpoint", "budget_truncated", "recheck_matches")})
+    return ReducedCase(**row)
+
+
+def dedup_verdict_of(store: LoopStore, candidate_id: str, probe_id: str):
+    """One candidate's NEWEST screen verdict, back as the record the report takes."""
+    from circt_bug_loop.store import DedupVerdict, latest
+
+    row = latest(store, "dedup_verdict", candidate_id)
+    if row is None:
+        raise LookupError(f"no dedup_verdict row for candidate {candidate_id!r}")
+    return DedupVerdict(probe_id=probe_id, verdict=row["verdict"],
+                        evidence=json.loads(row["evidence_json"]))
+
+
+def rewrite_report(store: LoopStore, report) -> None:
+    """Replace one candidate's `report` row: its PRIMARY KEY forbids a second one."""
+    fields = _row(store, "report", report)
+    fields.pop("candidate_id")
+    store.update("report", {"candidate_id": report.candidate_id}, fields)
+
+
+def report_turns_dispatch() -> Dispatch:
+    """Join the cluster `--report-turns` sends its turns through, or refuse."""
+    try:
+        ray.init(address="auto", runtime_env=runtime_env(stage_shipped()),
+                 ignore_reinit_error=True)
+        nodes = [node["NodeID"] for node in ray.nodes()
+                 if node.get("Alive") and "llm" in (node.get("Resources") or {})]
+    except Exception as error:                      # noqa: BLE001 - reported as a refusal
+        raise PreflightFailed(
+            "cluster", f"--report-turns makes stage 6's model turn, and no "
+            f"cluster answered: {type(error).__name__}: {error}") from error
+    if not nodes:
+        raise PreflightFailed(
+            "cluster", "--report-turns needs a live worker holding the `llm` "
+            "resource; the cluster has none")
+    return Dispatch(remote=True, head_node_id=_head_node_id())
+
+
+def report_turns(campaign: Campaign, out) -> int:
+    """Make stage 6's model turn for every candidate of one run whose report was rendered without one."""
+    from circt_bug_loop.store import load_candidate
+
+    store, run_id = campaign.store, campaign.manifest.run_manifest_id
+    owed = turns_owed(store, run_id)
+    if not owed:
+        print(f"--report-turns {run_id}: the store holds no candidate of that "
+              f"run that is owed a stage-6 turn", file=sys.stderr)
+        return 2
+
+    # The entry_id is (run, arm, stage, node, key): this is not a retry.
+    stamp = uuid.uuid4().hex
+    for candidate_id in owed:
+        candidate = load_candidate(store, candidate_id)
+        probe = store.query_one(
+            "SELECT arm, iteration FROM probe WHERE probe_id = ?",
+            (candidate.probe_id,))
+        turn = campaign.call(
+            "triage_report", campaign.stages.triage_report, candidate,
+            reduced_case_of(store, candidate.probe_id),
+            oracle_verdict_of(store, candidate.probe_id),
+            dedup_verdict_of(store, candidate_id, candidate.probe_id),
+            campaign.manifest, campaign.cfg(iteration=probe["iteration"]),
+            candidate.artefact_dir, _arm=probe["arm"],
+            _key=f"{candidate.probe_id}/{stamp}")
+        if turn["failure"] is None:
+            rewrite_report(store, turn["report"])
+        print(f"{candidate_id}  "
+              f"{turn['report'].title or turn['failure']}  "
+              f"billed_usd={(turn['logs'].get('usage') or {}).get('billed_usd')}",
+              file=out)
+    return 0
+
+
 #: The columns `--reclassify` prints, one row per seed it re-judged (D-13).
 _RECLASSIFY_COLUMNS = ("seed", "parse_error", "reclassified", "gate decisions")
 
@@ -2569,6 +2692,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--print-config", action="store_true")
     parser.add_argument("--rescreen", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--reclassify", default=None, metavar="RUN_MANIFEST_ID")
+    parser.add_argument("--render", default=None, metavar="RUN_MANIFEST_ID")
+    parser.add_argument("--report-turns", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--forum-post-url", default=None)
     parser.add_argument("--forum-post-date", default=None)
     parser.add_argument("--chia-root", default=str(_CHIA_ROOT))
@@ -2946,6 +3071,37 @@ def main(argv: Optional[list] = None, out=None) -> int:
             args.budget, str(FLOW_DIR.parent))["budget"]
         return rescreen(LoopStore(DB_PATH), args.rescreen, clone_path=args.clone,
                         top_n=budget.fingerprint_top_n, out=out)
+    if args.render:
+        budget = budget_module.load_budget._chia_original(
+            args.budget, str(FLOW_DIR.parent))["budget"]
+        return render(LoopStore(DB_PATH), args.render,
+                      top_n=budget.fingerprint_top_n, out=out)
+    if args.report_turns:
+        from types import SimpleNamespace
+
+        store = LoopStore(DB_PATH)
+        if not interlock_probe(need_key=False)["interlock_ok"]:
+            owed = turns_owed(store, args.report_turns)
+            print(f"{TURNS_WOULD_RUN}: {', '.join(owed) if owed else 'none'}",
+                  file=out)
+            return 0
+        budget = budget_module.load_budget._chia_original(
+            args.budget, str(FLOW_DIR.parent))["budget"]
+        manifest = manifest_of(store, args.report_turns)
+        try:
+            dispatch = report_turns_dispatch()
+        except PreflightFailed as error:
+            print(f"pre-flight refused the run: {error}", file=sys.stderr)
+            return 2
+        campaign = Campaign(
+            manifest=manifest, budget=budget, store=store,
+            stages=default_stages(), dispatch=dispatch,
+            counters=CounterLog(manifest.run_manifest_id),
+            clone_path=args.clone,
+            image_spec=SimpleNamespace(**manifest.image_spec),
+            bin_dir=CIRCT_BIN_DIR, repair_enabled=False,
+            head_options=dispatch.head_options())
+        return report_turns(campaign, out)
     if args.reclassify:
         from types import SimpleNamespace
 

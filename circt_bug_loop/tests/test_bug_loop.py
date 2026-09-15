@@ -2104,3 +2104,179 @@ def test_reclassify_refuses_to_start_without_a_circt_worker(monkeypatch):
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.reclassify_dispatch()
     assert "resource" in str(raised.value)
+
+
+@pytest.mark.t0
+def test_T_U_driver_54_render_writes_the_results_artefact_again(tmp_path: Path):
+    """D-17: `--render` renders `results/results.md` from the store as it is now, which is what a run that `--rescreen` or `--reclassify` changed no longer has."""
+    import io
+
+    parsed = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--render", _RUN])
+    assert parsed.render == _RUN
+    assert bug_loop.build_parser().parse_args(["--mode", "discovery"]).render is None
+
+    run = mini_campaign(tmp_path)
+    loop = run["store"]
+    out = io.StringIO()
+    assert bug_loop.render(loop, _RUN, top_n=5, out=out) == 0
+
+    rendered = tmp_path / _RUN / "results" / "results.md"
+    assert out.getvalue().strip() == str(rendered)
+    text = rendered.read_text(encoding="utf-8")
+    assert text == call_node(results_module.render_results, loop, run["manifest"],
+                             labelled_pairs=run["labelled_pairs"])["rendered"]
+
+    # The artefact follows the store: a moved taxonomy bucket moves with it.
+    loop.update("gate_decision", {"candidate_id": "c-p-000000000001"},
+                {"taxonomy_bucket": "duplicate"})
+    assert bug_loop.render(loop, _RUN, top_n=5, out=io.StringIO()) == 0
+    assert rendered.read_text(encoding="utf-8") != text
+
+    with pytest.raises(LookupError):
+        bug_loop.render(loop, "no-such-run", top_n=5, out=io.StringIO())
+
+
+def _no_turn_reports(store) -> list:
+    """FR-11.8's heading in every report file of the run, as a model-free run leaves it."""
+    rows = store.query("SELECT candidate_id, path FROM report ORDER BY candidate_id")
+    for row in rows:
+        Path(row["path"]).write_text(
+            f"{bug_loop.NO_TURN_HEADING} FOR THIS CANDIDATE.\n", encoding="utf-8")
+    return [row["candidate_id"] for row in rows]
+
+
+def _turn_stages(calls: list, *, fails: bool = False) -> bug_loop.Stages:
+    """`fake_stages`, with a stage-6 report that records its call, writes and prices it."""
+    stages = fake_stages()
+
+    def report(candidate, reduced, verdict, dedup, manifest_, cfg, artefact_dir,
+               **kwargs):
+        calls.append((candidate.candidate_id, dedup.verdict, reduced.probe_id,
+                      verdict.probe_id, cfg["iteration"]))
+        out = stages.triage_report(candidate, reduced, verdict, dedup, manifest_,
+                                   cfg, artefact_dir, **kwargs)
+        out["logs"] = {"usage": {"tokens_in": 30, "tokens_out": 9,
+                                 "billed_usd": 0.25}}
+        if fails:
+            out["report"] = dataclasses.replace(out["report"], path="", title="",
+                                                rendered_sha256="")
+            out["failure"] = "turn_failed:TimeoutError"
+            return out
+        title = f"a turn wrote this for {candidate.candidate_id}"
+        Path(artefact_dir, "report.md").write_text(f"# {title}\n", encoding="utf-8")
+        out["report"] = dataclasses.replace(out["report"], title=title)
+        return out
+
+    return dataclasses.replace(stages, triage_report=report)
+
+
+@pytest.mark.t0
+def test_T_U_driver_55_report_turns_makes_the_owed_turn_once_per_candidate(
+        tmp_path: Path):
+    """D-17: `--report-turns` sends stage 6's turn for every candidate the screen now calls `new` whose report was written without one, replaces that report and its row, and charges the turn to the ledger."""
+    import io
+
+    run = mini_campaign(tmp_path)
+    loop = run["store"]
+    _no_turn_reports(loop)
+    # A differential candidate has no screen verdict at all and is never owed one.
+    assert bug_loop.turns_owed(loop, _RUN) == ["c-p-000000000001",
+                                               "c-p-100000000001"]
+    loop.update("dedup_verdict", {"candidate_id": "c-p-100000000001"},
+                {"verdict": "known_open_issue"})
+    assert bug_loop.turns_owed(loop, _RUN) == ["c-p-000000000001"]
+    loop.update("dedup_verdict", {"candidate_id": "c-p-100000000001"},
+                {"verdict": "new"})
+    written = Path(loop.query_one(
+        "SELECT path FROM report WHERE candidate_id = 'c-p-100000000001'")["path"])
+    written.write_text("# circt-opt crashes on a reduced input\n", encoding="utf-8")
+    assert bug_loop.turns_owed(loop, _RUN) == ["c-p-000000000001"], "a turn wrote it"
+    written.write_text(f"{bug_loop.NO_TURN_HEADING}\n", encoding="utf-8")
+
+    calls: list = []
+    campaign = bug_loop.Campaign(
+        manifest=run["manifest"], budget=budget_file(), store=loop,
+        stages=_turn_stages(calls), dispatch=bug_loop.Dispatch(remote=False),
+        counters=bug_loop.CounterLog(_RUN), clone_path=str(tmp_path),
+        image_spec=image_spec("ok"), repair_enabled=False)
+    out = io.StringIO()
+    assert bug_loop.report_turns(campaign, out) == 0
+
+    # One turn per owed candidate, on the stored record and the stored verdict.
+    assert [call[0] for call in calls] == ["c-p-000000000001", "c-p-100000000001"]
+    assert [call[1] for call in calls] == ["new", "new"]
+    assert [call[2] for call in calls] == ["p-000000000001", "p-100000000001"]
+    assert [call[3] for call in calls] == ["p-000000000001", "p-100000000001"]
+    assert [call[4] for call in calls] == [1, 1]
+
+    # The report row is REPLACED: its PRIMARY KEY forbids a second one.
+    rows = loop.query("SELECT * FROM report WHERE candidate_id = 'c-p-000000000001'")
+    assert len(rows) == 1
+    assert rows[0]["title"] == "a turn wrote this for c-p-000000000001"
+    assert Path(rows[0]["path"]).read_text(encoding="utf-8").startswith(
+        "# a turn wrote this")
+
+    printed = out.getvalue().splitlines()
+    assert len(printed) == 2
+    assert printed[0].startswith("c-p-000000000001")
+    assert "a turn wrote this for c-p-000000000001" in printed[0]
+    assert all("billed_usd=0.25" in line for line in printed)
+
+    billed = [json.loads(row["observed_json"])["billed_usd"] for row in loop.query(
+        "SELECT observed_json FROM ledger_entry WHERE stage = 'stage_6'")]
+    assert billed.count(0.25) == 2
+
+    # Nothing is owed a second time, and there is nothing to do.
+    assert bug_loop.turns_owed(loop, _RUN) == []
+    assert bug_loop.report_turns(campaign, io.StringIO()) == 2
+
+    # FR-11.8: a turn that produced nothing replaces neither the row nor the file.
+    owed_again = Path(loop.query_one(
+        "SELECT path FROM report WHERE candidate_id = 'c-p-000000000001'")["path"])
+    owed_again.write_text(f"{bug_loop.NO_TURN_HEADING}\n", encoding="utf-8")
+    campaign.stages = _turn_stages([], fails=True)
+    failed = io.StringIO()
+    assert bug_loop.report_turns(campaign, failed) == 0
+    assert "turn_failed:TimeoutError" in failed.getvalue()
+    assert loop.query_one("SELECT title, path FROM report WHERE candidate_id = "
+                          "'c-p-000000000001'") == {
+        "title": "a turn wrote this for c-p-000000000001", "path": str(owed_again)}
+    assert bug_loop.turns_owed(loop, _RUN) == ["c-p-000000000001"]
+
+
+@pytest.mark.t0
+def test_T_U_driver_56_report_turns_needs_the_interlock_and_an_llm_worker(
+        tmp_path: Path, monkeypatch):
+    """D-17: `--report-turns` makes a live model turn, so with the interlock unset it names the candidates it would run and stops, and with it set it refuses a cluster that advertises no `llm` worker."""
+    import io
+
+    parsed = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--report-turns", _RUN])
+    assert parsed.report_turns == _RUN
+    assert bug_loop.build_parser().parse_args(
+        ["--mode", "discovery"]).report_turns is None
+
+    run = mini_campaign(tmp_path)
+    _no_turn_reports(run["store"])
+    monkeypatch.setattr(bug_loop, "DB_PATH", str(tmp_path / "loop.db"))
+    out = io.StringIO()
+    assert bug_loop.main(["--mode", "discovery", "--report-turns", _RUN],
+                         out=out) == 0
+    assert out.getvalue().strip() == (
+        f"{bug_loop.TURNS_WOULD_RUN}: c-p-000000000001, c-p-100000000001")
+
+    monkeypatch.setattr(bug_loop, "stage_shipped", lambda: {"py_modules": []})
+    monkeypatch.setattr(bug_loop.ray, "init",
+                        lambda **kwargs: (_ for _ in ()).throw(
+                            ConnectionError("no cluster at auto")))
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.report_turns_dispatch()
+    assert raised.value.check == "cluster" and "no cluster" in str(raised.value)
+
+    monkeypatch.setattr(bug_loop.ray, "init", lambda **kwargs: None)
+    monkeypatch.setattr(bug_loop.ray, "nodes",
+                        lambda: [{"Alive": True, "Resources": {"circt": 1.0}}])
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.report_turns_dispatch()
+    assert "`llm` resource" in str(raised.value)
