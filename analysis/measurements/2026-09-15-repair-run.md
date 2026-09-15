@@ -98,3 +98,19 @@ precondition for the next attempt, not an optimisation.**
   never dispatched.
 * That 9 GiB and `-j 4` are enough: untested under load, and §4 says the host may not be able to supply the 9 GiB.
 * `chia down -y circt_bug_loop/cluster_repair.yaml` ran at the end; no container and no raylet is left.
+
+## Attempt 2, 2026-09-15 10:35 to 11:03 IST (architect): the chain ran, diagnosed the bug, did not confirm the repro
+
+Same candidate `c-p-a2cb61b8d0aa`, same `cluster_repair.yaml` (1 llm, 1 circt, repair at 9 GiB), `repair_run.py` with `CAP_USD = None`
+so the run's registered cap (100.00, 23.83 spent) applied: ceiling 6.479896 per phase, authorised 32.39948 over five, billed
+unobservable (`token_capture = unavailable_remote_dispatch`). Wall 1,639.6 s. Restore ok, tool hashes matched after the rebuild,
+no OOM (repair container at 223 MiB at the end; the earlier OOM was host swap pressure from a 94 %-full RAM-backed `/tmp`, since cleared).
+
+| phase | outcome |
+|---|---|
+| assess | `DECISION: CLEAR`. Reason (verbatim from the phase log): "When lowering `moore.extract` from an array slice with a large negative offset such as `INT32_MIN`, 32-bit signed integer overflow in the bounds calculation results in zero padding widths and an empty operand list being passed to `hw.array_concat`, triggering an assertion failure." Expected: "compute the slice padding and bounds without integer overflow (e.g., using 64-bit integer arithmetic) and lower out-of-bounds extracts to properly padded zero values without constructing an empty `hw.array_concat`." |
+| repro | `reproduced: false`, status `no_repro`. The phase log shows the model writing its own `.circtissues/repro.mlir` (an `array<2 x i1>` variant) instead of confirming the pre-written `repro.sh`; the chain's reproduce phase then did not score the failure as reproduced. Fix, regression and writeup did not run. |
+| patch | none |
+
+Open: why the reproduce phase did not confirm a case that the gate reproduced twice (fresh process, other worker); the vertex backend
+writes no `issue_logs/`, so only the 1,000-character phase tails in `RepairResult.phase_logs` exist. No further attempt in this campaign.
