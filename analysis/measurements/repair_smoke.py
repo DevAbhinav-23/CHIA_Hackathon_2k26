@@ -14,7 +14,7 @@ import yaml
 
 from circt_bug_loop import bug_loop
 from circt_bug_loop.contract import schema
-from circt_bug_loop.store import (LoopStore, OracleVerdict, ReducedCase, Report,
+from circt_bug_loop.store import (LoopStore, ReducedCase, Report,
                                   load_candidate)
 
 RUN = "138400b18e44411c94f7d6344fa19286"
@@ -45,8 +45,7 @@ def _load(store: LoopStore) -> tuple:
             schema.from_json(probe["spec_json"], schema.ProbeSpec),
             _record(one("SELECT * FROM reduced_case WHERE probe_id = ?",
                         (candidate.probe_id,)), ReducedCase),
-            _record(one("SELECT * FROM oracle_verdict WHERE probe_id = ?",
-                        (candidate.probe_id,)), OracleVerdict),
+            bug_loop.oracle_verdict_of(store, candidate.probe_id),
             _record(one("SELECT * FROM report WHERE candidate_id = ?",
                         (CANDIDATE,)), Report))
 
