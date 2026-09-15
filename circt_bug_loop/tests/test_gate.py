@@ -222,12 +222,26 @@ def _direct(monkeypatch):
     """Replace the one dispatch seam with a direct call to each node's original."""
     seen = []
 
-    def _run(node, options, *args, **kwargs):
-        seen.append({"node": getattr(node, "__name__", node), "options": options})
+    def _run(node, options, *args, timeout=None, **kwargs):
+        seen.append({"node": getattr(node, "__name__", node), "options": options,
+                     "timeout": timeout})
         return call_node(node, *args, **kwargs)
 
     monkeypatch.setattr(gate, "_dispatch", _run)
     monkeypatch.setattr(gate, "live_circt_nodes", lambda: [])
+    return seen
+
+
+def _never_placed(monkeypatch, nodes=(NODE_A, NODE_B)):
+    """A dispatch seam that never completes, as a held `circt` slot never does."""
+    seen = []
+
+    def _run(node, options, *args, timeout=None, **kwargs):
+        seen.append({"node": node.__name__, "options": options, "timeout": timeout})
+        return None
+
+    monkeypatch.setattr(gate, "_dispatch", _run)
+    monkeypatch.setattr(gate, "live_circt_nodes", lambda: list(nodes))
     return seen
 
 
@@ -296,6 +310,79 @@ def test_gate_03_the_pin_is_soft_and_prefers_another_node():
     assert strategy.node_id == NODE_B
     assert strategy.soft is True
     assert rerun_options(None) == {}
+
+
+def test_gate_03b_the_soft_pin_is_given_up_on_and_then_the_re_run_is_too(
+        tmp_path, monkeypatch):
+    """T-U-gate-03 (FR-13.2): Ray's soft affinity falls back only for an infeasible or dead node, never for one whose single `circt` slot is merely held, so the gate waits out the pin itself, re-dispatches unpinned once, and - if that never lands either - answers question 1 no instead of waiting forever, as campaign 2's shard 0 did."""
+    bin_dir = _tools(tmp_path)
+    candidate = _candidate(tmp_path, bin_dir)
+    _store(tmp_path, candidate)
+    seen = _never_placed(monkeypatch)
+
+    out = call_node(gate_decide, candidate, _reduced(candidate.reduced_path),
+                    _dedup(), None, _manifest(tmp_path, bin_dir),
+                    str(tmp_path / "loop.db"), limits=LIMITS, top_n=TOP_N,
+                    bin_dir=bin_dir, minimal_case_lines=MINIMAL_CASE_LINES)
+    decision = out["decision"]
+
+    assert decision.q1_reproduce is False
+    assert decision.q1_rerun_worker == gate.RERUN_UNSCHEDULED
+    assert decision.q1_rerun_pid is None
+    assert decision.q1_same_worker is None, "no worker ran, so there is nothing to compare"
+    assert decision.stopped_at_question == 1
+    assert decision.decision == "nothing"
+    assert decision.taxonomy_bucket == "unreproducible"
+    assert TAXONOMY[(1, "rerun_unscheduled")] == "unreproducible"
+
+    # The pin once, then no pin at all, and no third attempt or later question.
+    assert [call["node"] for call in seen] == ["gate_rerun", "gate_rerun"]
+    assert seen[0]["options"]["scheduling_strategy"].node_id == NODE_B
+    assert seen[0]["timeout"] == gate.RERUN_SCHEDULE_WAIT_S == 60
+    assert seen[1]["options"] == {}
+    assert seen[1]["timeout"] == LIMITS["probe_wall_seconds"] + gate.RERUN_WAIT_MARGIN_S
+
+    # With no other live node there is no pin to give up on, and one attempt is all.
+    single = _never_placed(monkeypatch, nodes=(NODE_A,))
+    call_node(gate_decide, candidate, _reduced(candidate.reduced_path),
+              _dedup(), None, _manifest(tmp_path, bin_dir),
+              str(tmp_path / "loop.db"), limits=LIMITS, top_n=TOP_N,
+              bin_dir=bin_dir, minimal_case_lines=MINIMAL_CASE_LINES)
+    assert [call["options"] for call in single] == [{}]
+
+
+def test_gate_03c_a_dispatch_that_never_completes_is_force_cancelled(monkeypatch):
+    """T-U-gate-03 (FR-13.2): `_dispatch` bounds its own wait and force-cancels what it gives up on, so a re-run left in `PENDING_NODE_ASSIGNMENT` cannot hold `gate_decide` open for a whole seed iteration."""
+    import chia.base.ChiaFunction as chia_function
+    import ray
+
+    class _Node:
+        """A node whose dispatch produces a ref and never a result."""
+
+        def options(self, **options):
+            return self
+
+        def chia_remote(self, *args, **kwargs):
+            return "ref"
+
+    cancelled = []
+    monkeypatch.setattr(ray, "wait", lambda refs, timeout=None: ([], list(refs)))
+    monkeypatch.setattr(ray, "cancel",
+                        lambda ref, force=False: cancelled.append((ref, force)))
+    assert gate._dispatch(_Node(), {}, timeout=0.01) is None
+    assert cancelled == [("ref", True)], "force, because the probe may be running"
+
+    # A cancel that itself fails is swallowed: the gate still answers.
+    def _angry_cancel(ref, force=False):
+        raise RuntimeError("the raylet is wedged")
+
+    monkeypatch.setattr(ray, "cancel", _angry_cancel)
+    assert gate._dispatch(_Node(), {}, timeout=0.01) is None
+
+    # And a ref that IS ready inside the timeout is fetched, not cancelled.
+    monkeypatch.setattr(ray, "wait", lambda refs, timeout=None: (list(refs), []))
+    monkeypatch.setattr(chia_function, "get", lambda ref: {"worker": ref})
+    assert gate._dispatch(_Node(), {}, timeout=1) == {"worker": "ref"}
 
 
 def test_gate_04_both_worker_identities_are_recorded(tmp_path, monkeypatch):
@@ -676,6 +763,10 @@ def test_gate_20_every_stopping_value_lands_in_its_stated_bucket():
                       q4_new=True)
         fields[{1: "q1_reproduce", 2: "q2_minimal", 3: "q3_valid",
                 4: "q4_new"}[number]] = False
+        if number == 1:
+            fields["q1_rerun_worker"] = (
+                gate.RERUN_UNSCHEDULED if value == "rerun_unscheduled"
+                else "worker-a")
         if number == 2:
             fields["q2_reason"] = value
         if number == 4:

@@ -48,6 +48,7 @@ Gate precision is confirmed filings over filings. A merged repair is a filed pat
 | gate question | stopping value | bucket |
 |---|---|---|
 | 1 | did_not_reproduce | unreproducible |
+| 1 | rerun_unscheduled | unreproducible |
 | 2 | no_reducer | not_minimal |
 | 2 | not_fixpoint | not_minimal |
 | 2 | reduced_false | not_minimal |

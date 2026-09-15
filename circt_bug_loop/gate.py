@@ -34,6 +34,7 @@ PARSER_DIRS = ("lib/Parser/", "lib/AsmParser/", "tools/circt-translate/")
 #: FR-18.6's table, as the mapping it is.
 TAXONOMY = {
     (1, "did_not_reproduce"): "unreproducible",
+    (1, "rerun_unscheduled"): "unreproducible",
     (2, "reduced_false"): "not_minimal",
     (2, "reduction_changed_failure"): "not_minimal",
     (2, "no_reducer"): "not_minimal",
@@ -98,12 +99,34 @@ def rerun_options(node_id: Optional[str]) -> dict:
                                                                  soft=True)}
 
 
-def _dispatch(node, options: dict, *args, **kwargs):
-    """Run one `@ChiaFunction` as a task of its own, with *options*."""
+#: How long FR-13.2's preferred node is waited for before ANY `circt` node will do.
+RERUN_SCHEDULE_WAIT_S = 60.0
+
+#: What the re-run gets on top of the probe's own wall limit once it is placed.
+RERUN_WAIT_MARGIN_S = 60.0
+
+#: What `q1_rerun_worker` records when no `circt` slot ever came free.
+RERUN_UNSCHEDULED = "unscheduled"
+
+
+def _dispatch(node, options: dict, *args, timeout: Optional[float] = None,
+              **kwargs):
+    """Run one `@ChiaFunction` as a task of its own; None if *timeout* passes first."""
     from chia.base.ChiaFunction import get
 
     target = node.options(**options) if options else node
-    return get(target.chia_remote(*args, **kwargs))
+    ref = target.chia_remote(*args, **kwargs)
+    if timeout is None:
+        return get(ref)
+    import ray
+
+    if ray.wait([ref], timeout=timeout)[0]:
+        return get(ref)
+    try:
+        ray.cancel(ref, force=True)
+    except Exception:                               # noqa: BLE001 - a cancel that fails changes nothing here
+        pass
+    return None
 
 
 def _work_dir(artefact_root: str, run_manifest_id: str, candidate_id: str,
@@ -190,6 +213,20 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
                 seconds=time.monotonic() - started_at)}
 
 
+def _rerun(original_node: Optional[str], limits: dict, *args,
+           **kwargs) -> Optional[dict]:
+    """FR-13.2's re-run: the preferred `circt` node, then any of them, then nothing."""
+    options = rerun_options(preferred_node(live_circt_nodes(), original_node))
+    if options:
+        placed = _dispatch(gate_rerun, options, *args,
+                           timeout=RERUN_SCHEDULE_WAIT_S, **kwargs)
+        if placed is not None:
+            return placed
+    return _dispatch(
+        gate_rerun, {}, *args,
+        timeout=limits["probe_wall_seconds"] + RERUN_WAIT_MARGIN_S, **kwargs)
+
+
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
 def gate_validate(case_path: str, image_spec: dict, limits: dict,
                   artefact_root: str, *, run_manifest_id: str, candidate_id: str,
@@ -256,6 +293,12 @@ def _question_4(candidate: CandidateRecord, dedup: DedupVerdict) -> tuple:
     return False, dedup.verdict
 
 
+def _q1_stopping_value(rerun_worker: Optional[str]) -> str:
+    """Question 1's reason: a re-run that never reached a worker is named as such."""
+    return ("rerun_unscheduled" if rerun_worker == RERUN_UNSCHEDULED
+            else "did_not_reproduce")
+
+
 def _q2_stopping_value(reason: Optional[str]) -> str:
     """The reason question 2 recorded, mapped onto FR-18.6's own vocabulary."""
     return reason if (2, reason) in TAXONOMY else "reduced_false"
@@ -292,22 +335,25 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
         "WHERE probe_id = ?", (candidate.probe_id,)) or {}
     fields["q1_original_worker"] = original.get("worker_hostname")
     fields["q1_original_pid"] = original.get("child_pid")
-    rerun = _dispatch(
-        gate_rerun, rerun_options(preferred_node(live_circt_nodes(),
-                                                 original.get("worker_node_id"))),
+    rerun = _rerun(
+        original.get("worker_node_id"), limits,
         candidate.repro_command, manifest.image_spec, limits,
         manifest.artefact_root, run_manifest_id=candidate.run_manifest_id,
         candidate_id=candidate.candidate_id, top_n=top_n)
-    fields["q1_rerun_worker"] = rerun["worker"]
-    fields["q1_rerun_pid"] = rerun["pid"]
-    fields["q1_same_worker"] = original.get("worker_node_id") == rerun["node_id"]
-    fields["q1_reproduce"] = bool(
-        rerun["oracle_class"] == candidate.oracle_class
-        and rerun["assertion_text"] == candidate.assertion_text
-        and rerun["assertion_site"] == candidate.assertion_site)
-    # FR-10.1: recorded, printed beside the headline, and never a merge key.
-    store.update("fingerprint", {"candidate_id": candidate.candidate_id},
-                 {"fingerprint_stable": int(rerun["fingerprint"] == candidate.fingerprint)})
+    if rerun is None:
+        fields["q1_rerun_worker"] = RERUN_UNSCHEDULED
+        fields["q1_reproduce"] = False
+    else:
+        fields["q1_rerun_worker"] = rerun["worker"]
+        fields["q1_rerun_pid"] = rerun["pid"]
+        fields["q1_same_worker"] = original.get("worker_node_id") == rerun["node_id"]
+        fields["q1_reproduce"] = bool(
+            rerun["oracle_class"] == candidate.oracle_class
+            and rerun["assertion_text"] == candidate.assertion_text
+            and rerun["assertion_site"] == candidate.assertion_site)
+        # FR-10.1: recorded, printed beside the headline, and never a merge key.
+        store.update("fingerprint", {"candidate_id": candidate.candidate_id},
+                     {"fingerprint_stable": int(rerun["fingerprint"] == candidate.fingerprint)})
 
     if fields["q1_reproduce"]:
         # --- 2. is the case minimal? ---------------------------------------
@@ -361,7 +407,7 @@ def decide(fields: dict, repair: Optional[RepairResult]) -> tuple:
         if answer is None:
             return "nothing", number, "undecided"
         if answer is False:
-            value = {1: "did_not_reproduce",
+            value = {1: _q1_stopping_value(fields.get("q1_rerun_worker")),
                      2: _q2_stopping_value(fields.get("q2_reason")),
                      3: "invalid_input",
                      4: fields.get("q4_reason")}[number]
