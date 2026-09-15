@@ -66,11 +66,20 @@ _COMMIT = re.compile(r"^__C__ (?P<sha>[0-9a-f]{7,40}) (?P<date>\S+)$")
 _HUNK = re.compile(r"^@@ [^@]*@@ ?(?P<context>.*)$")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: The ten declared keys of `DedupVerdict.evidence` (2.9).
+#: The eleven declared keys of `DedupVerdict.evidence` (2.9, D-16).
 _EVIDENCE_KEYS = ("matched_key", "matched_token", "issue_number", "issue_url",
                   "issue_state", "issue_labels", "fixing_commit",
                   "duplicate_of_candidate_id", "post_pin_file_touches",
-                  "rescreened_from")
+                  "rescreened_from", "generic_text_match")
+
+#: Headers whose assertions are MLIR's or LLVM's and name no CIRCT code (D-16).
+GENERIC_ASSERTION_ROOTS = ("include/mlir/", "include/llvm/", "llvm/Support/")
+
+#: The generic assertion texts campaign 2 and pilot 1 mis-matched on (D-16).
+GENERIC_ASSERTIONS = (
+    "succeeded( ConcreteT::verifyInvariants(getDefaultDiagnosticEmitFn(ctx), "
+    "args...))",
+    'isa<To>(Val) && "cast<Ty>() argument of incompatible type!"')
 
 #: How many file-level post-pin shas D-11's evidence carries.
 POST_PIN_FILE_TOUCH_MAX = 5
@@ -95,6 +104,9 @@ def normalise_site(site: str) -> str:
     elif path.startswith("/"):
         path = "/".join([p for p in path.split("/") if p][-2:])
     return f"{path}:{line}" if sep else path
+
+
+_GENERIC_TEXTS = frozenset(normalise_expr(text) for text in GENERIC_ASSERTIONS)
 
 
 def structural_hash(text: str) -> str:
@@ -228,6 +240,29 @@ def mirror_screen(store: LoopStore, tokens: list) -> Optional[dict]:
     return {key: best[key] for key in
             ("matched_token", "issue_number", "issue_url", "issue_state",
              "issue_labels")}
+
+
+def generic_assertion(verdict: OracleVerdict) -> bool:
+    """Whether the assertion is MLIR's or LLVM's, so its text names no CIRCT code (D-16)."""
+    if verdict.oracle_class != "assertion":
+        return False
+    site = (verdict.assertion_site or "").replace("\\", "/")
+    return (any(root in site for root in GENERIC_ASSERTION_ROOTS)
+            or normalise_expr(verdict.assertion_text or "") in _GENERIC_TEXTS)
+
+
+def circt_frame_tokens(verdict: OracleVerdict) -> list:
+    """The top CIRCT frame's whole function and its file, and not the bare last component."""
+    function, _, basename = (verdict.fingerprint_frame or "").rpartition(" ")
+    return [token for token in (function, basename) if token]
+
+
+def mirror_corroborates(store: LoopStore, issue_number: int, tokens: list) -> bool:
+    """Whether the matched issue's own text carries one of the candidate's frame tokens."""
+    return any(store.query_one(
+        "SELECT 1 AS hit FROM issue_mirror WHERE issue_number = ? "
+        "AND instr(title || ' ' || body, ?) > 0", (issue_number, token))
+        for token in tokens)
 
 
 def frame_paths(verdict: OracleVerdict) -> list:
@@ -483,6 +518,11 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     evidence["rescreened_from"] = rescreened_from
     mirrored = store.query_one("SELECT COUNT(*) AS n FROM issue_mirror")["n"]
     hit = mirror_screen(store, mirror_tokens(verdict)) if mirrored else None
+    # D-16: a generic MLIR or LLVM assertion identifies no issue on its own.
+    if hit is not None and generic_assertion(verdict) and not mirror_corroborates(
+            store, hit["issue_number"], circt_frame_tokens(verdict)):
+        evidence["generic_text_match"] = hit["issue_number"]
+        hit = None
     duplicate_of = _duplicate_of(store, candidate, fingerprint)
 
     if not mirrored:
@@ -1134,6 +1174,8 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "labelled_fingerprint",
            "MIRROR_PAGE_CEILING", "mirror_tokens", "mirror_screen",
            "mirror_walk", "frame_paths", "frame_symbols",
+           "GENERIC_ASSERTIONS", "GENERIC_ASSERTION_ROOTS",
+           "generic_assertion", "circt_frame_tokens", "mirror_corroborates",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",
            "assisted_by", "assisted_by_model",
            "issue_mirror_refresh", "dedup_and_screen", "triage_report",
