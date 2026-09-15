@@ -13,7 +13,7 @@ from circt_bug_loop import ledger as ledger_module
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
 from circt_bug_loop.gate import TAXONOMY, decide
 from circt_bug_loop.probe_task import classify_build
-from circt_bug_loop.store import LoopStore
+from circt_bug_loop.store import LoopStore, latest
 from circt_bug_loop.triage_task import labelled_fingerprint, rates
 
 #: The two arms, in the order every table prints them.
@@ -115,12 +115,13 @@ def _facts(store: LoopStore, manifest: RunManifest, labelled_pairs,
     fingerprints = _by(store.query(
         "SELECT f.* FROM fingerprint f JOIN candidate c USING (candidate_id) "
         "WHERE c.run_manifest_id = ?", (run_id,)), "candidate_id")
+    # D-11: `--rescreen` appends, so the LAST row of each is the one that holds.
     dedups = _by(store.query(
         "SELECT d.* FROM dedup_verdict d JOIN candidate c USING (candidate_id) "
-        "WHERE c.run_manifest_id = ?", (run_id,)), "candidate_id")
+        "WHERE c.run_manifest_id = ? ORDER BY d.rowid", (run_id,)), "candidate_id")
     gates = _by(store.query(
         "SELECT g.* FROM gate_decision g JOIN candidate c USING (candidate_id) "
-        "WHERE c.run_manifest_id = ?", (run_id,)), "candidate_id")
+        "WHERE c.run_manifest_id = ? ORDER BY g.rowid", (run_id,)), "candidate_id")
     filings = store.query(
         "SELECT f.*, c.arm AS arm FROM filing f JOIN candidate c USING (candidate_id) "
         "WHERE c.run_manifest_id = ? ORDER BY f.candidate_id", (run_id,))
@@ -582,8 +583,7 @@ def _regeneration(facts: dict, store: LoopStore, candidates: list, gaps: dict) -
         if reduced is not None and reduced["budget_truncated"]:
             marks.append(BUDGET_TRUNCATED)
 
-        gate = store.query_one("SELECT * FROM gate_decision WHERE candidate_id = ?",
-                               (candidate["candidate_id"],))
+        gate = latest(store, "gate_decision", candidate["candidate_id"])
         if gate is not None:
             repair = store.query_one("SELECT * FROM repair WHERE candidate_id = ?",
                                      (candidate["candidate_id"],))

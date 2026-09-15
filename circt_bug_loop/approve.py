@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from circt_bug_loop.store import LoopStore, utc_now
+from circt_bug_loop.store import LoopStore, latest, utc_now
 from circt_bug_loop.contract.schema import canonical_json
 from circt_bug_loop.triage_task import GOOD_FIRST_ISSUE
 
@@ -74,14 +74,13 @@ def load_case(store: LoopStore, candidate_id: str) -> dict:
         "candidate": candidate,
         "report": store.query_one("SELECT * FROM report WHERE candidate_id = ?",
                                   (candidate_id,)),
-        "gate": store.query_one("SELECT * FROM gate_decision WHERE candidate_id = ?",
-                                (candidate_id,)),
+        # D-11: the LATEST gate and dedup rows, which `--rescreen` appends to.
+        "gate": latest(store, "gate_decision", candidate_id),
         "repair": store.query_one("SELECT * FROM repair WHERE candidate_id = ?",
                                   (candidate_id,)),
         "reduced": store.query_one("SELECT * FROM reduced_case WHERE probe_id = ?",
                                    (probe_id,)),
-        "dedup": store.query_one("SELECT * FROM dedup_verdict WHERE candidate_id = ?",
-                                 (candidate_id,)),
+        "dedup": latest(store, "dedup_verdict", candidate_id),
         "fingerprint": store.query_one(
             "SELECT * FROM fingerprint WHERE candidate_id = ?", (candidate_id,)),
         "filing": store.query_one("SELECT * FROM filing WHERE candidate_id = ?",
@@ -228,7 +227,10 @@ def cmd_list(store: LoopStore, args, out) -> int:
         "FROM gate_decision g JOIN candidate c USING (candidate_id) "
         "LEFT JOIN fingerprint f USING (candidate_id) "
         "LEFT JOIN filing fl USING (candidate_id) "
-        "WHERE g.decision IN (?, ?) AND fl.candidate_id IS NULL "
+        # D-11: one row per candidate, the latest, whatever `--rescreen` appended.
+        "WHERE g.rowid = (SELECT MAX(rowid) FROM gate_decision "
+        "                 WHERE candidate_id = c.candidate_id) "
+        "AND g.decision IN (?, ?) AND fl.candidate_id IS NULL "
         "ORDER BY c.candidate_id", FILEABLE)
     for row in rows:
         finger = (row["fingerprint"] or "").splitlines()

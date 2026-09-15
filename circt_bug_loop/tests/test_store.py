@@ -574,3 +574,32 @@ def test_T_U_store_13(tmp_path: Path):
         loop.insert("fingerprint", {**row, "basis": "frames", "value": None})
     loop.insert("fingerprint", {**row, "basis": "frames", "value": "SIGSEGV f Foo.cpp"})
     assert loop.query_one("SELECT value FROM fingerprint")["value"] == "SIGSEGV f Foo.cpp"
+
+
+def test_T_U_store_14(tmp_path: Path):
+    """T-U-store-14 (D-11): `make_appendable` frees the two rescreened tables of `candidate_id`'s PRIMARY KEY, once and without losing a row, and `latest` reads the newest row of each."""
+    loop = open_store(tmp_path)
+    seed_rows(loop)
+    first = {"candidate_id": "cand-01", "verdict": "fixed_post_pin",
+             "evidence_json": json.dumps({**_DEDUP_EVIDENCE_NULL,
+                                          "fixing_commit": "d" * 40})}
+    loop.insert("dedup_verdict", first)
+    with pytest.raises(sqlite3.IntegrityError):
+        loop.insert("dedup_verdict", {**first, "verdict": "new"})
+
+    assert store.make_appendable(loop) == ["dedup_verdict", "gate_decision"]
+    assert store.make_appendable(loop) == [], "the second call is a no-op"
+    assert store.latest(loop, "dedup_verdict", "cand-01")["verdict"] == "fixed_post_pin"
+
+    loop.insert("dedup_verdict", {**first, "verdict": "new",
+                                  "evidence_json": json.dumps(_DEDUP_EVIDENCE_NULL)})
+    rows = loop.query("SELECT verdict FROM dedup_verdict ORDER BY rowid")
+    assert [row["verdict"] for row in rows] == ["fixed_post_pin", "new"]
+    assert store.latest(loop, "dedup_verdict", "cand-01")["verdict"] == "new"
+    assert store.latest(loop, "dedup_verdict", "cand-99") is None
+
+    loop.insert("fingerprint", {
+        "candidate_id": "cand-01", "basis": "assertion", "value": "v",
+        "fingerprint_stable": None, "frame_tuple_json": "[]",
+        "structural_hash": "h" * 64})
+    assert store.load_candidate(loop, "cand-01").dedup_verdict == "new"

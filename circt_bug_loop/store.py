@@ -573,12 +573,14 @@ class DedupVerdict:
     verdict: Literal["new", "duplicate_of_candidate", "known_open_issue",
                      "known_closed_issue", "fixed_post_pin", "dedup_unavailable"]
     evidence: dict                    # keys: matched_key, matched_token, issue_number,
-                                      # issue_url, issue_state, issue_labels, fixing_commit, duplicate_of_candidate_id.
+                                      # issue_url, issue_state, issue_labels, fixing_commit, duplicate_of_candidate_id,
+                                      # post_pin_file_touches, rescreened_from.
 
 
 _DEDUP_EVIDENCE_KEYS = {"matched_key", "matched_token", "issue_number", "issue_url",
                         "issue_state", "issue_labels", "fixing_commit",
-                        "duplicate_of_candidate_id"}
+                        "duplicate_of_candidate_id", "post_pin_file_touches",
+                        "rescreened_from"}
 _DEDUP_EVIDENCE_REQUIRED = {
     "duplicate_of_candidate": ("matched_key", "duplicate_of_candidate_id"),
     "known_open_issue": ("matched_token", "issue_number", "issue_url", "issue_state",
@@ -1152,6 +1154,42 @@ def _j(value):
     return None if value is None else json.loads(value)
 
 
+#: D-11: 6.2 keys these two on `candidate_id`, and `--rescreen` appends to them.
+_APPENDABLE = {
+    "dedup_verdict": ("candidate_id TEXT NOT NULL REFERENCES candidate(candidate_id), "
+                      "verdict TEXT NOT NULL, evidence_json TEXT NOT NULL"),
+    "gate_decision": ("candidate_id TEXT NOT NULL REFERENCES candidate(candidate_id), "
+                      "answers_json TEXT NOT NULL, stopped_at_question INTEGER, "
+                      "decision TEXT NOT NULL CHECK (decision IN "
+                      "('report','report_plus_patch','nothing')), "
+                      "taxonomy_bucket TEXT, decided_utc TEXT NOT NULL"),
+}
+
+
+def latest(store: "LoopStore", table: str, candidate_id: str) -> Optional[dict]:
+    """One candidate's newest row of an appended-to table, or None (D-11)."""
+    return store.query_one(
+        f"SELECT rowid, * FROM {_ident(table)} WHERE candidate_id = ? "
+        f"ORDER BY rowid DESC", (candidate_id,))
+
+
+def make_appendable(store: "LoopStore") -> list:
+    """Drop `candidate_id`'s PRIMARY KEY on the two rescreened tables, once (D-11)."""
+    rebuilt = []
+    for table, columns in _APPENDABLE.items():
+        if not store.query("SELECT 1 FROM pragma_table_info(?) WHERE name = "
+                           "'candidate_id' AND pk = 1", (table,)):
+            continue
+        store.transaction([
+            (f"CREATE TABLE {table}_appendable ({columns})", ()),
+            (f"INSERT INTO {table}_appendable SELECT * FROM {table}", ()),
+            (f"DROP TABLE {table}", ()),
+            (f"ALTER TABLE {table}_appendable RENAME TO {table}", ()),
+        ])
+        rebuilt.append(table)
+    return rebuilt
+
+
 def load_candidate(store: "LoopStore", candidate_id: str) -> "CandidateRecord":
     """Join the six tables that hold one candidate back into one record."""
     row = store.query_one("SELECT * FROM candidate WHERE candidate_id = ?",
@@ -1164,10 +1202,8 @@ def load_candidate(store: "LoopStore", candidate_id: str) -> "CandidateRecord":
                               (row["probe_id"],)) or {}
     finger = store.query_one("SELECT * FROM fingerprint WHERE candidate_id = ?",
                              (candidate_id,)) or {}
-    dedup = store.query_one("SELECT * FROM dedup_verdict WHERE candidate_id = ?",
-                            (candidate_id,)) or {}
-    gate = store.query_one("SELECT * FROM gate_decision WHERE candidate_id = ?",
-                           (candidate_id,)) or {}
+    dedup = latest(store, "dedup_verdict", candidate_id) or {}
+    gate = latest(store, "gate_decision", candidate_id) or {}
     return CandidateRecord(
         candidate_id=row["candidate_id"],
         probe_id=row["probe_id"],

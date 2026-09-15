@@ -830,21 +830,34 @@ def test_triage_17_every_verdict_but_new_carries_evidence(tmp_path, clone):
 
 
 @pytest.mark.t1
-def test_triage_18_the_post_pin_scan_is_file_level(tmp_path, clone):
-    """T-U-triage-18 (FR-10.4): file level, lower bound `candidate.run_commit`, upper bound the clone head; a candidate reproducing a bug fixed inside the lag is `fixed_post_pin` with the fixing SHA."""
+def test_triage_18_the_post_pin_fix_is_symbol_level(tmp_path, clone):
+    """T-U-triage-18 (FR-10.4, D-11): the post-pin fix is the commit whose hunk headers name one of the frame's own functions; a commit that only touches the file is evidence and leaves the candidate `new`."""
     candidate = _candidate(tmp_path, screened=True, run_commit=clone["c1"])
     store = _store(tmp_path, candidate=candidate)
     _mirror_rows(store, [{"issue_number": 1, "title": "unrelated",
                           "body": "nothing matches here", "labels": [],
                           "state": "open", "url": "u"}])
+    db = str(tmp_path / "loop.db")
 
     out = call_node(dedup_and_screen, candidate, _seed(), _graph_verdict(),
-                    clone["path"], str(tmp_path / "loop.db"), 5)
+                    clone["path"], db, 5)
 
     assert out["dedup"].verdict == "fixed_post_pin"
-    assert set(out["fixing_commits"]) == {clone["c2"], clone["c3"]}
-    assert out["dedup"].evidence["fixing_commit"] in out["fixing_commits"]
+    assert out["fixing_commits"] == [clone["c2"]], "c2 names the frame's function"
+    assert out["post_pin_file_touches"] == [clone["c3"]]
+    assert out["dedup"].evidence["fixing_commit"] == clone["c2"]
+    assert out["dedup"].evidence["post_pin_file_touches"] == [clone["c3"]]
     assert out["contaminated_file"] is True
+
+    # D-11: c3 edits InstanceGraph.cpp at another function, and is not a fix.
+    after = call_node(dedup_and_screen,
+                      _candidate(tmp_path, screened=True, run_commit=clone["c2"]),
+                      _seed(), _graph_verdict(), clone["path"], db, 5)
+
+    assert after["dedup"].verdict == "new"
+    assert after["fixing_commits"] == []
+    assert after["dedup"].evidence["fixing_commit"] is None
+    assert after["dedup"].evidence["post_pin_file_touches"] == [clone["c3"]]
 
 
 @pytest.mark.t1
@@ -987,9 +1000,10 @@ def test_triage_32_the_scans_bound_on_the_candidates_own_run_commit(tmp_path, cl
     out = call_node(dedup_and_screen, second, _seed(sdk_exact=False),
                     _graph_verdict(), clone["path"], str(tmp_path / "loop.db"), 5)
 
-    assert out["fixing_commits"] == [clone["c3"]], (
+    assert out["post_pin_file_touches"] == [clone["c3"]], (
         "the post-pin scan bounded on c2, this candidate's own run commit")
-    assert clone["c2"] not in out["fixing_commits"]
+    assert out["fixing_commits"] == [], "c3 edits another function (D-11)"
+    assert clone["c2"] not in out["post_pin_file_touches"]
     from_index_zero = triage_task._after(
         scan_commits(clone["path"],
                      triage_task.commit_date(clone["path"], clone["c1"]),

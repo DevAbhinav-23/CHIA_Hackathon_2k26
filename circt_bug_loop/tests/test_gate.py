@@ -42,10 +42,11 @@ TOP_N = 3
 #: `budget.yaml`'s own `minimal_case_lines` (W-18b).
 MINIMAL_CASE_LINES = 12
 
-#: The eight keys `DedupVerdict.evidence` is closed at (§2.9).
+#: The ten keys `DedupVerdict.evidence` is closed at (§2.9).
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
-            "duplicate_of_candidate_id")
+            "duplicate_of_candidate_id", "post_pin_file_touches",
+            "rescreened_from")
 
 
 def _manifest(tmp_path, bin_dir):
