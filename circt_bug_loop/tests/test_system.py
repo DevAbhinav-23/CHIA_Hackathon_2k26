@@ -201,11 +201,10 @@ def test_recorded_stages_replaces_exactly_the_three_model_bearing_nodes():
     assert recorded.generate_seeded is bug_loop.generate_recorded_seeded
     assert recorded.generate_mutation is bug_loop.generate_recorded_mutation
     assert recorded.triage_report is bug_loop.recorded_report
-    # Every replacement keeps §3.2's placement.
-    for node in (bug_loop.generate_recorded_seeded,
-                 bug_loop.generate_recorded_mutation, bug_loop.recorded_report):
-        assert node._chia_options["resources"] == {"circt": 1}
-        assert node._chia_options["max_retries"] == 0
+    # Every replacement keeps the placement of the node it stands in for.
+    for name in replaced:
+        assert (getattr(recorded, name)._chia_options
+                == getattr(real, name)._chia_options), name
 
 
 @pytest.mark.t0

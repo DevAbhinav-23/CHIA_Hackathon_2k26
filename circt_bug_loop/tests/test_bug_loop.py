@@ -572,6 +572,20 @@ def test_T_U_driver_28b():
     assert built.corpus_head_sha == budget_file().corpus_head_sha
 
 
+def test_T_U_driver_28b_the_generator_side_holds_no_circt_slot():
+    """T-U-driver-28 (FR-04.4): A3 and its writer actor are off the `circt` pool - one slot held for a whole seed iteration is what wedged campaign 2's gate re-run."""
+    from circt_bug_loop import generate_task
+
+    cfg = bug_loop.generator_cfg(manifest(), budget_file(), clone_path="/clone",
+                                 iteration=0)
+    assert cfg["here_options"] == bug_loop.HERE_OPTIONS == {"num_cpus": 1}
+    assert cfg["here_options"] is not bug_loop.HERE_OPTIONS, "the caller gets a copy"
+    assert "circt" not in cfg["here_options"].get("resources", {})
+    assert generate_task.generate_seeded._chia_options == {"max_retries": 0}
+    assert "circt_bug_loop.generate_task.generate_seeded" in bug_loop.HEAD_NODES
+    assert bug_loop.generate_recorded_seeded._chia_options == {"max_retries": 0}
+
+
 def test_T_U_driver_28c():
     """T-U-driver-28 (FR-14.8): `stages_metered` follows the arm and the repair backend."""
     seeded_only = bug_loop.stages_metered(arms=("mutation",), repair_backend="vertex",

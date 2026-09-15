@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from circt_bug_loop import generate_task
+from circt_bug_loop import bug_loop, generate_task
 from circt_bug_loop.contract import schema
 from circt_bug_loop.generate_task import (LiveModelRefused, ProbeWriteTool,
                                           SourceReadTool, build_llm, emit_specs,
@@ -76,7 +76,7 @@ def config(tmp_path, throwaway_repo) -> dict:  # noqa: F811
             "price_usd_per_m_input_tokens": 0.30,
             "price_usd_per_m_output_tokens": 2.50,
             "head_options": {"scheduling_strategy": "head-node"},
-            "here_options": {"scheduling_strategy": "this-worker"}}
+            "here_options": dict(bug_loop.HERE_OPTIONS)}
 
 
 @pytest.fixture
@@ -345,7 +345,7 @@ def test_T_U_gen_19_both_tools_are_stopped_in_a_finally(replay, config,
 @pytest.mark.t0
 def test_T_U_gen_20_the_two_tools_are_placed_on_different_nodes(replay, config,
                                                                 tool_servers):  # noqa: F811
-    """T-U-gen-20 (FR-04.4): the source tool on the head, the writer here."""
+    """T-U-gen-20 (FR-04.4): the source tool on the head, the writer here, and NEITHER on a `circt` slot - one held for a whole iteration is what wedged campaign 2's gate."""
     replay([{"text": transcript("seed_read_ok")},
             {"text": transcript("probe_write_ok"),
              "files": probe_files(["array_element.mlir", "array_zero.mlir"])}])
@@ -355,6 +355,10 @@ def test_T_U_gen_20_the_two_tools_are_placed_on_different_nodes(replay, config,
     assert source_read.task_options == config["head_options"]
     assert probe_write.task_options == config["here_options"]
     assert source_read.task_options != probe_write.task_options
+    for tool in (source_read, probe_write):
+        assert "circt" not in (tool.task_options or {}).get("resources", {})
+    assert bug_loop.HERE_OPTIONS == {"num_cpus": 1}
+    assert generate_seeded._chia_options == {"max_retries": 0}
 
 
 @pytest.mark.t0

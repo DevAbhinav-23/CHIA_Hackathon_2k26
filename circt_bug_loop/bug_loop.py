@@ -192,14 +192,20 @@ def head_options(node_id: str) -> dict:
             NodeAffinitySchedulingStrategy(node_id=node_id, soft=False)}
 
 
+#: What a generator-side tool actor is placed at: one CPU and NO cluster resource.
+HERE_OPTIONS = {"num_cpus": 1}
+
+
 #: Every node of 3.2 that MUST run on the head, by `<module>.<name>` (K4).
 HEAD_NODES = frozenset({
     "circt_bug_loop.bug_loop.build_image",
+    "circt_bug_loop.bug_loop.generate_recorded_seeded",
     "circt_bug_loop.budget.load_budget",
     "circt_bug_loop.corpus.build_corpus",
     "circt_bug_loop.corpus.resolve_sites",
     "circt_bug_loop.feedback.build_feedback",
     "circt_bug_loop.gate.gate_decide",
+    "circt_bug_loop.generate_task.generate_seeded",
     "circt_bug_loop.ledger.accrue",
     "circt_bug_loop.mutator_synth.synthesise_mutators",
     "circt_bug_loop.pin_select.select_release_pinned_main",
@@ -1417,10 +1423,18 @@ def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
                                      seconds=time.monotonic() - started)}
 
 
-@ChiaFunction(resources={"circt": 1}, max_retries=0)
+@ChiaFunction(max_retries=0)
 def generate_recorded_seeded(seed: SeedRecord, feedback: FeedbackBundle,
                              remaining, cfg: dict) -> dict:
-    """A3's signature and placement, with recorded inputs and no turn (W-19b)."""
+    """A3's signature and placement, with recorded inputs and no turn (W-19b).
+
+    Returns:
+        A3's shape: {"specs", "logs", "failure", "counters"}.
+    Worker:
+        head, A3's own; it runs no CIRCT tool and holds no `circt` slot.
+    Raises:
+        nothing.
+    """
     return _recorded_generation(seed, cfg, "seeded")
 
 
@@ -1529,7 +1543,7 @@ def generator_cfg(manifest: RunManifest, budget: BudgetFile, *, clone_path: str,
             # A4 runs the seed's own test before it mutates it (FR-01.9, W-19c).
             "probe_limits": probe_limits(budget),
             "head_options": head_options,
-            "here_options": here_options,
+            "here_options": here_options or dict(HERE_OPTIONS),
             "max_tool_iterations": dict(budget.max_tool_iterations)}
 
 

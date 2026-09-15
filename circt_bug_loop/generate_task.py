@@ -579,7 +579,7 @@ def _turn_cost(stage: str, logs: dict, cfg: dict) -> dict:
             "cost_usd": cost, "metered": tokens_in is not None}
 
 
-@ChiaFunction(resources={"circt": 1}, max_retries=0)
+@ChiaFunction(max_retries=0)
 def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
                     remaining: LedgerSnapshot, cfg: dict) -> dict:
     """Run stages 1 and 2 for one seed and emit the probing inputs they wrote.
@@ -587,7 +587,7 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
     Returns:
         {"specs": list[ProbeSpec], "root_cause_class": str, "sibling_sites": list[dict], "rejected_sites": list[dict], "truncated": int, "rejections": dict, "logs": dict, "failure": str | None, "failure_detail": str | None, "counters": CounterBlock}.
     Worker:
-        {"circt": 1} for the node; each turn is dispatched at {"llm": 1.0}.
+        head - it runs no CIRCT tool, so it holds NO `circt` slot for the whole iteration while the gate's re-run waits for one; each turn is dispatched at {"llm": 1.0}.
     Raises:
         nothing.
     """

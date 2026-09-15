@@ -65,7 +65,8 @@ ARM_EXEMPT = ("ledger.py", "results.py", "contract/schema.py")
 NODES = {
     "corpus.build_corpus": None, "corpus.resolve_sites": None,
     "pin_select.select_release_pinned_main": None,
-    "generate_task.generate_seeded": {"circt": 1},
+    # Head-side since the campaign-2 gate deadlock: A3 runs no CIRCT tool.
+    "generate_task.generate_seeded": None,
     "generate_task.generate_mutation": {"circt": 1},
     "llm.llm_turn": {"llm": 1.0},
     "feedback.build_feedback": None, "budget.load_budget": None,
