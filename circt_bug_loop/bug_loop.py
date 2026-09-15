@@ -34,7 +34,8 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
                                   Report, utc_now, validate_candidate,
-                                  write_artefact, write_turn_failure)
+                                  widen_fingerprint_basis, write_artefact,
+                                  write_turn_failure)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -2419,8 +2420,6 @@ def _file_bytes(path: str) -> int:
 
 def reclassify(campaign: Campaign, out) -> int:
     """Re-judge one run's stored `parse_error` probes under contract 2.4 (D-13)."""
-    from circt_bug_loop.store import widen_fingerprint_basis
-
     store, run_id = campaign.store, campaign.manifest.run_manifest_id
     widen_fingerprint_basis(store)
     rows = store.query(
@@ -2765,6 +2764,11 @@ def run_campaign(args, out) -> int:
                   for name, probe in observations.items()})
 
     store = LoopStore(DB_PATH)
+    # loop.db outlives one run, and a store created before contract 2.4 has a
+    # `fingerprint` table that would refuse the `verifier` basis (D-13).
+    if widen_fingerprint_basis(store):
+        print("pre-flight: `fingerprint` rebuilt for contract 2.4's `verifier` "
+              "basis (D-13)", file=out)
     mirror = _mirror(store, budget, args, dispatch, triage_task)
     check_10_issue_mirror(mirror=mirror, refresh_requested=args.refresh_mirror)
     check_11_forum_post(forum_post_url=args.forum_post_url,
