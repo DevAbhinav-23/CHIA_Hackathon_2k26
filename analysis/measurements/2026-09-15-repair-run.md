@@ -114,3 +114,77 @@ no OOM (repair container at 223 MiB at the end; the earlier OOM was host swap pr
 
 Open: why the reproduce phase did not confirm a case that the gate reproduced twice (fresh process, other worker); the vertex backend
 writes no `issue_logs/`, so only the 1,000-character phase tails in `RepairResult.phase_logs` exist. No further attempt in this campaign.
+
+## Attempt 3, 2026-09-15 12:12 to 12:57 IST: the repro was confirmed, the chain ran to the writeup, and the fix turn produced a `printf`
+
+### The cause of attempt 2, established from the code and the artefacts
+
+The chain does not ask the model whether the bug reproduced. `issue_task.py:202-206` runs the reproduce turn, then runs
+`cfg["repro_path"]` itself and returns `no_repro` when `circt_util.circt_run_script` reports **`exit_code == 0`** — which is
+FR-12.3's own convention, not its inverse, so the loop's pre-written script and CHIA's gate already agreed and no second script
+and no prompt change was needed. What the gate actually scored was a BROKEN script. `repro_script` removed the tokens equal to
+the caller's `input_path`, `_drive_repair` passed `reduced.path` (`…/probe_p-a2cb61b8d0aa/reduced.mlir`), and the recorded
+`OracleVerdict.repro_command` names the probe's own `…/probe_p-a2cb61b8d0aa/input.mlir`: no token matched, none was removed, and
+the rendered command handed `circt-opt` **two** positional files. Measured by running attempt 2's own `repro.sh`
+(sha `1c5d9d71…`, `repro_overwritten = 0`, so it is the file the gate ran) inside `chia-circt-assert:eade0de61bc5-u1000`: it
+prints `circt-opt: Too many positional arguments specified!`, exits 1 before the pass runs, and the script — which asks only
+whether the run crashed — **exits 0**. That is what `no_repro` meant. The same case with the stale path removed aborts on
+`Assertion '!values.empty() && "Cannot build array of zero elements"'` and the script exits 1.
+
+### The change (`16416d9`)
+
+`repro_script` now replaces EVERY operand of the recorded command — every token that does not begin with `-` — with the case
+written beside the script, in place, and keeps the options verbatim. Every operand is the probe's own input by construction
+(`generate_task.probe_argv` binds each of lit's substitutions to that one path and appends it when the template names none), so
+no caller needs to say what the input was: `input_path` is gone from `repro_script` and from `repair_adapt`. The case name is
+validated because it is interpolated into a double-quoted word of a generated script. `T-U-repair-03c` pins the attempt-2 shape
+(recorded operand ≠ the reduced case's path), the two-operand `circt-lec` shape, a quoted multi-word option, an operand-less
+command and four hostile case names; `03b` and the whole `repair` file follow the new signature. **CHIA is untouched: the six
+prompt bodies are still read from its own `prompts/` and passed byte-identical (FR-12.9), and `CFG_KEYS` is still 18.**
+Suite at the commit: **720 passed, 1 skipped** (719 + the new test).
+
+### The attempt
+
+Same candidate, same `cluster_repair.yaml`, `repair_run.py` with `CAP_USD = None`. The store copy's own ledger is USD
+**24.074970** of the registered 100.00, so `turn_ceiling_usd` handed the chain **6.479896** per phase — the W1 worst case, not the
+clamp — which is 32.39948 over five phases and about 25.92 over the four turns that actually ran. Billed is unobservable
+(`token_capture = unavailable_remote_dispatch`) and **no stage-7 ledger row was written, because the node never returned**.
+
+| phase | outcome |
+|---|---|
+| assess | ran (turn 1) |
+| repro | **reproduced**. Inferred from the phase sequence, since no `RepairResult` came back: `run_issue_remote` returns `no_repro` before the fix turn, and the fix turn, the verify rebuild and the lit gate all ran. The agent's `/workspace/circt/.circtissues/repro.sh` is the loop's own script with the header comment stripped and its `case.mlir` is byte-identical to the loop's — it CONFIRMED the pre-written reproducer instead of inventing one, with CHIA's prompt unmodified |
+| fix | ran (turn 3), edited `lib/Conversion/MooreToCore/MooreToCore.cpp` — and the edit is a diagnostic `llvm::errs()` line inside `ExtractOpConversion`, printing `low/high/lsbPad/msbPad/extractWidth`. Not a fix |
+| verify | `circt_ninja_build` over the six targets, then the whole lit gate (22 test dirs, `--filter-out=circt-tblgen`). Neither result came back |
+| regression | not triggered |
+| writeup | turn 4, in flight when the wall cap fired |
+| patch | 1 file, **+1 / -0**, `~/bugloop-artefacts/f1e4fef5db314bef8d187bceca8f6a80/repair/900000068/patch.diff` (the agent's own repro is beside it as `agent-repro.sh`). The bug still fires on that tree: the loop's `repro.sh`, run in the container before teardown, exited 1 on the same assertion |
+
+**Wall 2,700 s exactly — `timeout` killed the driver (`EXIT=124`, SIGTERM at 12:57:01), so `run_issue_remote` never returned,
+FR-12.11's restore never ran, and the only row in the work copy is the `dispatched` row `write_repair_dispatch` writes BEFORE the
+chain.** The local id is **900000068** this time, not 900000032: `mint_local_id` is `LOCAL_ID_BASE + rowid` and the registered
+`loop.db` has grown since attempt 2.
+
+**429s:** three, all in the first two turns, each cleared on retry 1 of 6 (back-off 16.0 s, 18.2 s, 22.7 s).
+
+**Memory:** no OOM and no pressure. `bugloop_repair` idled at 0.49 GiB, ran the compile at 1.4-3.0 GiB and peaked at **4.0 GiB of
+its 9 GiB** in the link stage; `bugloop_circt` was flat at 0.19 GiB of 5 GiB, the LLM container under 0.1 GiB; host
+`MemAvailable` never fell below 4 GiB and `/tmp` stayed at 23 % of its 7.7 GiB.
+
+### Two things this attempt says, and one it does not
+
+1. The interlock must be in the environment of **`chia up`**, not only of the driver: `cluster_repair.yaml` passes
+   `-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}`, expanded when the container is created. A first dispatch at 12:06
+   was refused on the worker with `RayTaskError(LiveModelRefused)` after 1.5 s — **no model call, no money, nothing authorised** —
+   and the cluster was recycled with the variable exported. That refusal is the interlock working, not a failed attempt.
+2. The 45-minute wall is the binding constraint now, not the money: the verify rebuild of the six targets at `-j 4` alone ran
+   about 29 minutes of it. A next attempt needs either a longer wall or a `build_jobs`/target set that does not rebuild `firtool`,
+   `circt-verilog` and `arcilator` to test a `circt-opt` change.
+3. It does **not** say the model cannot fix this bug. The fix turn spent its budget instrumenting the arithmetic it had already
+   diagnosed correctly in attempt 2's assess phase, and was cut off with the `printf` still in the tree; whether it would have
+   converged is unmeasured.
+
+The `repair` row of the work copy was **not** imported into `circt_bug_loop/loop.db`. The schema allows the insert — `repair`
+is keyed by `candidate_id`, holds no row for this candidate, and the `candidate` foreign key is satisfied — but the row is the
+`status = 'dispatched'` placeholder, not a result, and putting it in the campaign's own record would assert that stage 7 is in
+flight. That is the architect's call to reverse.
