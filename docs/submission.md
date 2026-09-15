@@ -35,7 +35,7 @@ Two deadlines are open and two have passed. Both open ones take the same work.
 3. **File the three issues** on `llvm/circt` (`approve … url` prints the pre-filled GitHub URL) and record each issue URL back into the run with the `filed` subcommand.
 4. **Submit the paper to the A³ HotCRP by 2026-09-21 AoE**, and ask the chairs first whether a paper may still be submitted with no registered abstract, that registration having closed on Sep 14 AoE.
 5. **Submit to the hackathon by 2026-09-24 AoE**: the paper, the repository and its results. Confirm with the organisers that one work may go to both the workshop and the hackathon; the hackathon page says its paper "does not preclude future conference or workshop publication", which is not the same statement. <!-- docs/abstract.md, note under the table -->
-6. **GCP.** No form is owed: the short-term funding one closed on Sep 13. One credential action is: the Gemini API key was echoed into an agent transcript on 2026-09-14 and must be rotated in the Cloud console, the new value written to `~/.config/bugloop/gemini.env`. Not verified as done. <!-- docs/HANDOFF.md 2026-09-14 23:40 entry -->
+6. **GCP.** No form is owed: the short-term funding one closed on Sep 13. The Gemini API key was echoed into an agent transcript on 2026-09-14 (redacted from the one session file that held it; never in the repo). The user decided on 2026-09-15 not to rotate it: it is short-lived and auto-expires after the project.
 
 ### Architect
 
