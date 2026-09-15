@@ -605,13 +605,13 @@ class DedupVerdict:
                      "known_closed_issue", "fixed_post_pin", "dedup_unavailable"]
     evidence: dict                    # keys: matched_key, matched_token, issue_number,
                                       # issue_url, issue_state, issue_labels, fixing_commit, duplicate_of_candidate_id,
-                                      # post_pin_file_touches, rescreened_from, generic_text_match.
+                                      # post_pin_file_touches, rescreened_from, generic_text_match, op_only_match.
 
 
 _DEDUP_EVIDENCE_KEYS = {"matched_key", "matched_token", "issue_number", "issue_url",
                         "issue_state", "issue_labels", "fixing_commit",
                         "duplicate_of_candidate_id", "post_pin_file_touches",
-                        "rescreened_from", "generic_text_match"}
+                        "rescreened_from", "generic_text_match", "op_only_match"}
 _DEDUP_EVIDENCE_REQUIRED = {
     "duplicate_of_candidate": ("matched_key", "duplicate_of_candidate_id"),
     "known_open_issue": ("matched_token", "issue_number", "issue_url", "issue_state",

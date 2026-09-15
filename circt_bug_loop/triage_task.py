@@ -66,11 +66,11 @@ _COMMIT = re.compile(r"^__C__ (?P<sha>[0-9a-f]{7,40}) (?P<date>\S+)$")
 _HUNK = re.compile(r"^@@ [^@]*@@ ?(?P<context>.*)$")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: The eleven declared keys of `DedupVerdict.evidence` (2.9, D-16).
+#: The twelve declared keys of `DedupVerdict.evidence` (2.9, D-16, D-17).
 _EVIDENCE_KEYS = ("matched_key", "matched_token", "issue_number", "issue_url",
                   "issue_state", "issue_labels", "fixing_commit",
                   "duplicate_of_candidate_id", "post_pin_file_touches",
-                  "rescreened_from", "generic_text_match")
+                  "rescreened_from", "generic_text_match", "op_only_match")
 
 #: Headers whose assertions are MLIR's or LLVM's and name no CIRCT code (D-16).
 GENERIC_ASSERTION_ROOTS = ("include/mlir/", "include/llvm/", "llvm/Support/")
@@ -197,12 +197,18 @@ def labelled_fingerprint(side: dict, top_n: int) -> Fingerprint:
                                side.get("reduced", ""), top_n)
 
 
+def verifier_tokens(verdict: OracleVerdict) -> tuple:
+    """A verifier candidate's op and its constraint phrase, normalised as the fingerprint is (D-17)."""
+    return (verdict.verifier_op or "",
+            generalise_types(verifier_detail(verdict.verifier_message or "")[2]
+                             or ""))
+
+
 def mirror_tokens(verdict: OracleVerdict) -> list:
     """The screen's tokens for one candidate, per oracle class, and nothing else."""
     function = (verdict.fingerprint_frame or "").rsplit(" ", 1)[0]
     if verdict.oracle_class == "verifier_error":
-        found = [verdict.verifier_op,
-                 verifier_detail(verdict.verifier_message or "")[2]]
+        found = list(verifier_tokens(verdict))
     elif verdict.oracle_class == "assertion":
         found = [verdict.assertion_text, verdict.assertion_site]
     elif verdict.oracle_class == "crash":
@@ -257,12 +263,23 @@ def circt_frame_tokens(verdict: OracleVerdict) -> list:
     return [token for token in (function, basename) if token]
 
 
+def mirror_carries(store: LoopStore, issue_number: int, token: str) -> bool:
+    """Whether one mirrored issue's own title or body carries *token*."""
+    return bool(token) and store.query_one(
+        "SELECT 1 AS hit FROM issue_mirror WHERE issue_number = ? "
+        "AND instr(title || ' ' || body, ?) > 0", (issue_number, token)) is not None
+
+
 def mirror_corroborates(store: LoopStore, issue_number: int, tokens: list) -> bool:
     """Whether the matched issue's own text carries one of the candidate's frame tokens."""
-    return any(store.query_one(
-        "SELECT 1 AS hit FROM issue_mirror WHERE issue_number = ? "
-        "AND instr(title || ' ' || body, ?) > 0", (issue_number, token))
-        for token in tokens)
+    return any(mirror_carries(store, issue_number, token) for token in tokens)
+
+
+def verifier_corroborates(store: LoopStore, issue_number: int,
+                          verdict: OracleVerdict) -> bool:
+    """Whether the matched issue carries BOTH the op and the constraint phrase (D-17)."""
+    return all(mirror_carries(store, issue_number, token)
+               for token in verifier_tokens(verdict))
 
 
 def frame_paths(verdict: OracleVerdict) -> list:
@@ -522,6 +539,11 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     if hit is not None and generic_assertion(verdict) and not mirror_corroborates(
             store, hit["issue_number"], circt_frame_tokens(verdict)):
         evidence["generic_text_match"] = hit["issue_number"]
+        hit = None
+    # D-17: an issue that names the op and not the invariant is another bug.
+    if (hit is not None and fingerprint.basis == "verifier"
+            and not verifier_corroborates(store, hit["issue_number"], verdict)):
+        evidence["op_only_match"] = hit["issue_number"]
         hit = None
     duplicate_of = _duplicate_of(store, candidate, fingerprint)
 
@@ -1175,7 +1197,8 @@ __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
            "MIRROR_PAGE_CEILING", "mirror_tokens", "mirror_screen",
            "mirror_walk", "frame_paths", "frame_symbols",
            "GENERIC_ASSERTIONS", "GENERIC_ASSERTION_ROOTS",
-           "generic_assertion", "circt_frame_tokens", "mirror_corroborates",
+           "generic_assertion", "circt_frame_tokens", "mirror_carries",
+           "mirror_corroborates", "verifier_tokens", "verifier_corroborates",
            "commit_date", "scan_commits", "touches_symbol", "cap_sentences",
            "assisted_by", "assisted_by_model",
            "issue_mirror_refresh", "dedup_and_screen", "triage_report",

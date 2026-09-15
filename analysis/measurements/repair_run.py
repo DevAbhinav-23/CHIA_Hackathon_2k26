@@ -19,8 +19,8 @@ import yaml
 
 from circt_bug_loop import bug_loop, ledger
 from circt_bug_loop.contract import schema
-from circt_bug_loop.store import (LoopStore, OracleVerdict, ReducedCase, Report,
-                                  latest, load_candidate)
+from circt_bug_loop.store import (LoopStore, ReducedCase, Report, latest,
+                                  load_candidate)
 
 RUN = "f1e4fef5db314bef8d187bceca8f6a80"
 CANDIDATE = "c-p-a2cb61b8d0aa"
@@ -31,11 +31,7 @@ CAP_USD = None     #: None: the run's REGISTERED campaign_spend_cap_usd applies 
 
 
 def _record(row: dict, cls):
-    """Rebuild one stored dataclass from its row, JSON columns included.
-
-    A field with no column keeps its default: `OracleVerdict` carries contract
-    2.4's `verifier_message`/`verifier_op`, columns of `verifier_error`.
-    """
+    """Rebuild one stored dataclass from its row, JSON columns included."""
     return cls(**{f.name: (row[f.name] if f.name in row
                            else json.loads(row[f"{f.name}_json"]))
                   for f in dataclasses.fields(cls)
@@ -53,8 +49,7 @@ def _load(store: LoopStore) -> tuple:
             schema.from_json(probe["spec_json"], schema.ProbeSpec),
             _record(one("SELECT * FROM reduced_case WHERE probe_id = ?",
                         (candidate.probe_id,)), ReducedCase),
-            _record(one("SELECT * FROM oracle_verdict WHERE probe_id = ?",
-                        (candidate.probe_id,)), OracleVerdict),
+            bug_loop.oracle_verdict_of(store, candidate.probe_id),
             _record(one("SELECT * FROM report WHERE candidate_id = ?",
                         (CANDIDATE,)), Report),
             SimpleNamespace(verdict=latest(store, "dedup_verdict",
