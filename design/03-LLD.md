@@ -747,6 +747,22 @@ and the one refusal it introduces is the intended one, a `BudgetFile` built from
 failing §9.2's complete-and-closed check on two missing keys. This listing also still omits the four
 keys of 2026-09-14, which §16.2 records against §2.4 and which §9.1 and §9.5 carry.
 
+**Erratum 2026-09-15 (contracts 2.3 and 2.4, the annotated tags `contract-2.3` and
+`contract-2.4`).** Two further MINOR bumps, frozen in full in `contract/FROZEN.md`. 2.3 adds three
+fields and corrects one function. `FeedbackEntry.error_line` carries the probe's own first
+`error:` diagnostics (FR-16.1, §3.5.1); `LedgerEntry.observed` gains `cached_tokens`, a **subset**
+of `tokens_in` and never a summand of it (§2.7, `02-HLD.md` §2.9); `RunManifest.shard` carries the
+`K/N` of §13.1's `--shard`, or null. `from_json` required **every** declared field, which made
+§2.2's compatibility promise false the moment a MINOR added one: pilot 8's stored `manifest.json`
+is a 2.2 payload with no `shard` and it failed `E002_MISSING_FIELD` against a 2.3 package. It now
+requires only the fields that carry no default, the structural ones, and an older payload loads
+with the defaults for the rest. 2.4 adds one value to `BuildStatus` and one to `OracleClass`,
+`verifier_error`, and two `ProbeResult` fields, `verifier_message` and `verifier_op`, non-null
+exactly on that class under a rule of their own in §2.8; the fingerprint gains a fourth basis,
+`verifier` (§3.6, §3.7.1). Neither bump moves a dataclass, the `generate` signature or the
+serialiser. §6.2 carries the two auxiliary tables and the widened `CHECK` they need, and §9.1 the
+cached-input rate that is deliberately **not** a registered key.
+
 ### 2.5 The interface, and the read-only ledger view
 
 ```python
@@ -2211,6 +2227,42 @@ re-send together, with a `Retry-After` header or a protobuf retry delay in the e
 taking precedence. A refused call is billed nothing, so waiting costs wall clock only and the arm
 window already bounds that.
 
+**Erratum 2026-09-15 (D-10, D-14): four corrections to the turn, each measured on campaign 1 or
+2.** (a) The streamed transcript is written in a **`finally`**. A turn that raised left a
+zero-byte `llm_probe_write.md`, so the only record of what it had done died with the exception and
+the truncation that killed it could not be diagnosed at all. (b) A `MAX_TOKENS` finish reason with
+complete `function_call` parts present now **executes them and continues**; it raises
+`MaxOutputTokensError` only where the truncated response carries no call, which is the case with
+nothing to go on with. (c) Stage 2's output cap is **32,000** tokens against `MAX_OUTPUT_TOKENS` =
+16,000 for every other stage, stage 2 writing up to `per_seed_probe_cap` whole programs plus its
+json footer in one response and having been truncated at 16,000 on a campaign's first seed;
+`llm.stage_max_output_tokens` is the single reader, so this section's pre-authorisation prices the
+larger ceiling rather than discovering it. (d) Stage 1's answer does not change between the
+iterations of one seed and re-sending its turn cost USD 1 to 1.5 a time on large seeds, so
+`generate_seeded` takes `cfg["seed_reading"]`, the first iteration's `root_cause_class`,
+`sibling_sites` and `rejected_sites`, and reuses it on iterations 2 and 3, writing
+`llm_seed_read.usage.json` as `{"stage_1": "reused from iter_1"}` so that the artefact tree still
+carries a file in that turn's slot; `cfg["reread_seed"]` forces the turn. The feedback half is the
+same round's. A `parse_error` is no longer an abandoning status, `_ABANDON_STATUSES` being
+`timeout` and `oom` alone: its diagnostics feed the next iteration as `FeedbackEntry.error_line`,
+up to `ERROR_LINE_COUNT` = 2 `error:` lines joined by ` | `, each stripped of the artefact
+directory that begins it and capped at `ERROR_LINE_CAP` = 200 characters **after** the strip,
+because keeping the path and truncating before the message made one iteration repeat a single
+useless error four times. And §7.3 requires the turn to read one **current** test under
+`$test_dir`, the directory of the seed's first changed test, at the build commit before it writes
+anything: without it the model copied the seed's own era syntax and wrote inputs the build
+commit's parser had never heard of, 13 of 15 probes of one check-in being parse errors.
+
+**Erratum 2026-09-15: two measured facts about what a turn actually spends.** The input a tool
+loop re-sends is served largely from the backend's own context cache: campaign 2's stage-1 turn on
+seed `cc71d34a` had **546,697** of its input tokens reported cached over the turn's 13 calls, and
+`LedgerEntry.observed.cached_tokens` carries the figure per entry in the run ledgers for the rest.
+That is why the ledger's USD total is an upper bound and not an estimate, only two rates being
+registered and every input token priced at the list one (§9.1); an operator reading Google's
+billing page against the ledger should expect the ledger to be the larger. And a 429 costs wall
+clock rather than a turn, being retried inside the call on the backoff recorded above, a refused
+call being billed nothing.
+
 **The tool list handed to both turns is exactly `[source_read, probe_write]`** and FR-04.4's unit test
 asserts that literal list. **`BashTool` is not given to stage 1, stage 2 or stage 6** and this
 revision withdraws it from all three (W10).
@@ -2462,6 +2514,12 @@ is the same shape with the head's node id, which is §3.0's head placement. The 
 CHIA's own choice at the same place and for the same reason: a tool that will not stop must not mask
 the turn's result.
 
+**Erratum 2026-09-15 (D-12): `cfg["here_options"]` is no longer a node pin.** It is
+`bug_loop.HERE_OPTIONS`, `{"num_cpus": 0}`, and `generate_seeded` itself holds no `circt`
+resource, because pinning a generator-side tool actor onto a `circt` worker made the seeded arm
+hold a slot it never used for a whole seed iteration and deadlocked the gate's re-run against it
+(§3.9). `cfg["head_options"]` is unchanged.
+
 B7's stage-6 turn constructs and stops `SourceReadTool` the same way, and gets no other tool.
 ### 3.6 `probe_task.py` (B2, B3, B4, B5; F-06 to F-09)
 
@@ -2569,6 +2627,42 @@ changes is `stopping_reason`, which is `tool_rejected_argv` when stderr carries 
 `does not refer to a registered pass or pass pipeline` and `tool_rejected_input` otherwise, and
 `results.py` prints the two counts separately so the `parse_error` row is never read as "the tool
 rejected the input" when it means "the loop built an argv the tool would not take".
+
+**Erratum 2026-09-15 (D-13, contract 2.4): a ninth status, `verifier_error`, for the compiler
+refusing its own output.** MEASURED, campaign 2: ten probes of one seed ran `circt-opt
+--convert-moore-to-core` and exited 1 with `error: 'comb.extract' op result #0 must be a signless
+integer bitvector, but got '!hw.array<2xi2>'`, and with the `llhd.sig.extract` equivalent over a
+`!llhd.ref<!hw.struct<...>>`. Neither op is in the input: the conversion pass created them with
+aggregate types and MLIR's verifier refused the compiler's own output. The table above books every
+exit-1-with-`error:` run as `parse_error`, so the oracle never fired, the taxonomy charged the
+failure to the loop, and §3.5.1's feedback told the model to fix an input that was fine. A probe
+is now `verifier_error`, `stopping_reason` `verifier_rejected_output`, when **both** hold:
+`verifier_detail` finds a first `error: '<op>' op ...` line whose constraint has MLIR's
+**generated** verifier grammar, `<operand|result|region|successor> #N must be ` or `failed to
+satisfy constraint: ` (`_GENERATED_VERIFIER`); and §4.8's parse-and-verify command for the input's
+own language, run on the input **alone** on the same worker inside `probe_execute`, exits 0
+(`input_verifies`, which writes `verify.stderr.txt` beside the probe's own streams). Both
+conjuncts are load-bearing and the second alone is measured to be insufficient: recorded mutation
+probe `p-b3831e4112d4` is `circt-opt -lower-handshake-to-hw` on an input the loop fed without
+`--split-input-file`, and it exits 1 with `'builtin.module' op multiple candidate top-level
+modules detected ...` on an input that parses and verifies, that sentence being one a pass writes
+by hand. FR-06.9's status list is therefore **nine** and `OracleClass` **five**; `_FIRING` carries
+the new class, and `out_of_scope_root` is false for it by construction, a verifier diagnostic
+carrying no stack trace to root. Downstream, in this document's own order: §3.7.1's fingerprint
+takes the basis `verifier`, the op, the message with every quoted op name and type generalised to
+`T`, and the pass the argv names, so one invariant broken on one op with two different aggregate
+types is one candidate; §10.2 gains a class block that greps exit 1, the op and the invariant and
+never the concrete type, and `_recheck_verifier` compares the same pair, so reduction is free to
+change the type; §3.9's question 3 reads stage 3's own parse-and-verify run through
+`_verifier_check` rather than dispatching a fourth command, and `_after_parse` is true by
+definition, a verifier error being precisely a failure after parsing;
+`repair_adapter.REPAIR_CLASSES` is unchanged at `("crash", "assertion")`, so stage 7 refuses the
+class as `oracle_class_verifier_error`; and the feedback bundle prints `VERIFIER_FINDING` in place
+of FR-16.1's fix-your-input line, the probe being a finding and not a mistake. `bug_loop.py
+--reclassify <run>` re-judges every stored `parse_error` probe of a run under this rule and drives
+the ones that move through stage 4 to the gate, making **no model turn**; over the nine stored
+runs it moved 11 probes, all of one seed, and 0 of the mutation arm's 400, so the rest were
+genuine input errors.
 
 #### 3.6.1 The three firing patterns, fixed verbatim
 
@@ -3291,6 +3385,22 @@ level's 77.0%, and a near-constant cannot change what a number means.
 `contamination_lower_bound` records which bound was used, so the 16 non-exact seeds stay
 distinguishable from the rest in the results (FR-15.5).
 
+**Erratum 2026-09-15 (D-11): the post-pin row is symbol level too, and a file touch is recorded as
+a file touch.** MEASURED, campaign 2: the first real assertion the loop found, `!values.empty() &&
+"Cannot build array of zero elements"` at `HWOps.cpp:1995`, was screened `fixed_post_pin` because
+commit `ddb3d1bd`, "Bump LLVM" over 87 files, touched `HWOps.cpp` and `MooreToCore.cpp` at
+unrelated hunks; the same scanner's `contaminated_symbol` for that candidate was false, which is
+this table's two rows contradicting each other about one commit. A candidate refused at gate
+question 4 over an LLVM bump is a bug the campaign found and threw away, so the post-pin row's
+match level is now **symbol**, by the same `touches_symbol` test the contamination row uses. The
+file-level matches are not discarded: a post-pin commit that touches a frame's file without
+touching a frame's symbol is recorded in `DedupVerdict.evidence` as `post_pin_file_touches`, the
+first `POST_PIN_FILE_TOUCH_MAX` = 5 shas, and decides nothing. FR-10.4's over-inclusive-by-design
+argument stands for what it was about, a window of at most 100 commits and 16.1 days; it does not
+survive a single commit that churns an API across the tree, which is what the measurement was. The
+remaining limit is left to the human: an API-churn commit that does touch a frame symbol still
+reads as `fixed_post_pin`, and campaign 2's `APInt.h:121` candidate is one.
+
 #### 3.7.3 The issue-mirror screen, which decides `known_open_issue` and `known_closed_issue`
 
 FR-10.3 requires a screen against CIRCT's open and closed issues "for a match on the candidate's
@@ -3361,6 +3471,35 @@ bound, so the table is at most 20,000 rows and a
 scan of it is a few milliseconds; `instr` cannot use an index, so §6.3 adds none for this query and
 says why. The screen makes **no** GitHub request, which is FR-10.3's network-trace criterion: B6a is
 the only writer of the table and it runs once per run, before the first candidate is screened.
+
+**Erratum 2026-09-15 (D-16, D-17, D-18): two corroboration rules on the match above, and the
+duplicate target is the earliest candidate.** Over-inclusive by design is one thing and two
+measured shapes of this screen were over-inclusive to the point of deciding nothing. (a) A
+**generic** assertion identifies no issue on its own. `generic_assertion` holds when the assertion
+site lies under `include/mlir/`, `include/llvm/` or `llvm/Support/`, or when its normalised text
+is one of `GENERIC_ASSERTIONS`; such a hit survives only where the matched issue's own title or
+body also carries one of the candidate's CIRCT frame tokens, `circt_frame_tokens`, the top frame's
+whole function and its file rather than the bare basename. MEASURED: three distinct
+`succeeded(ConcreteT::verifyInvariants(...))` candidates at `StorageUniquerSupport.h:180` all
+matched open issue #9574 on the assertion text alone. (b) A `verifier` basis matches only where
+the issue carries the op **and** the constraint phrase, `verifier_corroborates` over
+`verifier_tokens`. MEASURED: the ten reclassified verifier probes matched #3002 and #10912 on the
+op name alone, and #3002 is an "enhancement, good first issue" item naming `comb.extract`, so
+FR-13.9's refusal would have fired on an unrelated bug. A hit dropped by either rule is kept as
+evidence rather than lost, `generic_text_match` or `op_only_match` carrying the issue number. (c)
+`_duplicate_of` named **any** other candidate holding the fingerprint, so two candidates sharing
+one were each the other's duplicate and neither stayed `new`: ten verifier candidates and three
+invariant assertions collapsed to no representative at all. It now names the **earliest**, ordered
+by `candidate.created_utc` then candidate id, and returns nothing when the candidate is itself
+that one. FR-10.6 is otherwise unchanged, `fingerprint_stable = 1` still being the only shape in
+which the verdict is reachable. `DedupVerdict.evidence` therefore holds **twelve** keys and not
+eight, the four added being `post_pin_file_touches`, `rescreened_from`, `generic_text_match` and
+`op_only_match`; it is a store-side dict and not one of §2.7's, so no contract bump follows.
+`bug_loop.py --rescreen <run>` recomputes this screen and gate question 4 for every
+non-`differential` candidate of a run from stored evidence with **no model turn**, appending a
+second `dedup_verdict` and `gate_decision` row rather than overwriting the first (§6.2) and naming
+the row it came from in `rescreened_from`; it prints the candidates that became `new`, which are
+the ones owed a stage-6 turn and which `--report-turns <run>` then makes.
 
 #### 3.7.4 B7, the triage turn and the report render
 
@@ -3866,6 +4005,27 @@ The four questions, each answered by a tool and none by a model (FR-13.1, NFR-03
    `original_node_id == rerun_node_id`, which is now computable. Without those three fields FR-13.2's
    "the worker identity, hostname together with Ray node id, and the process id are recorded for
    **both** runs" was unsatisfiable and the soft anti-affinity had no "other" to avoid.
+
+   **Erratum 2026-09-15 (D-12): the re-run is bounded twice and then answered, and the generator
+   no longer holds the slot it waits for.** MEASURED, campaign 2 attempt 2: `gate_decide` ran 25
+   minutes with its `gate_rerun` stuck in `PENDING_NODE_ASSIGNMENT` while `ray status` showed a
+   `circt` slot in use and no `circt` task running; both slots freed the moment the jobs were
+   stopped. Two faults compose. `generate_seeded` declared `resources={"circt": 1}` although it
+   runs no CIRCT tool, so each seeded shard held a slot for a whole seed iteration; it is now
+   `@ChiaFunction(max_retries=0)`, head-side, and its `ProbeWriteTool` is placed with
+   `bug_loop.HERE_OPTIONS`, `{"num_cpus": 0}` and no cluster resource at all (§3.5). And a
+   **soft** affinity waits for a busy node rather than falling back, so with two shards no re-run
+   could ever be placed and no iteration could end; the pilots, one job, always left the other
+   slot free. `_rerun` therefore tries the preferred node for `RERUN_SCHEDULE_WAIT_S` = 60 s, then
+   **any** `circt` node for `probe_wall_seconds` plus `RERUN_WAIT_MARGIN_S` = 60 s, and then stops
+   waiting: `q1_rerun_worker` records `unscheduled`, `_q1_stopping_value` answers
+   `rerun_unscheduled`, and `TAXONOMY` gains the pair `(1, "rerun_unscheduled") ->
+   unreproducible`, a **sixth** stopping value and no new bucket, so FR-18.6's six stay total. A
+   candidate refused that way is refused honestly, the loop having failed to place the re-run
+   rather than the bug having failed to reproduce, and the results artefact prints the stopping
+   value beside the bucket. `gate_validate` is dispatched through the same `_dispatch` with **no**
+   timeout and is still unbounded, which is open and recorded as such: it is one `circt` task per
+   candidate reaching question 3, and the deadlock needed a task that waits while another holds.
 
    The re-run also sets **`Fingerprint.fingerprint_stable`**: it recomputes the fingerprint from the
    re-run's own stderr by §3.7.1's rule and compares the string. `False` does not fail question 1,
@@ -5292,6 +5452,22 @@ bound **by**, and it is counted rather than described. The same renderer prints 
 never opened as **`not started`** in every column of the windows table rather than as a row of zeros,
 a zero elapsed and a zero spend being indistinguishable from an arm that ran and found nothing.
 
+**Erratum 2026-09-15 (contract 2.4, D-11): a second auxiliary table, one widened `CHECK`, and two
+tables that stop being keyed.** `oracle_verdict` and `fingerprint` below are compared byte for
+byte by `T-U-store-01`, so neither could move for contract 2.4 and both are reached around rather
+than through. (a) The two new `OracleVerdict` fields are a table of their own, `_DDL_VERIFIER`,
+appended to the schema `init_schema` runs exactly as `registration` and `turn_failure` are:
+`verifier_error(probe_id TEXT PRIMARY KEY REFERENCES probe(probe_id), verifier_message TEXT NOT
+NULL, verifier_op TEXT NOT NULL)`. (b) `fingerprint`'s `basis` `CHECK` has to admit `verifier`, so
+`store._DDL_FINGERPRINT` declares that whole table with the widened constraint and is executed
+**first**, which makes this section's own `CREATE TABLE IF NOT EXISTS fingerprint` the no-op;
+`store.widen_fingerprint_basis` rebuilds a store created before 2.4, and `--reclassify` calls it
+before it re-judges a row. (c) `store.make_appendable` drops `candidate_id`'s PRIMARY KEY from
+`dedup_verdict` and `gate_decision`, once, by rebuild, because `--rescreen` (§3.7.3) **appends** a
+second verdict rather than overwriting the first and the trail of what changed is the point;
+`store.latest` is then what every reader uses, the newest row of a candidate by `rowid`, and
+§6.4's write order is unchanged.
+
 ```sql
 PRAGMA foreign_keys = ON;
 
@@ -6620,6 +6796,18 @@ parameter inside a reported number, which is exactly what §9.1's opening rule f
 `stage_7` value is **recorded rather than enforced** by this file: the loop there hands the number to
 CHIA's own chain (§3.8), which owns the loop it bounds.
 
+**Erratum 2026-09-15 (contract 2.3): the cached-input rate is deliberately not a registered key.**
+The backend reports `usage_metadata.cached_content_token_count` and `LedgerEntry.observed` now
+carries it as `cached_tokens` (§2.7), so a run can state how much of its input the context cache
+served. The **price** does not follow it: this table registers exactly two rates and the ledger
+prices every input token at `price_usd_per_m_input_tokens`, so a campaign's USD total is an
+**upper bound** and `cached_tokens` is what the size of the overstatement is computed from.
+Google's cached-input rate for `gemini-3.8-flash` is USD 0.075 per million tokens through
+2026-12-31 (verified 2026-09-15 on `ai.google.dev/gemini-api/docs/pricing`, the page the two
+registered rates are verified against); it is recorded as `llm.CACHED_INPUT_RATE_USD_PER_M` and is
+read by **nothing**, a third rate added after the registration commit not being the file the
+campaign was registered against (FR-14.7). Registering it is a new registration, not an erratum.
+
 ### 9.2 The checks `budget.py` makes before a run starts
 
 1. **Committed, and earlier.** `git -C <repo> log -1 --format=%H%x09%cI -- budget.yaml` must return a
@@ -7652,6 +7840,34 @@ first, so a misconfiguration is caught before an image build is attempted.
   anything else as a failure, rather than by comparing two commit dates, which two branches can order
   wrongly. The list's phrasing above, "predates the budget file's", is the erratum.
 
+**Erratum 2026-09-15: nine further arguments, four of them post-hoc, and check 11 stops being a
+refusal.** The usage line above is missing `--seed-sha SHA` (repeatable), `--generator
+{model,recorded}`, `--shard K/N`, `--rescreen RUN`, `--reclassify RUN`, `--render RUN`,
+`--report-turns RUN`, `--forum-post-url URL` and `--forum-post-date DATE`. `--shard K/N` keeps the
+seeds at positions `index % N == K` of the corpus order, which is already fixed, after
+`--seed-sha` has narrowed it; the string is recorded as `RunManifest.shard` (contract 2.3) and
+section 0 of `results.md` states which part of the corpus the run drove, a sharded run's counts
+being that shard's and not the corpus's. The four `RUN` arguments each take the place of a
+campaign and act on a **stored** run: `--rescreen` recomputes the duplicate screen and gate
+question 4 from stored evidence (§3.7.3), `--reclassify` re-judges stored `parse_error` probes
+under contract 2.4 (§3.6), `--render` re-renders `results.md`, which the first two leave stale,
+and `--report-turns` makes the stage-6 turns that candidates re-screened to `new` are owed. Only
+the last makes a model turn, and it is **dry** unless `BUGLOOP_ALLOW_LIVE_MODEL` is set, printing
+the candidates a live invocation would send a turn for. **Check 11 refuses nothing.** FR-20.1's
+own acceptance criterion is "both present before the first filing" and not before the run, so the
+check records `posted`, `unposted` or `exempt` and the refusal moves to §13.2's approval command,
+which is where the first filing happens; `NO_FORUM_POST` reads "none: not posted before the run;
+required at approval (FR-20.1)". The count of fifteen above is unaffected. Stage 7 finally has a
+cluster of its own, `cluster_repair.yaml`: §12.1's file with three numbers changed and nothing
+else, the `llm` and `circt` types down to one container each and `bugloop_repair`'s `--memory` up
+from 4g to 9g, because the chain's CIRCT rebuild is the memory peak of the whole loop and Ray's
+node-level monitor killed it mid-`ninja` at 1,834 s with five workers up on a 15 GiB host. Its
+`bugloop_repair` type alone runs `chia-circt-assert:<tag>-u1000`, a child layer over the campaign
+image whose only content is a `chown -R 1000:1000` of the CIRCT tree, the chain rebuilding in
+place as uid 1000 where the campaign image's tree is root-owned; measured, the re-configure and
+the warm build succeed under it and the six tool hashes still match, so pre-flight check 7 passes
+on the variant.
+
 **Every `RunManifest` field, and who computes it.** Half the forty had no named producer (W27), which
 for a document whose standard is "an engineer types it in" is the same defect as a missing signature.
 The table is by source, because most fields share one.
@@ -7779,6 +7995,15 @@ the per-UTC-day filing cap (FR-13.8, counted from `filing.approved_at_utc` over 
 the total cap; the `good first issue` refusal, read from the `issue_labels` key of the candidate's
 `dedup_evidence` (FR-13.9); FR-11.8's hold; and a second approval of an already-approved candidate,
 which is refused with the first approval's timestamp (FR-13.13).
+
+**Erratum 2026-09-15 (FR-20.1, user decision): the forum post is a refusal of this command.**
+FR-20.1 is enforced at the first filing and not at campaign start, which is what its own
+acceptance criterion says, so §13.1's pre-flight check 11 records the state and refuses nothing
+and the refusal lives here. `approve` refuses any filing while the run's manifest carries no forum
+post, naming the two fields and saying to post the method and then record it, and it runs in the
+ordered refusal list above. `--forum-post-url` and `--forum-post-date` on the same command write
+the post into the run's `manifest_json` **before** the approval row is written, so a recorded
+filing always carries the post it was made under.
 
 **The pre-filled URL** (ADR-D-02 option (c)) is
 
