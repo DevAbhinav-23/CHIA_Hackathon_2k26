@@ -26,7 +26,8 @@ BUDGET = Path(__file__).resolve().parents[1] / "budget.yaml"
 FINGERPRINT = 'op && "null op"\nHWOps.cpp:412'
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
-            "duplicate_of_candidate_id")
+            "duplicate_of_candidate_id", "post_pin_file_touches",
+            "rescreened_from")
 
 
 def _answers(**over):
@@ -572,3 +573,34 @@ def test_appr_15b_the_post_is_recorded_at_approval_and_the_filing_proceeds(tmp_p
     assert manifest["forum_post_date"] == POSTED["forum_post_date"]
     assert approve.forum_posted(manifest)
     assert not approve.forum_posted({"forum_post_url": "none: not posted", "forum_post_date": "none: not posted"})
+
+
+def test_appr_16_the_newest_screen_and_gate_rows_are_the_ones_read(tmp_path):
+    """T-U-appr-16 (D-11): `--rescreen` appends its rows, and both the view and `list` read the newest of each, once."""
+    from circt_bug_loop.store import make_appendable
+
+    store = _store(tmp_path, dedup="fixed_post_pin", decision="nothing")
+    _case(store, tmp_path, "cand-0002")
+    make_appendable(store)
+    evidence = dict.fromkeys(EVIDENCE)
+    evidence["rescreened_from"] = "1"
+    store.insert("dedup_verdict", {
+        "candidate_id": "cand-0001", "verdict": "new",
+        "evidence_json": json.dumps(evidence, sort_keys=True)})
+    for candidate_id in ("cand-0001", "cand-0002"):
+        store.insert("gate_decision", {
+            "candidate_id": candidate_id,
+            "answers_json": json.dumps({**_answers(), "rescreened_from": "1"}),
+            "stopped_at_question": None, "decision": "report",
+            "taxonomy_bucket": "new_bug",
+            "decided_utc": "2026-09-20T00:00:00+00:00"})
+
+    case = approve.load_case(store, "cand-0001")
+    assert case["dedup"]["verdict"] == "new", "the rescreened verdict, not the old one"
+    assert case["gate"]["decision"] == "report"
+    assert json.loads(case["dedup"]["evidence_json"])["rescreened_from"] == "1"
+
+    status, listing = _run(tmp_path, "list")
+    assert status == 0 and "2 pending" in listing
+    for candidate_id in ("cand-0001", "cand-0002"):
+        assert listing.count(candidate_id) == 1, "one line per candidate"

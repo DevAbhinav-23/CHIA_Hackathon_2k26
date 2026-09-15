@@ -1282,7 +1282,8 @@ def write_repair_result(store: LoopStore, result) -> None:
     store.update("repair", {"candidate_id": result.candidate_id}, fields)
 
 
-def write_gate_decision(store: LoopStore, decision) -> None:
+def write_gate_decision(store: LoopStore, decision, *,
+                        notes: Optional[dict] = None) -> None:
     """§6.4 rule 4's second batch: the decision row and the candidate's bucket."""
     from circt_bug_loop.gate import answers
 
@@ -1290,7 +1291,8 @@ def write_gate_decision(store: LoopStore, decision) -> None:
         ("INSERT INTO gate_decision (candidate_id, answers_json, "
          "stopped_at_question, decision, taxonomy_bucket, decided_utc) "
          "VALUES (?, ?, ?, ?, ?, ?)",
-         (decision.candidate_id, json.dumps(answers(decision), sort_keys=True),
+         (decision.candidate_id,
+          json.dumps({**answers(decision), **(notes or {})}, sort_keys=True),
           decision.stopped_at_question, decision.decision,
           decision.taxonomy_bucket, _utc())),
         ("UPDATE candidate SET taxonomy_bucket = ?, held_reason = ? "
@@ -2180,6 +2182,125 @@ def reconcile(store: LoopStore, issues_db: str) -> dict:
             "issues_db": issues_db}
 
 
+#: What `--rescreen` prints above the candidates whose report was written with no turn.
+TURN_OWED = "stage-6 report turn owed"
+
+#: The first line of a report FR-11.8 rendered without a model turn.
+NO_TURN_HEADING = "# NO MODEL TURN WAS MADE"
+
+_RESCREEN_COLUMNS = ("candidate", "old verdict", "new verdict", "old decision",
+                     "new decision")
+
+
+def oracle_verdict_of(store: LoopStore, probe_id: str):
+    """Stage 4's stored row, back as the `OracleVerdict` the screen takes."""
+    from circt_bug_loop.store import Frame, OracleVerdict
+
+    row = store.query_one("SELECT * FROM oracle_verdict WHERE probe_id = ?",
+                          (probe_id,))
+    if row is None:
+        raise LookupError(f"no oracle_verdict row for probe {probe_id!r}")
+    frames = [Frame(**frame) for frame in json.loads(row.pop("frames_json"))]
+    row.update(fired=bool(row["fired"]),
+               out_of_scope_root=bool(row["out_of_scope_root"]))
+    return OracleVerdict(frames=frames, **row)
+
+
+def seed_record_of(store: LoopStore, run_id: str, probe_id: str) -> SeedRecord:
+    """The seed one probe came from, back as the record the screen takes."""
+    row = store.query_one(
+        "SELECT s.record_json FROM seed s JOIN probe p USING (seed_sha) "
+        "WHERE p.probe_id = ? AND s.run_manifest_id = ?", (probe_id, run_id))
+    if row is None:
+        raise LookupError(f"no seed row for probe {probe_id!r} of run {run_id!r}")
+    return schema.from_json(row["record_json"], SeedRecord)
+
+
+def _regate(store: LoopStore, candidate: CandidateRecord, dedup,
+            previous: Optional[dict], rescreened_from: str) -> Optional[str]:
+    """Re-answer question 4 on the rescreened verdict and append the gate's row."""
+    from circt_bug_loop.gate import ANSWER_KEYS, _question_4, decide
+    from circt_bug_loop.results import _repair_view
+    from circt_bug_loop.store import GateDecision
+
+    if previous is None:
+        return None
+    answers = json.loads(previous["answers_json"])
+    fields = {key: answers.get(key) for key in ANSWER_KEYS}
+    if fields["q3_valid"]:
+        fields["q4_new"], fields["q4_reason"] = _question_4(candidate, dedup)
+    repair = store.query_one("SELECT * FROM repair WHERE candidate_id = ?",
+                             (candidate.candidate_id,))
+    decision, stopped, bucket = decide(fields, _repair_view(repair))
+    write_gate_decision(
+        store,
+        GateDecision(candidate_id=candidate.candidate_id, **fields,
+                     stopped_at_question=stopped, decision=decision,
+                     taxonomy_bucket=bucket, held_reason=candidate.held_reason),
+        notes={"rescreened_from": rescreened_from})
+    return decision
+
+
+def _turn_owed(store: LoopStore, candidate_id: str) -> bool:
+    """Whether this candidate's report was rendered with no model turn (FR-11.8)."""
+    row = store.query_one("SELECT path FROM report WHERE candidate_id = ?",
+                          (candidate_id,))
+    try:
+        return Path(row["path"]).read_text(
+            encoding="utf-8", errors="backslashreplace").startswith(NO_TURN_HEADING)
+    except (OSError, TypeError, KeyError):
+        return False
+
+
+def rescreen(store: LoopStore, run_id: str, *, clone_path: str, top_n: int,
+             out) -> int:
+    """Screen one run's candidates again under the current rule, model-free (D-11)."""
+    from circt_bug_loop import triage_task
+    from circt_bug_loop.store import latest, load_candidate, make_appendable
+
+    make_appendable(store)
+    rows = store.query(
+        "SELECT candidate_id, probe_id FROM candidate WHERE run_manifest_id = ? "
+        "AND oracle_class <> 'differential' ORDER BY candidate_id", (run_id,))
+    if not rows:
+        print(f"--rescreen {run_id}: the store holds no screenable candidate "
+              f"of that run", file=sys.stderr)
+        return 2
+
+    print("  ".join(f"{name:<18}" for name in _RESCREEN_COLUMNS).rstrip(), file=out)
+    owed = []
+    for row in rows:
+        candidate_id, probe_id = row["candidate_id"], row["probe_id"]
+        before = latest(store, "dedup_verdict", candidate_id) or {}
+        gate_before = latest(store, "gate_decision", candidate_id)
+        # The screen REPLACES both rows it owns and neither column is its own.
+        keep = store.query_one("SELECT local_id, created_utc FROM candidate "
+                               "WHERE candidate_id = ?", (candidate_id,))
+        stable = store.query_one("SELECT fingerprint_stable FROM fingerprint "
+                                 "WHERE candidate_id = ?", (candidate_id,))
+        from_row = str(before.get("rowid") or _utc())
+        screen = triage_task.dedup_and_screen._chia_original(
+            load_candidate(store, candidate_id), seed_record_of(store, run_id, probe_id),
+            oracle_verdict_of(store, probe_id), clone_path, store.db_path, top_n,
+            rescreened_from=from_row)
+        store.update("candidate", {"candidate_id": candidate_id}, dict(keep))
+        if (stable or {}).get("fingerprint_stable") is not None:
+            store.update("fingerprint", {"candidate_id": candidate_id}, dict(stable))
+
+        verdict = screen["dedup"].verdict
+        decision = _regate(store, load_candidate(store, candidate_id),
+                           screen["dedup"], gate_before, from_row)
+        print("  ".join(f"{value:<18}" for value in (
+            candidate_id, before.get("verdict") or "-", verdict,
+            (gate_before or {}).get("decision") or "-", decision or "-")).rstrip(),
+            file=out)
+        if verdict == "new" and _turn_owed(store, candidate_id):
+            owed.append(candidate_id)
+
+    print(f"\n{TURN_OWED}: {', '.join(owed) if owed else 'none'}", file=out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Return 13.1's argument parser, with that table's defaults."""
     parser = argparse.ArgumentParser(prog="bug_loop.py",
@@ -2205,6 +2326,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--draw-calibration", action="store_true")
     parser.add_argument("--record-fixtures", default=None, metavar="DIR")
     parser.add_argument("--print-config", action="store_true")
+    parser.add_argument("--rescreen", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--forum-post-url", default=None)
     parser.add_argument("--forum-post-date", default=None)
     parser.add_argument("--chia-root", default=str(_CHIA_ROOT))
@@ -2572,6 +2694,11 @@ def main(argv: Optional[list] = None, out=None) -> int:
     if args.print_config:
         print(json.dumps(resolved_config(args), sort_keys=True, indent=2), file=out)
         return 0
+    if args.rescreen:
+        budget = budget_module.load_budget._chia_original(
+            args.budget, str(FLOW_DIR.parent))["budget"]
+        return rescreen(LoopStore(DB_PATH), args.rescreen, clone_path=args.clone,
+                        top_n=budget.fingerprint_top_n, out=out)
     if args.draw_calibration:
         from circt_bug_loop import corpus, pin_select
 

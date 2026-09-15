@@ -834,7 +834,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
             evidence=dict.fromkeys(
                 ("matched_key", "matched_token", "issue_number", "issue_url",
                  "issue_state", "issue_labels", "duplicate_of_candidate_id",
-                 "fixing_commit")))
+                 "fixing_commit", "post_pin_file_touches", "rescreened_from")))
         _write_rows(LoopStore(db_path),
                     _screened(candidate, fingerprint, dedup, False, False,
                               "seed_commit"),
@@ -1685,3 +1685,115 @@ def test_T_U_driver_40_the_shard_is_on_the_manifest_and_in_the_config():
             encoding="utf-8"), schema.RunManifest)
     assert manifest.shard is None
     schema.validate(dataclasses.replace(manifest, shard="1/4"))
+
+
+def _stub_scan(monkeypatch, sha: str, context: str) -> None:
+    """One post-pin commit, with the hunk-header context the test wants read."""
+    from circt_bug_loop import triage_task
+
+    monkeypatch.setattr(triage_task, "commit_date",
+                        lambda *a, **k: "2026-01-01T00:00:00+00:00")
+    monkeypatch.setattr(triage_task, "scan_commits",
+                        lambda path, since, paths, **k: [
+                            {"sha": sha, "date": "2026-02-01T00:00:00+00:00",
+                             "contexts": [context]}])
+
+
+@pytest.mark.t0
+def test_T_U_driver_47_rescreen_reruns_the_screen_and_appends_both_rows(
+        tmp_path: Path, monkeypatch):
+    """T-U-driver-47 (FR-10.4, D-11): `--rescreen` screens a run's candidates again under the current rule, appends a dedup row and a gate row to each, keeps the old ones, and names the reports that are owed a stage-6 turn."""
+    import io
+
+    from circt_bug_loop import results as results_module
+    from circt_bug_loop import triage_task
+    from circt_bug_loop.store import latest
+
+    run = mini_campaign(tmp_path)
+    loop, candidate_id = run["store"], "c-p-000000000001"
+    sha = "d" * 40
+    loop.insert("issue_mirror", {
+        "issue_number": 1, "title": "unrelated", "body": "nothing matches here",
+        "labels_json": "[]", "state": "open", "url": "u",
+        "mirrored_utc": "2026-09-19T00:00:00+00:00"})
+
+    # The state the file-level rule left: both refused, neither report written by a turn.
+    evidence = dict.fromkeys(triage_task._EVIDENCE_KEYS)
+    evidence["fixing_commit"] = sha
+    for refused in (candidate_id, "c-p-100000000001"):
+        answers = json.loads(loop.query_one(
+            "SELECT answers_json FROM gate_decision WHERE candidate_id = ?",
+            (refused,))["answers_json"])
+        answers.update(q4_new=False, q4_reason="fixed_post_pin")
+        loop.update("dedup_verdict", {"candidate_id": refused},
+                    {"verdict": "fixed_post_pin",
+                     "evidence_json": json.dumps(evidence, sort_keys=True)})
+        loop.update("gate_decision", {"candidate_id": refused},
+                    {"answers_json": json.dumps(answers, sort_keys=True),
+                     "stopped_at_question": 4, "decision": "nothing",
+                     "taxonomy_bucket": "duplicate"})
+        loop.update("candidate", {"candidate_id": refused},
+                    {"taxonomy_bucket": "duplicate"})
+    loop.update("fingerprint", {"candidate_id": candidate_id},
+                {"fingerprint_stable": 1})
+    report_path = Path(loop.query_one(
+        "SELECT path FROM report WHERE candidate_id = ?", (candidate_id,))["path"])
+    report_path.write_text(f"{bug_loop.NO_TURN_HEADING} FOR THIS CANDIDATE.\n",
+                           encoding="utf-8")
+    before = latest(loop, "dedup_verdict", candidate_id)["rowid"]
+
+    # The bump that only touched the file, exactly as ddb3d1bd did.
+    _stub_scan(monkeypatch, sha, "void circt::hw::HWModuleOp::somethingElse() {")
+    out = io.StringIO()
+    assert bug_loop.rescreen(loop, _RUN, clone_path=str(tmp_path), top_n=5,
+                             out=out) == 0
+
+    dedups = loop.query("SELECT rowid, * FROM dedup_verdict WHERE candidate_id = ? "
+                        "ORDER BY rowid", (candidate_id,))
+    assert [row["verdict"] for row in dedups] == ["fixed_post_pin", "new"]
+    fresh = json.loads(dedups[-1]["evidence_json"])
+    assert fresh["post_pin_file_touches"] == [sha] and fresh["fixing_commit"] is None
+    assert fresh["rescreened_from"] == str(before)
+
+    gates = loop.query("SELECT * FROM gate_decision WHERE candidate_id = ? "
+                       "ORDER BY rowid", (candidate_id,))
+    assert [row["decision"] for row in gates] == ["nothing", "report"]
+    assert [row["taxonomy_bucket"] for row in gates] == ["duplicate", "new_bug"]
+    reanswered = json.loads(gates[-1]["answers_json"])
+    assert (reanswered["q4_new"], reanswered["q4_reason"]) == (True, None)
+    assert reanswered["rescreened_from"] == str(before)
+    for copied in ("q1_reproduce", "q1_rerun_pid", "q2_minimal", "q3_valid",
+                   "q3_stderr_path"):
+        assert reanswered[copied] == answers[copied], "questions 1 to 3 are copied"
+
+    # The screen replaces the rows it owns, and neither of these is its own.
+    assert loop.query_one("SELECT fingerprint_stable FROM fingerprint "
+                          "WHERE candidate_id = ?", (candidate_id,)
+                          )["fingerprint_stable"] == 1
+    assert loop.query_one("SELECT created_utc FROM candidate WHERE candidate_id = ?",
+                          (candidate_id,))["created_utc"] is not None
+
+    printed = out.getvalue()
+    assert printed.splitlines()[0].split() == ["candidate", "old", "verdict",
+                                               "new", "verdict", "old",
+                                               "decision", "new", "decision"]
+    row = next(line for line in printed.splitlines() if candidate_id in line)
+    assert row.split() == [candidate_id, "fixed_post_pin", "new", "nothing", "report"]
+    assert f"{bug_loop.TURN_OWED}: {candidate_id}" in printed
+
+    # FR-18.6 counts the newest row of each, and counts it once: nothing was
+    # `new_bug` before the rescreen.
+    taxonomy = call_node(results_module.render_results, loop, run["manifest"],
+                         labelled_pairs=run["labelled_pairs"])["rendered"]
+    assert "| new_bug | 1 |" in taxonomy and "| duplicate | 1 |" in taxonomy
+
+
+@pytest.mark.t0
+def test_T_U_driver_48_rescreen_is_an_argument_of_the_driver(tmp_path: Path):
+    """T-U-driver-48 (FR-19.3): `--rescreen` takes a run manifest id, and refuses a run whose candidates the store does not hold."""
+    parsed = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--rescreen", _RUN])
+    assert parsed.rescreen == _RUN
+    assert bug_loop.build_parser().parse_args(["--mode", "discovery"]).rescreen is None
+    assert bug_loop.rescreen(open_store(tmp_path), _RUN, clone_path=str(tmp_path),
+                             top_n=5, out=None) == 2

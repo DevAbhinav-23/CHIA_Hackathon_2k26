@@ -64,10 +64,14 @@ _COMMIT = re.compile(r"^__C__ (?P<sha>[0-9a-f]{7,40}) (?P<date>\S+)$")
 _HUNK = re.compile(r"^@@ [^@]*@@ ?(?P<context>.*)$")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: The eight declared keys of `DedupVerdict.evidence` (2.9).
+#: The ten declared keys of `DedupVerdict.evidence` (2.9).
 _EVIDENCE_KEYS = ("matched_key", "matched_token", "issue_number", "issue_url",
                   "issue_state", "issue_labels", "fixing_commit",
-                  "duplicate_of_candidate_id")
+                  "duplicate_of_candidate_id", "post_pin_file_touches",
+                  "rescreened_from")
+
+#: How many file-level post-pin shas D-11's evidence carries.
+POST_PIN_FILE_TOUCH_MAX = 5
 
 
 class ReportIncomplete(Exception):
@@ -405,11 +409,11 @@ def issue_mirror_refresh(repo: str, issue_cap: int, token_path: str,
 @ChiaFunction(max_retries=0)
 def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
                      verdict: OracleVerdict, clone_path: str, db_path: str,
-                     top_n: int) -> dict:
+                     top_n: int, *, rescreened_from: Optional[str] = None) -> dict:
     """Fingerprint one candidate, screen it, and flag contamination both ways.
 
     Returns:
-        {"fingerprint": Fingerprint, "dedup": DedupVerdict, "contaminated_symbol": bool, "contaminated_file": bool, "contamination_lower_bound": str, "fixing_commits": list[str], "counters": CounterBlock}, the counters counting one candidate at stage_6, `dedup_unavailable` being the failed one (3.11).
+        {"fingerprint": Fingerprint, "dedup": DedupVerdict, "contaminated_symbol": bool, "contaminated_file": bool, "contamination_lower_bound": str, "fixing_commits": list[str], "post_pin_file_touches": list[str], "counters": CounterBlock}, the counters counting one candidate at stage_6, `dedup_unavailable` being the failed one (3.11).
     Worker:
         head - both commit scans walk 24 months of main in the head's blobless clone.
     Raises:
@@ -428,22 +432,26 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
     fingerprint = compute_fingerprint(
         verdict, (signal_row or {}).get("signal"), reduced_text, top_n)
 
-    # FR-10.4, the post-pin fix.
+    # FR-10.4, the post-pin fix: a fix names one of the frame's own functions,
+    # and a file-level touch is not a fix (D-11).
     paths = frame_paths(verdict)
+    symbols = frame_symbols(verdict)
     fixing: list = []
+    file_touches: list = []
     scan_failure = None
     try:
         post_pin = _after(scan_commits(
             clone_path, commit_date(clone_path, candidate.run_commit), paths),
             candidate.run_commit)
-        fixing = [commit["sha"] for commit in post_pin]
+        for commit in post_pin:
+            target = fixing if touches_symbol(commit, symbols) else file_touches
+            target.append(commit["sha"])
     except (OSError, subprocess.SubprocessError) as error:
         scan_failure = f"post_pin_scan:{type(error).__name__}"
 
     # FR-15.1 and FR-15.5, contamination.
     exact = bool(getattr(seed, "sdk_exact", False))
     lower_bound = "seed_commit" if exact else "run_commit"
-    symbols = frame_symbols(verdict)
     contaminated_symbol = contaminated_file = False
     try:
         since = (seed.committed_date_utc if exact
@@ -456,6 +464,8 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
         scan_failure = scan_failure or f"contamination_scan:{type(error).__name__}"
 
     evidence = dict.fromkeys(_EVIDENCE_KEYS)
+    evidence["post_pin_file_touches"] = file_touches[:POST_PIN_FILE_TOUCH_MAX] or None
+    evidence["rescreened_from"] = rescreened_from
     mirrored = store.query_one("SELECT COUNT(*) AS n FROM issue_mirror")["n"]
     hit = mirror_screen(store, mirror_tokens(verdict)) if mirrored else None
     duplicate_of = _duplicate_of(store, candidate, fingerprint)
@@ -489,6 +499,7 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
             "contaminated_symbol": contaminated_symbol,
             "contaminated_file": contaminated_file,
             "contamination_lower_bound": lower_bound, "fixing_commits": fixing,
+            "post_pin_file_touches": file_touches,
             "counters": CounterBlock(
                 stage="stage_6", started=1,
                 completed=int(dedup.verdict != "dedup_unavailable"),
@@ -1058,6 +1069,7 @@ def _read_text(path: Optional[str]) -> str:
 
 
 __all__ = ["TRIAGE_REASON_MAX_SENTENCES", "MIRROR_TOKEN_MIN_CHARS",
+           "POST_PIN_FILE_TOUCH_MAX",
            "GOOD_FIRST_ISSUE", "BUILD_PREFIX", "NOT_APPLICABLE", "ARC_TESTS",
            "PRIMARY_POINTS", "DIFFERENTIAL_POINTS",
            "ReportIncomplete",
