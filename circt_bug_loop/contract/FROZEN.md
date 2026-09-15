@@ -10,7 +10,7 @@
 - **Why.** Red-team NIT N9, measured: under a tight `--as` the real `circt-opt` exits **127** from the dynamic loader, before its first instruction, and the loop recorded that as `parse_error:tool_rejected_input` — a claim that the tool read the probing input and refused it, which it did not. `circt_core`'s own `execvp` failure path exits 127 too. `tool_unavailable` is the status that decides nothing; it is not a firing status and the differential is not asked of it.
 - **Compatibility.** MINOR. `check_version` compares the MAJOR half only (`03-LLD.md` §2.2), so a 2.0 instance still loads and a 2.0 consumer still reads every field it knew. No committed fixture carries the new value.
 - **The fixture set.** Every `contract_version` string under `contract/fixtures/` and `tests/fixtures/` was moved to `2.1`; no other byte of any fixture changed, the addition being unreachable from the data they hold. `T-U-fixt-01` validates each one at the version it records and `T-U-corpus-31`, `T-U-ledger-*` and the rest compare the recorded string against `CONTRACT_VERSION`.
-- **Done.** Annotated tag `contract-2.1` cut and pushed; `03-LLD.md` §2 and `01-FRD.md` FR-06.9 carry the eighth status as 2026-09-15 errata; `design/reviews/implementation-errata-log.md` carries the row.
+- **Done.** Annotated tag `contract-2.1` cut and pushed; `03-LLD.md` §2 carries the eighth status as a 2026-09-15 erratum, and `01-FRD.md` FR-06.9 now carries a 2026-09-15 erratum of its own, covering contracts 2.1 and 2.4 together: the list is **nine**, not seven, and the erratum names the miss, that this bump's `tool_unavailable` was added at 2.1 and that requirement never carried it, alongside 2.4's `verifier_error`; `design/reviews/implementation-errata-log.md` carries the row.
 
 ## Contract 2.2 (W-18b, 2026-09-16)
 
@@ -28,6 +28,7 @@
 - **Why (`error_line`).** MEASURED, campaign 1 run `903a37c8`, seed 2: all five probes were `parse_error` at the build commit and `feedback.py` counted `parse_error` among `_ABANDON_STATUSES`, so the seed was abandoned WITHOUT the next turn ever being told what the tool said. A parse error is the loop's own mistake and it is repairable; it now feeds back with its diagnostic and the instruction to fix or replace the input, while `timeout` and `oom` stay abandoned.
 - **Compatibility.** MINOR. `check_version` compares the MAJOR half only (`03-LLD.md` §2.2), so a 2.0, 2.1 or 2.2 instance still loads. `from_json` required EVERY declared field, which made that promise false the moment a MINOR added one to a member: pilot 8's stored `manifest.json` is a 2.2 payload with no `shard` and it failed E002. It now requires only the fields that carry no default - the structural ones - and an older payload loads with the default for what it has not got. `FeedbackEntry` is nested and was never affected.
 - **The fixture set.** Every `contract_version` string under `contract/fixtures/` and `tests/fixtures/` moved to `2.3`; every `FeedbackEntry` in a `feedback_bundle` fixture gained `"error_line": null`, every `observed` block gained `"cached_tokens": null` and every `run_manifest` fixture gained `"shard": null`. No other byte of any fixture changed.
+- **Done.** Annotated tag `contract-2.3` cut on 66c2601 and pushed (2026-09-15).
 
 ## Contract 2.4 (D-13, 2026-09-15)
 
