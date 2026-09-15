@@ -27,7 +27,7 @@ CANDIDATE = "c-p-a2cb61b8d0aa"
 REPO = Path(__file__).resolve().parents[2]
 DB = REPO / "circt_bug_loop" / "loop.db"
 BUDGET = REPO / "circt_bug_loop" / "budget.yaml"
-CAP_USD = 10.0     #: this step's own cap: the guard's, not the campaign's 100.00
+CAP_USD = None     #: None: the run's REGISTERED campaign_spend_cap_usd applies (architect, 2026-09-15)
 
 
 def _record(row: dict, cls):
@@ -66,6 +66,8 @@ def _budget(budget_file_sha: str):
     budget = schema.BudgetFile(budget_file_sha=budget_file_sha,
                                **yaml.safe_load(BUDGET.read_text(encoding="utf-8")))
     schema.validate(budget)
+    if CAP_USD is None:
+        return budget
     return dataclasses.replace(budget, campaign_spend_cap_usd=CAP_USD)
 
 
