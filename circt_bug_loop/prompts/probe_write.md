@@ -53,6 +53,15 @@ syntax was at the seed commit and may be stale. A probe that does not parse is
 this loop's mistake and not the compiler's: it tests nothing, it is recorded as a
 parse error, and it spends one of the $cap inputs this seed gets.
 
+BEFORE you write any input, read_file ONE CURRENT TEST under $test_dir that is
+not the seed's own, at the build commit, and copy its exact syntax for every
+operation, type and attribute you use. A test that lives in the tree today is
+the record of what the parser accepts today; syntax you half-remember for a
+dialect you know only loosely is not, and inventing it is how an input is
+rejected. The parser's messages in the feedback above are exact: each one names
+a line and a column in one of your own inputs, so fix the line it names, or
+replace that input with one whose syntax you copied from a test.
+
 This turn has three phases. First at most $max_tool_calls tool calls with every
 tool available: read one region at a time, and use grep to find a symbol before
 you read_file around it, because read_file returns one page and names the

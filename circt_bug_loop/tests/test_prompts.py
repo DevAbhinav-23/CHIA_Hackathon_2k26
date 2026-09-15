@@ -1,4 +1,5 @@
 """`prompts/` and the shared footer parser: `04-Test-Plan.md` §1.23."""
+import dataclasses
 import inspect
 import json
 import re
@@ -348,3 +349,25 @@ def test_T_U_prompt_10_both_reading_turns_are_told_the_build_commit():
     assert "$cap" not in written
     assert "BOTH must exist AT THE BUILD COMMIT" in generate_task.render_seed_read(
         seed(), {"per_seed_probe_cap": 4})
+
+    # And the exemplar the turn copies from, named as a directory it can read.
+    for phrase in ("read_file ONE CURRENT TEST under $test_dir",
+                   "not the seed's own", "copy its exact syntax",
+                   "The parser's messages in the feedback above are exact",
+                   "fix the line it names"):
+        assert phrase in stage_2, phrase
+    assert "read_file ONE CURRENT TEST under test/Conversion/HandshakeToHW" \
+        in written
+    assert "$test_dir" not in written
+
+
+def test_T_U_prompt_11_the_exemplar_directory_is_the_seeds_own():
+    """T-U-prompt-11 (campaign 2): `$test_dir` is where the seed's tests live."""
+    record = seed()
+    assert record.test_paths[0] == "test/Conversion/HandshakeToHW/test_buffer.mlir"
+    assert generate_task.seed_test_dir(record) == "test/Conversion/HandshakeToHW"
+
+    # A seed that changed no test still gets somewhere to read.
+    no_tests = dataclasses.replace(record, test_paths=[], test_files={})
+    assert generate_task.seed_test_dir(no_tests) == generate_task.DEFAULT_TEST_DIR
+    assert generate_task.DEFAULT_TEST_DIR == "test/"

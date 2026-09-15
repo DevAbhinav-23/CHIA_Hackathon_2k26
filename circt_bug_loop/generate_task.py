@@ -251,6 +251,15 @@ def render_test_files(seed: SeedRecord) -> str:
                      for path in seed.test_paths)
 
 
+#: Where 7.3 sends the turn for a syntax exemplar when the seed changed no test.
+DEFAULT_TEST_DIR = "test/"
+
+
+def seed_test_dir(seed: SeedRecord) -> str:
+    """Render 7.3's `$test_dir`: the directory of the seed's first test path (2.3)."""
+    return os.path.dirname(next(iter(seed.test_files), "")) or DEFAULT_TEST_DIR
+
+
 def render_sites(sites: list) -> str:
     """Render 7.3's `$sibling_sites`: one `<file>:<symbol> - <why>` line each."""
     return "\n".join(
@@ -340,6 +349,7 @@ def render_probe_write(seed: SeedRecord, root_cause_class: str, sites: list,
                    entry_tool=seed.entry_tool,
                    argv_template=render_argv_template(seed),
                    language=seed_language(seed),
+                   test_dir=seed_test_dir(seed),
                    probe_dir=probe_dir,
                    cap=int(cfg["per_seed_probe_cap"]),
                    max_tool_calls=tool_iterations(cfg, "stage_2"),
@@ -722,4 +732,5 @@ __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
            "render_feedback", "render_probe_write", "render_seed_read",
            "render_sites", "render_test_files",
            "seed_argv_template", "seed_language", "seed_stale_at_build",
+           "seed_test_dir",
            "write_calls"]
