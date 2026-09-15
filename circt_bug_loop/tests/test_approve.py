@@ -27,7 +27,7 @@ FINGERPRINT = 'op && "null op"\nHWOps.cpp:412'
 EVIDENCE = ("matched_key", "matched_token", "issue_number", "issue_url",
             "issue_state", "issue_labels", "fixing_commit",
             "duplicate_of_candidate_id", "post_pin_file_touches",
-            "rescreened_from", "generic_text_match")
+            "rescreened_from", "generic_text_match", "op_only_match")
 
 
 def _answers(**over):

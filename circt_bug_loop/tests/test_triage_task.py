@@ -1611,3 +1611,79 @@ def test_triage_40_a_generic_assertion_matches_when_the_issue_names_the_frame(
     assert out["dedup"].verdict == "known_open_issue"
     assert out["dedup"].evidence["issue_number"] == 9574
     assert out["dedup"].evidence["generic_text_match"] is None
+
+
+#: The constraint phrase D-13's two recorded diagnostics share, as an issue would carry it.
+_CONSTRAINT = "result #0 must be a signless integer bitvector"
+
+
+def _op_issue(body, *, number=3002, labels=("enhancement", "good first issue")):
+    """One mirrored open issue whose text carries whatever *body* says."""
+    return [{"issue_number": number, "title": "comb.extract folding",
+             "body": body, "labels": list(labels), "state": "open",
+             "url": f"https://github.com/llvm/circt/issues/{number}"}]
+
+
+@pytest.mark.t1
+def test_triage_41_the_op_name_alone_does_not_match_an_issue(tmp_path, clone):
+    """D-17: an issue that mentions the op and not the broken invariant is another bug, so the op alone is evidence for a human and never a `known_open_issue`."""
+    verdict = _verifier_verdict()
+    candidate = _candidate(tmp_path, oracle_class="verifier_error", screened=True,
+                           run_commit=clone["c1"])
+    store = _store(tmp_path, candidate=candidate)
+    _mirror_rows(store, _op_issue("comb.extract should fold through concat."))
+
+    out = call_node(dedup_and_screen, candidate, _seed(), verdict, clone["path"],
+                    str(tmp_path / "loop.db"), 5)
+
+    assert out["dedup"].verdict == "new"
+    assert out["dedup"].evidence["op_only_match"] == 3002
+    assert out["dedup"].evidence["issue_number"] is None
+    assert out["dedup"].evidence["matched_token"] is None
+    assert set(out["dedup"].evidence) == set(triage_task._EVIDENCE_KEYS)
+    # The screen itself still matches on the op: the verdict is what D-17 changed.
+    assert mirror_screen(store, mirror_tokens(verdict))["issue_number"] == 3002
+    assert triage_task.verifier_tokens(verdict) == ("comb.extract", _CONSTRAINT)
+    assert triage_task.verifier_corroborates(store, 3002, verdict) is False
+
+
+@pytest.mark.t1
+def test_triage_42_an_issue_carrying_the_op_and_the_invariant_matches(tmp_path, clone):
+    """D-17: the same op against an issue that also carries the constraint phrase is the match the screen was making before."""
+    verdict = _verifier_verdict()
+    candidate = _candidate(tmp_path, oracle_class="verifier_error", screened=True,
+                           run_commit=clone["c1"])
+    store = _store(tmp_path, candidate=candidate)
+    _mirror_rows(store, _op_issue(
+        f"circt-opt says 'comb.extract' op {_CONSTRAINT}, but got an array."))
+
+    out = call_node(dedup_and_screen, candidate, _seed(), verdict, clone["path"],
+                    str(tmp_path / "loop.db"), 5)
+
+    assert out["dedup"].verdict == "known_open_issue"
+    assert out["dedup"].evidence["issue_number"] == 3002
+    assert out["dedup"].evidence["matched_token"] == "comb.extract"
+    assert out["dedup"].evidence["op_only_match"] is None
+    assert triage_task.verifier_corroborates(store, 3002, verdict) is True
+
+
+@pytest.mark.t1
+def test_triage_43_the_assertion_basis_still_matches_on_one_token(tmp_path, clone):
+    """D-17 binds the verifier basis alone: an assertion candidate still matches an issue that carries its text and nothing else of it."""
+    candidate = _candidate(tmp_path, screened=True, run_commit=clone["c1"])
+    verdict = _verdict("assertion", assertion_text=candidate.assertion_text,
+                       assertion_site=candidate.assertion_site,
+                       fingerprint_frame="circt::hw::HWModuleOp::verify HWOps.cpp",
+                       frames=["circt::hw::HWModuleOp::verify"])
+    store = _store(tmp_path, candidate=candidate)
+    _mirror_rows(store, _op_issue(
+        f"It dies at {candidate.assertion_text} somewhere in the HW dialect.",
+        number=9001, labels=()))
+
+    out = call_node(dedup_and_screen, candidate, _seed(), verdict, clone["path"],
+                    str(tmp_path / "loop.db"), 5)
+
+    assert out["dedup"].verdict == "known_open_issue"
+    assert out["dedup"].evidence["issue_number"] == 9001
+    assert out["dedup"].evidence["matched_token"] == candidate.assertion_text
+    assert out["dedup"].evidence["op_only_match"] is None

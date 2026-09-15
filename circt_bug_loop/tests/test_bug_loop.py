@@ -849,7 +849,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
                 ("matched_key", "matched_token", "issue_number", "issue_url",
                  "issue_state", "issue_labels", "duplicate_of_candidate_id",
                  "fixing_commit", "post_pin_file_touches", "rescreened_from",
-                 "generic_text_match")))
+                 "generic_text_match", "op_only_match")))
         _write_rows(LoopStore(db_path),
                     _screened(candidate, fingerprint, dedup, False, False,
                               "seed_commit"),
