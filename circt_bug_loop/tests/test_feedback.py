@@ -295,7 +295,8 @@ def test_T_U_feed_12(tmp_path):
     (directory / "stderr.txt").write_text(
         "loading the input\n"
         "probe.mlir:3:8: error: unknown type 'string' in dialect 'sim'\n"
-        "probe.mlir:9:1: error: a second one, which is not carried\n",
+        "probe.mlir:9:1: error: a second one, which IS carried\n"
+        "probe.mlir:11:1: error: a third one, which is not\n",
         encoding="utf-8")
     rejected = stage_3("p-1", "parse_error", "tool_rejected_input")
     rejected = dataclasses.replace(rejected, artefact_dir=str(directory))
@@ -307,8 +308,10 @@ def test_T_U_feed_12(tmp_path):
     assert again.terminating_condition == "iteration_cap"
 
     entry = first.entries[0]
-    assert entry.error_line == \
+    assert entry.error_line == (
         "probe.mlir:3:8: error: unknown type 'string' in dialect 'sim'"
+        " | probe.mlir:9:1: error: a second one, which IS carried")
+    assert "a third one" not in entry.error_line
     rendered = render_feedback(first)
     assert entry.error_line in rendered
     assert "FIX this input's syntax against the build commit, or replace it" \
@@ -330,3 +333,28 @@ def test_T_U_feed_12(tmp_path):
     # An unreadable artefact directory is not a failure of the bundle.
     missing = dataclasses.replace(rejected, artefact_dir=str(tmp_path / "gone"))
     assert build([missing], iteration=2).entries[0].error_line is None
+
+
+def test_T_U_feed_13(tmp_path):
+    """T-U-feed-13 (campaign 2): the artefact path is not what the cap is spent on."""
+    directory = tmp_path / "probe_p-1"
+    directory.mkdir()
+    path = ("/home/adi/bugloop-artefacts/run-1/seed_56f16468/iter_1/probe_p-1"
+            "/input.mlir")
+    message = "custom op 'om.class.extern' expected valid keyword"
+    (directory / "stderr.txt").write_text(f"{path}:1:36: error: {message}\n",
+                                          encoding="utf-8")
+    rejected = dataclasses.replace(
+        stage_3("p-1", "parse_error", "tool_rejected_input"),
+        artefact_dir=str(directory))
+
+    assert build([rejected], iteration=2).entries[0].error_line == \
+        f"input.mlir:1:36: error: {message}"
+
+    # The cap applies AFTER the strip, so a long path cannot cut the message off.
+    (directory / "stderr.txt").write_text(f"{path}:1:36: error: " + "y" * 300,
+                                          encoding="utf-8")
+    line = build([rejected], iteration=2).entries[0].error_line
+    assert line.startswith("input.mlir:1:36: error: yyy")
+    assert len(line) == feedback_module.ERROR_LINE_CAP
+    assert len(f"{path}:1:36: error: ") > 60, "the path really was eating the cap"

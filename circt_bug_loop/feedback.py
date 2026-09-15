@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
 from chia.base.ChiaFunction import ChiaFunction
@@ -33,8 +33,12 @@ _FEEDBACK_STATUSES = frozenset({"parse_error"})
 #: What `probe_task.probe_execute` writes the probe's diagnostics to (3.6).
 _STDERR_FILE = "stderr.txt"
 
-#: The bound on the one error line an entry carries.
+#: The bound on each error line an entry carries, applied AFTER the path is stripped.
 ERROR_LINE_CAP = 200
+
+#: How many of the stderr's `error:` lines one entry carries, and what joins them.
+ERROR_LINE_COUNT = 2
+ERROR_LINE_JOIN = " | "
 
 #: The stage FR-16.6 counts over.
 _ABANDON_STAGE = "stage_3"
@@ -63,8 +67,14 @@ def _summary(result: ProbeResult) -> Optional[str]:
     return f"died by {result.signal}" if result.signal else None
 
 
+def _strip_dir(line: str) -> str:
+    """Drop the leading path's directory part, which is the artefact dir and not the message."""
+    head, sep, rest = line.partition(":")
+    return f"{PurePosixPath(head).name}{sep}{rest}" if "/" in head else line
+
+
 def _error_line(result: ProbeResult) -> Optional[str]:
-    """The probe's first `error:` diagnostic, bounded, or None (FR-16.1)."""
+    """The probe's first `error:` diagnostics, path-stripped and bounded, or None (FR-16.1)."""
     if result.build_status not in _FEEDBACK_STATUSES:
         return None
     try:
@@ -72,10 +82,9 @@ def _error_line(result: ProbeResult) -> Optional[str]:
             encoding="utf-8", errors="replace")
     except OSError:
         return None
-    for line in stderr.splitlines():
-        if "error:" in line:
-            return line.strip()[:ERROR_LINE_CAP]
-    return None
+    found = [_strip_dir(line.strip())[:ERROR_LINE_CAP]
+             for line in stderr.splitlines() if "error:" in line]
+    return ERROR_LINE_JOIN.join(found[:ERROR_LINE_COUNT]) or None
 
 
 def _entry(result: Optional[ProbeResult], probe_id: str, cap: int) -> FeedbackEntry:
