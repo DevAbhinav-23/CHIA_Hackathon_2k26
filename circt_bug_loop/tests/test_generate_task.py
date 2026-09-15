@@ -553,3 +553,89 @@ def test_a_raising_turn_records_what_the_guard_settled(monkeypatch, config,
     written = json.loads((Path(config["artefact_dir"])
                           / "llm_seed_read.usage.json").read_text())
     assert written == usage
+
+
+@pytest.mark.t0
+def test_T_U_gen_26_stage_one_is_read_once_per_seed_and_reused(replay, config):
+    """T-U-gen-26 (D-14): stage 1's answer does not depend on the feedback, so iterations 2+ are handed it instead of paying for it again."""
+    files = probe_files(["array_element.mlir", "array_zero.mlir"])
+    state = replay([{"text": transcript("seed_read_ok")},
+                    {"text": transcript("probe_write_ok"), "files": files},
+                    {"text": transcript("probe_write_ok"), "files": files}])
+    first = run_seeded(config)
+    reading = generate_task.seed_reading(first)
+    second_dir = Path(config["artefact_dir"]).parent / "iter_2"
+    second = run_seeded({**config, "iteration": 2, "seed_reading": reading,
+                         "artefact_dir": str(second_dir)})
+
+    # One stage-1 turn for the two iterations, and a stage-2 turn for each.
+    assert [call["stage"] for call in state["calls"]] == ["stage_1", "stage_2",
+                                                          "stage_2"]
+    assert len(second["specs"]) == 2, "stage 2 still ran on the second iteration"
+
+    # The answer the second iteration used is the first's, byte for byte.
+    for key in generate_task.SEED_READING_KEYS:
+        assert json.dumps(second[key]) == json.dumps(first[key]), key
+    assert reading == {key: first[key] for key in generate_task.SEED_READING_KEYS}
+
+    # The ledger sees stage 2 alone, and the artefacts say why (D-14).
+    assert list(second["logs"]["usage"]) == ["probe_write"]
+    assert second["logs"]["reused"] == {"stage_1": generate_task.SEED_READ_REUSED}
+    assert json.loads((second_dir / "llm_seed_read.usage.json").read_text()) == {
+        "stage_1": generate_task.SEED_READ_REUSED}
+    assert not (second_dir / "llm_seed_read.prompt.md").exists()
+
+    # `reread_seed` forces the read back on, answer in hand or not.
+    state = replay([{"text": transcript("seed_read_ok")},
+                    {"text": transcript("probe_write_ok"), "files": files}])
+    run_seeded({**config, "iteration": 3, "seed_reading": reading,
+                "reread_seed": True,
+                "artefact_dir": str(Path(config["artefact_dir"]).parent / "iter_3")})
+    assert [call["stage"] for call in state["calls"]] == ["stage_1", "stage_2"]
+
+
+@pytest.mark.t0
+def test_T_U_gen_27_only_stage_two_is_authorised_on_a_reusing_iteration(
+        monkeypatch, config, tool_servers):  # noqa: F811
+    """T-U-gen-27 (D-14, W1): the pre-authorisation prices the turns that are sent, and a reused stage 1 is not one of them."""
+    from circt_bug_loop import llm as llm_module
+
+    probes = {"dir": Path(config["artefact_dir"]) / "probes"}
+    text = {"stage_1": transcript("seed_read_ok"),
+            "stage_2": transcript("probe_write_ok")}
+
+    def _turn(request):
+        if request["stage"] == "stage_2":
+            probes["dir"].mkdir(parents=True, exist_ok=True)
+            for name in ("array_element.mlir", "array_zero.mlir"):
+                (probes["dir"] / name).write_text("hw.module @Top() {}\n")
+        return {"result": text[request["stage"]], "stream": "", "stderr": "",
+                "success": True,
+                "usage": {"tokens_in": 11, "tokens_out": 7, "num_turns": 1,
+                          "model": MODEL_ID, "observed": True}}
+
+    authorised = []
+    unpatched = llm_module.SpendGuard.authorise
+
+    def _authorise(self, request):
+        authorised.append(request["stage"])
+        return unpatched(self, request)
+
+    monkeypatch.setattr(llm_module.llm_turn, "_chia_original", _turn)
+    monkeypatch.setattr(llm_module.SpendGuard, "authorise", _authorise)
+    guard = llm_module.SpendGuard(
+        cap_usd=600.0, spend_usd=0.0,
+        price_usd_per_m_input_tokens=config["price_usd_per_m_input_tokens"],
+        price_usd_per_m_output_tokens=config["price_usd_per_m_output_tokens"])
+
+    first = run_seeded({**config, "spend_guard": guard})
+    assert authorised == ["stage_1", "stage_2"]
+
+    second_dir = Path(config["artefact_dir"]).parent / "iter_2"
+    probes["dir"] = second_dir / "probes"
+    second = run_seeded({**config, "spend_guard": guard, "iteration": 2,
+                         "artefact_dir": str(second_dir),
+                         "seed_reading": generate_task.seed_reading(first)})
+
+    assert second["failure"] is None and len(second["specs"]) == 2
+    assert authorised == ["stage_1", "stage_2", "stage_2"]

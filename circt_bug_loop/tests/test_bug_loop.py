@@ -1069,7 +1069,9 @@ def test_T_U_driver_33(tmp_path: Path):
     assert count("reduced_case") == 2
     assert count("candidate") == 4 and count("fingerprint") == 2
     assert count("dedup_verdict") == 2 and count("report") == 4
-    assert count("gate_decision") == 2 and count("feedback") == 2
+    # D-14: the cap here is one iteration, so no bundle any iteration would read
+    # exists and none is written; the two-iteration case is T-U-driver-51.
+    assert count("gate_decision") == 2 and count("feedback") == 0
     assert count("repair") == 0 and count("filing") == 0
 
     # FR-17.6: every row traces to this run, and the run row carries its end.
@@ -1335,6 +1337,54 @@ def test_T_U_driver_37_the_snapshot_is_rebuilt_every_iteration(tmp_path: Path):
     assert "budget_module.snapshot(" not in source.split("for iteration in range")[0]
     assert handed and all(s.arm in ("seeded", "mutation") for s in handed)
     assert len({id(s) for s in handed}) == len(handed), "one object per iteration"
+
+
+def test_T_U_driver_51_the_seed_reading_is_carried_and_the_last_bundle_is_not_written(
+        tmp_path: Path):
+    """T-U-driver-51 (D-14): the driver hands iteration 1's stage-1 answer to every later iteration, and writes no bundle for an iteration that cannot run."""
+    answer = {"root_cause_class": "the element type is assumed to be integral",
+              "sibling_sites": [{"file": "lib/A.cpp", "symbol": "parse",
+                                 "why": "the same cast"}],
+              "rejected_sites": []}
+    handed = []
+
+    def generate(seed, feedback, remaining, cfg):
+        reused = cfg.get("seed_reading")
+        handed.append(reused)
+        usage = {"probe_write": {"tokens_in": 200, "tokens_out": 40}}
+        walls = {"probe_write": 0.05}
+        if reused is None:
+            # What A3 reports for the one iteration that sends the stage-1 turn.
+            usage["seed_read"] = {"tokens_in": 100, "tokens_out": 20}
+            walls["seed_read"] = 0.04
+        digit = "0" if remaining.arm == "seeded" else "1"
+        return {"specs": [probe_spec(f"p-{digit}{cfg['iteration']}0000000000",
+                                     remaining.arm, iteration=cfg["iteration"])],
+                **answer, "logs": {"usage": usage, "wall_seconds": walls},
+                "counters": schema.CounterBlock(
+                    stage="stage_2", started=1, completed=1, failed=0, seconds=0.1)}
+
+    stages = dataclasses.replace(fake_stages(), generate_seeded=generate,
+                                 generate_mutation=generate)
+    run = mini_campaign(tmp_path, stages=stages,
+                        budget={"per_seed_iteration_cap": 2})
+    loop = run["store"]
+
+    # Two arms, two iterations each: the first reads, the second is handed it.
+    assert handed == [None, answer, None, answer]
+
+    # So the ledger carries one stage-1 row per arm and not one per iteration.
+    stage_1 = loop.query("SELECT arm FROM ledger_entry WHERE scope = 'stage' "
+                         "AND stage = 'stage_1'")
+    assert sorted(row["arm"] for row in stage_1) == ["mutation", "seeded"]
+    assert loop.query_one("SELECT COUNT(*) AS n FROM ledger_entry WHERE "
+                          "scope = 'stage' AND stage = 'stage_2'")["n"] == 4
+
+    # The bundle iteration 2 reads is on disk; the one no iteration reads is not.
+    paths = [Path(row["path"]) for row in loop.query("SELECT path FROM feedback")]
+    assert len(paths) == 2 and all(path.is_file() for path in paths)
+    assert {path.parent.name for path in paths} == {"iter_2"}
+    assert not (paths[0].parent.parent / "iter_3").exists()
 
 
 def test_T_U_driver_38_checks_seven_and_eight_ask_the_workers(tmp_path: Path):
