@@ -578,7 +578,7 @@ def test_T_U_driver_28b_the_generator_side_holds_no_circt_slot():
 
     cfg = bug_loop.generator_cfg(manifest(), budget_file(), clone_path="/clone",
                                  iteration=0)
-    assert cfg["here_options"] == bug_loop.HERE_OPTIONS == {"num_cpus": 1}
+    assert cfg["here_options"] == bug_loop.HERE_OPTIONS == {"num_cpus": 0}
     assert cfg["here_options"] is not bug_loop.HERE_OPTIONS, "the caller gets a copy"
     assert "circt" not in cfg["here_options"].get("resources", {})
     assert generate_task.generate_seeded._chia_options == {"max_retries": 0}

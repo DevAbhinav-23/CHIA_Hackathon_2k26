@@ -192,8 +192,11 @@ def head_options(node_id: str) -> dict:
             NodeAffinitySchedulingStrategy(node_id=node_id, soft=False)}
 
 
-#: What a generator-side tool actor is placed at: one CPU and NO cluster resource.
-HERE_OPTIONS = {"num_cpus": 1}
+#: What a generator-side tool actor is placed at: NO cluster resource, and the
+#: `num_cpus=0` `chia.base.tools.ChiaTool._ToolServerActor` already declares. It
+#: is stated rather than left to the default so that the one placement question
+#: campaign 2 got wrong is answered in the flow and not in CHIA's decorator.
+HERE_OPTIONS = {"num_cpus": 0}
 
 
 #: Every node of 3.2 that MUST run on the head, by `<module>.<name>` (K4).

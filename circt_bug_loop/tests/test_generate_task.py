@@ -357,7 +357,7 @@ def test_T_U_gen_20_the_two_tools_are_placed_on_different_nodes(replay, config,
     assert source_read.task_options != probe_write.task_options
     for tool in (source_read, probe_write):
         assert "circt" not in (tool.task_options or {}).get("resources", {})
-    assert bug_loop.HERE_OPTIONS == {"num_cpus": 1}
+    assert bug_loop.HERE_OPTIONS == {"num_cpus": 0}
     assert generate_seeded._chia_options == {"max_retries": 0}
 
 
