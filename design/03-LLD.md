@@ -763,6 +763,9 @@ exactly on that class under a rule of their own in §2.8; the fingerprint gains 
 serialiser. §6.2 carries the two auxiliary tables and the widened `CHECK` they need, and §9.1 the
 cached-input rate that is deliberately **not** a registered key.
 
+
+> **Erratum 2026-09-15 (contract 2.1, recorded late).** `BuildStatus` has carried `tool_unavailable` since contract 2.1 (W-20b: the probe tool missing from the image is the tool's fault, not the input's); the literal above lists the seven earlier values and is not re-frozen here. FR-06.9 records the nine current values.
+
 ### 2.5 The interface, and the read-only ledger view
 
 ```python
