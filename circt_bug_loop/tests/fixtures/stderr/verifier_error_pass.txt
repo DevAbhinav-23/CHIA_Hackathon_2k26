@@ -1,0 +1,1 @@
+/tmp/probe/input.mlir:0:0: error: 'builtin.module' op multiple candidate top-level modules detected (test_buffer_data, test_buffer_none). Please remove one of these from the source program.

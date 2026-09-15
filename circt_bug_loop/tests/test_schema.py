@@ -528,3 +528,35 @@ def test_T_U_schema_24():
     error = raises("E002_MISSING_FIELD", schema.from_json,
                    json.dumps(structural), schema.RunManifest)
     assert "['pin_sha']" in str(error)
+
+
+def test_T_U_schema_25_contract_2_4s_verifier_error_class():
+    """D-13: the ninth build status, the fifth oracle class and their two fields."""
+    assert schema.CONTRACT_VERSION == "2.4"
+    assert "verifier_error" in schema.BuildStatus.__args__
+    assert "verifier_error" in schema.OracleClass.__args__
+
+    fired = edit(result(), build_status="verifier_error")
+    fired = dataclasses.replace(
+        fired, oracle_class="verifier_error", assertion_text=None,
+        assertion_site=None,
+        verifier_message="error: 'comb.extract' op result #0 must be a "
+                         "signless integer bitvector",
+        verifier_op="comb.extract")
+    assert schema.validate(fired) is None
+    assert schema.from_json(schema.to_json(fired), schema.ProbeResult) == fired
+
+    # The pair is non-null exactly on the class, both ways.
+    for name in ("verifier_message", "verifier_op"):
+        error = raises("E005_CONDITIONAL_REQUIRED", schema.validate,
+                       dataclasses.replace(fired, **{name: None}))
+        assert f"ProbeResult.{name} is non-null exactly" in str(error)
+        raises("E005_CONDITIONAL_REQUIRED", schema.validate,
+               dataclasses.replace(result(), **{name: "x"}))
+
+    # A 2.3 payload carries neither field and still loads.
+    document = payload("probe_result/assertion_01.json") | {"contract_version": "2.3"}
+    del document["verifier_message"]
+    del document["verifier_op"]
+    loaded = schema.from_json(json.dumps(document), schema.ProbeResult)
+    assert loaded.verifier_message is None and loaded.verifier_op is None

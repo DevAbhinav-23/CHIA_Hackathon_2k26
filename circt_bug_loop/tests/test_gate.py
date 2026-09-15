@@ -778,3 +778,90 @@ def test_gate_20_every_stopping_value_lands_in_its_stated_bucket():
     free = dict.fromkeys(ANSWER_KEYS)
     free.update(q1_reproduce=True, q2_minimal=False, q2_reason="already_minimal")
     assert decide(free, None) == ("nothing", 2, "not_minimal")
+
+
+#: D-13's pass, as the probe's argv and the repro command name it.
+MOORE_PASS = "--convert-moore-to-core"
+
+
+def _verifier_candidate(tmp_path, bin_dir, case):
+    """A `verifier_error` candidate, fingerprinted the way stage 6 fingerprints it."""
+    from circt_bug_loop.store import OracleVerdict
+
+    verdict = OracleVerdict(
+        probe_id="p-01", fired=True, oracle_class="verifier_error",
+        assertion_text=None, assertion_site=None, fatal_message=None, frames=[],
+        prologue_dropped=0, frames_resolved=0, frames_with_location=0,
+        fingerprint_frame=None, out_of_scope_root=False, repro_command="x",
+        flag_string="-UNDEBUG", tool_version_output="v",
+        verifier_message="error: 'comb.extract' op result #0 must be a signless "
+                         "integer bitvector, but got '!hw.array<2xi2>'",
+        verifier_op="comb.extract")
+    fingerprint = compute_fingerprint(verdict, None, "", TOP_N,
+                                      pass_name="convert-moore-to-core")
+    return _candidate(
+        tmp_path, bin_dir, case=case, oracle_class="verifier_error",
+        assertion_text=None, assertion_site=None, frame_tuple=[],
+        frames_resolved=0, frames_with_location=0,
+        repro_command=f"{bin_dir}/entry-tool {MOORE_PASS} {case}",
+        fingerprint=fingerprint.value, dedup_basis="verifier")
+
+
+def test_gate_28_question_3_reads_stage_3s_own_parse_and_verify_run(tmp_path,
+                                                                   monkeypatch):
+    """D-13: the validity command already ran on this input, and is not run twice."""
+    bin_dir = _tools(tmp_path, entry="verifier.sh", check="clean.sh")
+    case = tmp_path / "case.mlir"
+    candidate = _verifier_candidate(tmp_path, bin_dir, case)
+    store = _store(tmp_path, candidate, argv=[MOORE_PASS, "in.mlir"])
+    store.update("oracle_verdict", {"probe_id": candidate.probe_id},
+                 {"oracle_class": "verifier_error", "assertion_text": None,
+                  "assertion_site": None, "frames_json": "[]",
+                  "fingerprint_frame": None})
+    verify_stderr = Path(candidate.artefact_dir, "verify.stderr.txt")
+    verify_stderr.parent.mkdir(parents=True, exist_ok=True)
+    verify_stderr.write_text("")
+
+    decision, _, seen = _decide(
+        tmp_path, monkeypatch, candidate=candidate, store=store,
+        reduced=_reduced(case, recheck_class="verifier_error",
+                         recheck_assertion_text=None, recheck_assertion_site=None),
+        entry="verifier.sh")
+    assert [call["node"] for call in seen] == ["gate_rerun"], (
+        "gate_validate is not dispatched: stage 3 already ran §4.8's command")
+    assert (decision.q1_reproduce, decision.q2_minimal, decision.q3_valid,
+            decision.q4_new) == (True, True, True, True)
+    assert decision.q3_validity_basis == "parsed"
+    assert decision.q3_exit_status == 0
+    assert decision.q3_stderr_path == str(verify_stderr)
+    # The failure IS after parsing: the input verified and the pass made the op.
+    assert decision.q3_after_parse is True
+    assert decision.decision == "report" and decision.taxonomy_bucket == "new_bug"
+    # It is not invalid input, and the re-run agreed it is the same failure.
+    assert store.query_one(
+        "SELECT fingerprint_stable FROM fingerprint WHERE candidate_id = ?",
+        (candidate.candidate_id,))["fingerprint_stable"] == 1
+
+
+def test_gate_29_the_rerun_judges_a_verifier_error_by_the_same_rule(tmp_path,
+                                                                   monkeypatch):
+    """D-13: `gate_rerun` runs §4.8's command too, or question 1 always says no."""
+    bin_dir = _tools(tmp_path, entry="verifier.sh", check="clean.sh")
+    case = tmp_path / "case.mlir"
+    case.write_bytes((GATE / "case.mlir").read_bytes())
+    out = call_node(gate_rerun, f"{bin_dir}/entry-tool {MOORE_PASS} {case}",
+                    _manifest(tmp_path, bin_dir).image_spec, LIMITS,
+                    str(tmp_path / "artefacts"), run_manifest_id="r" * 32,
+                    candidate_id="cand-0001", top_n=TOP_N)
+    assert out["status"] == "verifier_error"
+    assert out["oracle_class"] == "verifier_error"
+    assert out["fingerprint"].startswith("comb.extract\n")
+    assert "convert-moore-to-core" in out["fingerprint"]
+
+    # The same tool with §4.8's command refusing the input is a parse error.
+    refusing = _tools(tmp_path / "b", entry="verifier.sh", check="diagnostic.sh")
+    out = call_node(gate_rerun, f"{refusing}/entry-tool {MOORE_PASS} {case}",
+                    _manifest(tmp_path / "b", refusing).image_spec, LIMITS,
+                    str(tmp_path / "artefacts"), run_manifest_id="r" * 32,
+                    candidate_id="cand-0001", top_n=TOP_N)
+    assert out["status"] == "parse_error" and out["oracle_class"] is None

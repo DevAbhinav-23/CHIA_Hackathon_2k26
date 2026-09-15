@@ -14,12 +14,13 @@ from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.circt_core import CIRCT_ROOTS, circt_exec_probe
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
-from circt_bug_loop.probe_task import (DEFAULT_VALIDITY_COMMAND, PROBE_NOFILE,
-                                       VALIDITY_COMMANDS, VERIFY_STDERR_FILE,
-                                       BinaryMismatch, _last_pass, _sha256,
-                                       classify_build, oracle_primary,
-                                       probe_input, validity_command,
-                                       verifier_upgrade)
+# §4.8's command table is `probe_task`'s since D-13: stage 3 asks it first.
+from circt_bug_loop.probe_task import (DEFAULT_VALIDITY_COMMAND,  # noqa: F401
+                                       PROBE_NOFILE, VALIDITY_COMMANDS,
+                                       VERIFY_STDERR_FILE, BinaryMismatch,
+                                       _last_pass, _sha256, classify_build,
+                                       oracle_primary, probe_input,
+                                       validity_command, verifier_upgrade)
 from circt_bug_loop.store import (BuildResult, CandidateRecord, DedupVerdict,
                                   GateDecision, LoopStore, ReducedCase,
                                   RepairResult, validate_candidate)

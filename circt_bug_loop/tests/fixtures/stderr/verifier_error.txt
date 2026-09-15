@@ -1,0 +1,2 @@
+input.mlir:2:8: error: 'comb.extract' op result #0 must be a signless integer bitvector, but got '!hw.array<2xi2>'
+input.mlir:2:8: note: see current operation: %0 = "comb.extract"(%arg0) <{lowBit = 0 : i32}> : (i4) -> !hw.array<2xi2>

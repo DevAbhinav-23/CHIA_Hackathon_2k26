@@ -917,6 +917,22 @@ NO_TURN_PROSE = (
     "(FR-11.4).")
 
 
+#: The prose a report carries when the driver has stage 6's turn off (D-13).
+NO_TURN_PROSE_RECLASSIFIED = (
+    "NO MODEL TURN WAS MADE FOR THIS CANDIDATE. `--reclassify` re-judged a "
+    "stored probe against contract 2.4's `verifier_error` rule and never sends "
+    "a turn, so this field is the driver's own sentence. Every number, size, "
+    "hash and verdict below is read off the record exactly as it is for a "
+    "candidate that did get a turn (FR-11.4, FR-11.8).")
+
+
+def turn_skipped() -> tuple:
+    """FR-11.8's template report for a driver that is running with no turn (D-13)."""
+    prose = dict.fromkeys(("title", "summary", "why_it_matters"),
+                          NO_TURN_PROSE_RECLASSIFIED)
+    return "untriaged", prose, NO_TURN_PROSE_RECLASSIFIED
+
+
 def screened_out(dedup: Optional[DedupVerdict]) -> Optional[tuple]:
     """What to record for a candidate the screen already decided, or None."""
     if dedup is None or dedup.verdict == "new":
@@ -951,11 +967,14 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     classification = "untriaged"
     reason = ""
     screened = screened_out(dedup)
+    why = dedup.verdict if screened is not None else None
+    if screened is None and cfg.get("skip_turn"):
+        screened, why = turn_skipped(), "turn_disabled"
 
     if screened is not None:
         # No turn at all.
         classification, prose, reason = screened
-        logs.update({"turn_skipped": dedup.verdict, "success": True,
+        logs.update({"turn_skipped": why, "success": True,
                      "result": "", "stream": "", "stderr": ""})
     else:
         try:

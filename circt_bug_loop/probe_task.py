@@ -195,12 +195,7 @@ def generalise_types(message: str) -> str:
 def verifier_upgrade(status: str, reason: str, stderr: str, input_path: str,
                      tool_hashes: dict, limits: dict, work_dir: str,
                      bin_dir: str) -> tuple:
-    """D-13: book a rejection the input itself is not to blame for as the tool's.
-
-    A tool that refuses an op it created, rather than one the input holds, has
-    failed its own verifier. §4.8's parse-and-verify command on the input alone
-    is what separates the two, and it is run only when the diagnostic names an op.
-    """
+    """D-13: book a rejection the input itself is not to blame for as the tool's."""
     if (status, reason) != ("parse_error", "tool_rejected_input"):
         return status, reason
     if not verifier_detail(stderr)[0]:
@@ -235,6 +230,27 @@ def input_verifies(input_path: str, tool_hashes: dict, limits: dict,
 def probe_input(argv: list) -> str:
     """The input path of one recorded argv: its last token that is a file on disk."""
     return next((token for token in reversed(list(argv)) if os.path.isfile(token)), "")
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def probe_verify(input_path: str, image_spec: ImageSpec, limits: dict,
+                 artefact_dir: str, *, bin_dir: str = CIRCT_BIN_DIR) -> dict:
+    """Run §4.8's parse-and-verify command on one stored input (D-13).
+
+    Returns:
+        {"valid": bool, "counters": CounterBlock}, `valid` saying the input parses and verifies on its own; the counters count one check at stage_3, as 3.11 requires of every node.
+    Worker:
+        {"circt": 1} - it runs the image's own CIRCT binaries.
+    Raises:
+        nothing.
+    """
+    started_at = time.monotonic()
+    valid = input_verifies(input_path, image_spec.tool_hashes, limits,
+                           artefact_dir, bin_dir)
+    return {"valid": valid,
+            "counters": schema.CounterBlock(
+                stage="stage_3", started=1, completed=1, failed=0,
+                seconds=time.monotonic() - started_at)}
 
 
 def classify_build(rc: Optional[int], signal: Optional[str], stderr: str,
@@ -1522,7 +1538,8 @@ def _sha256(path: str) -> str:
         return ""
 
 
-__all__ = ["BinaryMismatch", "probe_execute", "classify_build", "oracle_primary",
+__all__ = ["BinaryMismatch", "probe_execute", "probe_verify",
+           "classify_build", "oracle_primary",
            "strip_prologue", "select_reducer", "reduce_case",
            "validity_command", "verifier_detail", "generalise_types",
            "verifier_upgrade", "input_verifies", "probe_input",
