@@ -366,11 +366,13 @@ withheld it as a duplicate of open issue 8508. % pilots 1-8: analysis/measuremen
 The two mutator syntheses cost USD 0.49 each, and naming the regular-expression
 engine in the prompt raised the kept mutators from 11 of 22 to 25 of 25. % 2026-09-16-mutator-synthesis.md 9.5, 10.4
 
-\textbf{Repair, attempted once.} On the assertion, CHIA's chain diagnosed the
-cause, 32-bit overflow in the slice bounds leaving an empty operand list, and
-decided the issue clear; its reproduce phase then wrote its own variant instead
-of confirming the loop's script and scored no reproduction, so no patch was
-attempted. % analysis/measurements/2026-09-15-repair-run.md attempt 2
+\textbf{Repair.} Three attempts on the assertion. The first two never reached a
+patch: the chain's reproduce step could not confirm the loop's own script,
+which, we found, handed the tool two input files, our defect, not the chain's.
+With that fixed the chain reproduced the failure, wrote a one-line change,
+rebuilt CIRCT and ran its test gate, and was writing up when the 45-minute
+wall we set ended it; the change was a debug print, not a fix. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
+A fix is not claimed.
 
 % =====================================================================
 \section{Related Work}
