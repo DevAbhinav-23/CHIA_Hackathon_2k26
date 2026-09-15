@@ -1,0 +1,170 @@
+# Ray cluster for ONE REPAIR ATTEMPT - SINGLE MACHINE, 3 containers.
+#
+#   bugloop_llm    : 1 x chia:latest,          llm:1    -> 1 concurrent prompt
+#   bugloop_circt  : 1 x chia-circt-assert,    circt:1  -> 1 concurrent probe
+#   bugloop_repair : 1 x chia-circt-assert,    repair:1 -> 1 repair attempt
+#
+# THIS IS cluster_single.yaml WITH THREE NUMBERS CHANGED AND NOTHING ELSE. Same
+# cluster_name, same images, same mounts, same --user, same env forwarding, same
+# setup commands, same head environment. The deltas, and only these:
+#
+#   1. bugloop_llm and bugloop_circt drop from 2 containers to 1 (and the
+#      cluster's own min/max_workers from 5 to 3).
+#   2. bugloop_repair's --memory / --memory-swap rise from 4g to 9g.
+#
+# WHY. `analysis/measurements/2026-09-15-repair-verification.md`: the repair
+# chain's `_restore` rebuild re-configured and compiled correctly as uid 1000,
+# and then Ray's memory monitor killed the task mid-`ninja` with
+# `refused:OutOfMemoryError` at 1,834 s - a NODE-level kill, not the container's
+# 4 GiB cgroup. The host has 15 GiB and was holding FIVE workers plus four
+# concurrent LLVM link jobs. The rebuild is the memory peak of the whole loop
+# and an LLVM link is the peak of the rebuild, so the fix is to give that one
+# container the headroom and to take the four idle containers off the machine
+# while it uses it: 5 (circt) + 9 (repair) = 14 GiB of cgroup CAP against
+# 15 GiB of host, with only the repair container actually building.
+#
+# THIS FILE IS FOR THE REPAIR STEP AND IS NOT THE CAMPAIGN'S CLUSTER.
+# cluster_single.yaml is what FR-14.5's wall-clock equality is measured on, and
+# its 2/2/1 is what RunManifest.llm_concurrency and apparatus_concurrency record
+# for both arms. A stage-7 attempt driven on its own through
+# `bug_loop._drive_repair` asks for the `repair` resource and nothing else, so
+# the two reduced types exist here only to keep the cluster's SHAPE - three
+# types, three resource names, the same pre-flight surface - identical to the
+# one the campaign runs on. Nothing in this file may be used to report a
+# campaign concurrency.
+#
+# Everything cluster_single.yaml's own header says about the credential
+# (a ${...} REFERENCE, never a value, NFR-06/NFR-07), the LOCAL and UNPULLED
+# assertions image, the `-u1000` child layer on the repair type only, the
+# forwarded SSH agent, and the REQUIRED ${BUGLOOP_HEAD_ENV} applies here
+# unchanged. Read that file for the reasoning; it is not duplicated here.
+cluster_name: circt_bug_loop
+
+available_node_types:
+    bugloop_llm:
+        resources: {"llm": 1}
+        balance_level: cluster
+        min_workers: 1
+        max_workers: 1
+        docker:
+            image: "ghcr.io/ucb-bar/chia:latest"
+            container_name: "circt_bug_loop_llm_${USER}"
+            pull_before_run: True
+            run_options:
+                # No --cpus / --memory here, unlike the other two types: this
+                # container makes HTTPS calls and holds no CIRCT tree, so
+                # NFR-05's outer level has nothing to protect the machine from.
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                - "--user $(id -u):$(id -g)"
+                - "-e GEMINI_API_KEY=${GEMINI_API_KEY}"
+                - "-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}"
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+            run_setup_commands:
+                # `|| true` HERE AND NOT ON THE OTHER TWO TYPES; see
+                # cluster_single.yaml for why.
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd || true
+                - mkdir -p ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+        compatible_ips: ["${CHIA_HEAD}"]
+
+    bugloop_circt:
+        resources: {"circt": 1}
+        balance_level: cluster
+        min_workers: 1
+        max_workers: 1
+        docker:
+            # LOCAL NAME, NO REGISTRY, AND NO PULL.
+            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}"
+            container_name: "circt_bug_loop_circt_${USER}"
+            pull_before_run: False
+            run_options:
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                - "--user $(id -u):$(id -g)"
+                # NFR-05's OUTER level: these protect the worker and the
+                # machine. The probe's own rlimits, set by prlimit on its argv,
+                # are what classify the probe.
+                - --cpus=6
+                - --memory=5g          # unchanged from cluster_single.yaml
+                - --memory-swap=5g
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+            run_setup_commands:
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                - git config --global user.email 'circt_bug_loop@chia' || true
+                - git config --global user.name  'circt_bug_loop'       || true
+                - git config --global --add safe.directory /workspace/circt || true
+        compatible_ips: ["${CHIA_HEAD}"]
+
+    bugloop_repair:
+        resources: {"repair": 1}
+        balance_level: cluster
+        min_workers: 1
+        max_workers: 1
+        docker:
+            # LOCAL NAME, NO REGISTRY, AND NO PULL. `-u1000` on THIS TYPE ONLY:
+            # the repair chain re-configures and rebuilds /workspace/circt and
+            # CMake's `configure_file` chmod needs OWNERSHIP, not a write bit.
+            image: "chia-circt-assert:${BUGLOOP_IMAGE_TAG}-u1000"
+            container_name: "circt_bug_loop_repair_${USER}"
+            pull_before_run: False
+            run_options:
+                - --ulimit nofile=65536:65536
+                - --shm-size=10.24gb
+                - "--user $(id -u):$(id -g)"
+                - --cpus=4             # == repair_adapter.BUILD_JOBS (W-19b)
+                # 9g, up from 4g. Ray's memory monitor reads THIS cgroup limit
+                # for the node it runs in, and `_restore`'s `ninja -j 4` links
+                # up to four LLVM binaries at once under it. 4 GiB was killed
+                # mid-link (2026-09-15 repair verification); 9 GiB is what the
+                # 15 GiB host can hold beside one 5 GiB probe container.
+                - --memory=9g
+                - --memory-swap=9g
+                - "-v ${BUGLOOP_ARTEFACTS}:${BUGLOOP_ARTEFACTS}"
+                - "-v $SSH_AUTH_SOCK:/ssh-agent"
+                - "-e SSH_AUTH_SOCK=/ssh-agent"
+                - "-e GEMINI_API_KEY=${GEMINI_API_KEY}"
+                - "-e BUGLOOP_ALLOW_LIVE_MODEL=${BUGLOOP_ALLOW_LIVE_MODEL}"
+            run_setup_commands:
+                - echo "user:x:$(id -u):$(id -g)::/home/ray:/bin/bash" >> /etc/passwd
+                - git config --global user.email 'circt_bug_loop@chia' || true
+                - git config --global user.name  'circt_bug_loop'       || true
+                - git config --global --add safe.directory /workspace/circt || true
+        compatible_ips: ["${CHIA_HEAD}"]
+
+provider:
+    head_ip: ${CHIA_HEAD}
+
+auth:
+    ssh_user: ${USER}
+
+# 1 llm + 1 circt + 1 repair = 3 workers, all on the one machine.
+min_workers: 3
+max_workers: 3
+upscaling_speed: 1.0
+idle_timeout_minutes: 5
+
+file_mounts: {}
+cluster_synced_files: []
+file_mounts_sync_continuously: False
+rsync_exclude: ["**/.git", "**/.git/**"]
+rsync_filter: [".gitignore"]
+initialization_commands: []
+setup_commands: []
+worker_setup_commands: []
+
+# THE HEAD ENVIRONMENT, exactly as in cluster_single.yaml: ${BUGLOOP_HEAD_ENV}
+# is the ACTIVATE SCRIPT of the environment the driver, both head nodes and
+# `ray start` itself run from, expanded by chia.cluster.config._expand_env_vars
+# at load. It is REQUIRED and cannot be defaulted here.
+head_setup_commands:
+    - "source ${BUGLOOP_HEAD_ENV}"
+head_start_ray_commands:
+    - "source ${BUGLOOP_HEAD_ENV} && ray stop"
+    - "source ${BUGLOOP_HEAD_ENV} && ulimit -c unlimited && ray start --head --port=6379 --include-dashboard=True --dashboard-agent-listen-port=0"
+worker_start_ray_commands:
+    - ray stop
+    - ray start --address=$RAY_HEAD_IP:6379 --dashboard-agent-listen-port=0
