@@ -391,9 +391,9 @@ downstream and discards by default.
 \section{Artefact and Limitations}
 We release the loop as CHIA nodes and tools, so swapping the generator for the
 mutation arm is one node substituted. Its two halves meet at a frozen contract
-of seven record types and one function call, version 2.2, tested separately
+of seven record types and one function call, version 2.4, tested separately
 against recorded examples; % contract 2.2, tag contract-2.2: circt_bug_loop/contract/FROZEN.md
-the suite is 634 tests, 594 of which need no cluster, network or model. % 2026-09-14 at HEAD d94fc42: 634 passed, 1 skipped with -m "not t2 and not t3"; -m t0 = 594
+the suite is 736 tests, 686 of which need no cluster, network or model. % 2026-09-15 at HEAD: pytest --co = 736; -m t0 = 686
 On CHIA's cluster layer the loop's five containers come up in 38 seconds and,
 with a recorded generator, drive 16 probes through both arms in 7.4 seconds. % chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s: docs/HANDOFF.md W-19b
 Four things go upstream to CHIA: the Dockerfile for the assertions-on image, its
