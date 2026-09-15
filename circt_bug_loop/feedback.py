@@ -64,6 +64,8 @@ def _summary(result: ProbeResult) -> Optional[str]:
     if result.oracle_class == "assertion" and result.assertion_text:
         site = result.assertion_site or ""
         return f"{result.assertion_text}\n{site}" if site else result.assertion_text
+    if result.oracle_class == "verifier_error":
+        return result.verifier_message
     return f"died by {result.signal}" if result.signal else None
 
 

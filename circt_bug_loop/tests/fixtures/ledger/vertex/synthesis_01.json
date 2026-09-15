@@ -1,7 +1,7 @@
 {
   "amount": 611.2,
   "arm": "shared",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "entry_id": "v-shared-01",
   "metered": true,
   "observed": {

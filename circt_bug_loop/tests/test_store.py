@@ -118,10 +118,10 @@ def test_T_U_store_01(tmp_path: Path):
                       "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
     tables = [r["name"] for r in rows if r["type"] == "table"]
     indexes = [r["name"] for r in rows if r["type"] == "index"]
-    # §6.2's twenty-one, plus the two §6.2 does NOT declare.
-    assert len(tables) == 23 and "candidate" in tables and "registration" in tables
+    # §6.2's twenty-one, plus the three §6.2 does NOT declare.
+    assert len(tables) == 24 and "candidate" in tables and "registration" in tables
     assert len(indexes) == 9 and "ix_ledger_day" in indexes
-    for late in ("registration", "turn_failure"):
+    for late in ("registration", "turn_failure", "verifier_error"):
         assert late in tables and late not in store._DDL_TABLES
 
     conn = sqlite3.connect(str(tmp_path / "loop.db"))
@@ -247,8 +247,9 @@ def test_T_U_store_06(tmp_path: Path):
         else:
             campaign_wide.append(table)
     assert campaign_wide == ["image", "issue_mirror"]
-    # 19 of §6.2, plus W-12's `registration` and D-3's `turn_failure`.
-    assert len(traced) == 21
+    # 19 of §6.2, plus W-12's `registration`, D-3's `turn_failure` and D-13's
+    # `verifier_error`.
+    assert len(traced) == 22
 
     seed_rows(loop)
     row = loop.query_one("SELECT artefact_dir, run_manifest_id FROM candidate")

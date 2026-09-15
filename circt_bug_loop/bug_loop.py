@@ -107,7 +107,7 @@ IMAGE_FLAG_STRING = "-O3 -UNDEBUG -gline-tables-only"
 PIN_CHECK_LINE = "PIN CHECK PASSED"
 
 #: The statuses at which a probe carries on to stage 4 (FR-06.9, 3.6).
-_FIRING_STATUSES = ("assertion", "fatal_error", "crash")
+_FIRING_STATUSES = ("assertion", "fatal_error", "crash", "verifier_error")
 
 #: The status at which a probe stops WITHOUT the differential being asked (N9).
 _UNDECIDED_STATUS = "tool_unavailable"
@@ -1243,6 +1243,10 @@ def write_probe_result(store: LoopStore, result, artefact_dir: str) -> None:
 def write_oracle_verdict(store: LoopStore, verdict) -> None:
     """Write stage 4's `oracle_verdict` row, frames and all."""
     store.insert("oracle_verdict", _row(store, "oracle_verdict", verdict))
+    # §6.2's `oracle_verdict` is frozen, so contract 2.4's two fields are their
+    # own row and are written only by the class that has them (D-13).
+    if verdict.verifier_op is not None:
+        store.insert("verifier_error", _row(store, "verifier_error", verdict))
 
 
 def write_differential_verdict(store: LoopStore, verdict) -> None:
@@ -2220,7 +2224,10 @@ def oracle_verdict_of(store: LoopStore, probe_id: str):
     frames = [Frame(**frame) for frame in json.loads(row.pop("frames_json"))]
     row.update(fired=bool(row["fired"]),
                out_of_scope_root=bool(row["out_of_scope_root"]))
-    return OracleVerdict(frames=frames, **row)
+    verifier = store.query_one(
+        "SELECT verifier_message, verifier_op FROM verifier_error "
+        "WHERE probe_id = ?", (probe_id,)) or {}
+    return OracleVerdict(frames=frames, **row, **verifier)
 
 
 def seed_record_of(store: LoopStore, run_id: str, probe_id: str) -> SeedRecord:

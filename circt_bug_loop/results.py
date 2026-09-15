@@ -23,9 +23,10 @@ ARMS = ("seeded", "mutation")
 BUCKETS = ("unreproducible", "not_minimal", "invalid_input", "duplicate",
            "undecided", "new_bug")
 
-#: FR-06.9's seven build statuses.
+#: FR-06.9's seven build statuses, plus 2.1's and 2.4's.
 BUILD_STATUSES = ("clean_exit", "parse_error", "assertion", "fatal_error",
-                  "crash", "timeout", "oom", "tool_unavailable")
+                  "crash", "timeout", "oom", "tool_unavailable",
+                  "verifier_error")
 PARSE_REASONS = ("tool_rejected_input", "tool_rejected_argv")
 
 #: The stages a MODEL TURN is charged to.
@@ -798,7 +799,10 @@ def _render(facts: dict) -> str:
         "`parse_error` is printed as two rows: `tool_rejected_input` is the tool "
         "refusing the probing input, and `tool_rejected_argv` is the tool refusing "
         "the argument vector the loop built, which is an apparatus defect and not a "
-        "property of the input. They sum to the `parse_error` total.",
+        "property of the input. They sum to the `parse_error` total. "
+        "`verifier_error` is counted apart from both and never as invalid input: "
+        "the tool refused an op it created itself, and §4.8's parse-and-verify "
+        "command showed the input to be valid (D-13).",
         "",
     ]
     failures = facts["turn_failures"]

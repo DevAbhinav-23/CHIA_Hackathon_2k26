@@ -399,7 +399,7 @@ def test_T_U_schema_19():
 
 def test_T_U_schema_20():
     """T-U-schema-20 (FR-01.1): contract 2.0's two new fields."""
-    assert schema.CONTRACT_VERSION == "2.3"
+    assert schema.CONTRACT_VERSION == "2.4"
     for name in ("diff", "test_files"):
         error = raises("E002_MISSING_FIELD", schema.validate, edit(seed(), **{name: None}))
         assert f"SeedRecord.{name} is None" in str(error)
@@ -445,7 +445,7 @@ def test_T_U_schema_22():
         "image", "corpus", "pin", "mirror", "synthesis",
         # Five added at the join (W-17).
         "feedback", "budget", "ledger", "artefact", "results"}
-    assert schema.CONTRACT_VERSION == "2.3"
+    assert schema.CONTRACT_VERSION == "2.4"
 
 
 def test_T_U_schema_23():
@@ -514,7 +514,7 @@ def test_T_U_schema_27():
 
 def test_T_U_schema_24():
     """W-23: a payload written at an older MINOR still loads at this one."""
-    assert schema.CONTRACT_VERSION == "2.3"
+    assert schema.CONTRACT_VERSION == "2.4"
     document = payload("run_manifest/discovery_01.json") | {"contract_version": "2.2"}
     # `shard` is contract 2.3's and a 2.2 manifest.json does not carry it.
     del document["shard"]

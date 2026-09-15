@@ -13,7 +13,7 @@
   "calibration_sample": null,
   "cluster_yaml_sha": "317cafae045b2eca4fe19136f75c3728645744f39e46e282e57d54a4fe3d76f0",
   "confirmation_cutoff_date": "2026-09-24",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "corpus_head_sha": "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2",
   "current_window_has_release": false,
   "deployment": "single_machine",

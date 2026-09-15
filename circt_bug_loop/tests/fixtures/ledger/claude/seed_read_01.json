@@ -1,7 +1,7 @@
 {
   "amount": 17.9,
   "arm": "mutation",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "entry_id": "c-stage1-01",
   "metered": false,
   "observed": {
