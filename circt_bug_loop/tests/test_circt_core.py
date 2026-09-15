@@ -171,11 +171,11 @@ def test_u_core_07_no_shell_and_no_command_string() -> None:
 @pytest.mark.t0
 def test_u_core_08_the_reducer_argv(tmp_path, monkeypatch) -> None:
     """T-U-core-08 (FR-09.2): --keep-best explicit, --test-must-fail never."""
-    seen = []
+    seen, signalled = [], []
 
     class _Popen:
         returncode = 0
-        pid = os.getpid()
+        pid = os.getpid()                   # the reducer's `finally` signals this group
 
         def __init__(self, argv, **kwargs):
             seen.append(argv)
@@ -185,8 +185,11 @@ def test_u_core_08_the_reducer_argv(tmp_path, monkeypatch) -> None:
             return (b"", None)
 
     monkeypatch.setattr(circt_core.subprocess, "Popen", _Popen)
+    monkeypatch.setattr(circt_core, "_killpg",
+                        lambda pgid, *sig: signalled.append(pgid))
     call_node(circt_reduce_run, "in.mlir", "interesting.sh", "out.mlir",
               binary="/workspace/circt/build/bin/circt-reduce")
+    assert signalled == [os.getpid()], "the stub is what keeps the suite alive here"
     assert seen == [["/workspace/circt/build/bin/circt-reduce", "in.mlir",
                      "--test=interesting.sh", "--keep-best", "-o", "out.mlir"]]
     assert not any(a.startswith("--test-arg") for a in seen[0])
