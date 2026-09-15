@@ -5,7 +5,7 @@
     "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-bd637a22ab0f/input.mlir"
   ],
   "arm": "mutation",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "differential": null,
   "expected_outcome": "any.argv.option.duplicate applied to test/Conversion/HandshakeToHW/test_cmerge.mlir",
   "input_filename": "input.mlir",

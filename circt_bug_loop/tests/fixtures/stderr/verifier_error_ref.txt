@@ -1,0 +1,1 @@
+error: 'llhd.sig.extract' op result #0 must be ref of a signless integer bitvector, but got '!llhd.ref<!hw.struct<a: i2, b: i2>>'

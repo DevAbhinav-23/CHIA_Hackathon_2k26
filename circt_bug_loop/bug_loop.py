@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -33,7 +34,8 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
                                   Report, utc_now, validate_candidate,
-                                  write_artefact, write_turn_failure)
+                                  widen_fingerprint_basis, write_artefact,
+                                  write_turn_failure)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -107,7 +109,7 @@ IMAGE_FLAG_STRING = "-O3 -UNDEBUG -gline-tables-only"
 PIN_CHECK_LINE = "PIN CHECK PASSED"
 
 #: The statuses at which a probe carries on to stage 4 (FR-06.9, 3.6).
-_FIRING_STATUSES = ("assertion", "fatal_error", "crash")
+_FIRING_STATUSES = ("assertion", "fatal_error", "crash", "verifier_error")
 
 #: The status at which a probe stops WITHOUT the differential being asked (N9).
 _UNDECIDED_STATUS = "tool_unavailable"
@@ -118,8 +120,9 @@ _STAGE_OF = {"generate_seeded": "stage_2", "generate_mutation": "stage_2",
              "oracle_differential": "stage_4", "reduce_case": "stage_5",
              "dedup_and_screen": "stage_6", "triage_report": "stage_6",
              "repair_adapt": "stage_7", "gate_decide": "gate",
-             # The gate's own two `{"circt": 1}` nodes (N8).
-             "gate_rerun": "gate", "gate_validate": "gate"}
+             # The gate's own two `{"circt": 1}` nodes (N8), and D-13's.
+             "gate_rerun": "gate", "gate_validate": "gate",
+             "probe_verify": "stage_3"}
 
 #: Which stage id each of A3's two agent turns occupies.
 _TURN_OF = {"seed_read": "stage_1", "probe_write": "stage_2"}
@@ -1243,6 +1246,10 @@ def write_probe_result(store: LoopStore, result, artefact_dir: str) -> None:
 def write_oracle_verdict(store: LoopStore, verdict) -> None:
     """Write stage 4's `oracle_verdict` row, frames and all."""
     store.insert("oracle_verdict", _row(store, "oracle_verdict", verdict))
+    # §6.2's `oracle_verdict` is frozen, so contract 2.4's two fields are their
+    # own row and are written only by the class that has them (D-13).
+    if verdict.verifier_op is not None:
+        store.insert("verifier_error", _row(store, "verifier_error", verdict))
 
 
 def write_differential_verdict(store: LoopStore, verdict) -> None:
@@ -1638,6 +1645,7 @@ class Campaign:
                  seed_map: Optional[dict] = None, now: Optional[Callable] = None,
                  bin_dir: str = CIRCT_BIN_DIR,
                  head_options: Optional[dict] = None,
+                 skip_turn: bool = False,
                  repair_backend: str = _METERED_REPAIR_BACKEND):
         """Take everything a stage call needs, and compute nothing else."""
         self.head_options = head_options
@@ -1656,6 +1664,8 @@ class Campaign:
         self.seed_map = seed_map or {}
         self.now = now or time.monotonic
         self.bin_dir = bin_dir
+        # D-13: `--reclassify` re-judges the record and never sends a turn.
+        self.skip_turn = skip_turn
 
     def cfg(self, *, iteration: int, artefact_dir: Optional[str] = None,
             spend_usd: Optional[float] = None) -> dict:
@@ -1667,6 +1677,7 @@ class Campaign:
         cfg["spend_guard"] = self.spend_guard(
             self.spend_usd() if spend_usd is None else spend_usd)
         cfg["bin_dir"] = self.bin_dir
+        cfg["skip_turn"] = self.skip_turn
         return cfg
 
     def spend_usd(self) -> float:
@@ -1764,9 +1775,7 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
                  artefact_dir: str) -> dict:
     """`drive_probe`'s body, under the marker its caller wrote (§6.5)."""
     def stop(stage: str, reason: str) -> dict:
-        out["stopping_stage"] = stage
-        out["stopping_reason"] = reason
-        return out
+        return _stop(out, stage, reason)
 
     try:
         executed = campaign.call("probe_execute", campaign.stages.probe_execute,
@@ -1804,7 +1813,14 @@ def _drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, out: dic
     result.assertion_text = verdict.assertion_text
     result.assertion_site = verdict.assertion_site
     result.stopping_stage = "stage_4"
+    return _drive_candidate(campaign, spec, seed, build, verdict, result, out,
+                            artefact_dir, stop)
 
+
+def _drive_candidate(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord,
+                     build, verdict, result, out: dict, artefact_dir: str,
+                     stop) -> dict:
+    """Stages 5 to the gate for one fired probe; `--reclassify` re-enters here."""
     try:
         reduced = campaign.call("reduce_case", campaign.stages.reduce_case, spec,
                                 verdict, campaign.limits, artefact_dir,
@@ -2220,7 +2236,10 @@ def oracle_verdict_of(store: LoopStore, probe_id: str):
     frames = [Frame(**frame) for frame in json.loads(row.pop("frames_json"))]
     row.update(fired=bool(row["fired"]),
                out_of_scope_root=bool(row["out_of_scope_root"]))
-    return OracleVerdict(frames=frames, **row)
+    verifier = store.query_one(
+        "SELECT verifier_message, verifier_op FROM verifier_error "
+        "WHERE probe_id = ?", (probe_id,)) or {}
+    return OracleVerdict(frames=frames, **row, **verifier)
 
 
 def seed_record_of(store: LoopStore, run_id: str, probe_id: str) -> SeedRecord:
@@ -2318,6 +2337,203 @@ def rescreen(store: LoopStore, run_id: str, *, clone_path: str, top_n: int,
     return 0
 
 
+#: The columns `--reclassify` prints, one row per seed it re-judged (D-13).
+_RECLASSIFY_COLUMNS = ("seed", "parse_error", "reclassified", "gate decisions")
+
+#: What `--reclassify` prints for a probe whose class did not move.
+NOT_VERIFIER = "not_verifier"
+INPUT_INVALID = "input_invalid"
+
+
+def reclassify_dispatch() -> Dispatch:
+    """Join the cluster `--reclassify` dispatches every check into, or refuse."""
+    try:
+        ray.init(address="auto", runtime_env=runtime_env(stage_shipped()),
+                 ignore_reinit_error=True)
+        nodes = gate_module().live_circt_nodes()
+    except Exception as error:                      # noqa: BLE001 - reported as a refusal
+        raise PreflightFailed(
+            "cluster", f"--reclassify runs §4.8's parse-and-verify command and "
+            f"stages 4 to the gate on `circt` workers, and no cluster answered: "
+            f"{type(error).__name__}: {error}") from error
+    if not nodes:
+        raise PreflightFailed(
+            "cluster", "--reclassify needs a live worker holding the `circt` "
+            "resource; the cluster has none")
+    return Dispatch(remote=True, head_node_id=_head_node_id())
+
+
+def gate_module():
+    """`circt_bug_loop.gate`, imported where a T0 test need not import it."""
+    from circt_bug_loop import gate
+
+    return gate
+
+
+def manifest_of(store: LoopStore, run_id: str) -> RunManifest:
+    """One stored run's manifest, back as the record every stage takes."""
+    row = store.query_one("SELECT manifest_json FROM run WHERE run_manifest_id = ?",
+                          (run_id,))
+    if row is None:
+        raise LookupError(f"no run row for {run_id!r}")
+    return schema.from_json(row["manifest_json"], RunManifest)
+
+
+def build_result_of(store: LoopStore, probe_id: str):
+    """Stage 3's stored row, back as the `BuildResult` stage 4 takes."""
+    from circt_bug_loop.store import BuildResult
+
+    row = store.query_one("SELECT * FROM build_result WHERE probe_id = ?",
+                          (probe_id,))
+    if row is None:
+        raise LookupError(f"no build_result row for probe {probe_id!r}")
+    probe = store.query_one(
+        "SELECT run_manifest_id, artefact_dir, argv_json FROM probe "
+        "WHERE probe_id = ?", (probe_id,)) or {}
+    fields = dict(row)
+    fields.pop("probe_id")
+    fields["truncated"] = bool(fields["truncated"])
+    return BuildResult(
+        probe_id=probe_id, run_manifest_id=probe.get("run_manifest_id", ""),
+        argv=_recorded_argv(probe.get("artefact_dir"), row["binary_path"],
+                            json.loads(probe.get("argv_json") or "[]")),
+        stdout_bytes=_file_bytes(row["stdout_path"]),
+        stderr_bytes=_file_bytes(row["stderr_path"]), **fields)
+
+
+def _recorded_argv(artefact_dir: Optional[str], binary_path: str,
+                   argv: list) -> list:
+    """The full argv `probe_execute` wrote beside the probe, or the one it can rebuild."""
+    try:
+        return json.loads(Path(artefact_dir, "argv.json").read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return [binary_path, *argv]
+
+
+def _file_bytes(path: str) -> int:
+    """One recorded stream's size on disk, or 0 when it is gone."""
+    try:
+        return Path(path).stat().st_size
+    except OSError:
+        return 0
+
+
+def reclassify(campaign: Campaign, out) -> int:
+    """Re-judge one run's stored `parse_error` probes under contract 2.4 (D-13)."""
+    store, run_id = campaign.store, campaign.manifest.run_manifest_id
+    widen_fingerprint_basis(store)
+    rows = store.query(
+        "SELECT p.probe_id, p.seed_sha, p.spec_json, p.artefact_dir, "
+        "b.stderr_path FROM probe p JOIN build_result b USING (probe_id) "
+        "WHERE p.run_manifest_id = ? AND b.status = 'parse_error' "
+        "ORDER BY p.seed_sha, p.probe_id", (run_id,))
+    if not rows:
+        print(f"--reclassify {run_id}: the store holds no `parse_error` probe "
+              f"of that run", file=sys.stderr)
+        return 2
+
+    # The ledger's entry_id is (run, arm, stage, node, key), so that a RETRIED
+    # dispatch does not charge twice. A second `--reclassify` is not a retry:
+    # it runs §4.8's command again, and the invocation is part of the key.
+    stamp = uuid.uuid4().hex
+    per_seed: dict = {}
+    for row in rows:
+        outcome, decision = _reclassify_probe(campaign, row, stamp)
+        seed = per_seed.setdefault(row["seed_sha"],
+                                   {"probes": 0, "moved": 0, "decisions": Counter()})
+        seed["probes"] += 1
+        if outcome == "verifier_error":
+            seed["moved"] += 1
+            seed["decisions"][decision] += 1
+
+    print("  ".join(f"{name:<18}" for name in _RECLASSIFY_COLUMNS).rstrip(), file=out)
+    for seed_sha, counts in sorted(per_seed.items()):
+        decisions = ", ".join(f"{name} x{n}"
+                              for name, n in sorted(counts["decisions"].items()))
+        print("  ".join(f"{value:<18}" for value in (
+            seed_sha[:12], counts["probes"], counts["moved"], decisions or "-")
+        ).rstrip(), file=out)
+    moved = sum(counts["moved"] for counts in per_seed.values())
+    print(f"\n{moved} of {len(rows)} `parse_error` probe(s) of {run_id} are "
+          f"`verifier_error`; no model turn was made", file=out)
+    return 0
+
+
+def _reclassify_probe(campaign: Campaign, row: dict, stamp: str) -> tuple:
+    """Re-judge one stored `parse_error` probe: (outcome, gate decision)."""
+    from circt_bug_loop import probe_task
+
+    store, probe_id = campaign.store, row["probe_id"]
+    if probe_task.verifier_detail(_read_stderr(row["stderr_path"]))[0] is None:
+        return NOT_VERIFIER, "-"
+    spec = schema.from_json(row["spec_json"], ProbeSpec)
+    checked = campaign.call("probe_verify", probe_task.probe_verify,
+                            spec.input_path, campaign.image_spec, campaign.limits,
+                            row["artefact_dir"], bin_dir=campaign.bin_dir,
+                            _arm=spec.arm, _key=f"{probe_id}/{stamp}")
+    if not checked["valid"]:
+        return INPUT_INVALID, "-"
+
+    build = build_result_of(store, probe_id)
+    build.status = "verifier_error"
+    store.update("build_result", {"probe_id": probe_id},
+                 {"status": "verifier_error"})
+    verdict = campaign.call("oracle_primary", campaign.stages.oracle_primary,
+                            build, campaign.image_spec, row["artefact_dir"],
+                            _arm=spec.arm, _key=probe_id)["verdict"]
+    write_oracle_verdict(store, verdict)
+
+    result = schema.from_json(
+        store.query_one("SELECT result_json FROM probe_result WHERE probe_id = ?",
+                        (probe_id,))["result_json"], schema.ProbeResult)
+    result.build_status = "verifier_error"
+    result.oracle_fired = True
+    result.oracle_class = verdict.oracle_class
+    result.verifier_message = verdict.verifier_message
+    result.verifier_op = verdict.verifier_op
+    result.stopping_stage = "stage_4"
+
+    out = {"probe_id": probe_id, "arm": spec.arm, "seed_sha": spec.seed_sha,
+           "iteration": spec.iteration, "stages": ["stage_3", "stage_4"],
+           "verdicts": {"stage_4": verdict.oracle_class},
+           "stopping_stage": "stage_4", "stopping_reason": "reclassified",
+           "probe_result": result, "candidate_id": None}
+    seed = seed_record_of(store, spec.run_manifest_id, probe_id)
+    try:
+        _drive_candidate(campaign, spec, seed, build, verdict, result, out,
+                         row["artefact_dir"],
+                         lambda stage, reason: _stop(out, stage, reason))
+    finally:
+        _rewrite_probe_result(store, result, out)
+    return "verifier_error", out["verdicts"].get("gate") or out["stopping_reason"]
+
+
+def _stop(out: dict, stage: str, reason: str) -> dict:
+    """`_drive_probe`'s own stop, as the callable `_drive_candidate` takes."""
+    out["stopping_stage"] = stage
+    out["stopping_reason"] = reason
+    return out
+
+
+def _rewrite_probe_result(store: LoopStore, result, out: dict) -> None:
+    """Update the probe's own row in place: its PRIMARY KEY forbids a second one."""
+    result.stopping_stage = out["stopping_stage"]
+    result.stopping_reason = out["stopping_reason"]
+    schema.validate(result)
+    fields = _row(store, "probe_result", result,
+                  result_json=schema.to_json(result))
+    fields.pop("probe_id")
+    store.update("probe_result", {"probe_id": result.probe_id}, fields)
+
+
+def _read_stderr(path: str) -> str:
+    """One recorded stderr, or "" when the artefact is gone."""
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="backslashreplace")
+    except OSError:
+        return ""
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Return 13.1's argument parser, with that table's defaults."""
     parser = argparse.ArgumentParser(prog="bug_loop.py",
@@ -2344,6 +2560,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--record-fixtures", default=None, metavar="DIR")
     parser.add_argument("--print-config", action="store_true")
     parser.add_argument("--rescreen", default=None, metavar="RUN_MANIFEST_ID")
+    parser.add_argument("--reclassify", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--forum-post-url", default=None)
     parser.add_argument("--forum-post-date", default=None)
     parser.add_argument("--chia-root", default=str(_CHIA_ROOT))
@@ -2547,6 +2764,11 @@ def run_campaign(args, out) -> int:
                   for name, probe in observations.items()})
 
     store = LoopStore(DB_PATH)
+    # loop.db outlives one run, and a store created before contract 2.4 has a
+    # `fingerprint` table that would refuse the `verifier` basis (D-13).
+    if widen_fingerprint_basis(store):
+        print("pre-flight: `fingerprint` rebuilt for contract 2.4's `verifier` "
+              "basis (D-13)", file=out)
     mirror = _mirror(store, budget, args, dispatch, triage_task)
     check_10_issue_mirror(mirror=mirror, refresh_requested=args.refresh_mirror)
     check_11_forum_post(forum_post_url=args.forum_post_url,
@@ -2716,6 +2938,21 @@ def main(argv: Optional[list] = None, out=None) -> int:
             args.budget, str(FLOW_DIR.parent))["budget"]
         return rescreen(LoopStore(DB_PATH), args.rescreen, clone_path=args.clone,
                         top_n=budget.fingerprint_top_n, out=out)
+    if args.reclassify:
+        from types import SimpleNamespace
+
+        budget = budget_module.load_budget._chia_original(
+            args.budget, str(FLOW_DIR.parent))["budget"]
+        store = LoopStore(DB_PATH)
+        manifest = manifest_of(store, args.reclassify)
+        campaign = Campaign(
+            manifest=manifest, budget=budget, store=store,
+            stages=default_stages(), dispatch=reclassify_dispatch(),
+            counters=CounterLog(manifest.run_manifest_id),
+            clone_path=args.clone,
+            image_spec=SimpleNamespace(**manifest.image_spec),
+            bin_dir=CIRCT_BIN_DIR, repair_enabled=False, skip_turn=True)
+        return reclassify(campaign, out)
     if args.draw_calibration:
         from circt_bug_loop import corpus, pin_select
 

@@ -14,19 +14,17 @@ from chia.base.ChiaFunction import ChiaFunction
 
 from circt_bug_loop.circt_core import CIRCT_ROOTS, circt_exec_probe
 from circt_bug_loop.contract.schema import CounterBlock, RunManifest
-from circt_bug_loop.probe_task import (PROBE_NOFILE, BinaryMismatch, _last_pass,
-                                       _sha256, classify_build, oracle_primary)
+# §4.8's command table is `probe_task`'s since D-13: stage 3 asks it first.
+from circt_bug_loop.probe_task import (DEFAULT_VALIDITY_COMMAND,  # noqa: F401
+                                       PROBE_NOFILE, VALIDITY_COMMANDS,
+                                       VERIFY_STDERR_FILE, BinaryMismatch,
+                                       _last_pass, _sha256, classify_build,
+                                       oracle_primary, probe_input,
+                                       validity_command, verifier_upgrade)
 from circt_bug_loop.store import (BuildResult, CandidateRecord, DedupVerdict,
                                   GateDecision, LoopStore, ReducedCase,
                                   RepairResult, validate_candidate)
 from circt_bug_loop.triage_task import compute_fingerprint
-
-#: §4.8's three parse-and-verify commands, by the reduced case's own extension.
-VALIDITY_COMMANDS = {
-    ".fir": ("firtool", ["--parse-only"]),
-    ".sv": ("circt-verilog", ["--import-only"]),
-}
-DEFAULT_VALIDITY_COMMAND = ("circt-opt", ["-o", "/dev/null"])
 
 #: FR-13.15's second conjunct.
 PARSER_DIRS = ("lib/Parser/", "lib/AsmParser/", "tools/circt-translate/")
@@ -59,12 +57,6 @@ ANSWER_KEYS = ("q1_reproduce", "q1_original_worker", "q1_rerun_worker",
 def answers(decision: GateDecision) -> dict:
     """The fifteen recorded answers of one decision, for `answers_json` (§6.2)."""
     return {key: getattr(decision, key) for key in ANSWER_KEYS}
-
-
-def validity_command(case_path: str) -> tuple:
-    """§4.8's command for one reduced case, chosen by its extension alone."""
-    return VALIDITY_COMMANDS.get(os.path.splitext(case_path)[1].lower(),
-                                 DEFAULT_VALIDITY_COMMAND)
 
 
 def in_parser(path: str) -> bool:
@@ -175,8 +167,12 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
     work = _work_dir(artefact_root, run_manifest_id, candidate_id, "gate")
     out = _run_command(argv[0], argv[1:], image_spec, limits, work)
 
-    status, _ = classify_build(out["exit_status"], out["signal"], out["stderr"],
-                               out["limit_hit"])
+    status, reason = classify_build(out["exit_status"], out["signal"],
+                                    out["stderr"], out["limit_hit"])
+    # D-13: the re-run is judged by the rule the original was judged by.
+    status, _reason = verifier_upgrade(
+        status, reason, out["stderr"], probe_input(argv),
+        image_spec["tool_hashes"], limits, work, os.path.dirname(argv[0]))
     signal_name = None if status == "timeout" else out["signal"]
     stdout_path = Path(work, "rerun.stdout.txt")
     stderr_path = Path(work, "rerun.stderr.txt")
@@ -200,7 +196,8 @@ def gate_rerun(repro_command: str, image_spec: dict, limits: dict,
     verdict = oracle_primary._chia_original(
         build, SimpleNamespace(flag_string=image_spec["flag_string"]), work,
         circt_roots=circt_roots, symbolizer=symbolizer)["verdict"]
-    finger = compute_fingerprint(verdict, signal_name, "", top_n)
+    finger = compute_fingerprint(verdict, signal_name, "", top_n,
+                                 pass_name=_last_pass(argv))
 
     return {"status": status, "oracle_class": verdict.oracle_class,
             "assertion_text": verdict.assertion_text,
@@ -361,10 +358,15 @@ def gate_decide(candidate: CandidateRecord, reduced: Optional[ReducedCase],
             reduced, minimal_case_lines)
         if fields["q2_minimal"]:
             # --- 3. is the input valid? ------------------------------------
-            check = _dispatch(
-                gate_validate, {}, reduced.path, manifest.image_spec, limits,
-                manifest.artefact_root, run_manifest_id=candidate.run_manifest_id,
-                candidate_id=candidate.candidate_id, bin_dir=bin_dir)
+            # D-13: stage 3 ran §4.8's command on this very input to decide the
+            # class, and a `verifier_error` candidate exists only because it
+            # passed. The answer is read off that run and not asked again.
+            check = (_verifier_check(candidate)
+                     if candidate.oracle_class == "verifier_error" else _dispatch(
+                         gate_validate, {}, reduced.path, manifest.image_spec, limits,
+                         manifest.artefact_root,
+                         run_manifest_id=candidate.run_manifest_id,
+                         candidate_id=candidate.candidate_id, bin_dir=bin_dir))
             fields["q3_exit_status"] = check["exit_status"]
             fields["q3_stderr_path"] = check["stderr_path"]
             fields["q3_after_parse"] = _after_parse(store, candidate, check)
@@ -416,9 +418,20 @@ def decide(fields: dict, repair: Optional[RepairResult]) -> tuple:
     return ("report_plus_patch" if fixed else "report"), None, "new_bug"
 
 
+def _verifier_check(candidate: CandidateRecord) -> dict:
+    """Stage 3's parse-and-verify run, in the shape `gate_validate` returns (D-13)."""
+    return {"argv": [], "exit_status": 0,
+            "stderr_path": os.path.join(candidate.artefact_dir, VERIFY_STDERR_FILE),
+            "checker_fired": False, "oracle_class": None}
+
+
 def _after_parse(store: LoopStore, candidate: CandidateRecord,
                  check: dict) -> Optional[bool]:
     """FR-13.15's second conjunct, answered from the record and no fourth command."""
+    # A verifier error IS the failure after parsing: the input parsed and
+    # verified on its own, and the pass emitted the op the verifier refused.
+    if candidate.oracle_class == "verifier_error":
+        return True
     frame_file = _fingerprint_frame_file(store, candidate.probe_id)
     if frame_file and not in_parser(frame_file):
         return True

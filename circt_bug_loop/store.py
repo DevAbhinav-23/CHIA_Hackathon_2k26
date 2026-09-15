@@ -371,12 +371,38 @@ CREATE INDEX IF NOT EXISTS ix_mirror_state          ON issue_mirror(state);
 CREATE INDEX IF NOT EXISTS ix_filing_confirmed      ON filing(confirmed);
 """
 
+#: 6.2's `fingerprint` declares `CHECK (basis IN (...))` and 6.2 is compared to
+#: the design document byte for byte (`T-U-store-01`), so contract 2.4's
+#: `verifier` basis cannot be added there. This statement creates the table
+#: FIRST, which makes 6.2's own `CREATE TABLE IF NOT EXISTS fingerprint` the
+#: no-op; `widen_fingerprint_basis` is what moves a store created before 2.4.
+_DDL_FINGERPRINT = """\
+CREATE TABLE IF NOT EXISTS fingerprint (
+    candidate_id        TEXT PRIMARY KEY REFERENCES candidate(candidate_id),
+    basis               TEXT NOT NULL CHECK (basis IN ('assertion','frames','verifier','insufficient')),
+    value               TEXT,
+    fingerprint_stable  INTEGER,
+    frame_tuple_json    TEXT NOT NULL,
+    structural_hash     TEXT NOT NULL,
+    CHECK ((value IS NULL) = (basis = 'insufficient'))
+);
+"""
+
 #: The two tables 6.2 does NOT declare.
 _DDL_REGISTRATION = """\
 CREATE TABLE IF NOT EXISTS registration (
     run_manifest_id     TEXT PRIMARY KEY REFERENCES run(run_manifest_id),
     registration_tag    TEXT NOT NULL,
     registration_commit TEXT NOT NULL
+);
+"""
+
+#: Contract 2.4's two `OracleVerdict` fields; 6.2's `oracle_verdict` is frozen (D-13).
+_DDL_VERIFIER = """\
+CREATE TABLE IF NOT EXISTS verifier_error (
+    probe_id            TEXT PRIMARY KEY REFERENCES probe(probe_id),
+    verifier_message    TEXT NOT NULL,
+    verifier_op         TEXT NOT NULL
 );
 """
 
@@ -396,8 +422,8 @@ CREATE TABLE IF NOT EXISTS turn_failure (
 """
 
 #: What init_schema runs. executescript takes the whole text at once.
-_SCHEMA = (_DDL_TABLES + "\n" + _DDL_INDEXES + "\n" + _DDL_REGISTRATION
-           + "\n" + _DDL_TURN_FAILURE)
+_SCHEMA = (_DDL_FINGERPRINT + "\n" + _DDL_TABLES + "\n" + _DDL_INDEXES + "\n"
+           + _DDL_REGISTRATION + "\n" + _DDL_TURN_FAILURE + "\n" + _DDL_VERIFIER)
 
 #: The zero-byte marker of FR-17.8, named once.
 PARTIAL = "PARTIAL"
@@ -454,7 +480,8 @@ class BuildResult:
     run_commit: str
     image_digest: str
     status: Literal["clean_exit", "parse_error", "assertion", "fatal_error",
-                    "crash", "timeout", "oom", "tool_unavailable"]
+                    "crash", "timeout", "oom", "tool_unavailable",
+                    "verifier_error"]
     binary_path: str                  # always under /workspace/circt/build/bin
     binary_sha256: str                # checked against ImageSpec.tool_hashes before the run
     argv: list[str]                   # the full argv, prlimit prefix included
@@ -493,7 +520,8 @@ class OracleVerdict:
     """The primary oracle's answer for one probe (F-07)."""
     probe_id: str
     fired: bool
-    oracle_class: Optional[Literal["assertion", "fatal_error", "crash"]]
+    oracle_class: Optional[Literal["assertion", "fatal_error", "crash",
+                                   "verifier_error"]]
     assertion_text: Optional[str]     # verbatim from stderr (FR-07.3)
     assertion_site: Optional[str]     # "<file>:<line>" verbatim from stderr
     fatal_message: Optional[str]      # the text after "LLVM ERROR:"
@@ -507,6 +535,9 @@ class OracleVerdict:
     repro_command: str                # one line, runnable inside the image (FR-07.6)
     flag_string: str                  # carries the literal -UNDEBUG (FR-07.7)
     tool_version_output: str          # the tool's own --version, which still says "Optimized build."
+    #: Contract 2.4's pair, non-null exactly on oracle_class 'verifier_error'.
+    verifier_message: Optional[str] = None   # the first `error:` line, path stripped
+    verifier_op: Optional[str] = None        # the op the verifier named, e.g. "comb.extract"
 
 
 @dataclass(kw_only=True)
@@ -558,7 +589,7 @@ class ReducedCase:
 class Fingerprint:
     """G-43's primary fingerprint plus its three evidence fields (FR-10.1)."""
     probe_id: str
-    basis: Literal["assertion", "frames", "insufficient"]
+    basis: Literal["assertion", "frames", "verifier", "insufficient"]
     value: Optional[str]              # the fingerprint; null iff basis is insufficient
     frame_tuple: list[str]            # evidence, recorded even when the basis is assertion
     structural_hash: str              # evidence; never merges two candidates
@@ -714,7 +745,8 @@ class CandidateRecord:
     arm: Literal["seeded", "mutation"]
     run_commit: str
     image_digest: str
-    oracle_class: Literal["assertion", "fatal_error", "crash", "differential"]
+    oracle_class: Literal["assertion", "fatal_error", "crash", "differential",
+                          "verifier_error"]
     frame_tuple: list[str]
     frames_resolved: int
     frames_with_location: int
@@ -739,7 +771,8 @@ class CandidateRecord:
     fingerprint: Optional[str] = None
     fingerprint_stable: Optional[bool] = None
     structural_hash: Optional[str] = None
-    dedup_basis: Optional[Literal["assertion", "frames", "insufficient"]] = None
+    dedup_basis: Optional[Literal["assertion", "frames", "verifier",
+                                  "insufficient"]] = None
     dedup_verdict: Optional[str] = None
     dedup_evidence: Optional[dict] = None
     gate_answers: Optional[dict] = None
@@ -1188,6 +1221,25 @@ def make_appendable(store: "LoopStore") -> list:
         ])
         rebuilt.append(table)
     return rebuilt
+
+
+#: What `_DDL_FINGERPRINT` declares, without its `IF NOT EXISTS` and its name.
+_FINGERPRINT_COLUMNS = _DDL_FINGERPRINT.split("(", 1)[1].rsplit(");", 1)[0].strip()
+
+
+def widen_fingerprint_basis(store: "LoopStore") -> bool:
+    """Rebuild a `fingerprint` table created before contract 2.4's `verifier` basis."""
+    row = store.query_one("SELECT sql FROM sqlite_master WHERE name = 'fingerprint'")
+    if row is None or "'verifier'" in (row["sql"] or ""):
+        return False
+    store.transaction([
+        (f"CREATE TABLE fingerprint_widened ({_FINGERPRINT_COLUMNS})", ()),
+        ("INSERT INTO fingerprint_widened SELECT * FROM fingerprint", ()),
+        ("DROP TABLE fingerprint", ()),
+        ("ALTER TABLE fingerprint_widened RENAME TO fingerprint", ()),
+        ("CREATE INDEX IF NOT EXISTS ix_fingerprint_value ON fingerprint(value)", ()),
+    ])
+    return True
 
 
 def load_candidate(store: "LoopStore", candidate_id: str) -> "CandidateRecord":

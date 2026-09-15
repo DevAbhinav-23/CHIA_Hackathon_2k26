@@ -2,7 +2,7 @@
   "abandon_reason": null,
   "abandoned": false,
   "arm": "mutation",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "entries": [],
   "iteration": 2,
   "run_manifest_id": "0f3c1a7e5b294d8ea16c02f47db9e358",

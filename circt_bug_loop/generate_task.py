@@ -267,6 +267,14 @@ def render_sites(sites: list) -> str:
         for site in sites) or "none"
 
 
+#: What a `verifier_error` entry says instead of FR-16.1's fix-your-input line (D-13).
+VERIFIER_FINDING = (
+    "  This input is FINE and this probe is a FINDING: it parses and verifies "
+    "on its own, and the tool's own verifier refused an op the tool itself "
+    "created. Do not fix or repeat this input. Write different probes, for "
+    "other sites.")
+
+
 def render_feedback(feedback: FeedbackBundle) -> str:
     """Render 7.3's `$feedback` from the previous iteration's ProbeResults."""
     if not feedback.entries:
@@ -278,6 +286,8 @@ def render_feedback(feedback: FeedbackBundle) -> str:
         if entry.oracle_class:
             lines.append(f"  oracle: {entry.oracle_class}"
                          + (f" - {entry.oracle_summary}" if entry.oracle_summary else ""))
+        if entry.oracle_class == "verifier_error":
+            lines.append(VERIFIER_FINDING)
         if entry.error_line:
             lines.append(f"  {entry.error_line}")
             lines.append("  FIX this input's syntax against the build commit, or "

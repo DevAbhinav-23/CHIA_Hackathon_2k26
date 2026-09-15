@@ -43,6 +43,42 @@ _ARGV_REJECTED = "does not refer to a registered pass or pass pipeline"
 #: The exit status of a tool that never started.
 LOADER_FAILED_STATUS = 127
 
+#: 4.8's parse-and-verify commands, by the input's own extension; the gate's too.
+VALIDITY_COMMANDS = {
+    ".fir": ("firtool", ["--parse-only"]),
+    ".sv": ("circt-verilog", ["--import-only"]),
+}
+DEFAULT_VALIDITY_COMMAND = ("circt-opt", ["-o", "/dev/null"])
+
+#: What `probe_execute` writes the parse-and-verify run's diagnostics to (D-13).
+VERIFY_STDERR_FILE = "verify.stderr.txt"
+
+#: `BuildResult.status`'s reason when the compiler's own verifier refused its output.
+VERIFIER_REASON = "verifier_rejected_output"
+
+#: The bound on `OracleVerdict.verifier_message`, applied after the path is stripped.
+VERIFIER_MESSAGE_CAP = 300
+
+#: One op-naming diagnostic, with the source location it may carry stripped.
+_VERIFIER_ERROR = re.compile(
+    r"^(?:[^\s:]*:\d+:\d+: )?(?P<message>error: '(?P<op>[A-Za-z_][\w.]*)' op "
+    r"(?P<constraint>.+))$")
+
+#: MLIR's GENERATED op verifier, whose diagnostics have a fixed grammar.
+#: MEASURED: the shape alone is not enough. Recorded mutation probe
+#: `p-b3831e4112d4` is `circt-opt -lower-handshake-to-hw` on an input the loop
+#: fed without `--split-input-file`; it exits 1 with
+#: `'builtin.module' op multiple candidate top-level modules detected ...` and
+#: the input parses and verifies on its own, so §4.8's command alone would book
+#: a pass's own complaint about the input as a compiler defect. A pass writes
+#: that sentence by hand; only the generated verifier writes these.
+_GENERATED_VERIFIER = re.compile(
+    r"(?:operand|result|region|successor) #\d+ must be |"
+    r"failed to satisfy constraint: ")
+
+#: What separates a verifier constraint from the concrete type that broke it.
+_BUT_GOT = ", but got"
+
 
 class BinaryMismatch(Exception):
     """A tool binary's SHA-256 differs from `ImageSpec.tool_hashes` (FR-06.1)."""
@@ -93,6 +129,9 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
 
     status, reason = classify_build(out["exit_status"], out["signal"],
                                     out["stderr"], out["limit_hit"])
+    status, reason = verifier_upgrade(
+        status, reason, out["stderr"], spec.input_path, image_spec.tool_hashes,
+        limits, artefact_dir, bin_dir)
     # FR-06.4: a probe the stage itself killed carries a NULL signal.
     signal_name = None if status == "timeout" else out["signal"]
 
@@ -129,6 +168,88 @@ def probe_execute(spec, image_spec: ImageSpec, limits: dict,
                 stage="stage_3", started=1,
                 completed=int(build.status != "internal_error"),
                 failed=int(build.status == "internal_error"),
+                seconds=time.monotonic() - started_at)}
+
+
+def validity_command(case_path: str) -> tuple:
+    """4.8's parse-and-verify command for one input, chosen by its extension alone."""
+    return VALIDITY_COMMANDS.get(os.path.splitext(case_path)[1].lower(),
+                                 DEFAULT_VALIDITY_COMMAND)
+
+
+def verifier_detail(stderr: str) -> tuple:
+    """(op, message, constraint) of the first generated-verifier line, or three Nones."""
+    for _index, match in _matches(_VERIFIER_ERROR, stderr):
+        constraint = match.group("constraint").split(_BUT_GOT, 1)[0]
+        if _GENERATED_VERIFIER.search(constraint):
+            return (match.group("op"),
+                    match.group("message")[:VERIFIER_MESSAGE_CAP], constraint)
+    return None, None, None
+
+
+def generalise_types(message: str) -> str:
+    """One verifier message with every quoted op name and type replaced by `T`."""
+    return re.sub(r"'[^']*'", "T", message or "")
+
+
+def verifier_upgrade(status: str, reason: str, stderr: str, input_path: str,
+                     tool_hashes: dict, limits: dict, work_dir: str,
+                     bin_dir: str) -> tuple:
+    """D-13: book a rejection the input itself is not to blame for as the tool's."""
+    if (status, reason) != ("parse_error", "tool_rejected_input"):
+        return status, reason
+    if not verifier_detail(stderr)[0]:
+        return status, reason
+    if not input_verifies(input_path, tool_hashes, limits, work_dir, bin_dir):
+        return status, reason
+    return "verifier_error", VERIFIER_REASON
+
+
+def input_verifies(input_path: str, tool_hashes: dict, limits: dict,
+                   work_dir: str, bin_dir: str) -> bool:
+    """Whether one input parses and verifies on its own, under §4.8's command."""
+    tool, options = validity_command(input_path)
+    binary = os.path.join(bin_dir, tool)
+    expected = tool_hashes.get(tool)
+    # An unbuilt or unexpected checker decides nothing, and never upgrades a status.
+    if not expected or expected != _sha256(binary):
+        return False
+    try:
+        out = _exec_probe(binary, [*options, input_path], cwd=work_dir,
+                          wall_seconds=limits["probe_wall_seconds"],
+                          address_space_bytes=limits["probe_address_space_bytes"],
+                          cpu_seconds=limits["probe_cpu_seconds"],
+                          nofile=PROBE_NOFILE,
+                          output_byte_cap=limits["probe_output_byte_cap"])
+    except (OSError, subprocess.SubprocessError):
+        return False
+    Path(work_dir, VERIFY_STDERR_FILE).write_text(out["stderr"], encoding="utf-8")
+    return out["exit_status"] == 0
+
+
+def probe_input(argv: list) -> str:
+    """The input path of one recorded argv: its last token that is a file on disk."""
+    return next((token for token in reversed(list(argv)) if os.path.isfile(token)), "")
+
+
+@ChiaFunction(resources={"circt": 1}, max_retries=0)
+def probe_verify(input_path: str, image_spec: ImageSpec, limits: dict,
+                 artefact_dir: str, *, bin_dir: str = CIRCT_BIN_DIR) -> dict:
+    """Run §4.8's parse-and-verify command on one stored input (D-13).
+
+    Returns:
+        {"valid": bool, "counters": CounterBlock}, `valid` saying the input parses and verifies on its own; the counters count one check at stage_3, as 3.11 requires of every node.
+    Worker:
+        {"circt": 1} - it runs the image's own CIRCT binaries.
+    Raises:
+        nothing.
+    """
+    started_at = time.monotonic()
+    valid = input_verifies(input_path, image_spec.tool_hashes, limits,
+                           artefact_dir, bin_dir)
+    return {"valid": valid,
+            "counters": schema.CounterBlock(
+                stage="stage_3", started=1, completed=1, failed=0,
                 seconds=time.monotonic() - started_at)}
 
 
@@ -178,7 +299,7 @@ _DEGENERATE = ("", "operator")
 #: Clang's spelling of an internal-linkage qualifier.
 _ANONYMOUS = "(anonymous namespace)::"
 
-_FIRING = ("crash", "assertion", "fatal_error")
+_FIRING = ("crash", "assertion", "fatal_error", "verifier_error")
 
 
 @ChiaFunction(resources={"circt": 1}, max_retries=0)
@@ -200,11 +321,14 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
     oracle_class = build.status if fired else None
 
     assertion_text, assertion_site, fatal_message = None, None, None
+    verifier_op, verifier_message = None, None
     if oracle_class == "assertion":
         assertion_text, assertion_site = _extract_assertion(stderr)
     elif oracle_class == "fatal_error":
         found = _first_match(_FATAL_ERROR, stderr)
         fatal_message = found[1].group("message") if found else None
+    elif oracle_class == "verifier_error":
+        verifier_op, verifier_message, _constraint = verifier_detail(stderr)
 
     frames = _parse_frames(stderr) if fired else []
     if frames:
@@ -232,9 +356,13 @@ def oracle_primary(build: BuildResult, image_spec: ImageSpec, artefact_dir: str,
         frames_with_location=sum(1 for f in frames
                                  if f.line > 0 and f.in_circt_object),
         fingerprint_frame=_fingerprint_frame(stripped),
-        out_of_scope_root=bool(fired) and not root_in_scope(stripped),
+        # A verifier error prints a diagnostic and no trace, so it has no root
+        # frame that could be out of scope.
+        out_of_scope_root=(bool(fired) and oracle_class != "verifier_error"
+                           and not root_in_scope(stripped)),
         repro_command=repro, flag_string=image_spec.flag_string,
-        tool_version_output=_tool_version(build.binary_path))
+        tool_version_output=_tool_version(build.binary_path),
+        verifier_message=verifier_message, verifier_op=verifier_op)
     return {"verdict": verdict,
             "counters": schema.CounterBlock(
                 stage="stage_4", started=1, completed=1, failed=0,
@@ -1212,6 +1340,8 @@ def _recheck(choice: dict, verdict: OracleVerdict, case: Path, bin_dir: str,
         return blank
     status, _reason = classify_build(run["exit_status"], run["signal"],
                                      run["stderr"], run["limit_hit"])
+    if verdict.oracle_class == "verifier_error":
+        return _recheck_verifier(status, run["stderr"], verdict)
     text, site = (_extract_assertion(run["stderr"])
                   if status == "assertion" else (None, None))
     return {"recheck_class": status, "recheck_assertion_text": text,
@@ -1219,6 +1349,19 @@ def _recheck(choice: dict, verdict: OracleVerdict, case: Path, bin_dir: str,
             "recheck_matches": (status == verdict.oracle_class
                                 and text == verdict.assertion_text
                                 and site == verdict.assertion_site)}
+
+
+def _recheck_verifier(status: str, stderr: str, verdict: OracleVerdict) -> dict:
+    """FR-09.3 for D-13's class: the same op and the same invariant, whatever the type."""
+    # `classify_build` books the re-run as `parse_error`: the parse-and-verify
+    # command that separates the two is 3.6's and is not re-run here.
+    op, _message, constraint = verifier_detail(stderr)
+    recorded = verifier_detail(verdict.verifier_message or "")[2]
+    matches = bool(status == "parse_error" and op == verdict.verifier_op
+                   and constraint and constraint == recorded)
+    return {"recheck_class": "verifier_error" if matches else status,
+            "recheck_assertion_text": None, "recheck_assertion_site": None,
+            "recheck_matches": matches}
 
 
 def _unreduced(spec, before: str, reason: str, started: float) -> ReducedCase:
@@ -1301,12 +1444,22 @@ exit 0""",
 [ "$RC" -gt 128 ] || exit 1
 grep -qF @TOP_FRAME@ "$WORK/err" || exit 1
 exit 0""",
+    "verifier_error": """# --- class: verifier_error --------------------------------------------------
+# The tool refused its own output and exited 1. A different exit status, and a
+# diagnostic about a different op or a different invariant, is a different
+# failure; the concrete type the invariant names is NOT compared, because
+# reduction is free to change it.
+[ "$RC" -eq 1 ] || exit 1
+grep -qF @VERIFIER_OP@ "$WORK/err" || exit 1
+grep -qF @VERIFIER_CONSTRAINT@ "$WORK/err" || exit 1
+exit 0""",
 }
 
-#: Every placeholder §10.2 declares.
+#: Every placeholder §10.2 declares, plus contract 2.4's two (D-13).
 _PLACEHOLDERS = ("@TOOL@", "@ARGS@", "@WALL@", "@GRACE@", "@AS_BYTES@",
                  "@CPU_SECONDS@", "@NOFILE@", "@ASSERT_EXPR@", "@ASSERT_SITE@",
-                 "@FATAL_MESSAGE@", "@TOP_FRAME@")
+                 "@FATAL_MESSAGE@", "@TOP_FRAME@", "@VERIFIER_OP@",
+                 "@VERIFIER_CONSTRAINT@")
 
 
 def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
@@ -1328,6 +1481,10 @@ def write_interestingness(path: str, verdict: OracleVerdict, tool_path: str,
         "@ASSERT_SITE@": shlex.quote(verdict.assertion_site or ""),
         "@FATAL_MESSAGE@": shlex.quote(verdict.fatal_message or ""),
         "@TOP_FRAME@": shlex.quote(frame.rsplit(" ", 1)[0] if frame else ""),
+        "@VERIFIER_OP@": shlex.quote(f"'{verdict.verifier_op}'"
+                                     if verdict.verifier_op else ""),
+        "@VERIFIER_CONSTRAINT@": shlex.quote(
+            verifier_detail(verdict.verifier_message or "")[2] or ""),
     }
     text = _INTERESTING_TEMPLATE.replace(
         "@CLASS_BLOCK@", _CLASS_BLOCKS[verdict.oracle_class])
@@ -1362,11 +1519,15 @@ def _tool_version(binary: str) -> str:
 
 def _first_match(pattern, stderr: str):
     """The first line of *stderr* that *pattern* matches, with its index."""
+    return next(_matches(pattern, stderr), None)
+
+
+def _matches(pattern, stderr: str):
+    """Every line of *stderr* that *pattern* matches, in order, with its index."""
     for index, line in enumerate(stderr.splitlines()):
         found = pattern.match(line)
         if found:
-            return index, found
-    return None
+            yield index, found
 
 
 def _sha256(path: str) -> str:
@@ -1377,8 +1538,13 @@ def _sha256(path: str) -> str:
         return ""
 
 
-__all__ = ["BinaryMismatch", "probe_execute", "classify_build", "oracle_primary",
+__all__ = ["BinaryMismatch", "probe_execute", "probe_verify",
+           "classify_build", "oracle_primary",
            "strip_prologue", "select_reducer", "reduce_case",
+           "validity_command", "verifier_detail", "generalise_types",
+           "verifier_upgrade", "input_verifies", "probe_input",
+           "VALIDITY_COMMANDS", "DEFAULT_VALIDITY_COMMAND", "VERIFIER_REASON",
+           "VERIFY_STDERR_FILE", "VERIFIER_MESSAGE_CAP",
            "write_interestingness", "HarnessError", "Port", "extract_port_list",
            "top_module_name", "gen_arc_harness", "gen_verilator_tb",
            "stimulus_seed", "lfsr_value", "PROBE_NOFILE",

@@ -4,7 +4,7 @@
     "/home/adi/circt_bug_loop_artefacts/7c1f4a9d6e2b48c0a53f81d27e6b09c4/probes/p-0000000001/probe_0001.mlir"
   ],
   "arm": "seeded",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "differential": null,
   "expected_outcome": "clean_exit",
   "input_filename": "probe_0001.mlir",

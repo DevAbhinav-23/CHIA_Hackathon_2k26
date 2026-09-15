@@ -19,7 +19,9 @@ from circt_bug_loop.contract.schema import (CounterBlock, RunManifest,
                                             SeedRecord)
 from circt_bug_loop.llm import (PromptContractError,  # noqa: F401
                                 dispatch_turn, parse_json_footer, tool_iterations)
-from circt_bug_loop.probe_task import _normalise_function, strip_prologue
+from circt_bug_loop.probe_task import (_last_pass, _normalise_function,
+                                       generalise_types, strip_prologue,
+                                       verifier_detail)
 from circt_bug_loop.store import (CandidateRecord, DedupVerdict,
                                   DifferentialVerdict, Fingerprint, LoopStore,
                                   OracleVerdict, ReducedCase, Report,
@@ -104,14 +106,23 @@ def structural_hash(text: str) -> str:
 
 
 def compute_fingerprint(verdict: OracleVerdict, signal: Optional[str],
-                        reduced_text: str, top_n: int) -> Fingerprint:
+                        reduced_text: str, top_n: int, *,
+                        pass_name: str = "") -> Fingerprint:
     """Compute G-43's primary fingerprint and its three evidence fields."""
     stripped = strip_prologue(list(verdict.frames))
     names = [_normalise_function(frame.function) for frame in stripped]
     resolved = sum(1 for frame in stripped if frame.function)
     tuple_evidence = names[:top_n]
 
-    if verdict.oracle_class == "assertion" and verdict.assertion_text:
+    if verdict.oracle_class == "verifier_error" and verdict.verifier_op:
+        # D-13: the op, the invariant with every concrete type generalised to
+        # `T`, and the pass that produced the op. Two probes that break the same
+        # invariant on the same op with different aggregate types are one bug.
+        basis = "verifier"
+        value = (f"{verdict.verifier_op}\n"
+                 f"{generalise_types(verdict.verifier_message or '')}\n"
+                 f"{pass_name}")
+    elif verdict.oracle_class == "assertion" and verdict.assertion_text:
         basis = "assertion"
         value = (f"{normalise_expr(verdict.assertion_text)}\n"
                  f"{normalise_site(verdict.assertion_site or '')}")
@@ -177,7 +188,10 @@ def labelled_fingerprint(side: dict, top_n: int) -> Fingerprint:
 def mirror_tokens(verdict: OracleVerdict) -> list:
     """The screen's tokens for one candidate, per oracle class, and nothing else."""
     function = (verdict.fingerprint_frame or "").rsplit(" ", 1)[0]
-    if verdict.oracle_class == "assertion":
+    if verdict.oracle_class == "verifier_error":
+        found = [verdict.verifier_op,
+                 verifier_detail(verdict.verifier_message or "")[2]]
+    elif verdict.oracle_class == "assertion":
         found = [verdict.assertion_text, verdict.assertion_site]
     elif verdict.oracle_class == "crash":
         found = [function]
@@ -430,7 +444,8 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
         "SELECT signal FROM build_result WHERE probe_id = ?", (candidate.probe_id,))
     reduced_text = _read_text(candidate.reduced_path)
     fingerprint = compute_fingerprint(
-        verdict, (signal_row or {}).get("signal"), reduced_text, top_n)
+        verdict, (signal_row or {}).get("signal"), reduced_text, top_n,
+        pass_name=probe_pass_name(store, candidate.probe_id))
 
     # FR-10.4, the post-pin fix: a fix names one of the frame's own functions,
     # and a file-level touch is not a fix (D-11).
@@ -505,6 +520,13 @@ def dedup_and_screen(candidate: CandidateRecord, seed: SeedRecord,
                 completed=int(dedup.verdict != "dedup_unavailable"),
                 failed=int(dedup.verdict == "dedup_unavailable"),
                 seconds=time.monotonic() - started_at)}
+
+
+def probe_pass_name(store: LoopStore, probe_id: str) -> str:
+    """The last pass one probe's own argv names, or "" (D-13's third component)."""
+    row = store.query_one("SELECT argv_json FROM probe WHERE probe_id = ?",
+                          (probe_id,))
+    return _last_pass(json.loads(row["argv_json"])) if row else ""
 
 
 def _duplicate_of(store: LoopStore, candidate: CandidateRecord,
@@ -721,6 +743,11 @@ def assisted_by(manifest: RunManifest) -> str:
     return f"Assisted-by: {model}"
 
 
+#: What the primary template's `frames` point says for a class that prints no trace.
+_NO_FRAMES = {"verifier_error": "No stack trace: the tool printed a verifier "
+                                "diagnostic and exited 1."}
+
+
 def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
                     verdict: Optional[OracleVerdict],
                     dedup: Optional[DedupVerdict],
@@ -746,7 +773,8 @@ def _primary_values(candidate: CandidateRecord, reduced: Optional[ReducedCase],
             "~~~"]),
         "frames": "\n".join(
             f"{_normalise_function(frame.function)} {frame.file}:{frame.line}"
-            for frame in frames[:top_n]) or None,
+            for frame in frames[:top_n]) or _NO_FRAMES.get(
+                candidate.oracle_class),
         "dedup_evidence": _dedup_lines(dedup),
         "arm": candidate.arm,
         "contamination": "\n".join([
@@ -830,6 +858,15 @@ def _observed(verdict: Optional[OracleVerdict]) -> Optional[str]:
             "~~~",
             f"LLVM ERROR: {verdict.fatal_message}",
             "~~~"])
+    if verdict.oracle_class == "verifier_error":
+        return "\n".join([
+            "CIRCT's own verifier refused the output of the pass below: the op "
+            "it names is not in the input, the compiler created it, and the "
+            "input parses and verifies on its own.",
+            "",
+            "~~~",
+            verdict.verifier_message or "",
+            "~~~"])
     return ("CIRCT terminated abnormally on the input below, with no diagnostic "
             "of its own. The symbolised frames are given further down.")
 
@@ -880,6 +917,22 @@ NO_TURN_PROSE = (
     "(FR-11.4).")
 
 
+#: The prose a report carries when the driver has stage 6's turn off (D-13).
+NO_TURN_PROSE_RECLASSIFIED = (
+    "NO MODEL TURN WAS MADE FOR THIS CANDIDATE. `--reclassify` re-judged a "
+    "stored probe against contract 2.4's `verifier_error` rule and never sends "
+    "a turn, so this field is the driver's own sentence. Every number, size, "
+    "hash and verdict below is read off the record exactly as it is for a "
+    "candidate that did get a turn (FR-11.4, FR-11.8).")
+
+
+def turn_skipped() -> tuple:
+    """FR-11.8's template report for a driver that is running with no turn (D-13)."""
+    prose = dict.fromkeys(("title", "summary", "why_it_matters"),
+                          NO_TURN_PROSE_RECLASSIFIED)
+    return "untriaged", prose, NO_TURN_PROSE_RECLASSIFIED
+
+
 def screened_out(dedup: Optional[DedupVerdict]) -> Optional[tuple]:
     """What to record for a candidate the screen already decided, or None."""
     if dedup is None or dedup.verdict == "new":
@@ -914,11 +967,14 @@ def triage_report(candidate: CandidateRecord, reduced: Optional[ReducedCase],
     classification = "untriaged"
     reason = ""
     screened = screened_out(dedup)
+    why = dedup.verdict if screened is not None else None
+    if screened is None and cfg.get("skip_turn"):
+        screened, why = turn_skipped(), "turn_disabled"
 
     if screened is not None:
         # No turn at all.
         classification, prose, reason = screened
-        logs.update({"turn_skipped": dedup.verdict, "success": True,
+        logs.update({"turn_skipped": why, "success": True,
                      "result": "", "stream": "", "stderr": ""})
     else:
         try:

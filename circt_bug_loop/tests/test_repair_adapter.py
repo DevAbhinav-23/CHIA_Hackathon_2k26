@@ -684,7 +684,7 @@ def test_repair_23_stage_sevens_tokens_are_null_with_a_reason(tmp_path, monkeypa
                         "tokens_out": None, "cost_usd": None}
     assert set(observed) == schema._DICT_KEYS[("LedgerEntry", "observed")]
     assert "token_capture" not in observed
-    assert schema.CONTRACT_VERSION == "2.3"
+    assert schema.CONTRACT_VERSION == "2.4"
 
     run = _attempt(tmp_path, monkeypatch)
     assert run.result.token_capture == "unavailable_remote_dispatch"
@@ -839,3 +839,17 @@ def test_repair_28_a_failed_attempt_keeps_its_phase_logs(tmp_path, monkeypatch):
         len(tail) <= repair_adapter.PHASE_LOG_TAIL
         for tail in quiet.result.phase_logs.values())
     assert quiet.result.assess_reason is None
+
+
+def test_repair_29_a_verifier_error_is_never_repaired(tmp_path, monkeypatch):
+    """D-13: FR-12.4's two classes are unchanged, so the new one is refused."""
+    from circt_bug_loop.repair_adapter import REPAIR_CLASSES
+
+    assert REPAIR_CLASSES == ("crash", "assertion")
+    chain = _Recorder({"status": "fixed"})
+    with pytest.raises(RepairRefused) as refused:
+        _attempt(tmp_path, monkeypatch, chain=chain,
+                 candidate=_candidate(tmp_path, oracle_class="verifier_error",
+                                      assertion_text=None, assertion_site=None))
+    assert refused.value.reason == "oracle_class_verifier_error"
+    assert chain.calls == []

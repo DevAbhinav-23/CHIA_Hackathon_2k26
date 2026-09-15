@@ -4,7 +4,7 @@
   "assertion_site": null,
   "assertion_text": null,
   "build_status": "parse_error",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "exit_status": 1,
   "iteration": 1,
   "limit_hit": null,
@@ -17,5 +17,7 @@
   "seed_sha": "3b30c823b82916627d62f59d4e6e8e520f8b530d",
   "signal": null,
   "stopping_reason": "tool_rejected_input",
-  "stopping_stage": "stage_3"
+  "stopping_stage": "stage_3",
+  "verifier_message": null,
+  "verifier_op": null
 }

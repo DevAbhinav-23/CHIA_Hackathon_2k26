@@ -578,3 +578,23 @@ def test_T_U_results_23_a_sharded_run_says_so_in_its_header(tmp_path):
     assert "Corpus shard `1/3`" in text
     assert "every 3th seed of the corpus order from position 1" in text
     assert "that shard's and not the whole corpus's" in text
+
+
+def test_T_U_results_24(tmp_path):
+    """D-13: `verifier_error` is a row of its own and never the invalid-input bucket."""
+    from circt_bug_loop.results import BUILD_STATUSES
+
+    assert BUILD_STATUSES[-1] == "verifier_error"
+    store, manifest, pairs = campaign(tmp_path)
+    store.update("probe_result", {"build_status": "parse_error"},
+                 {"build_status": "verifier_error",
+                  "stopping_reason": "verifier_rejected_output"})
+    taxonomy = section(render(store, manifest, pairs), "3. Failure taxonomy")
+    _mapping, buckets, _phases, outcomes, _failures = tables(taxonomy)
+
+    split = {row[0]: [int(cell) for cell in row[1:]] for row in outcomes["rows"]}
+    assert sum(split["verifier_error"]) == 1
+    assert split["parse_error:tool_rejected_input"] == [0, 0]
+    assert split["parse_error:tool_rejected_argv"] == [0, 0]
+    assert {row[0]: int(row[1]) for row in buckets["rows"]}["invalid_input"] == 0
+    assert "`verifier_error` is counted apart from both" in taxonomy

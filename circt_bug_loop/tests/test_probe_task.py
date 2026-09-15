@@ -1362,3 +1362,211 @@ def test_u_probe_58_limit_hit_needs_evidence_and_127_is_not_a_rejection() -> Non
 
     assert "tool_unavailable" not in bug_loop._FIRING_STATUSES
     assert bug_loop._UNDECIDED_STATUS == "tool_unavailable"
+
+
+# --- D-13: the `verifier_error` class, contract 2.4 -------------------------
+
+#: What a pass writes by hand about an input it will not take. MEASURED, the
+#: recorded mutation probes of `contract/fixtures/recorded/`.
+_PASS_DIAGNOSTIC = _stderr("verifier_error_pass.txt")
+
+
+def _verify_tool(tmp_path: Path, *, stderr: str, verify_rc: int = 0) -> str:
+    """A `circt-opt` that fails a pass and answers §4.8's own command separately."""
+    tool = tmp_path / "circt-opt"
+    tool.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "-o" ]; then exit %d; fi\n'
+        "cat <<'STDERR' >&2\n%s\nSTDERR\n"
+        "exit 1\n" % (verify_rc, stderr.strip()))
+    tool.chmod(0o755)
+    return str(tool)
+
+
+@pytest.mark.t0
+def test_the_generated_verifier_is_told_from_a_pass_writing_by_hand() -> None:
+    """D-13: only MLIR's generated verifier writes `#N must be` and `constraint:`."""
+    op, message, constraint = probe_task.verifier_detail(_stderr("verifier_error.txt"))
+    assert op == "comb.extract"
+    assert message == ("error: 'comb.extract' op result #0 must be a signless "
+                       "integer bitvector, but got '!hw.array<2xi2>'")
+    assert constraint == "result #0 must be a signless integer bitvector"
+
+    ref = probe_task.verifier_detail(_stderr("verifier_error_ref.txt"))
+    assert ref[0] == "llhd.sig.extract"
+    assert ref[2] == "result #0 must be ref of a signless integer bitvector"
+
+    # MEASURED: the input of this one parses and verifies, and it is NOT D-13.
+    assert probe_task.verifier_detail(_PASS_DIAGNOSTIC) == (None, None, None)
+    assert probe_task.verifier_detail(_stderr("parse_error.txt")) == (None, None, None)
+    assert probe_task.verifier_detail("") == (None, None, None)
+    # An attribute constraint is the generated verifier's too.
+    attribute = ("error: 'hw.constant' op attribute 'value' failed to satisfy "
+                 "constraint: arbitrary integer attribute")
+    assert probe_task.verifier_detail(attribute)[0] == "hw.constant"
+    # The cap is applied after the path is stripped.
+    long_line = f"x.mlir:1:1: error: 'a.b' op result #0 must be {'x' * 400}"
+    assert len(probe_task.verifier_detail(long_line)[1]) == \
+        probe_task.VERIFIER_MESSAGE_CAP
+
+
+@pytest.mark.t0
+def test_two_aggregate_types_break_one_invariant_and_fingerprint_alike() -> None:
+    """D-13: the message generalises to the invariant, so the types collide."""
+    left = probe_task.verifier_detail(_stderr("verifier_error.txt"))[1]
+    right = left.replace("!hw.array<2xi2>", "!hw.struct<a: i2, b: i2>")
+    assert left != right
+    assert probe_task.generalise_types(left) == probe_task.generalise_types(right)
+    assert probe_task.generalise_types(left) == (
+        "error: T op result #0 must be a signless integer bitvector, but got T")
+
+
+@pytest.mark.t0
+def test_a_rejection_of_the_tools_own_output_is_not_a_parse_error(tmp_path) -> None:
+    """D-13: §4.8's command on the input alone is what decides, and it is run."""
+    directory = tmp_path / "probe"
+    directory.mkdir()
+    (tmp_path / "input.mlir").write_text("hw.module @T() {}\n")
+
+    def execute(tool_path: str) -> dict:
+        return call_node(
+            probe_execute,
+            _spec("circt-opt", ["--convert-moore-to-core",
+                                str(tmp_path / "input.mlir")], tmp_path),
+            _image_spec(**{"circt-opt": _sha256(tool_path)}), LIMITS,
+            str(directory), bin_dir=str(tmp_path))
+
+    out = execute(_verify_tool(tmp_path, stderr=_stderr("verifier_error.txt")))
+    assert out["build_result"].status == "verifier_error"
+    assert out["probe_result"].build_status == "verifier_error"
+    assert out["probe_result"].stopping_reason == probe_task.VERIFIER_REASON
+    assert (directory / probe_task.VERIFY_STDERR_FILE).is_file()
+    assert schema.validate(out["probe_result"]) is None
+
+    # The input itself does not verify: the tool is right and the input is wrong.
+    out = execute(_verify_tool(tmp_path, stderr=_stderr("verifier_error.txt"),
+                               verify_rc=1))
+    assert out["build_result"].status == "parse_error"
+    assert out["probe_result"].stopping_reason == "tool_rejected_input"
+
+    # A pass complaining about the input by hand stays a parse error, and §4.8's
+    # command is not even run for it.
+    (directory / probe_task.VERIFY_STDERR_FILE).unlink()
+    out = execute(_verify_tool(tmp_path, stderr=_PASS_DIAGNOSTIC))
+    assert out["build_result"].status == "parse_error"
+    assert not (directory / probe_task.VERIFY_STDERR_FILE).exists()
+
+
+@pytest.mark.t0
+def test_an_unbuilt_checker_never_upgrades_a_status(tmp_path) -> None:
+    """D-13: a checker whose hash the image does not vouch for decides nothing."""
+    directory = tmp_path / "probe"
+    directory.mkdir()
+    case = tmp_path / "input.sv"
+    case.write_text("module T; endmodule\n")
+    tool = tmp_path / "circt-translate"
+    tool.write_text("#!/bin/sh\ncat <<'STDERR' >&2\n%s\nSTDERR\nexit 1\n"
+                    % _stderr("verifier_error.txt").strip())
+    tool.chmod(0o755)
+    # §4.8 sends a `.sv` to `circt-verilog`, which this bin_dir has not got.
+    out = call_node(
+        probe_execute,
+        _spec("circt-translate", ["--import-verilog", str(case)], tmp_path,
+              input_filename="input.sv", input_path=str(case)),
+        _image_spec(**{"circt-translate": _sha256(tool)}), LIMITS,
+        str(directory), bin_dir=str(tmp_path))
+    assert out["build_result"].status == "parse_error"
+    assert not (directory / probe_task.VERIFY_STDERR_FILE).exists()
+    for hashes in ({}, {"circt-verilog": "b" * 64}):
+        assert probe_task.input_verifies(str(case), hashes, LIMITS,
+                                         str(directory), str(tmp_path)) is False
+
+
+@pytest.mark.t0
+def test_validity_command_is_chosen_by_the_extension_alone(tmp_path) -> None:
+    """§4.8's table, shared by stage 3 and the gate, lives in one place."""
+    assert probe_task.validity_command("/x/case.fir") == ("firtool", ["--parse-only"])
+    assert probe_task.validity_command("/x/case.SV") == ("circt-verilog",
+                                                         ["--import-only"])
+    assert probe_task.validity_command("/x/case.mlir") == ("circt-opt",
+                                                           ["-o", "/dev/null"])
+    assert probe_task.validity_command("/x/case") == \
+        probe_task.DEFAULT_VALIDITY_COMMAND
+    from circt_bug_loop import gate
+
+    assert gate.validity_command is probe_task.validity_command
+
+
+@pytest.mark.t0
+def test_the_oracle_fires_on_a_verifier_error_with_no_trace(tmp_path) -> None:
+    """D-13: the class fires, carries its two fields and has no root frame."""
+    verdict = _verdict(tmp_path, "verifier_error.txt", "verifier_error",
+                       signal=None, exit_status=1)
+    assert verdict.fired and verdict.oracle_class == "verifier_error"
+    assert verdict.verifier_op == "comb.extract"
+    assert verdict.verifier_message.startswith("error: 'comb.extract' op")
+    assert verdict.frames == [] and verdict.fingerprint_frame is None
+    # No trace means no root frame, so the root is not "out of scope".
+    assert verdict.out_of_scope_root is False
+    assert verdict.assertion_text is None and verdict.fatal_message is None
+    assert "verifier_error" in probe_task._FIRING
+
+    # Every other class leaves the pair null.
+    crash = _verdict(tmp_path)
+    assert crash.verifier_op is None and crash.verifier_message is None
+
+
+@pytest.mark.t0
+def test_the_interestingness_test_pins_the_op_and_the_invariant(tmp_path) -> None:
+    """D-13: exit 1, the op and the invariant; never the concrete type."""
+    import subprocess as sp
+
+    verdict = _verdict(tmp_path, "verifier_error.txt", "verifier_error",
+                       signal=None, exit_status=1)
+    script = tmp_path / "interesting.sh"
+    text = probe_task.write_interestingness(
+        str(script), verdict, "/bin/true", [], {**LIMITS, **REDUCTION},
+        str(tmp_path / "calls"))
+    blocks = [line for line in text.splitlines() if line.startswith("# --- class:")]
+    assert len(blocks) == 1 and "verifier_error" in blocks[0]
+    assert not re.search(r"@[A-Z_]+@", text)
+    assert "'comb.extract'" in text
+    assert "result #0 must be a signless integer bitvector" in text
+    assert "!hw.array<2xi2>" not in text, "the type is not part of the test"
+    assert '[ "$RC" -eq 1 ]' in text
+    assert sp.run(["sh", "-n", str(script)]).returncode == 0
+
+    # A candidate that breaks the same invariant with a different type is interesting.
+    other = _stderr("verifier_error.txt").replace("!hw.array<2xi2>",
+                                                  "!hw.struct<a: i2, b: i2>")
+    stub = tmp_path / "again.sh"
+    stub.write_text(f"#!/bin/sh\ncat <<'STDERR' >&2\n{other.strip()}\nSTDERR\nexit 1\n")
+    stub.chmod(0o755)
+    probe_task.write_interestingness(str(script), verdict, str(stub), [],
+                                     {**LIMITS, **REDUCTION}, str(tmp_path / "calls"))
+    (tmp_path / "cand.mlir").write_text("hw.module @T() {}\n")
+    assert sp.run([str(script), "cand.mlir"], cwd=str(tmp_path)).returncode == 0
+
+    # A different op is a different failure.
+    elsewhere = _stderr("verifier_error.txt").replace("comb.extract", "hw.bitcast")
+    stub.write_text(f"#!/bin/sh\ncat <<'STDERR' >&2\n{elsewhere.strip()}\n"
+                    "STDERR\nexit 1\n")
+    assert sp.run([str(script), "cand.mlir"], cwd=str(tmp_path)).returncode == 1
+
+
+@pytest.mark.t0
+def test_the_recheck_reads_the_class_the_reduced_case_still_shows(tmp_path) -> None:
+    """FR-09.3 for D-13: §4.8's command is not re-run, the diagnostic is compared."""
+    verdict = _verdict(tmp_path, "verifier_error.txt", "verifier_error",
+                       signal=None, exit_status=1)
+    same = _stderr("verifier_error.txt").replace("!hw.array<2xi2>", "!hw.struct<a: i2>")
+    out = probe_task._recheck_verifier("parse_error", same, verdict)
+    assert out["recheck_matches"] and out["recheck_class"] == "verifier_error"
+    assert out["recheck_assertion_text"] is None
+
+    for stderr, status in ((_PASS_DIAGNOSTIC, "parse_error"),
+                           (_stderr("verifier_error.txt"), "crash"),
+                           ("", "clean_exit")):
+        out = probe_task._recheck_verifier(status, stderr, verdict)
+        assert out["recheck_matches"] is False
+        assert out["recheck_class"] == status

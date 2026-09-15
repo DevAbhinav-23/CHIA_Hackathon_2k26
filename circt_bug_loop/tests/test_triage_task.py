@@ -1476,3 +1476,70 @@ def test_triage_35_live_mirror_against_llvm_circt(tmp_path):
         "SELECT issue_number FROM issue_mirror")}
     assert {item["number"] for item in recorded} <= live, (
         "every recorded fixture issue is still in the live mirror")
+
+
+#: The two diagnostics campaign 2 recorded for D-13, as the verdict holds them.
+_COMB = ("error: 'comb.extract' op result #0 must be a signless integer "
+         "bitvector, but got '!hw.array<2xi2>'")
+_STRUCT = _COMB.replace("!hw.array<2xi2>", "!hw.struct<a: i2, b: i2>")
+
+
+def _verifier_verdict(message=_COMB, op="comb.extract", **over):
+    """An `OracleVerdict` of D-13's class: the two fields and no frame at all."""
+    import dataclasses
+
+    return dataclasses.replace(_verdict("verifier_error", **over),
+                               verifier_message=message, verifier_op=op)
+
+
+def test_triage_30_the_verifier_basis_is_the_op_the_invariant_and_the_pass():
+    """D-13: two probes that break one invariant with different types are one bug."""
+    array = compute_fingerprint(_verifier_verdict(), None, "", 5,
+                                pass_name="convert-moore-to-core")
+    struct = compute_fingerprint(_verifier_verdict(_STRUCT), None, "", 5,
+                                 pass_name="convert-moore-to-core")
+    assert array.basis == struct.basis == "verifier"
+    assert array.value == struct.value == (
+        "comb.extract\n"
+        "error: T op result #0 must be a signless integer bitvector, but got T\n"
+        "convert-moore-to-core")
+    assert array.frame_tuple == [] and array.structural_hash
+
+    # The pass is part of the identity: the same op broken by another pass is not
+    # the same bug, and neither is another op broken the same way.
+    other_pass = compute_fingerprint(_verifier_verdict(), None, "", 5,
+                                     pass_name="lower-seq-to-sv")
+    other_op = compute_fingerprint(
+        _verifier_verdict(_COMB.replace("comb.extract", "hw.bitcast"), "hw.bitcast"),
+        None, "", 5, pass_name="convert-moore-to-core")
+    assert len({array.value, other_pass.value, other_op.value}) == 3
+
+    # The screen's tokens are the op and the invariant, never the type.
+    assert mirror_tokens(_verifier_verdict()) == [
+        "comb.extract", "result #0 must be a signless integer bitvector"]
+    assert mirror_tokens(_verifier_verdict(_STRUCT)) == mirror_tokens(
+        _verifier_verdict())
+
+
+def test_triage_31_the_screen_reads_the_pass_off_the_probes_own_argv(tmp_path):
+    """D-13: the fingerprint's third component comes from the stored `probe` row."""
+    from circt_bug_loop.triage_task import probe_pass_name
+
+    candidate = _candidate(tmp_path, oracle_class="verifier_error")
+    store = _store(tmp_path, candidate=candidate)
+    store.update("probe", {"probe_id": candidate.probe_id},
+                 {"argv_json": json.dumps(["--convert-moore-to-core", "-o",
+                                           "/dev/null", "in.mlir"])})
+    assert probe_pass_name(store, candidate.probe_id) == "convert-moore-to-core"
+    assert probe_pass_name(store, "absent") == ""
+
+
+def test_triage_32_the_report_says_the_compiler_made_the_op(tmp_path):
+    """D-13: the observed-behaviour point is the class's own, and there is no trace."""
+    from circt_bug_loop.triage_task import _NO_FRAMES, _observed
+
+    observed = _observed(_verifier_verdict())
+    assert "verifier refused the output of the pass" in observed
+    assert _COMB in observed
+    assert "terminated abnormally" not in observed
+    assert _NO_FRAMES["verifier_error"].startswith("No stack trace")

@@ -1811,3 +1811,245 @@ def test_T_U_driver_48_rescreen_is_an_argument_of_the_driver(tmp_path: Path):
     assert bug_loop.build_parser().parse_args(["--mode", "discovery"]).rescreen is None
     assert bug_loop.rescreen(open_store(tmp_path), _RUN, clone_path=str(tmp_path),
                              top_n=5, out=None) == 2
+
+
+#: D-13's diagnostic, and the one a PASS writes by hand about a valid input.
+_VERIFIER_STDERR = "verifier_error.txt"
+_PASS_STDERR = "verifier_error_pass.txt"
+
+
+class _RecordingDispatch(bug_loop.Dispatch):
+    """`Dispatch(remote=False)` that names every node it was asked to run."""
+
+    def __init__(self):
+        super().__init__(remote=False)
+        self.nodes = []
+
+    def call(self, fn, *args, **kwargs):
+        self.nodes.append(getattr(fn, "__name__", str(fn)))
+        return super().call(fn, *args, **kwargs)
+
+
+def _verify_stub(bin_dir: Path) -> str:
+    """§4.8's command as a stand-in tool: it refuses an input whose name says so."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    tool = bin_dir / "circt-opt"
+    tool.write_text("#!/bin/sh\n"
+                    'case "$3" in *invalid*) echo "error: bad" >&2; exit 1 ;; esac\n'
+                    "exit 0\n")
+    tool.chmod(0o755)
+    from circt_bug_loop.probe_task import _sha256
+
+    return _sha256(str(tool))
+
+
+def _parse_error_run(tmp_path: Path, bin_dir: Path):
+    """A stored run of three `parse_error` probes, as campaign 2 left them."""
+    loop = open_store(tmp_path)
+    built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
+    spec_image = image_spec("ok")
+    spec_image.tool_hashes = {"circt-opt": _verify_stub(bin_dir)}
+    built.image_spec["tool_hashes"] = dict(spec_image.tool_hashes)
+    seed = seed_record()
+    bug_loop.write_run_rows(
+        loop, built, image_spec=spec_image,
+        mined={"seeds": [seed], "sdk_map": {seed.sdk_tag: [seed.seed_sha]},
+               "exclusions": {}, "sv_seeds": []},
+        mirror=dict(_MIRROR))
+    cases = (("p-000000000001", _VERIFIER_STDERR, "input.mlir"),
+             ("p-000000000002", _PASS_STDERR, "input.mlir"),
+             ("p-000000000003", _VERIFIER_STDERR, "invalid.mlir"))
+    for probe_id, stderr_name, filename in cases:
+        directory = tmp_path / probe_id
+        directory.mkdir()
+        case = directory / filename
+        case.write_text("hw.module @T() {}\n")
+        stderr = directory / "stderr.txt"
+        stderr.write_text((FIXTURES / "stderr" / stderr_name).read_text())
+        spec = probe_spec(probe_id, "seeded", input_filename=filename,
+                          input_path=str(case),
+                          argv=["--convert-moore-to-core", str(case)])
+        bug_loop.write_probe(loop, spec, str(directory))
+        bug_loop.write_build_result(loop, BuildResult(
+            probe_id=probe_id, run_manifest_id=_RUN, run_commit="e" * 40,
+            image_digest=spec_image.image_digest, status="parse_error",
+            binary_path=str(bin_dir / "circt-opt"), binary_sha256="0" * 64,
+            argv=[str(bin_dir / "circt-opt"), "--convert-moore-to-core", str(case)],
+            exit_status=1, signal=None, limit_hit=None, cpu_seconds=0.1,
+            wall_seconds=0.2, peak_rss_bytes=1024, worker_hostname="host",
+            worker_node_id="node", child_pid=1, stdout_path="/dev/null",
+            stderr_path=str(stderr), stdout_bytes=0,
+            stderr_bytes=stderr.stat().st_size, truncated=False))
+        bug_loop.write_probe_result(loop, schema.ProbeResult(
+            probe_id=probe_id, run_manifest_id=_RUN, seed_sha=spec.seed_sha,
+            arm="seeded", iteration=spec.iteration, build_status="parse_error",
+            oracle_fired=False, stopping_stage="stage_3",
+            stopping_reason="tool_rejected_input", artefact_dir=str(directory),
+            exit_status=1), str(directory))
+    return loop, built, spec_image
+
+
+def _reclassify_stages(tmp_path: Path) -> bug_loop.Stages:
+    """`fake_stages`, with stage 4 and stage 6's render the real nodes (D-13)."""
+    from circt_bug_loop import probe_task, triage_task
+
+    stages = fake_stages()
+
+    def reduce(spec, verdict, limits, artefact_dir, **kwargs):
+        path = Path(artefact_dir, "reduced.mlir")
+        path.write_text("hw.module @T() {}\n")
+        return {"counters": schema.CounterBlock(
+            stage="stage_5", started=1, completed=1, failed=0, seconds=0.1),
+            "reduced": ReducedCase(
+            probe_id=spec.probe_id, reducer="circt-reduce", reduced=True,
+            fixpoint=True, budget_truncated=False, reason=None, lift=None,
+            path=str(path), size_before_bytes=100, size_after_bytes=10,
+            size_before_ops=10, size_after_ops=1, wall_seconds=1.0,
+            interestingness_calls=3, recheck_class="verifier_error",
+            recheck_assertion_text=None, recheck_assertion_site=None,
+            recheck_matches=True)}
+
+    def screen(candidate, seed, verdict, clone_path, db_path, top_n, **kwargs):
+        from circt_bug_loop.store import LoopStore
+        from circt_bug_loop.triage_task import _screened, _write_rows
+
+        fingerprint = triage_task.compute_fingerprint(
+            verdict, None, "", top_n, pass_name="convert-moore-to-core")
+        dedup = DedupVerdict(
+            probe_id=candidate.probe_id, verdict="new",
+            evidence=dict.fromkeys(triage_task._EVIDENCE_KEYS))
+        _write_rows(LoopStore(db_path),
+                    _screened(candidate, fingerprint, dedup, False, False,
+                              "seed_commit"), fingerprint, dedup)
+        return {"fingerprint": fingerprint, "dedup": dedup,
+                "contaminated_symbol": False, "contaminated_file": False,
+                "contamination_lower_bound": "seed_commit", "fixing_commits": [],
+                "counters": schema.CounterBlock(
+                    stage="stage_6", started=1, completed=1, failed=0, seconds=0.1)}
+
+    return dataclasses.replace(
+        stages, oracle_primary=probe_task.oracle_primary, reduce_case=reduce,
+        dedup_and_screen=screen, triage_report=triage_task.triage_report)
+
+
+@pytest.mark.t0
+def test_T_U_driver_49_reclassify_rejudges_a_runs_parse_errors(tmp_path: Path):
+    """D-13: `--reclassify` re-judges stored `parse_error` probes and makes no turn."""
+    import io
+
+    from circt_bug_loop.store import latest
+
+    bin_dir = tmp_path / "bin"
+    loop, built, spec_image = _parse_error_run(tmp_path, bin_dir)
+    dispatch = _RecordingDispatch()
+    campaign = bug_loop.Campaign(
+        manifest=built, budget=budget_file(), store=loop,
+        stages=_reclassify_stages(tmp_path), dispatch=dispatch,
+        counters=bug_loop.CounterLog(_RUN), clone_path=str(tmp_path),
+        image_spec=spec_image, bin_dir=str(bin_dir), repair_enabled=False,
+        skip_turn=True)
+    out = io.StringIO()
+    assert bug_loop.reclassify(campaign, out) == 0
+
+    # Only the probe whose diagnostic is the generated verifier's moved, and
+    # §4.8's command was not even dispatched for the one that is a pass's own.
+    statuses = {row["probe_id"]: row["status"] for row in
+                loop.query("SELECT probe_id, status FROM build_result")}
+    assert statuses == {"p-000000000001": "verifier_error",
+                        "p-000000000002": "parse_error",
+                        "p-000000000003": "parse_error"}
+    assert dispatch.nodes.count("probe_verify") == 2, "not for the pass's own"
+
+    # The probe's own row moved with it, in place: its PRIMARY KEY forbids a second.
+    rows = loop.query("SELECT * FROM probe_result WHERE probe_id = 'p-000000000001'")
+    assert len(rows) == 1
+    result = schema.from_json(rows[0]["result_json"], schema.ProbeResult)
+    assert result.build_status == "verifier_error" and result.oracle_fired
+    assert result.oracle_class == "verifier_error"
+    assert result.verifier_op == "comb.extract"
+    assert result.verifier_message.startswith("error: 'comb.extract' op")
+    assert rows[0]["oracle_class"] == "verifier_error"
+    assert rows[0]["stopping_stage"] == "gate"
+
+    # Stage 4's two rows, the candidate, and the `verifier` fingerprint basis.
+    assert loop.query_one("SELECT verifier_op FROM verifier_error "
+                          "WHERE probe_id = 'p-000000000001'")["verifier_op"] \
+        == "comb.extract"
+    candidate = loop.query_one("SELECT * FROM candidate")
+    assert candidate["oracle_class"] == "verifier_error"
+    assert candidate["assertion_text"] is None
+    finger = loop.query_one("SELECT basis, value FROM fingerprint")
+    assert finger["basis"] == "verifier"
+    assert finger["value"].startswith("comb.extract\n")
+    assert latest(loop, "gate_decision", candidate["candidate_id"])["decision"] \
+        == "report"
+
+    # FR-11.8: the report was rendered from the record, by no model turn at all.
+    report = loop.query_one("SELECT path, assisted_by FROM report")
+    rendered = Path(report["path"]).read_text(encoding="utf-8")
+    assert "NO MODEL TURN WAS MADE FOR THIS CANDIDATE" in rendered
+    assert "--reclassify" in rendered
+    assert "No stack trace" in rendered
+    assert "verifier refused the output of the pass" in rendered
+    assert "repair_adapt" not in dispatch.nodes
+
+    printed = out.getvalue()
+    header = printed.splitlines()[0]
+    assert all(name in header for name in bug_loop._RECLASSIFY_COLUMNS)
+    row = printed.splitlines()[1].split()
+    assert row == ["a" * 12, "3", "1", "report", "x1"]
+    assert "1 of 3 `parse_error` probe(s)" in printed
+    assert "no model turn was made" in printed
+
+    # A second pass no longer sees the probe that moved, and charges its own
+    # entries for the two it must check again: an invocation is not a retry.
+    second = io.StringIO()
+    assert bug_loop.reclassify(campaign, second) == 0
+    assert "0 of 2 `parse_error` probe(s)" in second.getvalue()
+    assert len(loop.query("SELECT 1 FROM ledger_entry WHERE stage = 'stage_3'")) == 3
+
+
+
+@pytest.mark.t0
+def test_T_U_driver_50_reclassify_is_an_argument_and_needs_the_cluster(tmp_path: Path):
+    """D-13: `--reclassify` takes a run id, refuses an empty run and needs `circt`."""
+    import io
+
+    parsed = bug_loop.build_parser().parse_args(
+        ["--mode", "discovery", "--reclassify", _RUN])
+    assert parsed.reclassify == _RUN
+    assert bug_loop.build_parser().parse_args(
+        ["--mode", "discovery"]).reclassify is None
+    assert bug_loop._STAGE_OF["probe_verify"] == "stage_3"
+
+    bin_dir = tmp_path / "bin"
+    loop, built, spec_image = _parse_error_run(tmp_path, bin_dir)
+    loop.update("build_result", {"status": "parse_error"}, {"status": "clean_exit"})
+    campaign = bug_loop.Campaign(
+        manifest=built, budget=budget_file(), store=loop,
+        stages=fake_stages(), dispatch=bug_loop.Dispatch(remote=False),
+        counters=bug_loop.CounterLog(_RUN), clone_path=str(tmp_path),
+        image_spec=spec_image, bin_dir=str(bin_dir), repair_enabled=False)
+    assert bug_loop.reclassify(campaign, io.StringIO()) == 2
+    assert bug_loop.manifest_of(loop, _RUN).run_manifest_id == _RUN
+    with pytest.raises(LookupError):
+        bug_loop.manifest_of(loop, "no-such-run")
+
+
+@pytest.mark.t0
+def test_reclassify_refuses_to_start_without_a_circt_worker(monkeypatch):
+    """D-13: every check it makes runs on a `circt` worker, so it needs one."""
+    from circt_bug_loop import gate
+
+    monkeypatch.setattr(bug_loop.ray, "init",
+                        lambda **kwargs: (_ for _ in ()).throw(
+                            ConnectionError("no cluster at auto")))
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.reclassify_dispatch()
+    assert raised.value.check == "cluster" and "no cluster" in str(raised.value)
+
+    monkeypatch.setattr(bug_loop.ray, "init", lambda **kwargs: None)
+    monkeypatch.setattr(gate, "live_circt_nodes", lambda: [])
+    with pytest.raises(bug_loop.PreflightFailed) as raised:
+        bug_loop.reclassify_dispatch()
+    assert "resource" in str(raised.value)

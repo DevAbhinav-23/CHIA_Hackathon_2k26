@@ -358,3 +358,39 @@ def test_T_U_feed_13(tmp_path):
     assert line.startswith("input.mlir:1:36: error: yyy")
     assert len(line) == feedback_module.ERROR_LINE_CAP
     assert len(f"{path}:1:36: error: ") > 60, "the path really was eating the cap"
+
+
+def test_T_U_feed_14(tmp_path):
+    """D-13: a `verifier_error` probe is a FINDING, never an input to fix."""
+    from circt_bug_loop.generate_task import VERIFIER_FINDING, render_feedback
+
+    message = ("error: 'comb.extract' op result #0 must be a signless integer "
+               "bitvector, but got '!hw.array<2xi2>'")
+    directory = tmp_path / "probe_p-1"
+    directory.mkdir()
+    (directory / "stderr.txt").write_text(f"input.mlir:2:8: {message}\n",
+                                          encoding="utf-8")
+    found = result("p-1", status="verifier_error",
+                   reason="verifier_rejected_output", stage="gate",
+                   oracle_fired=True, oracle_class="verifier_error",
+                   verifier_message=message, verifier_op="comb.extract",
+                   artefact_dir=str(directory))
+
+    bundle = build([found], iteration=2)
+    entry = bundle.entries[0]
+    assert entry.oracle_class == "verifier_error"
+    assert entry.oracle_summary == message
+    # `error_line` belongs to the statuses that ARE the loop's own mistake.
+    assert entry.error_line is None
+    assert "verifier_error" not in feedback_module._ABANDON_STATUSES
+    assert "verifier_error" not in feedback_module._FEEDBACK_STATUSES
+
+    rendered = render_feedback(bundle)
+    assert VERIFIER_FINDING in rendered
+    assert "FIX this input's syntax" not in rendered
+    assert "Do not fix or repeat this input" in rendered
+    assert message in rendered
+
+    # Two of them in a row do not abandon the seed either: they are findings.
+    again = build([found], bundle, iteration=3)
+    assert again.abandoned is False and again.abandon_reason is None

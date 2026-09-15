@@ -118,10 +118,10 @@ def test_T_U_store_01(tmp_path: Path):
                       "WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name")
     tables = [r["name"] for r in rows if r["type"] == "table"]
     indexes = [r["name"] for r in rows if r["type"] == "index"]
-    # §6.2's twenty-one, plus the two §6.2 does NOT declare.
-    assert len(tables) == 23 and "candidate" in tables and "registration" in tables
+    # §6.2's twenty-one, plus the three §6.2 does NOT declare.
+    assert len(tables) == 24 and "candidate" in tables and "registration" in tables
     assert len(indexes) == 9 and "ix_ledger_day" in indexes
-    for late in ("registration", "turn_failure"):
+    for late in ("registration", "turn_failure", "verifier_error"):
         assert late in tables and late not in store._DDL_TABLES
 
     conn = sqlite3.connect(str(tmp_path / "loop.db"))
@@ -247,8 +247,9 @@ def test_T_U_store_06(tmp_path: Path):
         else:
             campaign_wide.append(table)
     assert campaign_wide == ["image", "issue_mirror"]
-    # 19 of §6.2, plus W-12's `registration` and D-3's `turn_failure`.
-    assert len(traced) == 21
+    # 19 of §6.2, plus W-12's `registration`, D-3's `turn_failure` and D-13's
+    # `verifier_error`.
+    assert len(traced) == 22
 
     seed_rows(loop)
     row = loop.query_one("SELECT artefact_dir, run_manifest_id FROM candidate")
@@ -603,3 +604,54 @@ def test_T_U_store_14(tmp_path: Path):
         "fingerprint_stable": None, "frame_tuple_json": "[]",
         "structural_hash": "h" * 64})
     assert store.load_candidate(loop, "cand-01").dedup_verdict == "new"
+
+
+def test_the_verifier_error_table_and_the_widened_fingerprint_basis(tmp_path: Path):
+    """D-13: §6.2 is frozen, so 2.4's two fields and the basis arrive beside it."""
+    loop = open_store(tmp_path)
+    # §6.2's own text is untouched: both statements are appended to the schema.
+    assert "verifier_error" not in store._DDL_TABLES
+    assert "'verifier'" not in store._DDL_TABLES
+    assert store._SCHEMA.index(store._DDL_FINGERPRINT) < \
+        store._SCHEMA.index(store._DDL_TABLES), \
+        "6.2's own CREATE TABLE IF NOT EXISTS fingerprint must be the no-op"
+
+    seed_rows(loop)
+    loop.insert("verifier_error", {
+        "probe_id": "probe-01",
+        "verifier_message": "error: 'comb.extract' op result #0 must be a "
+                            "signless integer bitvector",
+        "verifier_op": "comb.extract"})
+    assert loop.query_one("SELECT verifier_op FROM verifier_error")["verifier_op"] \
+        == "comb.extract"
+
+    loop.insert("fingerprint", {
+        "candidate_id": "cand-01", "basis": "verifier", "value": "comb.extract\nT",
+        "fingerprint_stable": None, "frame_tuple_json": "[]",
+        "structural_hash": "h" * 64})
+    assert loop.query_one("SELECT basis FROM fingerprint "
+                          "WHERE candidate_id = ?", ("cand-01",))["basis"] == "verifier"
+    assert store.widen_fingerprint_basis(loop) is False
+
+
+def test_a_store_written_before_contract_2_4_is_widened_in_place(tmp_path: Path):
+    """D-13: `--reclassify` moves a `fingerprint` table 2.3 created."""
+    loop = open_store(tmp_path)
+    seed_rows(loop)
+    narrow = store._DDL_FINGERPRINT.replace("'verifier',", "")
+    loop.transaction([
+        ("DROP TABLE fingerprint", ()),
+        (narrow.rstrip().rstrip(";"), ()),
+        ("INSERT INTO fingerprint (candidate_id, basis, value, frame_tuple_json, "
+         "structural_hash) VALUES ('cand-01', 'assertion', 'v', '[]', 'h')", ()),
+    ])
+    with pytest.raises(sqlite3.IntegrityError):
+        loop.update("fingerprint", {"candidate_id": "cand-01"}, {"basis": "verifier"})
+
+    assert store.widen_fingerprint_basis(loop) is True
+    loop.update("fingerprint", {"candidate_id": "cand-01"}, {"basis": "verifier"})
+    row = loop.query_one("SELECT basis, value FROM fingerprint")
+    assert (row["basis"], row["value"]) == ("verifier", "v")
+    # The index §6.3 declares on it survives the rebuild, and a second call is a no-op.
+    assert loop.query("SELECT 1 FROM sqlite_master WHERE name = 'ix_fingerprint_value'")
+    assert store.widen_fingerprint_basis(loop) is False

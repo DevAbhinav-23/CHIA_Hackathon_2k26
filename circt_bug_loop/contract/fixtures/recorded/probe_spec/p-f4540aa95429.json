@@ -4,7 +4,7 @@
     "/tmp/bugloop-recorded-0f3c1a7e5b29/artefacts/0f3c1a7e5b294d8ea16c02f47db9e358/seed_3b30c823b82916627d62f59d4e6e8e520f8b530d/iter_1/probe_p-f4540aa95429/input.mlir"
   ],
   "arm": "seeded",
-  "contract_version": "2.3",
+  "contract_version": "2.4",
   "differential": null,
   "expected_outcome": "the element-type assertion in parseHWArray fires",
   "input_filename": "input.mlir",

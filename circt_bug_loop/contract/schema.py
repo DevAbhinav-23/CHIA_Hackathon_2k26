@@ -7,16 +7,18 @@ import typing
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Protocol
 
-CONTRACT_VERSION = "2.3"          # MAJOR.MINOR; the single source of the string
+CONTRACT_VERSION = "2.4"          # MAJOR.MINOR; the single source of the string
 
 Arm = Literal["seeded", "mutation"]
 LedgerArm = Literal["seeded", "mutation", "shared"]
 Polarity = Literal["expect_zero", "expect_nonzero"]
 Shape = Literal["plain", "split_file", "unsupported"]
-#: FR-06.9's seven, plus `tool_unavailable` at contract 2.1 (W-20b).
+#: FR-06.9's seven, plus `tool_unavailable` at 2.1 (W-20b) and `verifier_error` at 2.4 (D-13).
 BuildStatus = Literal["clean_exit", "parse_error", "assertion", "fatal_error",
-                      "crash", "timeout", "oom", "tool_unavailable"]
-OracleClass = Literal["assertion", "fatal_error", "crash", "differential"]
+                      "crash", "timeout", "oom", "tool_unavailable",
+                      "verifier_error"]
+OracleClass = Literal["assertion", "fatal_error", "crash", "differential",
+                      "verifier_error"]
 LimitHit = Literal["wall", "cpu", "address_space"]
 Scope = Literal["arm_window", "stage"]
 Mode = Literal["discovery", "calibration"]
@@ -201,6 +203,8 @@ class ProbeResult:
     assertion_site: Optional[str] = None    # "<file>:<line>", normalised per 3.7.2
     reduced_text: Optional[str] = None      # conditional, 2.12's cap rule
     reduced_path: Optional[str] = None
+    verifier_message: Optional[str] = None  # the rejected op's diagnostic, path-stripped (2.4)
+    verifier_op: Optional[str] = None       # the op the verifier named, e.g. "comb.extract" (2.4)
 
 
 @dataclass(kw_only=True)
@@ -466,6 +470,11 @@ def _probe_result_conditionals(o: ProbeResult) -> None:
         _require((getattr(o, name) is not None) == (o.oracle_class == "assertion"),
                  "E005_CONDITIONAL_REQUIRED",
                  f"ProbeResult.{name} is non-null exactly on oracle_class 'assertion'")
+    for name in ("verifier_message", "verifier_op"):
+        _require((getattr(o, name) is not None) == (o.oracle_class == "verifier_error"),
+                 "E005_CONDITIONAL_REQUIRED",
+                 f"ProbeResult.{name} is non-null exactly on oracle_class "
+                 f"'verifier_error'")
 
 
 def _budget_conditionals(o: BudgetFile) -> None:
