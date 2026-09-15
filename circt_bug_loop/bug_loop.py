@@ -28,7 +28,7 @@ from circt_bug_loop import budget as budget_module
 from circt_bug_loop import ledger as ledger_module
 from circt_bug_loop.circt_core import CIRCT_BIN_DIR
 from circt_bug_loop.contract import schema
-from circt_bug_loop.generate_task import STALE_AT_BUILD
+from circt_bug_loop.generate_task import STALE_AT_BUILD, seed_reading
 from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBundle,
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
@@ -2005,7 +2005,10 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
            "verdicts": {}, "terminating_condition": "iteration_cap"}
     bundle = empty_feedback(campaign.manifest, seed, arm, 1)
     snapshot = None
-    for iteration in range(1, campaign.budget.per_seed_iteration_cap + 1):
+    cap = campaign.budget.per_seed_iteration_cap
+    # D-14: stage 1's answer does not depend on the feedback, so it is read once.
+    reading = None
+    for iteration in range(1, cap + 1):
         if deadline is not None and campaign.now() >= deadline:
             out["terminating_condition"] = "arm_window"
             return out
@@ -2014,6 +2017,8 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                                             campaign.store.db_path)
         snapshot = budget_module.snapshot(aggregate, arm, campaign.budget)
         cfg = campaign.cfg(iteration=iteration, spend_usd=aggregate.spend_usd)
+        if reading is not None:
+            cfg["seed_reading"] = reading
         try:
             generated = campaign.call(
                 f"generate_{arm}", campaign.stages.generator(arm), seed, bundle,
@@ -2034,6 +2039,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             out["terminating_condition"] = "campaign_spend_cap"
             return out
         out["iterations"] = iteration
+        reading = reading or seed_reading(generated)
         specs = list(generated.get("specs", []))
         for spec in specs:
             campaign.recorder.record(spec)
@@ -2053,9 +2059,11 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                                 [s.probe_id for s in specs], snapshot,
                                 len(out["probes"]))
         campaign.recorder.record(bundle)
-        write_feedback(campaign.store, bundle,
-                       str(Path(iteration_dir(campaign.manifest, seed.seed_sha,
-                                              bundle.iteration)) / "feedback.json"))
+        # A bundle no iteration will read is not written (D-14).
+        if iteration < cap:
+            write_feedback(campaign.store, bundle,
+                           str(Path(iteration_dir(campaign.manifest, seed.seed_sha,
+                                                  bundle.iteration)) / "feedback.json"))
         if bundle.abandoned:
             out["terminating_condition"] = "abandoned"
             return out

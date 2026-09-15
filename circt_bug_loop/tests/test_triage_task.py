@@ -1543,3 +1543,71 @@ def test_triage_32_the_report_says_the_compiler_made_the_op(tmp_path):
     assert _COMB in observed
     assert "terminated abnormally" not in observed
     assert _NO_FRAMES["verifier_error"].startswith("No stack trace")
+
+
+#: MLIR's own op verifier, which every dialect reaches and which names no CIRCT code.
+GENERIC_TEXT = ("succeeded( ConcreteT::verifyInvariants("
+                "getDefaultDiagnosticEmitFn(ctx), args...))")
+
+
+def _generic_verdict():
+    """A candidate whose assertion is MLIR's generic one, fired from CIRCT code."""
+    return _verdict(
+        "assertion", assertion_text=GENERIC_TEXT,
+        assertion_site=f"{CIRCT_ROOT}include/mlir/IR/StorageUniquerSupport.h:180",
+        fingerprint_frame="circt::firrtl::LowerXMRPass::runOnOperation LowerXMR.cpp",
+        frames=["circt::firrtl::LowerXMRPass::runOnOperation"],
+        files={"circt::firrtl::LowerXMRPass::runOnOperation": "LowerXMR.cpp"})
+
+
+def _generic_issue(body):
+    """One mirrored open issue whose text carries MLIR's generic assertion."""
+    return [{"issue_number": 9574, "title": "assertion during verification",
+             "body": f"It dies at {GENERIC_TEXT}\n{body}", "labels": [],
+             "state": "open", "url": "https://github.com/llvm/circt/issues/9574"}]
+
+
+@pytest.mark.t1
+def test_triage_39_a_generic_assertion_alone_does_not_match_an_issue(tmp_path, clone):
+    """D-16: MLIR's and LLVM's own assertion texts name no CIRCT code, so an issue that carries one and nothing of this candidate's frame is evidence for a human, not a verdict."""
+    verdict = _generic_verdict()
+    candidate = _candidate(tmp_path, screened=True, run_commit=clone["c1"])
+    store = _store(tmp_path, candidate=candidate)
+    _mirror_rows(store, _generic_issue("Reduced case attached, circt-opt -canonicalize."))
+
+    out = call_node(dedup_and_screen, candidate, _seed(), verdict, clone["path"],
+                    str(tmp_path / "loop.db"), 5)
+
+    assert out["dedup"].verdict == "new"
+    assert out["dedup"].evidence["generic_text_match"] == 9574
+    assert out["dedup"].evidence["issue_number"] is None
+    assert out["dedup"].evidence["matched_token"] is None
+    assert set(out["dedup"].evidence) == set(triage_task._EVIDENCE_KEYS)
+    # The screen itself still matches: the verdict is what D-16 changed.
+    assert mirror_screen(store, mirror_tokens(verdict)) is not None
+    # Pilot 1's text is generic wherever it fires; a CIRCT site is not.
+    assert triage_task.generic_assertion(_verdict(
+        "assertion", assertion_text=triage_task.GENERIC_ASSERTIONS[1],
+        assertion_site="/build/llvm/include/llvm/Support/Casting.h:566")) is True
+    assert triage_task.generic_assertion(_graph_verdict()) is False
+    assert triage_task.circt_frame_tokens(verdict) == [
+        "circt::firrtl::LowerXMRPass::runOnOperation", "LowerXMR.cpp"], (
+        "the bare last component would corroborate any MLIR issue")
+
+
+@pytest.mark.t1
+def test_triage_40_a_generic_assertion_matches_when_the_issue_names_the_frame(
+        tmp_path, clone):
+    """D-16: the same text against an issue that also carries the candidate's own top CIRCT frame is the match it was before."""
+    verdict = _generic_verdict()
+    candidate = _candidate(tmp_path, screened=True, run_commit=clone["c1"])
+    store = _store(tmp_path, candidate=candidate)
+    _mirror_rows(store, _generic_issue(
+        "#8 circt::firrtl::LowerXMRPass::runOnOperation LowerXMR.cpp:412"))
+
+    out = call_node(dedup_and_screen, candidate, _seed(), verdict, clone["path"],
+                    str(tmp_path / "loop.db"), 5)
+
+    assert out["dedup"].verdict == "known_open_issue"
+    assert out["dedup"].evidence["issue_number"] == 9574
+    assert out["dedup"].evidence["generic_text_match"] is None

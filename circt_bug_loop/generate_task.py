@@ -41,6 +41,18 @@ _PARTIAL = "PARTIAL"
 #: A3's two turns, by artefact-file name, to the stage id their `CounterBlock` carries.
 _TURN_STAGE = {"seed_read": "stage_1", "probe_write": "stage_2"}
 
+#: What an iteration writes in place of the stage-1 turn it did not send (D-14).
+SEED_READ_REUSED = "reused from iter_1"
+
+#: Stage 1's answer, which no feedback changes and which iterations 2+ reuse (D-14).
+SEED_READING_KEYS = ("root_cause_class", "sibling_sites", "rejected_sites")
+
+
+def seed_reading(result: dict) -> Optional[dict]:
+    """Stage 1's answer out of one `generate_seeded` result, or None when it has none."""
+    return ({key: result.get(key) for key in SEED_READING_KEYS}
+            if result.get("root_cause_class") else None)
+
 
 #: 3.2's tool row: 60 s [DEFAULT] per git call, enforced by subprocess.
 SOURCE_READ_TIMEOUT_SECONDS = 60
@@ -628,15 +640,25 @@ def generate_seeded(seed: SeedRecord, feedback: FeedbackBundle,
             probe_dir=probe_dir, task_options=cfg.get("here_options"))
         tools = [source_read, probe_write]
 
-        answer = parse_json_footer(
-            _turn("seed_read", render_seed_read(seed, cfg), tools, cfg,
-                  directory, logs).get("result") or "",
-            ("root_cause_class", "sibling_sites"))
-        root_cause_class = str(answer["root_cause_class"])
-        resolution = _resolve_sites(
-            [site for site in answer["sibling_sites"]
-             if isinstance(site, dict)][:cap], cfg)
-        sites, rejected = resolution["resolved"], resolution["rejected"]
+        reused = None if cfg.get("reread_seed") else cfg.get("seed_reading")
+        if reused:
+            root_cause_class = reused["root_cause_class"]
+            sites = reused["sibling_sites"] or []
+            rejected = reused["rejected_sites"] or []
+            logs["reused"] = {"stage_1": SEED_READ_REUSED}
+            logs["llm_seed_read.usage.json"] = _write(
+                directory, "llm_seed_read.usage.json",
+                json.dumps({"stage_1": SEED_READ_REUSED}, indent=2) + "\n")
+        else:
+            answer = parse_json_footer(
+                _turn("seed_read", render_seed_read(seed, cfg), tools, cfg,
+                      directory, logs).get("result") or "",
+                ("root_cause_class", "sibling_sites"))
+            root_cause_class = str(answer["root_cause_class"])
+            resolution = _resolve_sites(
+                [site for site in answer["sibling_sites"]
+                 if isinstance(site, dict)][:cap], cfg)
+            sites, rejected = resolution["resolved"], resolution["rejected"]
 
         written = parse_json_footer(
             _turn("probe_write",
@@ -733,7 +755,8 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
 
 
 __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
-           "REJECTION_REASONS", "SOURCE_READ_TIMEOUT_SECONDS", "STALE_AT_BUILD",
+           "REJECTION_REASONS", "SEED_READ_REUSED", "SEED_READING_KEYS",
+           "SOURCE_READ_TIMEOUT_SECONDS", "STALE_AT_BUILD",
            "TURN_FAILED_FILE", "WRITE_PROBE_METHOD",
            "ProbeWriteTool", "SourceReadTool", "check_tool", "emit_specs",
            "generate_mutation", "generate_seeded",
@@ -741,6 +764,6 @@ __all__ = ["GENERATE_SYSTEM_MESSAGE", "PROMPTS",
            "probe_argv", "probe_id", "render_argv_template",
            "render_feedback", "render_probe_write", "render_seed_read",
            "render_sites", "render_test_files",
-           "seed_argv_template", "seed_language", "seed_stale_at_build",
-           "seed_test_dir",
+           "seed_argv_template", "seed_language", "seed_reading",
+           "seed_stale_at_build", "seed_test_dir",
            "write_calls"]
