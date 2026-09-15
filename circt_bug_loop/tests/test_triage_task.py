@@ -1687,3 +1687,27 @@ def test_triage_43_the_assertion_basis_still_matches_on_one_token(tmp_path, clon
     assert out["dedup"].evidence["issue_number"] == 9001
     assert out["dedup"].evidence["matched_token"] == candidate.assertion_text
     assert out["dedup"].evidence["op_only_match"] is None
+
+
+def test_triage_44_duplicate_of_names_the_earliest_and_spares_it(tmp_path):
+    """T-U-triage-44 (FR-10.6, D-18): the duplicate target is the earliest candidate with the fingerprint; the earliest itself is not a duplicate, so two mutual matches never leave zero representatives."""
+    fingerprint = compute_fingerprint(_verdict("assertion"), "SIGABRT", "hw.module @a {}", 5)
+    fingerprint.value, fingerprint.basis, fingerprint.fingerprint_stable = "fp-v", "assertion", True
+    calls = []
+
+    class Store:
+        def __init__(self, earliest):
+            self.earliest = earliest
+
+        def query_one(self, sql, params):
+            calls.append((sql, params))
+            return {"candidate_id": self.earliest}
+
+    me = _candidate(tmp_path, candidate_id="cand-0002")
+    assert triage_task._duplicate_of(Store("cand-0001"), me, fingerprint) == "cand-0001"
+    assert triage_task._duplicate_of(Store("cand-0002"), me, fingerprint) is None
+    sql, params = calls[-1]
+    assert "created_utc" in sql and "fingerprint_stable = 1" in sql
+    assert params == (fingerprint.value,), "the candidate itself is excluded after ordering, not in SQL"
+    assert triage_task._duplicate_of(Store(None), me, fingerprint) is None
+

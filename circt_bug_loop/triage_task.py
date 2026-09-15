@@ -593,14 +593,16 @@ def probe_pass_name(store: LoopStore, probe_id: str) -> str:
 
 def _duplicate_of(store: LoopStore, candidate: CandidateRecord,
                   fingerprint: Fingerprint) -> Optional[str]:
-    """The earlier candidate this one duplicates, across runs (FR-10.6)."""
+    """The EARLIEST candidate sharing this fingerprint across runs, or None when this one is it (FR-10.6)."""
     if fingerprint.value is None:
         return None
     row = store.query_one(
-        "SELECT candidate_id FROM fingerprint WHERE value = ? "
-        "AND fingerprint_stable = 1 AND candidate_id <> ? "
-        "ORDER BY candidate_id", (fingerprint.value, candidate.candidate_id))
-    return row["candidate_id"] if row else None
+        "SELECT f.candidate_id AS candidate_id FROM fingerprint f "
+        "LEFT JOIN candidate c USING (candidate_id) "
+        "WHERE f.value = ? AND f.fingerprint_stable = 1 "
+        "ORDER BY COALESCE(c.created_utc, ''), f.candidate_id", (fingerprint.value,))
+    first = row["candidate_id"] if row else None
+    return None if first in (None, candidate.candidate_id) else first
 
 
 def _screened(candidate: CandidateRecord, fingerprint: Fingerprint,
