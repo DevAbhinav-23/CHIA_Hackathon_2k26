@@ -1935,7 +1935,7 @@ def _drive_repair(campaign: Campaign, spec: ProbeSpec, candidate: CandidateRecor
         repair = campaign.call(
             "repair_adapt", campaign.stages.repair_adapt, report["report"],
             candidate, reduced, verdict, campaign.manifest, cfg,
-            local_id=local_id, input_path=reduced.path or spec.input_path,
+            local_id=local_id,
             chia_artifact_dir=str(solver / "issue_logs" / f"issue_{local_id}"),
             _arm=spec.arm, _key=spec.probe_id)["result"]
         out["verdicts"]["stage_7"] = repair.status

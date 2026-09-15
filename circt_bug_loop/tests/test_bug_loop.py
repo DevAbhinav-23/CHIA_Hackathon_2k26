@@ -883,7 +883,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
                     seconds=0.1)}
 
     def repair(report_, candidate, reduced, verdict, manifest_, cfg, *,
-               local_id, input_path, **kwargs):
+               local_id, **kwargs):
         from circt_bug_loop.store import RepairResult
 
         if not repairs:
@@ -894,7 +894,7 @@ def fake_stages(*, fires: bool = True, repairs: bool = False) -> bug_loop.Stages
             candidate_id=candidate.candidate_id, local_id=local_id,
             status="fixed", failing_phase=None, reproduced=True, build_ok=True,
             fixed=True, lit_ok=True, lit_unusable=False, lit_passed=1119,
-            lit_failed=0, lit_failures=[], diff_path=f"{input_path}.diff",
+            lit_failed=0, lit_failures=[], diff_path=f"{reduced.path}.diff",
             diff_added=3, diff_removed=1, chia_artifact_dir=None,
             repro_dir=f"{manifest_.artefact_root}/{manifest_.run_manifest_id}"
                       f"/repair/{local_id}",

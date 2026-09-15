@@ -196,7 +196,7 @@ def _attempt(tmp_path, monkeypatch, *, verdict="fixed.json", candidate=None,
     out = call_node(
         repair_adapt, _report(), candidate, _reduced(case), _verdict(), manifest,
         chain_cfg,
-        local_id=local_id, input_path="/art/probe/input.mlir",
+        local_id=local_id,
         created_utc="2026-09-14T00:00:00+00:00", bin_dir=bin_dir,
         chia_artifact_dir=str(issue_solver_dir() / "issue_logs"
                               / f"issue_{local_id}"),
@@ -242,7 +242,7 @@ def _run_repro(script: Path, tool: Path, case: Path) -> int:
     """Write *script* beside *case*, point it at *tool*, and run it."""
     directory = case.parent
     text = repro_script(_verdict(repro=f"{tool} --lower-seq-to-sv /art/in.mlir"),
-                        input_path="/art/in.mlir", case_name=case.name)
+                        case_name=case.name)
     (directory / script.name).write_text(text, encoding="utf-8")
     return subprocess.run(["sh", str(directory / script.name)],
                           capture_output=True, text=True).returncode
@@ -309,8 +309,7 @@ def test_repair_04_repro_exits_zero_on_a_diagnosing_tool(tmp_path):
 
 def test_repair_03b_the_script_drops_the_probe_input_and_is_shell_clean(tmp_path):
     """The candidate replaces the probe's own input, the script names no placeholder, and `sh -n` parses it (§3.8)."""
-    text = repro_script(_verdict(), input_path="/art/probe/input.mlir",
-                        case_name="case.mlir")
+    text = repro_script(_verdict(), case_name="case.mlir")
     assert "/art/probe/input.mlir" not in text
     assert "--lower-seq-to-sv" in text and "case.mlir" in text
     for placeholder in ("@TOOL@", "@ARGS@", "@CASE@"):
@@ -319,7 +318,49 @@ def test_repair_03b_the_script_drops_the_probe_input_and_is_shell_clean(tmp_path
     script.write_text(text, encoding="utf-8")
     assert subprocess.run(["sh", "-n", str(script)]).returncode == 0
     with pytest.raises(ValueError):
-        repro_script(_verdict(repro="  "), input_path="x", case_name="case.mlir")
+        repro_script(_verdict(repro="  "), case_name="case.mlir")
+
+
+def test_repair_03c_every_recorded_operand_becomes_the_case(tmp_path):
+    """The case replaces EVERY operand of the recorded command and the options survive verbatim, whatever any caller believes the input path to be.
+
+    The attempt of 2026-09-15 failed here: the recorded command named the
+    PROBE's `input.mlir` and the adapter was handed the REDUCED case's path, so
+    the old "drop the token equal to `input_path`" rule dropped nothing and the
+    script ran `circt-opt` on two positional files. `circt-opt` exited 1 on
+    "Too many positional arguments specified!" before the pass ran, so FR-12.3's
+    script - which asks only whether the run crashed - exited 0, and that is
+    what `issue_task.py:204` reads as NOT reproduced.
+    """
+    recorded = ("/workspace/circt/build/bin/circt-opt "
+                "/art/f1e4/seed_cc71/iter_3/probe_p-a2cb/input.mlir "
+                "--convert-moore-to-core")
+    text = repro_script(_verdict(repro=recorded), case_name="case.mlir")
+    line = next(ln for ln in text.splitlines() if "circt-opt" in ln)
+
+    assert "input.mlir" not in text and "/art/" not in text
+    assert line.count('"$HERE/case.mlir"') == 1, "exactly ONE positional file"
+    # In the operand's own place, so a tool that reads its input first still works.
+    assert line.index('"$HERE/case.mlir"') < line.index("--convert-moore-to-core")
+
+    # Two operands (circt-lec compares two modules) keep both slots.
+    both = repro_script(_verdict(repro="/bin/circt-lec /a/in.mlir /a/in.mlir -c1=A"),
+                        case_name="case.mlir")
+    assert both.count('"$HERE/case.mlir"') == 2 and "-c1=A" in both
+
+    # A quoted multi-word option stays ONE argument; a command with no operand
+    # at all still names the case.
+    quoted = repro_script(
+        _verdict(repro="/bin/circt-opt '-om-elaborate-object=a b' /a/in.mlir"),
+        case_name="case.mlir")
+    assert "'-om-elaborate-object=a b'" in quoted
+    assert repro_script(_verdict(repro="/bin/circt-opt --canonicalize"),
+                        case_name="case.mlir").count('"$HERE/case.mlir"') == 1
+
+    # The case name is interpolated into a double-quoted shell word.
+    for hostile in ('case.mlir"; rm -rf /', "$(id)", "a b.mlir", "../case.mlir"):
+        with pytest.raises(ValueError):
+            repro_script(_verdict(), case_name=hostile)
 
 
 @pytest.mark.parametrize("oracle_class", ["differential", "fatal_error"])
@@ -499,8 +540,7 @@ def test_repair_20c_the_generators_cfg_is_refused_by_name(tmp_path, monkeypatch)
         call_node(repair_adapt, _report(), _candidate(tmp_path), _reduced(case),
                   _verdict(), manifest,
                   {"repair_backend": "vertex", **generator_cfg},
-                  local_id=LOCAL_ID_BASE + 7, input_path="/art/probe/input.mlir",
-                  env=dict(ALLOW_ENV))
+                  local_id=LOCAL_ID_BASE + 7, env=dict(ALLOW_ENV))
     message = str(raised.value)
     assert "build_cfg" in message
     # Every one CHIA reads is named as missing, none of them silently; the
@@ -762,7 +802,7 @@ def test_repair_26_a_generator_shaped_cap_is_refused(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as raised:
         call_node(repair_adapt, _report(), _candidate(tmp_path), _reduced(case),
                   _verdict(), manifest, cfg, local_id=LOCAL_ID_BASE + 7,
-                  input_path="/art/probe/input.mlir", env=dict(ALLOW_ENV))
+                  env=dict(ALLOW_ENV))
     assert "max_tool_iterations" in str(raised.value)
 
 

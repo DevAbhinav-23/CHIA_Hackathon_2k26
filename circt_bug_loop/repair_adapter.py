@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shlex
 import time
 from datetime import datetime, timezone
@@ -52,6 +53,10 @@ CFG_KEYS = frozenset({"tag", "tool_targets", "repro_dir", "repro_path",
 
 #: The CIRCT source tree inside the image.
 CIRCT_BUILD_BIN = "/workspace/circt/build/bin"
+
+#: What `repro_script` accepts as the case beside the script (it is interpolated
+#: into a double-quoted word of a shell script).
+_CASE_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 
 class RepairRefused(Exception):
@@ -125,7 +130,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ERR=$(mktemp)
 trap 'rm -f "$ERR"' EXIT
 
-@TOOL@ @ARGS@ "$HERE/@CASE@" >/dev/null 2>"$ERR"
+@TOOL@ @ARGS@ >/dev/null 2>"$ERR"
 RC=$?
 cat "$ERR" >&2
 
@@ -138,16 +143,38 @@ exit 0
 """
 
 
-def repro_script(verdict: OracleVerdict, *, input_path: str, case_name: str) -> str:
-    """Render FR-12.3's `repro.sh` for one recorded firing."""
+def repro_script(verdict: OracleVerdict, *, case_name: str) -> str:
+    """Render FR-12.3's `repro.sh` for one recorded firing.
+
+    EVERY operand of the recorded command - every token that is not an option -
+    is the probe's own input by construction, because `generate_task.probe_argv`
+    binds each of lit's substitutions to that one path and appends it when the
+    template names none. So every operand is replaced by the case written beside
+    the script, in place, and nothing but the options survives.
+
+    Matching a CALLER's idea of the input path against the recorded token
+    instead is what broke the attempt of 2026-09-15: the caller passed the
+    REDUCED case's path, the recorded command named the probe's `input.mlir`,
+    no token matched, and the script ran `circt-opt` on two positional files.
+    `circt-opt` exited 1 on "Too many positional arguments specified!" before
+    the pass ran, the script asks only whether the run crashed, so it exited 0 -
+    which `issue_task.py:204` reads as NOT reproduced.
+    """
     argv = shlex.split(verdict.repro_command)
     if not argv:
         raise ValueError("OracleVerdict.repro_command is empty: no tool to run")
-    args = [token for token in argv[1:] if token != input_path]
+    if not _CASE_NAME.fullmatch(case_name):
+        raise ValueError(
+            f"case name {case_name!r} is not a plain file name: it is "
+            f"interpolated into a double-quoted word of a generated script")
+    case = f'"$HERE/{case_name}"'
+    args = [shlex.quote(token) if token.startswith("-") else case
+            for token in argv[1:]]
+    if case not in args:                          # a command with no operand
+        args.append(case)
     return (_REPRO_TEMPLATE
             .replace("@TOOL@", shlex.quote(argv[0]))
-            .replace("@ARGS@", " ".join(shlex.quote(token) for token in args))
-            .replace("@CASE@", case_name))
+            .replace("@ARGS@", " ".join(args)))
 
 
 def build_cfg(candidate: CandidateRecord, manifest: RunManifest, *,
@@ -261,7 +288,7 @@ def stage7_observed(elapsed: float, ceiling_usd: Optional[float] = None) -> dict
 @ChiaFunction(resources={"repair": 1}, max_retries=0)
 def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCase,
                  verdict: OracleVerdict, manifest: RunManifest, cfg: dict, *,
-                 local_id: int, input_path: str, created_utc: Optional[str] = None,
+                 local_id: int, created_utc: Optional[str] = None,
                  chia_artifact_dir: str = "",
                  bin_dir: str = CIRCT_BUILD_BIN,
                  env: Optional[Mapping[str, str]] = None) -> dict:
@@ -316,7 +343,7 @@ def repair_adapt(report: Report, candidate: CandidateRecord, reduced: ReducedCas
 
     repro_dir = chain_cfg["repro_dir"]
     case_name = f"case{os.path.splitext(reduced.path)[1]}"
-    script = repro_script(verdict, input_path=input_path, case_name=case_name)
+    script = repro_script(verdict, case_name=case_name)
     circt_util.circt_write_files(
         {"repro.sh": script,
          case_name: Path(reduced.path).read_text(encoding="utf-8")}, repro_dir)
