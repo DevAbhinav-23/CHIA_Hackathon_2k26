@@ -776,6 +776,19 @@ turn with tools made up to `max_tool_iterations` of them, each re-sending the wh
 The key set of §2.11 grows by exactly these four; `BudgetFile` (§2.5) gains `max_tool_iterations`
 and `minimal_case_lines` in the same MINOR bump, and `03-LLD.md` §3.5.1 carries the arithmetic.
 
+**Erratum 2026-09-15 (contract 2.3, the annotated tag `contract-2.3`): `observed` gains a fifth key,
+about the input the turn did not really pay for.** `cached_tokens` is the count of input tokens the
+backend served from its own context cache, reported as `usage_metadata.cached_content_token_count`
+and captured by nothing until this bump, so no run could say how much of its input was cached at
+all. It is a **subset** of `tokens_in` and never a summand of it, and the ledger's arithmetic above
+is unchanged: §2.5 registers exactly two prices, every input token is priced at the input rate, and
+the campaign's `cost_usd` is therefore an **upper bound** of which `cached_tokens` measures the
+overstatement. The cached rate is not registered and is read by nothing, a third price added after
+the registration commit not being the file the campaign was registered against. It is worth having
+because the figure is large: one measured stage-1 turn reported 546,697 cached input tokens over its
+13 calls, a tool loop re-sending the whole conversation on every one of them. §2.11's
+`LedgerEntry.observed` row grows by this key and by contract 2.2's four.
+
 ### 2.10 `RunManifest`, direction both
 
 Stamped on every artefact of both halves (FR-17.6), with fields written on both sides. Produced by
@@ -836,6 +849,13 @@ legitimately null.
 `RunCommit` is a nested dataclass of `commit: str` required and `seed_sha: str or null` optional. A
 discovery manifest has exactly one entry with `seed_sha` null; a calibration manifest has one per
 sampled seed (FR-02.7).
+
+**Erratum 2026-09-15 (contract 2.3): one more optional field, `shard`.** `str or null`, the `K/N` of
+the driver's `--shard`, which keeps the seeds at positions `index % N == K` of the fixed corpus
+order. It is recorded because the seeded arm is parallel over seeds and a campaign that drives its
+corpus from more than one job has to say which part of it each run drove, or the run's counts read
+as the whole corpus's; the results artefact's own opening section carries the same string. A run
+that drove the whole corpus records null.
 
 ### 2.11 The declared dicts
 
