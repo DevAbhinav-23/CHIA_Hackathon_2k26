@@ -3,7 +3,8 @@ import sqlite3, json
 import os, sys
 c = sqlite3.connect(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "..", "circt_bug_loop", "loop.db"), timeout=30); c.row_factory = sqlite3.Row
 runs = {"903a37c8": "c1 both(stopped)", "11f54337": "c2a s0", "81b06e65": "c2a s1", "df996900": "c2a mut",
-        "f6d5148b": "c2b s0", "9748aa2b": "c2b s1", "460b7b48": "c2 mut", "f1e4fef5": "c2c s0", "73effefc": "c2c s1"}
+        "f6d5148b": "c2b s0", "9748aa2b": "c2b s1", "460b7b48": "c2 mut", "f1e4fef5": "c2c s0", "73effefc": "c2c s1",
+        "f0b2ef10": "c3 s0", "db45ab7b": "c3 s1", "91e58983": "c3 mut"}
 print(f"{'run':10}{'label':16}{'arm':9}{'seeds':>6}{'probes':>7}{'parse':>6}{'verif':>6}{'fired':>6}{'cands':>6}{'spend':>8}{'turns':>6}")
 for pref, label in runs.items():
     r = c.execute("select run_manifest_id from run where run_manifest_id like ?", (pref + "%",)).fetchone()

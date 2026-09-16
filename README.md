@@ -7,9 +7,10 @@ CIRCT is the LLVM project's hardware compiler, and the agents that repair it dra
 
 ## The result
 
-Campaign 2, seeded arm: 9 seeds, 134 probes, 15 candidates, **3 distinct new bugs through the gate**, every one of them in the Moore-to-core extract lowering. <!-- docs/HANDOFF.md 2026-09-15 12:10 entry; paper/main.tex Table II -->
-Mutation arm, sharing the harness, oracles, reducer and gate: 1,154 mutants, 0 firings, 0 candidates. <!-- same entry; run 460b7b48 -->
-USD 66 at list price for every live model call of the project, pilots and campaign together. <!-- paper/main.tex VII; docs/HANDOFF.md 2026-09-15 12:10 entry -->
+Two registered campaigns, seeded arm: 52 seeds, 758 probes, 84 candidates, 17 distinct new fingerprints and **15 new bugs through the gate**, three in the Moore-to-core extract lowering and twelve spread across the compiler, among them two segmentation faults and an `om` dialect abort. <!-- analysis/measurements/2026-09-15-campaign-2.md and 2026-09-16-campaign-3.md; paper/main.tex Table II -->
+Campaign 3 was stopped by the operator at 43 of 187 seeds after 11.9 hours, well inside its registered window and spend cap. <!-- 2026-09-16-campaign-3.md -->
+Mutation arm, sharing the harness, oracles, reducer and gate: 2,308 mutants over two runs, 0 firings, 0 candidates. <!-- runs 460b7b48 and 91e58983 -->
+USD 189 at list price for every live model call of the project, pilots and both campaigns together; the real bill is lower by the cached share. <!-- 65.99 + 122.77; paper/main.tex V -->
 
 Nothing has been filed. Filing is a named human's act, and it follows the forum post.
 
@@ -17,7 +18,7 @@ Nothing has been filed. Filing is a named human's act, and it follows the forum 
 
 | Path | What |
 |---|---|
-| `paper/circt-bug-loop-paper-v3.pdf` | The 4-page paper (source `paper/main.tex`, built by `paper/build.sh`) |
+| `paper/circt-bug-loop-paper-v4.pdf` | The 4-page paper (source `paper/main.tex`, built by `paper/build.sh`) |
 | `circt_bug_loop/` | The loop: CHIA nodes and tools, the frozen contract (`contract/FROZEN.md`), the driver `bug_loop.py`, the budget file, the tests |
 | `design/00-README.md` | Entry point to the formal design set: FRD, HLD, LLD, test plan, work plan, ADRs, red-team reviews |
 | `analysis/measurements/` | Every measurement with its script and raw output: the image build, the crash fixtures, eight pilots, the repair runs |

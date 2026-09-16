@@ -47,8 +47,11 @@ compares arcilator against Verilator on the few designs where both apply.
   for crashes and assertion failures only, reviewed and understood by the
   author, and licensable under Apache-2.0 with LLVM exceptions.
 
-**Timing.** One run of about four hours this week, then filings over the
-following days, only after a human has looked at each.
+**Timing.** Two runs have finished, one of two hours per arm and one we
+stopped ourselves after twelve hours. Fifteen candidates are now held, each
+reduced and checked against your issues, waiting for a human to read them; the
+caps above still apply, so most of them will never be filed. Filings would
+follow over the days after this post, only after a person has looked at each.
 
 **Two questions.** Would you prefer these as individual issues, or one tracking
 issue with the reduced cases attached? Is there a label you would like on them?

@@ -45,11 +45,11 @@ test reduction and deduplication entirely to deterministic tools, hands patch
 generation to CHIA's existing repair chain, and reserves human effort
 exclusively for final filing approval. It restores the compiler's internal
 assertions, compiled out of CHIA's published image, in 536 of 555 objects, % 606/606 compile commands -DNDEBUG in the published image (frd-followups A-10); 536 of 555 objects reference the assertion handler: 2026-09-14-image-build.md 4
-so defects become observable where none could fire before. A registered two-hour campaign then found three new lowering bugs, each
+so defects become observable where none could fire before. Two registered campaigns then found fifteen new bugs, each
 reproduced, minimised, validated and unmatched against 2,652 issues, held for
-a named human to file, % campaign 2: 3 candidates new -> report; 2,652-issue mirror: docs/HANDOFF.md 2026-09-15 entries; results.md of run f1e4fef5
-while a mutation baseline over 1,154 inputs found none; % run 460b7b48: 1,154 mutants, 0 firings
-every model call of the project cost USD 66 at list price. % 0.977 synthesis + 12.13 pilots + 1.56 c1 + 4.35 c2a + 2.23 c2b + 44.49 c2c + 0.25 report turns = 65.99: run ledgers via aggregate.py
+a named human to file, % 3 + 12 candidates new -> report: runs f1e4fef5, f0b2ef10, db45ab7b; 2,652-issue mirror: docs/HANDOFF.md 2026-09-15 entries
+while a mutation baseline over 2,308 inputs found none; % runs 460b7b48 and 91e58983: 1,154 mutants each, 0 firings
+every model call of the project cost USD 189 at list price. % 65.99 + 122.77 = 188.76: run ledgers via campaign_aggregate.py
 \end{abstract}
 
 % =====================================================================
@@ -282,109 +282,110 @@ excluding it.
 
 % =====================================================================
 \section{Results}\label{sec:res}
-Table~\ref{tab:res} is the registered campaign: two hours per arm, the seeded
-arm as two shards in parallel on the same cluster, USD 100 cap per job. % registration/campaign-2 on cb75a0f: budget.yaml
-It was started three times. We stopped the first two at 32 and 45 minutes for
-defects the live run exposed, a feedback line cut before its error text and a
-scheduling deadlock between a shard's generator and the gate; the third ran
-both shards to their windows. % docs/HANDOFF.md 2026-09-15 06:05 and 07:05 entries
+Table~\ref{tab:res} is two registered campaigns, each running the seeded arm as
+two shards in parallel. The first gave every arm two hours and capped each job
+at USD 100, and was started three times, the first two stopped early for
+defects the live run exposed. % registration/campaign-2 on cb75a0f; docs/HANDOFF.md 2026-09-15 06:05 and 07:05 entries
+The second changed three registered numbers and nothing else, the whole corpus
+instead of its head, a 41.7-hour window and a USD 175 cap, and we stopped it
+ourselves after 11.9 hours, well inside both. % registration/campaign-3 on a65331b; launched 19:01 UTC, stopped 06:54:56 UTC
 Every number is read from the loop's database after the stored probes were
-re-judged under the two corrections described below; no model turn was re-run
-for that. % --reclassify and --rescreen, head-only, no model turn
+re-judged under the two corrections below; no model turn was re-run. % --reclassify and --rescreen, head-only, no model turn
 
 \begin{table}[!t]
-\caption{The campaign, from the loop's database. The seeded arm is both
-two-hour shards together; the mutation arm exhausted its seeds in 13 minutes,
-87 of them skipped because their own test no longer parses at the build commit}
+\caption{Both campaigns, from the loop's database. A seeded column is its two
+shards together; the mutation column is one run per campaign, the two agreeing
+in every cell}
 \label{tab:res}
 \centering
 \scriptsize
 \renewcommand{\arraystretch}{0.90}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.85cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.35cm}@{\hspace{5pt}}>{\centering\arraybackslash}p{1.35cm}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.65cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{}}
 \toprule
-\textbf{Measure} & \textbf{seeded} & \textbf{mutation} \\
+\textbf{Measure} & \textbf{seeded 1} & \textbf{seeded 2} & \textbf{mutation} \\
 \midrule
-% aggregate.py over runs f1e4fef5 + 73effefc (seeded) and 460b7b48 (mutation)
-Seeds probed & 9 & 96 \\
-Probes written & 134 & 1{,}154 \\
-Rejected by the parser & 72 & 400 \\
-Compiler's output rejected by its verifier & 10 & 0 \\
-Assertion failures & 5 & 0 \\
-Candidates & 15 & 0 \\
-\textbf{Distinct new bugs through the gate} & \textbf{3} & \textbf{0} \\
-Duplicates of those & 9 & 0 \\
-Fixed after the pin, held for review & 2 (+2 dup.) & 0 \\
-Filed & 0, awaiting approval & 0 \\
-% 55 turns, mean billed/authorised 0.178 and 0.191: results.md of both shards
-Model turns; billed over authorised, mean & 55; 0.18 & 0 \\
-% 44.49 list; 37.7 M of 55.6 M input tokens cached = 67.9%
-Spend, USD at list price; cached share of input & 44.5; 68\% & 0 \\
+% campaign_aggregate.py: f1e4fef5+73effefc, f0b2ef10+db45ab7b, 460b7b48 = 91e58983
+Seeds probed & 9 & 43 & 96 \\
+Probes written & 134 & 624 & 1{,}154 \\
+Output rejected by its own verifier & 10 & 7 & 0 \\
+Assertion failures & 5 & 54 & 0 \\
+Crashes & 0 & 8 & 0 \\
+Candidates & 15 & 69 & 0 \\
+Distinct new fingerprints & 3 & 14 & 0 \\
+\textbf{Through the gate} & \textbf{3} & \textbf{12} & \textbf{0} \\
+Filed & 0 & 0 & 0 \\
+% 55 and 191 metered turns carrying a call count
+Model turns & 55 & 191 & 0 \\
+% 44.49 and 122.77 list
+Spend, USD at list price & 44.5 & 122.8 & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{Three new bugs, one fix family.} All three came from one seed, the
-August fix for out-of-bounds \texttt{moore.extract} lowering, and sit beside
-it: an extract at the most negative 32-bit offset makes the lowering build an
-array of zero elements and trips the assertion at \texttt{HWOps.cpp:1995};
-lowering a dynamic extract emits \texttt{comb.extract} with an aggregate result
-type; lowering an extract of a reference emits \texttt{llhd.sig.extract} with
-an aggregate reference type. % candidates c-p-a2cb61b8d0aa, c-p-075cf1d70f3a, c-p-356e9e6e061d; seed cc71d34a
-The last two are the compiler emitting IR its own verifier rejects. Each
-reproduced in a fresh process on another worker, was minimal at the reducer's
-fixpoint, at most five lines, valid, and matched neither an issue nor a commit
-since the pin; the model wrote the three reports, and they are held for a named
-human. % gate q1-q4 per candidate and the report titles: run f1e4fef5 store; docs/HANDOFF.md 11:40 entry
+\textbf{Fifteen new bugs through the gate.} The first campaign's three came
+from one seed, the August fix for out-of-bounds \texttt{moore.extract}
+lowering, and sit beside it: an extract at the most negative 32-bit offset
+builds an array of zero elements and trips the assertion at
+\texttt{HWOps.cpp:1995}, while a dynamic extract and an extract of a reference
+lower to \texttt{comb.extract} and \texttt{llhd.sig.extract} with aggregate
+types, the compiler emitting IR its own verifier rejects. % candidates c-p-a2cb61b8d0aa, c-p-075cf1d70f3a, c-p-356e9e6e061d; seed cc71d34a
+The second campaign's twelve are spread across the compiler instead, and three
+are not assertions at all: a segmentation fault in
+\texttt{resolveClassStructBody} in \texttt{MooreToCore.cpp}, a second whose
+only named frame is \texttt{main} in \texttt{circt-opt.cpp}, and an abort in
+\texttt{ElaboratedObjectOp::}\allowbreak\texttt{verifySymbolUses} in
+\texttt{OMOps.cpp}. % candidates c-p-4d7a36e3ce15, c-p-4b9f84841ec3, c-p-a3a1556793d7
+Each of the fifteen reproduced in a fresh process on another worker, was
+minimal at the reducer's fixpoint, valid, and matched neither an issue nor a
+commit since the pin; the model wrote the reports, held for a named human. % gate q1-q4 per candidate: runs f1e4fef5, f0b2ef10, db45ab7b store
+Two further new fingerprints did not survive it, one unreproducible on re-run
+and one rejected by the validity checker. % c-p-0eec26191ff2 unreproducible, c-p-bb144e1c880c invalid_input
 
-\textbf{The oracle had to learn a class.} Ten of the seeded arm's 82 rejected
-probes were the compiler's fault, not the model's: the input alone parses and
-verifies, and the diagnostic has the shape of MLIR's generated verifier. Both
-conditions are needed, since a pass may complain legitimately about a valid
-input, such as two top-level modules. % D-13: probe_task._GENERATED_VERIFIER and the parse-and-verify command; the false positive: docs/HANDOFF.md 07:55 entry and the oracle-verifier branch report
-None of the mutation arm's 400 rejections qualified: a mutated test that fails
-to parse is broken syntax, while the model's inputs parse and exercise the
-lowering.
+\textbf{The oracle had to learn a class.} Seventeen of the seeded arm's
+rejected probes were the compiler's fault, not the model's: the input alone
+parses and verifies, and the diagnostic has the shape of MLIR's generated
+verifier. Both conditions are needed, since a pass may complain legitimately
+about a valid input, such as two top-level modules. % D-13: probe_task._GENERATED_VERIFIER and the parse-and-verify command; docs/HANDOFF.md 07:55 entry
+No rejection in either mutation run qualified: a mutated test that fails to
+parse is broken syntax, while the model's inputs parse and exercise the
+lowering. That arm ran once per campaign, the two runs agreeing in every stored
+count, and across 2{,}308 mutants it raised no candidate to judge. % runs 460b7b48 and 91e58983
 
 \textbf{Dedup needed four corrections, each found on a real candidate.} A
-commit after the pin counted as a fix if it touched the crash's file, so an
-LLVM version bump touching 87 files silenced the first find; it now has to
-touch a frame symbol. A generic MLIR assertion text matched an open issue; it
-now also needs a CIRCT frame token in the issue. A verifier failure matched an
-issue on the op name alone; it now needs the constraint too. And two candidates
-sharing a fingerprint were each the other's duplicate, so thirteen candidates
-had no representative; the duplicate is now of the earliest. % D-11, D-16, D-17, D-18: docs/HANDOFF.md 2026-09-15 entries
-Because every verdict is recomputed from stored evidence, correcting a rule
-re-judges every stored candidate without a model turn.
+post-pin commit counted as a fix if it touched the crash's file, so an LLVM
+bump touching 87 files silenced the first find; it now has to touch a frame
+symbol. A generic MLIR assertion text matched an open issue; it now also needs
+a CIRCT frame token. A verifier failure matched an issue on the op name alone;
+it now needs the constraint. And two candidates sharing a fingerprint were each
+the other's duplicate, leaving thirteen without a representative. % D-11, D-16, D-17, D-18: docs/HANDOFF.md 2026-09-15 entries
+Every verdict is recomputed from stored evidence, so a corrected rule re-judges
+every candidate without a model turn.
 
-\textbf{Money.} Fifty-five turns billed 0.18 of what the guard authorised
-before the first call, never more than 0.41; 68\% of the 55.6 million input
-tokens were served from Google's cache, so the bill is below the list price the
-ledger records. % results.md of both shards; aggregate over usage.json
-Eight capped pilots preceded it for USD 13 in total, each retiring one defect
-in the model-turn path; the first found a real assertion on its first seed and
-withheld it as a duplicate of open issue 8508. % pilots 1-8: analysis/measurements/*pilot*.md; pilot 1: 2026-09-16-pilot.md 4 and 5
-The two mutator syntheses cost USD 0.49 each, and naming the regular-expression
-engine in the prompt raised the kept mutators from 11 of 22 to 25 of 25. % 2026-09-16-mutator-synthesis.md 9.5, 10.4
+\textbf{Money.} The first campaign spent USD 44.5 over 9 seeds and the second
+USD 122.8 over 43, about USD 4.9 and USD 2.9 a seed. % 44.49/9, 122.77/43: ledger_entry billed_usd
+Google's cache served 68\% of the first campaign's 55.6 million input tokens
+and 60\% of the second's 148.7 million, so the real bill sits below the list
+price every figure here quotes: at the first campaign's end the project had
+been billed USD 30 against USD 66 of list. Eight capped pilots preceded the
+campaigns for USD 13 in total. % 37.7 M of 55.6 M; 88.4 M of 148.7 M; billed 30 vs 66 list at 2026-09-15; pilots 1-8: analysis/measurements/*pilot*.md
 
 \textbf{Repair.} Three attempts on the assertion. The first two never reached a
-patch: the chain's reproduce step could not confirm the loop's own script,
-which, we found, handed the tool two input files, our defect, not the chain's.
-With that fixed the chain reproduced the failure, wrote a one-line change,
-rebuilt CIRCT and ran its test gate, and was writing up when the 45-minute
-wall we set ended it; the change was a debug print, not a fix. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
-A fix is not claimed.
+patch, because the loop's own script handed the tool two input files. With that
+fixed the chain reproduced the failure, wrote a one-line change, rebuilt CIRCT
+and ran its test gate, and was writing up when the 45-minute wall ended it; the
+change was a debug print. A fix is not claimed. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
 
 % =====================================================================
 \section{Related Work}
-SWE-bench \cite{swebench} scores agents on real GitHub issues and CHIA's issue
+SWE-bench \cite{swebench} scores agents on GitHub issues and CHIA's issue
 solver \cite{chia} applies the pattern to a hardware compiler; both draw from a
 queue, and we fill one. Fuzzers fill queues without repairing or withholding:
 CSmith \cite{csmith} for C; for MLIR, MLIRod \cite{mlirod}, N\"uwa \cite{nuwa},
-DESIL \cite{desil} and FLEX, 80 unknown bugs in 30 days \cite{flex}; our
-mutation arm follows Mut4All's synthesised mutators \cite{mut4all}. AFuzz
-\cite{afuzz} is the origin of our method, an agent testing where else a
-reference bug's cause could live, 40 bugs in V8 in a month; we apply it behind
-a gate. Delta debugging \cite{deltadebug} is stage 5's algorithm.
+DESIL \cite{desil} and FLEX \cite{flex}; our mutation arm follows Mut4All's
+synthesised mutators \cite{mut4all}. AFuzz \cite{afuzz} is the origin of our
+method, an agent testing where else a reference bug's cause could live; we
+apply it behind a gate. Delta debugging \cite{deltadebug} is stage 5's
+algorithm.
 Abstain-and-Validate \cite{abstain}, llvm-harness \cite{llvmharness} and
 CodeRover-S \cite{coderovers} make a repair agent more selective; our gate sits
 downstream and discards by default.
@@ -393,45 +394,42 @@ downstream and discards by default.
 \section{Artefact and Limitations}
 We release the loop as CHIA nodes and tools, so swapping the generator for the
 mutation arm is one node substituted. Its two halves meet at a frozen contract
-of seven record types and one function call, version 2.4, tested separately
-against recorded examples; % contract 2.2, tag contract-2.2: circt_bug_loop/contract/FROZEN.md
-the suite is 736 tests, 686 of which need no cluster, network or model. % 2026-09-15 at HEAD: pytest --co = 736; -m t0 = 686
+of seven record types and one function call, version 2.4, and the suite is 736
+tests, 686 of which need no cluster, network or model. % contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686
 On CHIA's cluster layer the loop's five containers come up in 38 seconds and,
 with a recorded generator, drive 16 probes through both arms in 7.4 seconds. % chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s: docs/HANDOFF.md W-19b
-Four things go upstream to CHIA: the Dockerfile for the assertions-on image, its
-build workflow, three helpers for its CIRCT module, and the nineteen-line branch
-that lets its repair chain select our backend. % upstream/: dockerfiles/ChiaCirctAssertDockerfile, .github/workflows/chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
-All of it, with the seed corpus and every input, verdict, reduced case,
-transcript and gate decision, is at
+Four things go upstream to CHIA: the Dockerfile for the assertions-on image,
+its build workflow, three helpers for its CIRCT module, and the nineteen-line
+branch that lets its repair chain select our backend. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
+All of it, with the corpus and every input, verdict, reduced case, transcript
+and gate decision, is at
 \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
 
-The second oracle's harness generators emit, from one design, a CIRCT
-simulation harness and a Verilator testbench printing identical 112-line
-sequences, and one changed constant makes them disagree at a named cycle and
-signal. % identical 112-line sequences, A-08 closed: docs/HANDOFF.md W-08 done; implementation-errata-log.md W-08 row 14
-
 \textbf{Limitations.} Nothing has been filed at the time of writing; filing is
-the approver's act and follows the forum post. Model time across every live
-run totals USD 66 at list price, and the repair chain's own model use is not
-observable, so its one attempt is counted at its authorisation. % aggregate: 65.99 list; repair token_capture unavailable_remote_dispatch, authorised 32.4
-The second oracle applies to 6 of the 187 seeds. % A-19: analysis/measurements/2026-09-15-a19-differential-applicability.md
-The 187 rest on a subject-keyword filter, no diffs read to confirm each is a bug
-fix; of seven mining attempts, one seed did not fail at its parent. % 6 confirmed of 7 attempted: analysis/measurements/2026-09-14-crash-fixtures.md 1
+the approver's act and follows the forum post, and all fifteen wait on it. The
+second campaign covered 43 of the 187 seeds before we stopped it at 11.9 hours,
+so the corpus is not exhausted, and Vertex rate limiting rather than the cluster
+bounded throughput at about 3.6 seeds an hour across two shards, one of which
+wrote no probe for two hours while its turns were still billed. % 43 of 187; 43/11.9 h; shard db45ab7b idle ~10:00-12:20 IST under 429s
+Model time across every live run totals USD 189 at list price, and the repair
+chain's own model use is not observable. % 65.99 + 122.77 = 188.76 list; repair token_capture unavailable_remote_dispatch
+The second oracle applies to 6 of the 187 seeds, which themselves rest on a
+subject-keyword filter with no diffs read to confirm each is a bug fix. % A-19: 2026-09-15-a19-differential-applicability.md
 The contamination screen misses a sibling fixed in a commit whose subject does
-not name it. Calibration by re-injecting known bugs is not possible on one
-prebuilt image: no seed's parent shares its LLVM pin. % 0 of 187 parents carry the image pin, 44 distinct pins: bug_loop.py calibratable docstring; errata row 52
+not name it, and calibration by re-injecting known bugs is not possible on one
+prebuilt image, since no seed's parent shares its LLVM pin. % 0 of 187 parents carry the image pin: bug_loop.py calibratable docstring; errata row 52
 The image is built but not published, so a report names its content hash rather
 than a registry digest.
 
 \textbf{Scope.} The loop does not repair wrong-output bugs, because the oracle
 that would find them is report-only, and it does not replace maintainers: it
-converts the human event from writing a bug report into reading one.
+turns the human event from writing a bug report into reading one.
 
 \section*{Acknowledgements}
 We thank the CHIA developers and the A\textsuperscript{3} hackathon organisers.
 \textit{AI-assistance disclosure.} Claude (Anthropic) and Gemini (Google) were
 used for drafting, code generation and revision; the human authors made every
-claim, decision and number their own and are responsible for the whole paper.
+claim, decision and number their own and answer for the whole paper.
 
 \bibliographystyle{IEEEtran}
 \bibliography{refs}
