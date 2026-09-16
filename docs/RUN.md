@@ -162,7 +162,7 @@ deliberately hard to switch on: no stage can build a model client unless
 
 **1. The model key.** Copy `config/gemini.env.example` to
 `~/.config/bugloop/gemini.env`, `chmod 600`, put your own key on the
-`GEMINI_API_KEY=` line. Nothing else in this repository is affected by it, and
+`GEMINI_API_KEY` line. Nothing else in this repository is affected by it, and
 no key ever goes in the repository. Load it only into the shell that runs
 `chia up`:
 
