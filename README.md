@@ -1,4 +1,4 @@
-# Seed, generate, reduce, repair, gate: a closed CIRCT bug loop
+# From Mined Fixes to Gated Repair: Closed-Loop Defect Synthesis for CIRCT
 
 CHIA Hackathon 2026 (A³ workshop @ MICRO 2026). Team: Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla (IIIT Hyderabad).
 
