@@ -28,6 +28,8 @@ Nothing has been filed. Filing is a named human's act, and it follows the forum 
 
 ## Running it
 
+On a machine that has never seen this repository run `./scripts/setup.sh` first — it builds `.venv` from `requirements.txt` and the pinned CHIA checkout — and see [`docs/RUN.md`](docs/RUN.md) for the three levels: tests, inspecting a past run, and a live campaign.
+
 Tests: `python -m pytest circt_bug_loop/tests -q -m "not t2 and not t3"` selects 720 of the suite's 736 tests and passes 719 with 1 skipped. Of those, the 686 that `-m t0` selects need no CIRCT binary, no clone, no network and no model; the other 34 want the prebuilt SDK or a blobless `llvm/circt` clone. <!-- measured 2026-09-15 at HEAD under ~/.cache/chia-venv-py31019; markers defined in pytest.ini -->
 
 **Registration.** A run is registered by an annotated git tag `registration/<run>` on the commit that lands its `budget.yaml`. The loop refuses a budget file no such tag names, and refuses a mutator set committed after the tag, so no threshold can be chosen after the fact. <!-- circt_bug_loop/budget.py REGISTRATION_TAGS and registration(); the tags themselves are listed by `git tag -l` -->
