@@ -39,3 +39,19 @@ Tests: `python -m pytest circt_bug_loop/tests -q -m "not t2 and not t3"` selects
 **Approval.** Filing is a command a person runs: `python -m circt_bug_loop.approve --db <abs loop.db> approve <candidate> --by "<name>" --forum-post-url <url> --forum-post-date <date>`. Nothing is filed by default, the approver is named in the record, and the command refuses every filing until the method has been posted to CIRCT's forum (FR-20.1). <!-- circt_bug_loop/approve.py FORUM_FIELDS and the FR-20.1 refusal, lines 99 to 161; draft post at docs/forum-post.md -->
 
 No credentials live in this repository. Runtime state (`loop.db`, artefact roots) is ignored by `.gitignore`.
+
+**Results data.** The results database and the campaigns' artefact roots are too large for git and ship as assets of the release tagged `data-2026-09-25`:
+
+| Asset | Contents | SHA-256 |
+|---|---|---|
+| `loop.db.zst` | every probe, verdict, reduced case, fingerprint, gate decision and ledger row (465 MB unpacked) | `91374e8fce46c553e0f6210f58d32833b0e07f33a76e5cdd1178ce19d2c430a3` |
+| `artefacts-campaigns-2-3.tar.zst` | inputs, stream logs and reduced cases of runs `f1e4fef5`, `73effefc`, `f0b2ef10`, `db45ab7b`, `460b7b48`, `91e58983` (18,010 files) | `c39a75ddb22127398b23435d13b5300b2edbc34c1c0f384526ad67cfd5d592d5` |
+
+```sh
+B=https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26/releases/download/data-2026-09-25
+curl -LO $B/loop.db.zst -LO $B/artefacts-campaigns-2-3.tar.zst -LO $B/SHA256SUMS
+sha256sum -c SHA256SUMS
+zstd -d loop.db.zst -o circt_bug_loop/loop.db
+mkdir -p ~/bugloop-artefacts && zstd -dc artefacts-campaigns-2-3.tar.zst | tar -xf - -C ~/bugloop-artefacts
+.venv/bin/python analysis/measurements/campaign_aggregate.py    # regenerates the paper's Table II
+```

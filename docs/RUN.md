@@ -110,8 +110,9 @@ first check that level A landed.
 .venv/bin/python -m circt_bug_loop.bug_loop --mode discovery --render 460b7b48
 ```
 
-The results database is **not in the repository** (see below). Put the team's
-copy at `circt_bug_loop/loop.db` first; without it the command creates an empty
+The results database is **not in the repository**. Download `loop.db.zst` from
+the release `data-2026-09-25` (commands in the README) and unpack it to
+`circt_bug_loop/loop.db` first; without it the command creates an empty
 database and raises `LookupError: no run row for …`. `circt_bug_loop/approve.py`
 (`--db <absolute path>`) reads the same file.
 
