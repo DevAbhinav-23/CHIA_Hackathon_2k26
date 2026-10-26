@@ -1,0 +1,1086 @@
+run	probe_id	command	exit	first_error
+460b7b48debf47deba8a34701a8f9372	p-001c76634e33	<input> -o /dev/null	1	<input>:141:18: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-00acf9926332	<input> -o /dev/null	1	<input>:22:23: error: use of value '%4' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-019487aaeed8	--import-only <input>	1	..<input>:4584:12: error: use of undeclared identifier 'q'
+460b7b48debf47deba8a34701a8f9372	p-020ccc848f5f	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-020f712ffceb	<input> -o /dev/null	1	<input>:58:20: error: use of value '%y' expects different type than prior uses: 'i4' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-023ef1947ca4	--import-only <input>	1	..<input>:716:13: error: expected ')'
+460b7b48debf47deba8a34701a8f9372	p-0253bf684e97	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-02b3463fe04f	--import-only <input>	1	..<input>:2335:68: error: expected identifier
+460b7b48debf47deba8a34701a8f9372	p-031972697fe1	<input> -o /dev/null	1	<input>:214:44: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-03430a98fca4	--import-only <input>	1	..<input>:923:5: error: use of undeclared identifier 'vec_1'; did you mean 'vec_1a'?
+460b7b48debf47deba8a34701a8f9372	p-03eee19fe1f1	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-04b824ec8208	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1174:25: error: use of value '%c0_i9' expects different type than prior uses: 'i9' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-069c40d0101f	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-0a1d4e91e277	<input> -o /dev/null	1	<input>:53:14: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+460b7b48debf47deba8a34701a8f9372	p-0a8eae6d2024	<input> -o /dev/null	1	<input>:89:16: error: use of value '%a' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-0bf5b74844af	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1368:21: error: use of value '%c0_i16' expects different type than prior uses: 'i16' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-101c072bb8b8	<input> -o /dev/null	1	<input>:275:10: error: use of value '%c15_i8' expects different type than prior uses: 'i8' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-10cd88f0819e	<input> -o /dev/null	1	<input>:199:3: error: 'hw.hierpath' op  module: "ObjectModelDUT" does not contain any instance with symbol: "dut"
+460b7b48debf47deba8a34701a8f9372	p-122fd4f94632	<input> -o /dev/null	1	<input>:29:3: error: 'hw.output' op output types must match module. In operand 0, expected 'i0', but got 'i4'.
+460b7b48debf47deba8a34701a8f9372	p-12963b4970d7	<input> -o /dev/null	1	<input>:1383:24: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-12bd50b16568	<input> -o /dev/null	1	<input>:200:224: error: use of value '%wMask' expects different type than prior uses: 'i0' vs 'i4'
+460b7b48debf47deba8a34701a8f9372	p-134acb4ba599	<input> -o /dev/null	1	<input>:374:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-1396f1548170	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-13a073838ad7	--import-only <input>	1	..<input>:715:8: error: expected identifier
+460b7b48debf47deba8a34701a8f9372	p-14083a85595a	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-1429b4424941	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-14957e451407	<input> -o /dev/null	1	<input>:291:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-149d0a7e99f7	--import-only <input>	1	..<input>:2467:9: error: use of undeclared identifier 'enable'
+460b7b48debf47deba8a34701a8f9372	p-1542ca5950c4	<input> -o /dev/null	0	
+460b7b48debf47deba8a34701a8f9372	p-1578c4bb516b	<input> -o /dev/null	1	<input>:91:10: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-170b18d40174	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-17627594dc9c	--import-only <input>	1	..<input>:715:8: error: expected identifier
+460b7b48debf47deba8a34701a8f9372	p-1886dfe579ea	<input> -o /dev/null	1	<input>:62:23: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-1955d0a77d28	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+460b7b48debf47deba8a34701a8f9372	p-1981fbbba402	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-198ca5153c36	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:132:26: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-1a377dd44ab9	<input> -o /dev/null	1	<input>:184:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-1aa44dda97bb	<input> -o /dev/null	1	<input>:90:14: error: 'scf.index_switch' op expected region to end with scf.yield, but got arith.constant
+460b7b48debf47deba8a34701a8f9372	p-1ac5dfcdf10e	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1380:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-1bb6e85e7492	<input> -o /dev/null	1	<input>:3291:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-1bcf350fffb9	<input> -o /dev/null	1	<input>:240:17: error: use of value '%u' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-1cf31d85809f	<input> -o /dev/null	1	<input>:284:3: error: 'hw.output' op output types must match module. In operand 2, expected 'i0', but got 'i1'.
+460b7b48debf47deba8a34701a8f9372	p-1d388b7a21cd	<input> -o /dev/null	1	<input>:572:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+460b7b48debf47deba8a34701a8f9372	p-1ec150c7ad4a	<input> -o /dev/null	1	<input>:98:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-23224d4be4b9	--verify-roundtrip <input> -o /dev/null	1	<input>:41:58: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-23fd2cbec89c	--verify-roundtrip <input> -o /dev/null	1	<input>:110:46: error: use of value '%last' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-24fd128312c9	<input> -o /dev/null	1	<input>:57:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+460b7b48debf47deba8a34701a8f9372	p-24fd3a0d6b18	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-251ffbd0ebd2	<input> -o /dev/null	1	<input>:152:5: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-25542a83a246	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-25fcd378e9be	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:207:40: error: use of value '%c-1_i1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-26844cc8cb37	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:433:20: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-275555b7f1e2	<input> -o /dev/null	1	<input>:299:5: error: redefinition of SSA value '%crumb_in'
+460b7b48debf47deba8a34701a8f9372	p-27f368e23f46	<input> -o /dev/null	1	<input>:86:75: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-28f0e4972c24	<input> -o /dev/null	1	<input>:503:20: error: use of value '%c15_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-29a99499e643	<input> -o /dev/null	1	<input>:63:3: error: 'hw.instance' op operand type #0 must be 'i0', but got 'i4'
+460b7b48debf47deba8a34701a8f9372	p-29bf28ed2f13	<input> -o /dev/null	1	<input>:902:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-2a905581d01f	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-2ac986096ae9	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-2ad0e96ad4c6	<input> -o /dev/null	1	<input>:27:24: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-2aeaa978c2ee	<input> -o /dev/null	1	<input>:235:166: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-2c1d8072c003	<input> -o /dev/null	1	<input>:77:19: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+460b7b48debf47deba8a34701a8f9372	p-2ce29171df76	<input> -o /dev/null	1	<input>:9:23: error: custom op 'moore.constant' value requires 14 bits, but result type only has 0
+460b7b48debf47deba8a34701a8f9372	p-2d54a1d0f172	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:571:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-2de32596e43f	<input> -o /dev/null	1	<input>:155:50: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-2e72839984d5	<input> -o /dev/null	1	<input>:347:5: error: redefinition of SSA value '%leaf_in'
+460b7b48debf47deba8a34701a8f9372	p-30f485a1a7bc	<input> -o /dev/null	1	<input>:52:28: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-313731d30401	<input> -o /dev/null	1	<input>:275:10: error: use of value '%c15_i8' expects different type than prior uses: 'i8' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-31e02497311e	<input> -o /dev/null	1	<input>:780:5: error: redefinition of SSA value '%1'
+460b7b48debf47deba8a34701a8f9372	p-33e8400f0da9	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-344eca8a8bbb	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-355ec5b82859	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-393e2aec624a	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-3961383891c1	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:200:25: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-39752d922279	<input> -o /dev/null	1	<input>:30:3: error: 'hw.output' op output types must match module. In operand 0, expected 'i0', but got 'i64'.
+460b7b48debf47deba8a34701a8f9372	p-39991c95b40e	<input> -o /dev/null	1	<input>:155:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-3a832ba3c4a1	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+460b7b48debf47deba8a34701a8f9372	p-3b1b4f9d96e8	<input> -o /dev/null	1	<input>:3551:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-3b76acad24b3	<input> -o /dev/null	1	<input>:14:25: error: use of value '%6' expects different type than prior uses: 'i0' vs 'i46'
+460b7b48debf47deba8a34701a8f9372	p-3c5dcc7cbc1e	<input> -o /dev/null	1	<input>:60:38: error: use of value '%c2_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-3d01206e6621	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:200:5: error: 'verif.yield' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-3d3706c9fb7a	<input> -o /dev/null	1	<input>:20:13: error: use of value '%0' expects different type than prior uses: 'i42' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-3dc0ee68cfa8	<input> -o /dev/null	1	<input>:151:8: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-3e394c394784	--import-only <input>	1	..<input>:971:9: error: use of undeclared identifier 'vec_1a'; did you mean 'vec_1'?
+460b7b48debf47deba8a34701a8f9372	p-3eb80c10f0ae	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+460b7b48debf47deba8a34701a8f9372	p-3f37429f3ed0	<input> -o /dev/null	1	<input>:89:5: error: type of yield operand 0 ('i42') does not match enclosing 'llhd.combinational' result type ('i0')
+460b7b48debf47deba8a34701a8f9372	p-3fb98d1266af	<input> -o /dev/null	1	<input>:1577:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-3fecefa16596	<input> -o /dev/null	1	<input>:231:23: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-40c2f93aeaa4	<input> -o /dev/null	1	<input>:446:10: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-416096ddf4a4	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-416594929dc9	<input> -o /dev/null	1	<input>:258:1: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@DUT::@mem0> was not found 
+460b7b48debf47deba8a34701a8f9372	p-4251f8758014	<input> -o /dev/null	1	<input>:104:35: error: use of value '%a0' expects different type than prior uses: 'i40' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-42e8c7f76f77	<input> -o /dev/null	1	<input>:17:36: error: use of value '%ADR' expects different type than prior uses: 'i0' vs 'i13'
+460b7b48debf47deba8a34701a8f9372	p-42fda5ad874e	<input> -o /dev/null	1	<input>:3243:20: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-4377079ccf2a	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+460b7b48debf47deba8a34701a8f9372	p-43d5ca3f61e2	<input> -o /dev/null	1	<input>:29:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-44f83b564c02	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-46f0578f6689	<input> -o /dev/null	1	<input>:92:25: error: use of value '%c1_i7' expects different type than prior uses: 'i7' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-47f7b06aecf2	--verify-roundtrip <input> -o /dev/null	1	<input>:109:31: error: use of value '%c1' expects different type than prior uses: 'i32' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-4882774b7ca4	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+460b7b48debf47deba8a34701a8f9372	p-4894cbcd8f9f	<input> -o /dev/null	1	<input>:227:22: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+460b7b48debf47deba8a34701a8f9372	p-48d181db4cf0	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-49616ab666d9	<input> -o /dev/null	1	<input>:20:27: error: use of value '%state_is_0' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-49d8be8ad0c3	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-4a00eb91d599	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-4b83af65755e	<input> -o /dev/null	1	<input>:135:10: error: use of value '%gep' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i32>'
+460b7b48debf47deba8a34701a8f9372	p-4c4233ce939e	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+460b7b48debf47deba8a34701a8f9372	p-4c44f13b5a7f	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-4ceb0d83dcd2	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:132:26: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-4d3b95bc387a	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:101:21: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-501585151fd6	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:761:3: error: 'hw.hierpath' op  module: "instNameRename" does not contain any instance with symbol: "bar1"
+460b7b48debf47deba8a34701a8f9372	p-50ae595db1de	<input> -o /dev/null	1	<input>:275:5: error: operation with block successors must terminate its parent block
+460b7b48debf47deba8a34701a8f9372	p-524e4a5ad6b8	<input> -o /dev/null	1	<input>:280:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-527fd8113d9d	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-5302be1592cd	--import-only <input>	1	..<input>:4560:9: error: use of undeclared identifier 'qe'
+460b7b48debf47deba8a34701a8f9372	p-5381e7b7db47	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1195:7: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-53fc32a101e9	<input> -o /dev/null	1	<input>:22:46: error: use of value '%c0_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-5450b232e58a	<input> -o /dev/null	1	<input>:719:14: error: 'firrtl.ref.rwprobe' op has target that cannot be resolved: #hw.innerNameRef<@ResolveRWProbeOfInnerSym::@sym>
+460b7b48debf47deba8a34701a8f9372	p-566efbbd4a05	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1390:9: error: redefinition of SSA value '%unused'
+460b7b48debf47deba8a34701a8f9372	p-568979fd0e97	<input> -o /dev/null	1	<input>:324:14: error: 'firrtl.instance' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+460b7b48debf47deba8a34701a8f9372	p-57972d02863c	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-57987d1c95b3	<input> -o /dev/null	1	<input>:11:25: error: use of value '%1' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i42>'
+460b7b48debf47deba8a34701a8f9372	p-57b88911d97c	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:2012:24: error: use of value '%b0000101100' expects different type than prior uses: 'i10' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-57f9bde72551	<input> -o /dev/null	1	<input>:3295:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-57fe4bea5a2b	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-58bf2429b068	<input> -o /dev/null	1	<input>:1503:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-58cef75d293d	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:433:3: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@Quz::@Quz_port> was not found 
+460b7b48debf47deba8a34701a8f9372	p-5991a7141993	<input> -o /dev/null	1	<input>:44:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-59e8f7215bc0	<input> -o /dev/null	1	<input>:263:25: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-5a2d8425ebe5	<input> -o /dev/null	1	<input>:284:3: error: 'handshake.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-5ab919375316	<input> -o /dev/null	1	<input>:1209:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-5b510340bfc7	<input> -o /dev/null	1	<input>:17:35: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-5bbbbbcc22c4	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:19:40: error: use of value '%c-1_i1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-5c3216a7e8fe	<input> -o /dev/null	1	<input>:3312:20: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-5d2f4313412d	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+460b7b48debf47deba8a34701a8f9372	p-5d31e09c7b25	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-5d92572d55ab	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-5d969453dacb	<input> -o /dev/null	1	<input>:3325:20: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-6031b93ca920	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-6057351f2c88	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:245:15: error: use of value '%bmc' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-62fdc96bc578	<input> -o /dev/null	1	<input>:81:18: error: use of value '%a0' expects different type than prior uses: 'i0' vs 'i40'
+460b7b48debf47deba8a34701a8f9372	p-637cd3be83f7	<input> -o /dev/null	1	<input>:280:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-643c19faa8fc	<input> -o /dev/null	1	<input>:78:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-648b67bd13f9	-	missing_input	
+460b7b48debf47deba8a34701a8f9372	p-64e662d6af9f	<input> -o /dev/null	1	<input>:3295:170: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-657195b90d98	<input> -o /dev/null	1	<input>:97:23: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-65a99f16a3da	<input> -o /dev/null	1	<input>:258:1: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@DUT::@mem0> was not found 
+460b7b48debf47deba8a34701a8f9372	p-65c53d23e9ee	<input> -o /dev/null	1	<input>:36:33: error: use of undeclared SSA value name
+460b7b48debf47deba8a34701a8f9372	p-670718551e61	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:28:28: error: use of value '%c-1_i32' expects different type than prior uses: 'i32' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-677489c9682c	<input> -o /dev/null	1	<input>:171:3: error: type of return operand 0 ('i2') doesn't match function result type ('i0')
+460b7b48debf47deba8a34701a8f9372	p-67ffa801796b	<input> -o /dev/null	1	<input>:92:47: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-6828e74ac6d5	<input> -o /dev/null	1	<input>:83:5: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-6853b8934b32	<input> -o /dev/null	1	<input>:26:3: error: 'handshake.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-68cfbe741a5a	<input> -o /dev/null	1	<input>:554:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-690f6dd97df5	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-69102cd6d287	--import-only <input>	1	..<input>:856:7: error: expected a declaration name
+460b7b48debf47deba8a34701a8f9372	p-6a8ca141b9b2	<input> -o /dev/null	1	<input>:463:3: error: 'hw.hierpath' op  module: "ExtModuleTest" does not contain any instance with symbol: "e1"
+460b7b48debf47deba8a34701a8f9372	p-6ae976ea10be	--import-only <input>	1	..<input>:716:13: error: expected ')'
+460b7b48debf47deba8a34701a8f9372	p-6b543524f846	<input> -o /dev/null	1	<input>:3304:170: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-6bab92c9979f	--verify-roundtrip <input> -o /dev/null	1	<input>:109:31: error: use of value '%c1' expects different type than prior uses: 'i32' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-6be62cbf1ebd	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1845:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-6bf81ac5594f	<input> -o /dev/null	1	<input>:213:21: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-6d1aa8ba681b	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:20:5: error: 'verif.yield' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-6d6481d69ad0	<input> -o /dev/null	1	<input>:138:13: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-6da13afa4fa8	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+460b7b48debf47deba8a34701a8f9372	p-6e0ecf397c2c	<input> -o /dev/null	1	<input>:156:5: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-6e403839398f	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-6ebb47f2173e	<input> -o /dev/null	1	<input>:168:20: error: use of value '%a' expects different type than prior uses: 'memref<i32>' vs 'memref<i0>'
+460b7b48debf47deba8a34701a8f9372	p-6edf2914690e	--verify-roundtrip <input> -o /dev/null	1	<input>:159:45: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-6fc83754af41	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-6fd39cf8daf6	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-70d06e473c1d	--import-only <input>	1	..<input>:183:14: error: expected identifier
+460b7b48debf47deba8a34701a8f9372	p-7141d82f3ac2	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+460b7b48debf47deba8a34701a8f9372	p-7149a1613dfc	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1330:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+460b7b48debf47deba8a34701a8f9372	p-7183e4d03342	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:552:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-725c36e712c9	--import-only <input>	1	..<input>:715:8: error: expected identifier
+460b7b48debf47deba8a34701a8f9372	p-72f86f1fdf37	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1483:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+460b7b48debf47deba8a34701a8f9372	p-733b5b2d8d46	<input> -o /dev/null	1	<input>:88:7: error: Dialect `' not found for custom op 'annotations'  (tried '.annotations' as well)
+460b7b48debf47deba8a34701a8f9372	p-73967b0519d8	<input> -o /dev/null	1	<input>:13:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-7478f9d9e3d9	<input> -o /dev/null	1	<input>:59:25: error: use of undeclared SSA value name
+460b7b48debf47deba8a34701a8f9372	p-74b9f60f726f	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-752b7c44f512	<input> -o /dev/null	1	<input>:1490:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-7732e1760c7e	<input> -o /dev/null	1	<input>:42:3: error: operation with block successors must terminate its parent block
+460b7b48debf47deba8a34701a8f9372	p-7798f0af5811	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+460b7b48debf47deba8a34701a8f9372	p-78f29f4d9371	<input> -o /dev/null	1	<input>:52:29: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-795965264b76	<input> -o /dev/null	1	<input>:32:32: error: use of value '%4' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-79a0b27cff02	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1363:25: error: use of value '%allones' expects different type than prior uses: 'i32' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-7a1aa36625f2	--import-only <input>	1	..<input>:716:13: error: expected ')'
+460b7b48debf47deba8a34701a8f9372	p-7b7c2d2d4efe	<input> -o /dev/null	0	
+460b7b48debf47deba8a34701a8f9372	p-7d7468f10342	<input> -o /dev/null	1	<input>:901:7: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-7e29041168b5	<input> -o /dev/null	1	<input>:22:46: error: use of value '%c0_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-7e7ab1e96346	<input> -o /dev/null	1	<input>:91:33: error: use of value '%addr' expects different type than prior uses: 'i0' vs 'i2'
+460b7b48debf47deba8a34701a8f9372	p-7ed4a3985997	<input> -o /dev/null	1	<input>:27:27: error: use of value '%c1_i33' expects different type than prior uses: 'i33' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-7f46515f9b4e	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-802dbf6193c5	<input> -o /dev/null	1	<input>:3282:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-806994f1cd05	<input> -o /dev/null	1	<input>:82:7: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-807bf0f40609	<input> -o /dev/null	1	<input>:54:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+460b7b48debf47deba8a34701a8f9372	p-813ba95828bd	<input> -o /dev/null	1	<input>:247:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-817c4c6b4fe1	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-822a5e06b9cc	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-83a43d688aca	<input> -o /dev/null	1	<input>:15:80: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-842c0fd80cdb	<input> -o /dev/null	1	<input>:82:10: error: 'firrtl.wire' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+460b7b48debf47deba8a34701a8f9372	p-8502a624d210	<input> -o /dev/null	1	<input>:16:28: error: use of value '%c0_i42' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-87f3a0ba680f	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-8868bd72b857	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-889ef13fa591	<input> -o /dev/null	1	<input>:48:30: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-89263c7c90c8	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:189:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-8ae78d53a8f8	<input> -o /dev/null	1	<input>:187:42: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-8d71a59f366e	<input> -o /dev/null	1	<input>:455:24: error: use of value '%rhs' expects different type than prior uses: 'i8' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-8e3702bb28e8	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:197:3: error: custom op 'init' is unknown (tried 'func.init' as well)
+460b7b48debf47deba8a34701a8f9372	p-8e49f3f7e04f	<input> -o /dev/null	1	<input>:98:10: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-8e95bcd1678c	<input> -o /dev/null	1	<input>:3200:170: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-8ed3b9c21c7e	<input> -o /dev/null	1	<input>:82:23: error: use of value '%a2' expects different type than prior uses: 'i40' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-8f4a9f1b7f96	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:983:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-8f8e4328dff7	<input> -o /dev/null	1	<input>:1489:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-93391ecceff8	<input> -o /dev/null	0	
+460b7b48debf47deba8a34701a8f9372	p-94d02eb85986	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:998:27: error: use of value '%c-7_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-94d1c3fbcb9c	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+460b7b48debf47deba8a34701a8f9372	p-94e09c042f89	<input> -o /dev/null	1	<input>:3455:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-94f9cb9266da	<input> -o /dev/null	1	<input>:169:3: error: 'hw.output' op output types must match module. In operand 3, expected 'i0', but got 'i32'.
+460b7b48debf47deba8a34701a8f9372	p-956d7a7cda80	<input> -o /dev/null	1	<input>:61:3: error: 'hw.hierpath' op  module: "NLARenaming" does not contain any instance with symbol: "dut"
+460b7b48debf47deba8a34701a8f9372	p-95af752df69e	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-95b0f3d44b07	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+460b7b48debf47deba8a34701a8f9372	p-96b6804f605d	<input> -o /dev/null	1	<input>:218:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-96d20bd0116a	<input> -o /dev/null	1	<input>:1127:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-96d332241b4d	<input> -o /dev/null	1	<input>:1130:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-97e408ecfd61	<input> -o /dev/null	1	<input>:3278:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-98082216420a	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9856e6e6ec05	<input> -o /dev/null	1	<input>:169:17: error: use of value '%c0_i42' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-985afb84cb86	<input> -o /dev/null	1	<input>:126:150: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-9966c5cf166e	<input> -o /dev/null	1	<input>:107:19: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9a0014a3ee4d	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:91:21: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9a8f032907b0	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:446:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+460b7b48debf47deba8a34701a8f9372	p-9ac05249928d	<input> -o /dev/null	1	<input>:198:29: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9b4db583a0d6	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9bc43fab08e7	<input> -o /dev/null	1	<input>:18:26: error: use of value '%c3_i3' expects different type than prior uses: 'i3' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9bd82041c9c6	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-9cb3bfbcb5a5	<input> -o /dev/null	1	<input>:59:30: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-9cd2fee18016	<input> -o /dev/null	0	
+460b7b48debf47deba8a34701a8f9372	p-9ce7883a3bd3	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-9d56c287dcba	<input> -o /dev/null	0	
+460b7b48debf47deba8a34701a8f9372	p-9dd783967720	<input> -o /dev/null	1	<input>:209:45: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-9ea51d817ac5	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:406:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+460b7b48debf47deba8a34701a8f9372	p-9f0db076cba7	<input> -o /dev/null	1	<input>:55:8: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-9f31e82394e5	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-9fc2b419f9db	<input> -o /dev/null	1	<input>:23:32: error: use of value '%in1' expects different type than prior uses: 'i32' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-a01e0fe9ab50	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:18:28: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-a0b03f8f7ddc	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:104:29: error: use of value '%c1' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-a0f580e3776a	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+460b7b48debf47deba8a34701a8f9372	p-a1f8fe487921	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-a244165be38d	<input> -o /dev/null	1	<input>:28:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-a2567be0b8ea	<input> -o /dev/null	1	<input>:75:10: error: 'firrtl.wire' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+460b7b48debf47deba8a34701a8f9372	p-a2948f971d12	<input> -o /dev/null	1	<input>:116:21: error: custom op 'comb.concat' number of operands and types do not match: got 6 operands and 5 types
+460b7b48debf47deba8a34701a8f9372	p-a30cf7aa44d3	<input> -o /dev/null	1	<input>:60:3: error: 'func.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-a34e387997f3	<input> -o /dev/null	1	<input>:193:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-a53ed8811dac	<input> -o /dev/null	1	<input>:47:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-a61b67be3eb6	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+460b7b48debf47deba8a34701a8f9372	p-a621491941c0	<input> -o /dev/null	1	<input>:817:12: error: 'firrtl.object' op expects parent op to be one of 'firrtl.module, firrtl.class'
+460b7b48debf47deba8a34701a8f9372	p-a7e6151187b8	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1134:5: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-a7f1d8e1816d	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-a89540b9e01a	<input> -o /dev/null	1	<input>:140:19: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-a96b7131feaa	<input> -o /dev/null	1	<input>:17:35: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-a9873bc09516	-	missing_input	
+460b7b48debf47deba8a34701a8f9372	p-a988a9fb8874	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-aa3f45aa1576	<input> -o /dev/null	1	<input>:61:19: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i4'
+460b7b48debf47deba8a34701a8f9372	p-ab4ddde9f9df	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+460b7b48debf47deba8a34701a8f9372	p-ac739731e949	<input> -o /dev/null	1	<input>:3209:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-ad09d8993d12	<input> -o /dev/null	1	<input>:178:3: error: 'func.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-ada4442aa0ae	<input> -o /dev/null	1	<input>:31:15: error: use of value '%counter' expects different type than prior uses: 'i0' vs 'i2'
+460b7b48debf47deba8a34701a8f9372	p-aebbedf59f03	<input> -o /dev/null	1	<input>:247:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-b02e2a9f63c2	<input> -o /dev/null	1	<input>:93:23: error: use of value '%a1' expects different type than prior uses: 'i40' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-b183422ea212	<input> -o /dev/null	1	<input>:1577:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-b2b65c2a55e4	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:19:27: error: use of value '%from_clock' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-b2fb7592413b	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:741:27: error: use of value '%c3_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-b3109a025894	<input> -o /dev/null	1	<input>:183:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-b448ad9cd50c	<input> -o /dev/null	1	<input>:104:17: error: use of value '%cd' expects different type than prior uses: 'i0' vs 'i32'
+460b7b48debf47deba8a34701a8f9372	p-b45a2661c678	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:549:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-b4bea04cbbe6	--verify-roundtrip <input> -o /dev/null	1	<input>:41:58: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-b665bc3c1709	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1035:26: error: use of value '%c255_i39' expects different type than prior uses: 'i39' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-b6d9a858b2b2	<input> -o /dev/null	1	<input>:77:19: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+460b7b48debf47deba8a34701a8f9372	p-b72df57ce70d	<input> -o /dev/null	1	<input>:49:46: error: use of value '%g' expects different type than prior uses: 'i1' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-b84a87805064	<input> -o /dev/null	1	<input>:1119:12: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-b9e154582b00	<input> -o /dev/null	1	<input>:126:3: error: 'hw.hierpath' op  module: "Annotations" does not contain any instance with symbol: "annotations0"
+460b7b48debf47deba8a34701a8f9372	p-b9ebeaf29ecb	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:378:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+460b7b48debf47deba8a34701a8f9372	p-b9f9394c8cb0	<input> -o /dev/null	1	<input>:206:176: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-ba296de2afda	<input> -o /dev/null	1	<input>:90:21: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-bb69670cbc3e	<input> -o /dev/null	1	<input>:52:28: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-bc7a83b0a662	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-be39336fba58	<input> -o /dev/null	1	<input>:16:24: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-bf014a0d8633	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:484:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-bf34fd8454b4	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:570:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-bf53fbd80608	<input> -o /dev/null	1	<input>:98:18: error: use of value '%c0_i5' expects different type than prior uses: 'i5' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-bfe5a19ae5ad	<input> -o /dev/null	1	<input>:311:5: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-c0e55a15ceb0	<input> -o /dev/null	1	<input>:228:16: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-c1e8a5bc53a8	<input> -o /dev/null	1	<input>:383:17: error: use of value '%c1_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-c23793dd29a7	<input> -o /dev/null	1	<input>:1075:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-c32ca049d1f2	<input> -o /dev/null	1	<input>:993:20: error: use of value '%c0_i11' expects different type than prior uses: 'i11' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-c394886d50a5	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-c4659fa27918	<input> -o /dev/null	1	<input>:323:3: error: 'hw.hierpath' op  module: "Context1" does not contain any instance with symbol: "c1"
+460b7b48debf47deba8a34701a8f9372	p-c4ba14e921c3	<input> -o /dev/null	1	<input>:137:15: error: use of value '%counter' expects different type than prior uses: 'i0' vs 'i2'
+460b7b48debf47deba8a34701a8f9372	p-c56d199f1704	<input> -o /dev/null	1	<input>:20:13: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-c6023e6bce75	<input> -o /dev/null	1	<input>:61:10: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-c61d8ae1e17a	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1585:3: error: 'hw.hierpath' op  module: "Foo" does not contain any instance with symbol: "bar"
+460b7b48debf47deba8a34701a8f9372	p-c6d0fdc9440d	<input> -o /dev/null	1	<input>:18:15: error: use of value '%a' expects different type than prior uses: 'i42' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-c6dbae7a9740	<input> -o /dev/null	1	<input>:11:31: error: use of value '%a' expects different type than prior uses: 'i1' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-c7e3aa56bd56	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+460b7b48debf47deba8a34701a8f9372	p-c7f6a2abdb7b	<input> -o /dev/null	1	<input>:19:5: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-c89b37225e8f	<input> -o /dev/null	1	<input>:562:8: error: 'comb.extract' op from bit too large for input
+460b7b48debf47deba8a34701a8f9372	p-c991356d1019	<input> -o /dev/null	1	<input>:187:42: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-ca1b775333d4	<input> -o /dev/null	1	<input>:44:23: error: use of value '%c11_i7' expects different type than prior uses: 'i7' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-ca875230f0ae	<input> -o /dev/null	1	<input>:6:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-cb334497d41e	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-cc12d0c28faa	<input> -o /dev/null	1	<input>:3185:8: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-cc5fbfdf1c23	-	missing_input	
+460b7b48debf47deba8a34701a8f9372	p-cc96b4768677	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+460b7b48debf47deba8a34701a8f9372	p-ccb30c93aef7	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-cd9d4e5c0888	<input> -o /dev/null	1	<input>:80:31: error: use of value '%c3_i4' expects different type than prior uses: 'i4' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-ce0bd73827ca	--verify-roundtrip <input> -o /dev/null	1	<input>:43:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-ce23ecc99b8a	<input> -o /dev/null	1	<input>:418:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-ce4445a528b3	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1550:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-cef3e5a05cc8	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:232:25: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-cf0ad0ae0c1a	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+460b7b48debf47deba8a34701a8f9372	p-cf7413309b90	<input> -o /dev/null	1	<input>:29:17: error: use of value '%arg0' expects different type than prior uses: '!hw.typealias<@__hw_typedecls::@foo, i0>' vs '!hw.typealias<@__hw_typedecls::@foo, i1>'
+460b7b48debf47deba8a34701a8f9372	p-cfa18b9a59c8	<input> -o /dev/null	1	<input>:24:28: error: use of value '%mu.out' expects different type than prior uses: 'i32' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-d02c839a65c7	--verify-roundtrip <input> -o /dev/null	1	<input>:59:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-d0374a36becf	<input> -o /dev/null	1	<input>:27:28: error: use of value '%a' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-d0d155b4f55b	<input> -o /dev/null	1	<input>:70:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-d172dffd54f5	<input> -o /dev/null	1	<input>:773:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-d203e24c1e13	<input> -o /dev/null	1	<input>:223:3: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-d297d981e371	<input> -o /dev/null	1	<input>:219:5: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-d2d3f516a853	<input> -o /dev/null	1	<input>:45:19: error: use of value '%1' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i32>'
+460b7b48debf47deba8a34701a8f9372	p-d35001ed8003	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:12:5: error: 'verif.yield' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-d41246706290	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-d4e969aca08f	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+460b7b48debf47deba8a34701a8f9372	p-d503686720f6	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-d5609a854d4f	<input> -o /dev/null	1	<input>:3278:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+460b7b48debf47deba8a34701a8f9372	p-d70abb1dcee5	<input> -o /dev/null	1	<input>:387:5: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-d7ac8c10d7fe	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-d81ea1f9e313	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-d87bdd261920	<input> -o /dev/null	1	<input>:18:34: error: use of value '%c2_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-d881f2d2529d	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-d8c3406b8c76	<input> -o /dev/null	1	<input>:274:3: error: 'handshake.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-d8fa3170508e	<input> -o /dev/null	1	<input>:201:12: error: 'firrtl.ref.rwprobe' op has target that cannot be resolved: #hw.innerNameRef<@DUT::@sym>
+460b7b48debf47deba8a34701a8f9372	p-d921d49802bf	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-da14719ae1b4	<input> -o /dev/null	1	<input>:211:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-dcbd4582777a	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-dd983539162d	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+460b7b48debf47deba8a34701a8f9372	p-dda1655df8eb	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-df6d06b9cd22	<input> -o /dev/null	1	<input>:53:30: error: use of value '%a' expects different type than prior uses: 'i1' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-df70f42a689e	<input> -o /dev/null	1	<input>:618:30: error: use of value '%c3_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-dff23ced2035	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-e002e52bb699	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-e03621e1a4ba	<input> -o /dev/null	1	<input>:1426:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-e04ee971afd7	<input> -o /dev/null	1	<input>:22:20: error: use of value '%mu.left' expects different type than prior uses: 'i0' vs 'i32'
+460b7b48debf47deba8a34701a8f9372	p-e239f43d3a1f	<input> -o /dev/null	1	<input>:990:22: error: operand #2 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-e2699331e23e	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-e2c98443004d	-	missing_input	
+460b7b48debf47deba8a34701a8f9372	p-e2d6634da872	<input> -o /dev/null	1	<input>:360:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-e396c2f627c4	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-e3e933650873	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:28:28: error: use of value '%c-1_i32' expects different type than prior uses: 'i32' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-e447655bd231	<input> -o /dev/null	1	<input>:27:27: error: use of value '%c1_i33' expects different type than prior uses: 'i33' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-e45e9d9b2b63	<input> -o /dev/null	1	<input>:262:13: error: use of value '%z' expects different type than prior uses: 'i1' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-e481d2edad54	<input> -o /dev/null	1	<input>:57:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+460b7b48debf47deba8a34701a8f9372	p-e4bd3e0d8981	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-e4bd50824a71	<input> -o /dev/null	1	<input>:73:5: error: expected ':'
+460b7b48debf47deba8a34701a8f9372	p-e5a776eb4f1d	<input> -o /dev/null	1	<input>:1197:5: error: operand #1 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-e613ba9584cf	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+460b7b48debf47deba8a34701a8f9372	p-e61d017931f4	<input> -o /dev/null	1	<input>:281:116: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-e669ce7b2af4	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:393:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+460b7b48debf47deba8a34701a8f9372	p-e7ac3d45ba18	--verify-roundtrip <input> -o /dev/null	1	<input>:123:3: error: expected valid keyword
+460b7b48debf47deba8a34701a8f9372	p-e7e85e92eeb0	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+460b7b48debf47deba8a34701a8f9372	p-e8e8b89b1c9c	<input> -o /dev/null	1	<input>:360:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-e90c2fbbfd16	<input> -o /dev/null	1	<input>:142:18: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-eaed3230d4eb	<input> -o /dev/null	1	<input>:184:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-eb7188858fd3	<input> -o /dev/null	1	<input>:258:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-ed7e90d519fd	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:363:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-eef09f4d4eb7	-	missing_input	
+460b7b48debf47deba8a34701a8f9372	p-ef5f69f3ca62	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:672:3: error: 'hw.hierpath' op  module: "Foo" does not contain any instance with symbol: "bar"
+460b7b48debf47deba8a34701a8f9372	p-f01ee4ab6c4c	<input> -o /dev/null	1	<input>:178:3: error: 'func.return' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-f0a240be9d11	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-f18ebbb79b66	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:515:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-f222230212a2	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:862:27: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-f26df15d06ad	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:93:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-f37722d5f6ad	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:26:26: error: use of value '%state0' expects different type than prior uses: 'i32' vs 'i0'
+460b7b48debf47deba8a34701a8f9372	p-f41adaaceaad	<input> -o /dev/null	1	<input>:47:26: error: use of value '%d' expects different type than prior uses: 'i0' vs 'i1'
+460b7b48debf47deba8a34701a8f9372	p-f44c2ebe4368	--import-only <input>	0	
+460b7b48debf47deba8a34701a8f9372	p-f50562d40891	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+460b7b48debf47deba8a34701a8f9372	p-f5a4b6138404	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:382:26: error: use of value '%c768_i10' expects different type than prior uses: 'i10' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-f6b08a752773	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-f7ac612ee82b	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+460b7b48debf47deba8a34701a8f9372	p-f84c94978bf7	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+460b7b48debf47deba8a34701a8f9372	p-f85ebf4b5ccd	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+460b7b48debf47deba8a34701a8f9372	p-fab48309ea17	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:262:45: error: integer constant out of range for attribute
+460b7b48debf47deba8a34701a8f9372	p-fb3ed262b2f1	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:792:3: error: 'hw.output' op must be the last operation in the parent block
+460b7b48debf47deba8a34701a8f9372	p-fb51d8e11b55	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+460b7b48debf47deba8a34701a8f9372	p-fbd404b82b3c	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:936:21: error: use of value '%c3_i3' expects different type than prior uses: 'i3' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-fbf8b629cb02	<input> -o /dev/null	1	<input>:39:16: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i42'
+460b7b48debf47deba8a34701a8f9372	p-fca4eebc713d	<input> -o /dev/null	1	<input>:641:24: error: use of value '%c-2_i2' expects different type than prior uses: 'i2' vs 'i65'
+460b7b48debf47deba8a34701a8f9372	p-fcc08af48c02	<input> -o /dev/null	1	<input>:41:8: error: operand #0 does not dominate this use
+460b7b48debf47deba8a34701a8f9372	p-fee0f1b6f27a	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+73effefcde2a44758515ef4652d32668	p-00e969a16dde	<input> -o /dev/null	1	<input>:3:178: error: expected ::circt::firrtl::NameKindEnum to be one of: droppable_name, interesting_name
+73effefcde2a44758515ef4652d32668	p-06d9f868b984	<input> -o /dev/null	1	<input>:2:30: error: expected ':'
+73effefcde2a44758515ef4652d32668	p-1986d18be87d	<input> -o /dev/null	1	<input>:3:177: error: expected ::circt::firrtl::NameKindEnum to be one of: droppable_name, interesting_name
+73effefcde2a44758515ef4652d32668	p-1c0875715e50	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:26: error: use of value '%0' expects different type than prior uses: '!sim.dstring' vs 'i32'
+73effefcde2a44758515ef4652d32668	p-29e59f6b7b1f	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:56: error: unknown  type `string` in dialect `sim`
+73effefcde2a44758515ef4652d32668	p-3681be384c02	<input> -o /dev/null	0	
+73effefcde2a44758515ef4652d32668	p-3abd6e4b0c49	<input> -o /dev/null	0	
+73effefcde2a44758515ef4652d32668	p-3f7fc4969849	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:26: error: use of value '%0' expects different type than prior uses: '!sim.dstring' vs 'i64'
+73effefcde2a44758515ef4652d32668	p-482b27cf6c21	<input> -o /dev/null	1	<input>:5:10: error: 'firrtl.ref.rwprobe' op has target that cannot be probed
+73effefcde2a44758515ef4652d32668	p-4e9770b39d05	--import-only <input>	1	..<input>:6:15: error: unsupported conversion from '!moore.uarray<2 x i32>' to '!moore.i32'
+73effefcde2a44758515ef4652d32668	p-5d80807ec0e2	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:56: error: unknown  type `string` in dialect `sim`
+73effefcde2a44758515ef4652d32668	p-62a3de52df74	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:4:23: error: use of value '%str' expects different type than prior uses: '!sim.dstring' vs 'i32'
+73effefcde2a44758515ef4652d32668	p-6b64a6f18cec	--import-only <input>	1	..<input>:3:14: error: unknown name `kArr`
+73effefcde2a44758515ef4652d32668	p-74697b15d084	<input> -o /dev/null	1	<input>:10:36: error: expected ::circt::firrtl::NameKindEnum to be one of: droppable_name, interesting_name
+73effefcde2a44758515ef4652d32668	p-798472c790cb	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:4:28: error: expected '['
+73effefcde2a44758515ef4652d32668	p-7fba7c2a3c86	<input> -o /dev/null	0	
+73effefcde2a44758515ef4652d32668	p-906d7a2599fb	<input> -o /dev/null	0	
+73effefcde2a44758515ef4652d32668	p-91395d7cbf92	<input> -o /dev/null	0	
+73effefcde2a44758515ef4652d32668	p-a2cb2c72dd79	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:4:23: error: use of value '%str' expects different type than prior uses: '!sim.dstring' vs 'i32'
+73effefcde2a44758515ef4652d32668	p-ac5c17f7679d	<input> -o /dev/null	1	<input>:3:135: error: expected ::circt::firrtl::NameKindEnum to be one of: droppable_name, interesting_name
+73effefcde2a44758515ef4652d32668	p-aefc766c2e1b	<input> -o /dev/null	1	<input>:10:36: error: expected ::circt::firrtl::NameKindEnum to be one of: droppable_name, interesting_name
+73effefcde2a44758515ef4652d32668	p-b30bebe51474	<input> -o /dev/null	1	<input>:3:67: error: expected ':'
+73effefcde2a44758515ef4652d32668	p-c2ca88207587	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:4:28: error: expected '['
+73effefcde2a44758515ef4652d32668	p-ca24b9a74b30	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:57: error: unknown  type `string` in dialect `sim`
+73effefcde2a44758515ef4652d32668	p-d505d5a1682e	<input> -o /dev/null	1	<input>:2:29: error: expected ':'
+73effefcde2a44758515ef4652d32668	p-d72a8b8f3773	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:55: error: unknown  type `string` in dialect `sim`
+73effefcde2a44758515ef4652d32668	p-daab62f181f9	<input> -o /dev/null	1	<input>:9:10: error: 'firrtl.ref.rwprobe' op has target that cannot be probed
+73effefcde2a44758515ef4652d32668	p-e0b566e40945	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:56: error: unknown  type `string` in dialect `sim`
+73effefcde2a44758515ef4652d32668	p-f383736d9ddf	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:4:23: error: use of value '%str' expects different type than prior uses: '!sim.dstring' vs 'i64'
+91e58983716b46e2902c01cc7cde10ab	p-008bbf228d03	<input> -o /dev/null	1	<input>:324:14: error: 'firrtl.instance' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+91e58983716b46e2902c01cc7cde10ab	p-01c09e19a2b5	--import-only <input>	1	..<input>:716:13: error: expected ')'
+91e58983716b46e2902c01cc7cde10ab	p-01e611acd903	<input> -o /dev/null	1	<input>:82:23: error: use of value '%a2' expects different type than prior uses: 'i40' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-02202bf9f297	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:104:29: error: use of value '%c1' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-02efccffdbdb	<input> -o /dev/null	1	<input>:90:21: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-02f1d7d11e4f	<input> -o /dev/null	1	<input>:20:13: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-03cc93b29c32	<input> -o /dev/null	1	<input>:258:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-0454d03dded5	<input> -o /dev/null	1	<input>:3295:170: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-0597787d250c	<input> -o /dev/null	1	<input>:169:17: error: use of value '%c0_i42' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-0611df187cf7	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-06c100d2342a	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-078a2a02f4cf	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:245:15: error: use of value '%bmc' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-0819b191c953	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:484:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-084bd75fafd2	<input> -o /dev/null	1	<input>:57:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+91e58983716b46e2902c01cc7cde10ab	p-0854a1f8eff1	<input> -o /dev/null	1	<input>:58:20: error: use of value '%y' expects different type than prior uses: 'i4' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-087e355cf35e	<input> -o /dev/null	1	<input>:60:38: error: use of value '%c2_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-0a156bf3ab0c	<input> -o /dev/null	1	<input>:97:23: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-0a86e78102d1	<input> -o /dev/null	1	<input>:52:28: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-0c60ca17e9e3	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:2012:24: error: use of value '%b0000101100' expects different type than prior uses: 'i10' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-0d0345eec8ab	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:741:27: error: use of value '%c3_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-0ef8831b184c	<input> -o /dev/null	1	<input>:22:23: error: use of value '%4' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-0f987244cb1b	<input> -o /dev/null	1	<input>:20:27: error: use of value '%state_is_0' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-1010324cda79	<input> -o /dev/null	1	<input>:446:10: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-101c4e3cfbfd	<input> -o /dev/null	1	<input>:228:16: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-10283e7b05eb	<input> -o /dev/null	1	<input>:86:75: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-103d17e9f61c	<input> -o /dev/null	1	<input>:299:5: error: redefinition of SSA value '%crumb_in'
+91e58983716b46e2902c01cc7cde10ab	p-12965e5faeda	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-1304059d6e89	<input> -o /dev/null	1	<input>:275:10: error: use of value '%c15_i8' expects different type than prior uses: 'i8' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-148d57864557	<input> -o /dev/null	1	<input>:3200:170: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-14d97926b94f	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-15c2c0c9fcc6	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:207:40: error: use of value '%c-1_i1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-175401593037	<input> -o /dev/null	1	<input>:641:24: error: use of value '%c-2_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-175a20cd7eaf	<input> -o /dev/null	1	<input>:719:14: error: 'firrtl.ref.rwprobe' op has target that cannot be resolved: #hw.innerNameRef<@ResolveRWProbeOfInnerSym::@sym>
+91e58983716b46e2902c01cc7cde10ab	p-184d981bc84c	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-187355b543dc	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+91e58983716b46e2902c01cc7cde10ab	p-1888fa54f5bd	<input> -o /dev/null	1	<input>:206:176: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-1890c4ff0697	<input> -o /dev/null	1	<input>:152:5: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-19a87d531345	<input> -o /dev/null	1	<input>:91:10: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-19b6d748484b	<input> -o /dev/null	1	<input>:39:16: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-1b670a119c6d	<input> -o /dev/null	1	<input>:29:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-1d14f5bdcdcb	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1174:25: error: use of value '%c0_i9' expects different type than prior uses: 'i9' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-1d83dc9b8ce0	<input> -o /dev/null	1	<input>:138:13: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-1d9f5e44b131	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-1f36ca30a7d9	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-1f3c698ba127	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:761:3: error: 'hw.hierpath' op  module: "instNameRename" does not contain any instance with symbol: "bar1"
+91e58983716b46e2902c01cc7cde10ab	p-1f41d31879db	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-1f7d95a48900	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+91e58983716b46e2902c01cc7cde10ab	p-21151180f5b7	<input> -o /dev/null	1	<input>:14:25: error: use of value '%6' expects different type than prior uses: 'i0' vs 'i46'
+91e58983716b46e2902c01cc7cde10ab	p-21751d3a3480	<input> -o /dev/null	1	<input>:235:166: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-221b5e828a41	<input> -o /dev/null	1	<input>:22:20: error: use of value '%mu.left' expects different type than prior uses: 'i0' vs 'i32'
+91e58983716b46e2902c01cc7cde10ab	p-224d65cde7ef	<input> -o /dev/null	1	<input>:223:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-22e9222d6601	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-2367dc622deb	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-23bb157aac5d	<input> -o /dev/null	1	<input>:258:1: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@DUT::@mem0> was not found 
+91e58983716b46e2902c01cc7cde10ab	p-2460a4bbc76e	<input> -o /dev/null	1	<input>:3295:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-248775f4783e	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-24e06010c3fa	<input> -o /dev/null	1	<input>:262:13: error: use of value '%z' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-276144abdf3e	<input> -o /dev/null	1	<input>:171:3: error: type of return operand 0 ('i2') doesn't match function result type ('i0')
+91e58983716b46e2902c01cc7cde10ab	p-2766ea747b71	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-294b8c8b9774	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-2968e38c0153	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-29759112b406	<input> -o /dev/null	1	<input>:98:10: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-29ea4fa141d0	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-2a7cfa788543	<input> -o /dev/null	1	<input>:3278:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-2c90b7da99bd	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:189:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-2df8c0b6da78	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:998:27: error: use of value '%c-7_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-2e20b924d5f9	<input> -o /dev/null	1	<input>:61:19: error: use of value '%0' expects different type than prior uses: 'i0' vs 'i4'
+91e58983716b46e2902c01cc7cde10ab	p-2ea12e1c6d89	--import-only <input>	1	..<input>:716:13: error: expected ')'
+91e58983716b46e2902c01cc7cde10ab	p-2ea8687d0ab4	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-2ee1a84ee73f	<input> -o /dev/null	1	<input>:20:13: error: use of value '%0' expects different type than prior uses: 'i42' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-2f5a5de9119e	<input> -o /dev/null	1	<input>:247:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-2fe04a853f12	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-304fd0106a71	<input> -o /dev/null	1	<input>:213:21: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-3130afe84843	<input> -o /dev/null	1	<input>:17:35: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-318959ce0cd0	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:91:21: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-31a9af877976	<input> -o /dev/null	1	<input>:116:21: error: custom op 'comb.concat' number of operands and types do not match: got 6 operands and 5 types
+91e58983716b46e2902c01cc7cde10ab	p-31b56c7ebc3a	<input> -o /dev/null	1	<input>:57:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+91e58983716b46e2902c01cc7cde10ab	p-330c03e31f94	<input> -o /dev/null	1	<input>:55:8: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-337f0cacb5fe	<input> -o /dev/null	1	<input>:142:18: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-34864115bb03	<input> -o /dev/null	1	<input>:75:10: error: 'firrtl.wire' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+91e58983716b46e2902c01cc7cde10ab	p-34ca77c8517e	<input> -o /dev/null	1	<input>:59:25: error: use of undeclared SSA value name
+91e58983716b46e2902c01cc7cde10ab	p-35f8654dbff3	<input> -o /dev/null	1	<input>:151:8: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-374da28e592c	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-37c47990ca17	<input> -o /dev/null	1	<input>:26:3: error: 'handshake.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-385fa8f2445f	<input> -o /dev/null	1	<input>:218:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-3a0dc125b659	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+91e58983716b46e2902c01cc7cde10ab	p-3a7e765ffcfa	<input> -o /dev/null	1	<input>:155:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-3b1018dc4721	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:28:28: error: use of value '%c-1_i32' expects different type than prior uses: 'i32' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-3b37baa58844	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-3b4a5648b188	<input> -o /dev/null	1	<input>:88:7: error: Dialect `' not found for custom op 'annotations'  (tried '.annotations' as well)
+91e58983716b46e2902c01cc7cde10ab	p-3cc4d4f658c9	<input> -o /dev/null	1	<input>:36:33: error: use of undeclared SSA value name
+91e58983716b46e2902c01cc7cde10ab	p-3ec4e25de420	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-3f135f36fcf1	<input> -o /dev/null	1	<input>:156:5: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-3f638d15454b	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:406:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+91e58983716b46e2902c01cc7cde10ab	p-4096365427f7	<input> -o /dev/null	1	<input>:54:3: error: 'hw.hierpath' op  module: "DUT" does not contain any instance with symbol: "sub"
+91e58983716b46e2902c01cc7cde10ab	p-422bb3eff47a	--verify-roundtrip <input> -o /dev/null	1	<input>:109:31: error: use of value '%c1' expects different type than prior uses: 'i32' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-4253a9b9a267	<input> -o /dev/null	1	<input>:98:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-433f94a133c8	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+91e58983716b46e2902c01cc7cde10ab	p-45f1420ea882	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-46c09fb45c80	<input> -o /dev/null	1	<input>:219:5: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-471ccdd13718	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:552:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-47e31bf90f49	<input> -o /dev/null	1	<input>:418:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-48905ace82e7	<input> -o /dev/null	1	<input>:1577:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-4aefc246cebf	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-4b21172f22f0	<input> -o /dev/null	1	<input>:274:3: error: 'handshake.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-4bdaf217bd30	<input> -o /dev/null	1	<input>:90:14: error: 'scf.index_switch' op expected region to end with scf.yield, but got arith.constant
+91e58983716b46e2902c01cc7cde10ab	p-4c566a9bd341	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1330:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+91e58983716b46e2902c01cc7cde10ab	p-4ca3d248c3c7	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1380:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-4d26b5e23540	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-4d7ae1cc2e81	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+91e58983716b46e2902c01cc7cde10ab	p-4eb6a2e53fce	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-4ee1922519d4	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-5103502f7677	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:549:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-513b159106eb	-	missing_input	
+91e58983716b46e2902c01cc7cde10ab	p-51b0d475f866	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:28:28: error: use of value '%c-1_i32' expects different type than prior uses: 'i32' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-52340c5e8693	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1550:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-53fbb25db3a5	<input> -o /dev/null	1	<input>:193:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-542693d2ce1b	-	missing_input	
+91e58983716b46e2902c01cc7cde10ab	p-54516086869d	<input> -o /dev/null	1	<input>:22:46: error: use of value '%c0_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-556477c0deb3	--import-only <input>	1	..<input>:183:14: error: expected identifier
+91e58983716b46e2902c01cc7cde10ab	p-55bbc68da119	<input> -o /dev/null	1	<input>:14:37: error: use of value '%c0' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-55cb805a1884	<input> -o /dev/null	1	<input>:82:10: error: 'firrtl.wire' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+91e58983716b46e2902c01cc7cde10ab	p-577a400f040a	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-57e28af278e4	<input> -o /dev/null	1	<input>:30:3: error: 'hw.output' op output types must match module. In operand 0, expected 'i0', but got 'i64'.
+91e58983716b46e2902c01cc7cde10ab	p-58143c2644a1	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1363:25: error: use of value '%allones' expects different type than prior uses: 'i32' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-59160ce3f1eb	--import-only <input>	1	..<input>:715:8: error: expected identifier
+91e58983716b46e2902c01cc7cde10ab	p-5989234e8c3e	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:262:45: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-59fe7f9bb016	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+91e58983716b46e2902c01cc7cde10ab	p-5a2697787461	--import-only <input>	1	..<input>:715:8: error: expected identifier
+91e58983716b46e2902c01cc7cde10ab	p-5a5f8d122874	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1585:3: error: 'hw.hierpath' op  module: "Foo" does not contain any instance with symbol: "bar"
+91e58983716b46e2902c01cc7cde10ab	p-5ac8b5e3c6ec	<input> -o /dev/null	1	<input>:29:3: error: 'hw.output' op output types must match module. In operand 0, expected 'i0', but got 'i4'.
+91e58983716b46e2902c01cc7cde10ab	p-5b126294d1d0	--verify-roundtrip <input> -o /dev/null	1	<input>:41:58: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-5b259e837df7	<input> -o /dev/null	0	
+91e58983716b46e2902c01cc7cde10ab	p-5b30e4bec2e6	<input> -o /dev/null	1	<input>:383:17: error: use of value '%c1_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-5c110200d441	<input> -o /dev/null	1	<input>:15:80: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-5c3c01718761	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-5daac1eb2447	<input> -o /dev/null	0	
+91e58983716b46e2902c01cc7cde10ab	p-5e23e833f6ad	<input> -o /dev/null	1	<input>:554:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-5e4f35c965eb	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-5ebb27e19dd1	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+91e58983716b46e2902c01cc7cde10ab	p-5eda4f2fecfc	<input> -o /dev/null	1	<input>:62:23: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-5f2ece88d5b6	<input> -o /dev/null	1	<input>:1075:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-5f3d2337dde4	<input> -o /dev/null	1	<input>:32:32: error: use of value '%4' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-62f375a031a4	<input> -o /dev/null	1	<input>:990:22: error: operand #2 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-6336c73f28e4	<input> -o /dev/null	1	<input>:77:19: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+91e58983716b46e2902c01cc7cde10ab	p-6365247b8b32	--verify-roundtrip <input> -o /dev/null	1	<input>:41:58: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-6366a49ea85d	<input> -o /dev/null	1	<input>:387:5: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-63f52d2f8ae4	<input> -o /dev/null	1	<input>:3185:8: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-6452753d8d1e	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:862:27: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-646e0d45ddc6	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+91e58983716b46e2902c01cc7cde10ab	p-64a3dc3cebcf	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:18:28: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-64cfa951ee4b	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:433:3: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@Quz::@Quz_port> was not found 
+91e58983716b46e2902c01cc7cde10ab	p-660596f583d0	<input> -o /dev/null	1	<input>:1503:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-6671f7536df5	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:132:26: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-67cde43ee809	--import-only <input>	1	..<input>:2467:9: error: use of undeclared identifier 'enable'
+91e58983716b46e2902c01cc7cde10ab	p-682ca00d81f1	--import-only <input>	1	..<input>:856:7: error: expected a declaration name
+91e58983716b46e2902c01cc7cde10ab	p-683ac4f4e629	<input> -o /dev/null	1	<input>:374:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-68da82dab0cc	<input> -o /dev/null	1	<input>:3278:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-6a79e508f752	<input> -o /dev/null	1	<input>:9:23: error: custom op 'moore.constant' value requires 14 bits, but result type only has 0
+91e58983716b46e2902c01cc7cde10ab	p-6bb955c94295	<input> -o /dev/null	1	<input>:104:35: error: use of value '%a0' expects different type than prior uses: 'i40' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-6fc50e889231	<input> -o /dev/null	1	<input>:284:3: error: 'hw.output' op output types must match module. In operand 2, expected 'i0', but got 'i1'.
+91e58983716b46e2902c01cc7cde10ab	p-702365775e8f	<input> -o /dev/null	1	<input>:155:50: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-7053d7fc7fe0	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-70b4dd62697a	<input> -o /dev/null	1	<input>:178:3: error: 'func.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-70bc1c9c940e	<input> -o /dev/null	1	<input>:16:24: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-715e7b53673f	<input> -o /dev/null	0	
+91e58983716b46e2902c01cc7cde10ab	p-7286d90910cd	<input> -o /dev/null	1	<input>:70:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-73b0de9e0c6e	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:983:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-743c3424322c	<input> -o /dev/null	1	<input>:360:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-749c0d257f2e	<input> -o /dev/null	1	<input>:572:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+91e58983716b46e2902c01cc7cde10ab	p-7527a955718c	<input> -o /dev/null	1	<input>:13:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-75f879316a4f	<input> -o /dev/null	1	<input>:168:20: error: use of value '%a' expects different type than prior uses: 'memref<i32>' vs 'memref<i0>'
+91e58983716b46e2902c01cc7cde10ab	p-76594cd4c6e1	-	missing_input	
+91e58983716b46e2902c01cc7cde10ab	p-767a83c06f11	--parse-only <input>	1	<input>:4:1: error: Unhandled annotation: {class = "Unknown"}
+91e58983716b46e2902c01cc7cde10ab	p-77b42c6c7ba9	<input> -o /dev/null	1	<input>:817:12: error: 'firrtl.object' op expects parent op to be one of 'firrtl.module, firrtl.class'
+91e58983716b46e2902c01cc7cde10ab	p-77d9f3a02b12	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1368:21: error: use of value '%c0_i16' expects different type than prior uses: 'i16' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-77e6c549b2b5	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-77f296559762	<input> -o /dev/null	1	<input>:24:28: error: use of value '%mu.out' expects different type than prior uses: 'i32' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-7a044f377095	<input> -o /dev/null	1	<input>:42:3: error: operation with block successors must terminate its parent block
+91e58983716b46e2902c01cc7cde10ab	p-7a8e20ccf3ef	<input> -o /dev/null	1	<input>:1490:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-7b19cff1e25f	<input> -o /dev/null	1	<input>:280:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-7c7307672219	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:433:20: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-7ccbe864b296	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:197:3: error: custom op 'init' is unknown (tried 'func.init' as well)
+91e58983716b46e2902c01cc7cde10ab	p-7cf87040a031	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:232:25: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-7eefa42ac517	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-8069a3b98021	<input> -o /dev/null	1	<input>:3312:20: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-81f3e8b334bb	<input> -o /dev/null	1	<input>:28:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-8285108efffd	--verify-roundtrip <input> -o /dev/null	1	<input>:109:31: error: use of value '%c1' expects different type than prior uses: 'i32' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-829729eb4da9	-	missing_input	
+91e58983716b46e2902c01cc7cde10ab	p-82db45b8d97e	<input> -o /dev/null	1	<input>:126:3: error: 'hw.hierpath' op  module: "Annotations" does not contain any instance with symbol: "annotations0"
+91e58983716b46e2902c01cc7cde10ab	p-8512366db76b	<input> -o /dev/null	1	<input>:323:3: error: 'hw.hierpath' op  module: "Context1" does not contain any instance with symbol: "c1"
+91e58983716b46e2902c01cc7cde10ab	p-85744cc9d29a	<input> -o /dev/null	1	<input>:214:44: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-85ab6b0f200d	<input> -o /dev/null	1	<input>:773:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-85c55e91740a	<input> -o /dev/null	1	<input>:360:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-867d5b0dd711	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1845:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-876cf56e398d	<input> -o /dev/null	1	<input>:3304:170: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-879c1e724db6	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+91e58983716b46e2902c01cc7cde10ab	p-87a03f488d49	<input> -o /dev/null	1	<input>:1209:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-880b61c211fa	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-892968e56e1a	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:792:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-89bf13b63a98	<input> -o /dev/null	1	<input>:23:32: error: use of value '%in1' expects different type than prior uses: 'i32' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-8b018cd61d86	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:101:21: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-8c1746e26e9b	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-8c659eac9c22	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-8c791f83fcc3	<input> -o /dev/null	1	<input>:19:5: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-8c8ce524dae7	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-8dd7c8edff57	<input> -o /dev/null	1	<input>:80:31: error: use of value '%c3_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-8f567129ef20	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-8fb00af47efa	<input> -o /dev/null	1	<input>:137:15: error: use of value '%counter' expects different type than prior uses: 'i0' vs 'i2'
+91e58983716b46e2902c01cc7cde10ab	p-908215158167	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+91e58983716b46e2902c01cc7cde10ab	p-90d15fffbed7	<input> -o /dev/null	1	<input>:48:30: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-92fe0f74550f	<input> -o /dev/null	1	<input>:6:7: error: expected '{' to begin a region
+91e58983716b46e2902c01cc7cde10ab	p-930b2d1d0971	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:26:26: error: use of value '%state0' expects different type than prior uses: 'i32' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-9357200180c3	<input> -o /dev/null	1	<input>:11:31: error: use of value '%a' expects different type than prior uses: 'i1' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-936f52296dfd	<input> -o /dev/null	1	<input>:92:25: error: use of value '%c1_i7' expects different type than prior uses: 'i7' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-95876cc05467	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-95c87b720e13	<input> -o /dev/null	1	<input>:140:19: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-98867ad401c2	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-98f30cac584e	<input> -o /dev/null	1	<input>:89:5: error: type of yield operand 0 ('i42') does not match enclosing 'llhd.combinational' result type ('i0')
+91e58983716b46e2902c01cc7cde10ab	p-994a223b835e	<input> -o /dev/null	1	<input>:275:5: error: operation with block successors must terminate its parent block
+91e58983716b46e2902c01cc7cde10ab	p-99721a8ac318	--verify-roundtrip <input> -o /dev/null	1	<input>:123:3: error: expected valid keyword
+91e58983716b46e2902c01cc7cde10ab	p-9a2f1cc646bd	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:515:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-9b5d1ae4d457	--verify-roundtrip <input> -o /dev/null	1	<input>:43:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-9b6b930f780b	<input> -o /dev/null	1	<input>:240:17: error: use of value '%u' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-9bc9ed497e74	<input> -o /dev/null	1	<input>:201:12: error: 'firrtl.ref.rwprobe' op has target that cannot be resolved: #hw.innerNameRef<@DUT::@sym>
+91e58983716b46e2902c01cc7cde10ab	p-9bdf9419e9d3	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:12:5: error: 'verif.yield' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-9d5cd06e9fb6	<input> -o /dev/null	1	<input>:77:19: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+91e58983716b46e2902c01cc7cde10ab	p-9e78b2ef0685	<input> -o /dev/null	1	<input>:901:7: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-9f0afab24e17	<input> -o /dev/null	1	<input>:902:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-9fbef784b996	--verify-roundtrip <input> -o /dev/null	1	<input>:159:45: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-9ff0728b9733	<input> -o /dev/null	1	<input>:52:28: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-a004205951ad	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:200:25: error: use of value '%c0_i1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a0395430a862	<input> -o /dev/null	1	<input>:178:3: error: 'func.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-a0bcb1bc70fe	<input> -o /dev/null	1	<input>:135:10: error: use of value '%gep' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i32>'
+91e58983716b46e2902c01cc7cde10ab	p-a0bd0da78ff7	<input> -o /dev/null	1	<input>:183:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-a13c4e35a469	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a1bd2cbd0a24	<input> -o /dev/null	1	<input>:1130:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-a25010d71a4f	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1134:5: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-a264d95e92e9	<input> -o /dev/null	1	<input>:11:23: error: use of value '%c0_i46' expects different type than prior uses: 'i46' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a2830188ce8f	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:570:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-a2980576b088	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-a347cdd7de81	<input> -o /dev/null	1	<input>:98:18: error: use of value '%c0_i5' expects different type than prior uses: 'i5' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a454aafe01bb	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-a4777a561550	<input> -o /dev/null	1	<input>:263:25: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-a5ed6207079a	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-a68cfc1800b2	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+91e58983716b46e2902c01cc7cde10ab	p-a6ba70fd3c53	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-a72eb7ce83b4	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-a78701a0c185	<input> -o /dev/null	1	<input>:107:19: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a8c8221c6448	<input> -o /dev/null	1	<input>:281:116: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-a8fce7bee753	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:382:26: error: use of value '%c768_i10' expects different type than prior uses: 'i10' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a90dd1bb5be5	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-a97496306e99	<input> -o /dev/null	1	<input>:618:30: error: use of value '%c3_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-a979fc1d871d	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:571:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-a9a9d3472721	<input> -o /dev/null	1	<input>:1577:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-a9d415aa1302	<input> -o /dev/null	1	<input>:258:1: error: 'hw.hierpath' op  operation with symbol: #hw.innerNameRef<@DUT::@mem0> was not found 
+91e58983716b46e2902c01cc7cde10ab	p-aa6fe5c6f8e8	<input> -o /dev/null	1	<input>:17:5: error: 'llhd.halt' op expects parent op to be one of 'llhd.process, llhd.final, llhd.coroutine'
+91e58983716b46e2902c01cc7cde10ab	p-aad5652c292b	<input> -o /dev/null	1	<input>:89:16: error: use of value '%a' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-ab348edcd7aa	<input> -o /dev/null	1	<input>:200:224: error: use of value '%wMask' expects different type than prior uses: 'i0' vs 'i4'
+91e58983716b46e2902c01cc7cde10ab	p-ab7d37c9e111	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-ac4a9da824fd	<input> -o /dev/null	1	<input>:1426:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-adf49df87347	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-ae1aaf4787b8	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-aec7374a1208	<input> -o /dev/null	1	<input>:503:20: error: use of value '%c15_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-af6435dbea50	<input> -o /dev/null	1	<input>:1197:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-afe1800a97cc	<input> -o /dev/null	1	<input>:169:3: error: 'hw.output' op output types must match module. In operand 3, expected 'i0', but got 'i32'.
+91e58983716b46e2902c01cc7cde10ab	p-b0e67b1978f8	<input> -o /dev/null	1	<input>:21:22: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-b175f7d9289d	<input> -o /dev/null	1	<input>:44:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-b2edcec3d7a8	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:378:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+91e58983716b46e2902c01cc7cde10ab	p-b2fc6d195aee	<input> -o /dev/null	1	<input>:187:42: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-b474eccd7ecc	<input> -o /dev/null	1	<input>:16:28: error: use of value '%c0_i42' expects different type than prior uses: 'i0' vs 'i42'
+91e58983716b46e2902c01cc7cde10ab	p-b4bcf384d7cd	<input> -o /dev/null	1	<input>:209:45: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-b4ceaa5fc563	<input> -o /dev/null	1	<input>:126:150: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-b5276e6f0a56	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1035:26: error: use of value '%c255_i39' expects different type than prior uses: 'i39' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-b5ea207d073e	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-b7479c0b6249	<input> -o /dev/null	1	<input>:231:23: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-b8108c6b9380	<input> -o /dev/null	1	<input>:17:31: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-b883a1271a9f	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-b88af8f9f4b4	<input> -o /dev/null	1	<input>:280:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-b9070fb7ae20	<input> -o /dev/null	1	<input>:81:18: error: use of value '%a0' expects different type than prior uses: 'i0' vs 'i40'
+91e58983716b46e2902c01cc7cde10ab	p-b9e5449071fe	<input> -o /dev/null	1	<input>:211:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-ba1404882192	<input> -o /dev/null	1	<input>:83:5: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-ba8d067ac85f	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:672:3: error: 'hw.hierpath' op  module: "Foo" does not contain any instance with symbol: "bar"
+91e58983716b46e2902c01cc7cde10ab	p-bad54be63908	<input> -o /dev/null	1	<input>:199:3: error: 'hw.hierpath' op  module: "ObjectModelDUT" does not contain any instance with symbol: "dut"
+91e58983716b46e2902c01cc7cde10ab	p-bc268dccbf10	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:446:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+91e58983716b46e2902c01cc7cde10ab	p-bc59543d4a30	<input> -o /dev/null	1	<input>:41:29: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-bcc0d64ce266	<input> -o /dev/null	1	<input>:11:25: error: use of value '%1' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i42>'
+91e58983716b46e2902c01cc7cde10ab	p-bd89ad67f881	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-bda03341fde8	<input> -o /dev/null	1	<input>:3291:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-bdf352334b73	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-be66c4a42148	<input> -o /dev/null	1	<input>:184:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-be90dca54657	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+91e58983716b46e2902c01cc7cde10ab	p-be9c31cc31f1	<input> -o /dev/null	1	<input>:53:14: error: use of value '%a' expects different type than prior uses: '!llhd.ref<i0>' vs '!llhd.ref<i42>'
+91e58983716b46e2902c01cc7cde10ab	p-bf2081d67978	-	missing_input	
+91e58983716b46e2902c01cc7cde10ab	p-bf7ffade0556	--import-only <input>	1	..<input>:2335:68: error: expected identifier
+91e58983716b46e2902c01cc7cde10ab	p-bfff54fb27b0	<input> -o /dev/null	1	<input>:463:3: error: 'hw.hierpath' op  module: "ExtModuleTest" does not contain any instance with symbol: "e1"
+91e58983716b46e2902c01cc7cde10ab	p-c07841daeed1	<input> -o /dev/null	1	<input>:1657:42: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-c097d6674c8c	--import-only <input>	1	..<input>:1029:30: error: unsupported conversion from '!moore.uarray<4 x l11>' to '!moore.l44'
+91e58983716b46e2902c01cc7cde10ab	p-c175be48e8a4	--verify-roundtrip <input> -o /dev/null	1	<input>:59:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-c1f751c20a4c	<input> -o /dev/null	1	<input>:184:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-c2682502d6e1	<input> -o /dev/null	1	<input>:44:23: error: use of value '%c11_i7' expects different type than prior uses: 'i7' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-c377c93c24cf	<input> -o /dev/null	1	<input>:275:10: error: use of value '%c15_i8' expects different type than prior uses: 'i8' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-c3bba843ddcf	<input> -o /dev/null	1	<input>:53:30: error: use of value '%a' expects different type than prior uses: 'i1' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-c4265851e2e9	<input> -o /dev/null	1	<input>:227:22: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+91e58983716b46e2902c01cc7cde10ab	p-c4d097fe09ed	--import-only <input>	1	..<input>:715:8: error: expected identifier
+91e58983716b46e2902c01cc7cde10ab	p-c5328cce63e1	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-c73229fb5e76	<input> -o /dev/null	1	<input>:47:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-c869bf46a842	<input> -o /dev/null	1	<input>:3243:20: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-c8c872b29803	<input> -o /dev/null	1	<input>:63:3: error: 'hw.instance' op operand type #0 must be 'i0', but got 'i4'
+91e58983716b46e2902c01cc7cde10ab	p-c9e069387d71	--import-only <input>	1	..<input>:716:13: error: expected ')'
+91e58983716b46e2902c01cc7cde10ab	p-ca046596d483	<input> -o /dev/null	1	<input>:1119:12: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-ca2ee243f9d0	<input> -o /dev/null	1	<input>:7:39: error: use of value '%c0' expects different type than prior uses: 'i1' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-ca5b6a56b2e5	<input> -o /dev/null	1	<input>:18:34: error: use of value '%c2_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-ca6df5075a72	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:1483:20: error: custom op 'comb.concat' number of operands and types do not match: got 5 operands and 4 types
+91e58983716b46e2902c01cc7cde10ab	p-cc3cf52026e4	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-cda0a3efb350	<input> -o /dev/null	0	
+91e58983716b46e2902c01cc7cde10ab	p-ce3f2e217039	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+91e58983716b46e2902c01cc7cde10ab	p-ce4bbec02942	<input> -o /dev/null	1	<input>:284:3: error: 'handshake.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-cf05c46257fb	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1390:9: error: redefinition of SSA value '%unused'
+91e58983716b46e2902c01cc7cde10ab	p-cf0733fc59f4	<input> -o /dev/null	1	<input>:3282:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-cf187f19afbf	<input> -o /dev/null	1	<input>:1383:24: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d0079b3cf7be	<input> -o /dev/null	1	<input>:45:19: error: use of value '%1' expects different type than prior uses: '!moore.ref<i0>' vs '!moore.ref<i32>'
+91e58983716b46e2902c01cc7cde10ab	p-d07b09655eb0	<input> -o /dev/null	1	<input>:27:27: error: use of value '%c1_i33' expects different type than prior uses: 'i33' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d1f8f3cc20ae	<input> -o /dev/null	1	<input>:60:3: error: 'func.return' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-d2955b8f9dc6	<input> -o /dev/null	1	<input>:455:24: error: use of value '%rhs' expects different type than prior uses: 'i8' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d2cbbdbe62ec	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:936:21: error: use of value '%c3_i3' expects different type than prior uses: 'i3' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d34018a9e76d	<input> -o /dev/null	1	<input>:247:5: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-d38f7cc33cb4	--verify-roundtrip <input> -o /dev/null	1	<input>:110:46: error: use of value '%last' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-d47d5c73aa0a	<input> -o /dev/null	1	<input>:47:26: error: use of value '%d' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-d49cd33c6c56	<input> -o /dev/null	1	<input>:311:5: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-d5685f5177cc	<input> -o /dev/null	1	<input>:187:42: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d57fc365e4d8	<input> -o /dev/null	1	<input>:27:27: error: use of value '%c1_i33' expects different type than prior uses: 'i33' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d72747617248	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:200:5: error: 'verif.yield' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-d795ca331221	<input> -o /dev/null	1	<input>:26:3: error: definition of SSA value '%c_i5#0' has type 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-d8122fd9ff68	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:93:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-d83d93a88e1a	<input> -o /dev/null	1	<input>:73:5: error: expected ':'
+91e58983716b46e2902c01cc7cde10ab	p-d8b942b262af	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1195:7: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-d8dac235289a	<input> -o /dev/null	1	<input>:780:5: error: redefinition of SSA value '%1'
+91e58983716b46e2902c01cc7cde10ab	p-d97d1257edb6	<input> -o /dev/null	1	<input>:41:8: error: operand #0 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-db59308f63f7	<input> -o /dev/null	1	<input>:29:17: error: use of value '%arg0' expects different type than prior uses: '!hw.typealias<@__hw_typedecls::@foo, i0>' vs '!hw.typealias<@__hw_typedecls::@foo, i1>'
+91e58983716b46e2902c01cc7cde10ab	p-db82f19c8232	<input> -o /dev/null	1	<input>:3455:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-dbde880f14e5	<input> -o /dev/null	1	<input>:602:30: error: operation being parsed with an unregistered dialect. If this is intended, please use -allow-unregistered-dialect with the MLIR tool used
+91e58983716b46e2902c01cc7cde10ab	p-dcdb4506568f	<input> -o /dev/null	1	<input>:6:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-dd64a1e47af9	<input> -o /dev/null	1	<input>:61:10: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-df86a05b1cbb	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:393:20: error: custom op 'comb.concat' number of operands and types do not match: got 4 operands and 3 types
+91e58983716b46e2902c01cc7cde10ab	p-dfee5f7b177f	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-e156d322baca	<input> -o /dev/null	1	<input>:198:29: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-e174341e8353	<input> -o /dev/null	1	<input>:93:23: error: use of value '%a1' expects different type than prior uses: 'i40' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-e215268ed0c1	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-e2d1a266e7f6	<input> -o /dev/null	1	<input>:104:17: error: use of value '%cd' expects different type than prior uses: 'i0' vs 'i32'
+91e58983716b46e2902c01cc7cde10ab	p-e31b169db5f1	<input> -o /dev/null	1	<input>:82:7: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-e46fac1898cb	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:132:26: error: use of value '%c1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-e47d2571660d	--import-only <input>	1	..<input>:4560:9: error: use of undeclared identifier 'qe'
+91e58983716b46e2902c01cc7cde10ab	p-e49c7d7e6c2d	<input> -o /dev/null	1	<input>:27:24: error: use of value '%c1_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-e4dbda2883a4	<input> -o /dev/null	1	<input>:43:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-e52437e5a72f	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:20:5: error: 'verif.yield' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-e5403761d3a3	<input> -o /dev/null	1	<input>:18:15: error: use of value '%a' expects different type than prior uses: 'i42' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-e5591f34c029	--import-only <input>	1	..<input>:971:9: error: use of undeclared identifier 'vec_1a'; did you mean 'vec_1'?
+91e58983716b46e2902c01cc7cde10ab	p-e59149f087ed	<input> -o /dev/null	1	<input>:3551:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-e620e65008fe	<input> -o /dev/null	1	<input>:17:35: error: use of value '%c0_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-e630bb92fb6e	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-e6cb372c5f56	<input> -o /dev/null	1	<input>:92:47: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-e76dacbbfca9	<input> -o /dev/null	1	<input>:3325:20: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-e91cefbdd475	<input> -o /dev/null	1	<input>:1127:21: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-e9d9cae29e62	<input> -o /dev/null	0	
+91e58983716b46e2902c01cc7cde10ab	p-ec68463443dd	<input> -o /dev/null	1	<input>:31:15: error: use of value '%counter' expects different type than prior uses: 'i0' vs 'i2'
+91e58983716b46e2902c01cc7cde10ab	p-ecfe25011772	<input> -o /dev/null	1	<input>:1489:3: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-ed10a43a2195	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:19:40: error: use of value '%c-1_i1' expects different type than prior uses: 'i1' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-ed61a2b0d5b1	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-ed8c5a0ffd99	<input> -o /dev/null	1	<input>:91:33: error: use of value '%addr' expects different type than prior uses: 'i0' vs 'i2'
+91e58983716b46e2902c01cc7cde10ab	p-eea5a4aca5f4	<input> -o /dev/null	1	<input>:141:18: error: operand #1 does not dominate this use
+91e58983716b46e2902c01cc7cde10ab	p-ef12d8e2505e	<input> -o /dev/null	1	<input>:347:5: error: redefinition of SSA value '%leaf_in'
+91e58983716b46e2902c01cc7cde10ab	p-ef30b0bdd80a	--import-only <input>	1	..<input>:205:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-ef4b2a7a6fd8	<input> -o /dev/null	1	<input>:52:29: error: integer constant out of range for attribute
+91e58983716b46e2902c01cc7cde10ab	p-f08d6361eb39	<input> -o /dev/null	1	<input>:61:3: error: 'hw.hierpath' op  module: "NLARenaming" does not contain any instance with symbol: "dut"
+91e58983716b46e2902c01cc7cde10ab	p-f0b64ed96535	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-f11368b15abc	<input> -o /dev/null	1	<input>:562:8: error: 'comb.extract' op from bit too large for input
+91e58983716b46e2902c01cc7cde10ab	p-f14e76ea2a5c	--allow-unregistered-dialect <input> -o /dev/null	1	<input>:363:20: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-f1681786448d	<input> -o /dev/null	1	<input>:59:30: error: use of value '%c1_i2' expects different type than prior uses: 'i2' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-f22aca16ad22	--import-only <input>	1	..<input>:4584:12: error: use of undeclared identifier 'q'
+91e58983716b46e2902c01cc7cde10ab	p-f2ebe441f2a5	<input> -o /dev/null	1	<input>:291:17: error: use of value '%c0_i42' expects different type than prior uses: 'i42' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-f3df27bcdb29	<input> -o /dev/null	0	<input>:99:6: error: expected error "failed to legalize operation 'arith.extsi' that was explicitly marked illegal" was not produced
+91e58983716b46e2902c01cc7cde10ab	p-f3e5fcc6db4e	--import-only <input>	1	..<input>:2488:3: error: immediate assertion statements may only appear in procedural contexts
+91e58983716b46e2902c01cc7cde10ab	p-f3f987c1ff97	<input> -o /dev/null	1	<input>:993:20: error: use of value '%c0_i11' expects different type than prior uses: 'i11' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-f44534ea71e2	--import-only <input>	0	
+91e58983716b46e2902c01cc7cde10ab	p-f4f818504a04	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-f4f97ec28d24	<input> -o /dev/null	1	<input>:3209:16: error: 'firrtl.mem' op attribute 'readLatency' failed to satisfy constraint: 32-bit signless integer attribute whose minimum value is 0
+91e58983716b46e2902c01cc7cde10ab	p-f7455469f775	<input> -o /dev/null	1	<input>:1:1: error: unexpected character
+91e58983716b46e2902c01cc7cde10ab	p-f81eeed7c965	<input> -o /dev/null	1	<input>:16:24: error: custom op 'comb.concat' number of operands and types do not match: got 3 operands and 2 types
+91e58983716b46e2902c01cc7cde10ab	p-f867be060402	--import-only <input>	1	..<input>:204:20: error: sequence has no explicit clocking event and one cannot be inferred from context
+91e58983716b46e2902c01cc7cde10ab	p-f8c6abab769e	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:19:27: error: use of value '%from_clock' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-f9f9be042468	<input> -o /dev/null	1	<input>:18:26: error: use of value '%c3_i3' expects different type than prior uses: 'i3' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-fa423d7dfbab	<input> -o /dev/null	1	<input>:22:46: error: use of value '%c0_i4' expects different type than prior uses: 'i4' vs 'i65'
+91e58983716b46e2902c01cc7cde10ab	p-fa4f459e122b	<input> -o /dev/null	1	<input>:17:36: error: use of value '%ADR' expects different type than prior uses: 'i0' vs 'i13'
+91e58983716b46e2902c01cc7cde10ab	p-fac680744b68	--import-only <input>	1	..<input>:923:5: error: use of undeclared identifier 'vec_1'; did you mean 'vec_1a'?
+91e58983716b46e2902c01cc7cde10ab	p-fc0c42e0e809	<input> -o /dev/null	1	<input>:78:3: error: 'hw.output' op must be the last operation in the parent block
+91e58983716b46e2902c01cc7cde10ab	p-fc52efc6480b	<input> -o /dev/null	1	<input>:49:46: error: use of value '%g' expects different type than prior uses: 'i1' vs 'i0'
+91e58983716b46e2902c01cc7cde10ab	p-fd1759ff4062	--import-only <input>	1	..<input>:222:18: error: use of undeclared identifier 'lut'; did you mean 'out'?
+91e58983716b46e2902c01cc7cde10ab	p-fe85221e6aae	<input> -o /dev/null	1	<input>:27:28: error: use of value '%a' expects different type than prior uses: 'i0' vs 'i1'
+91e58983716b46e2902c01cc7cde10ab	p-ffea786a297d	--import-only <input>	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-01a4ba6d5a62	<input> -o /dev/null	1	<input>:3:63: error: custom op 'firrtl.module' domain name '"clk"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-0415b7e39860	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:7:20: error: expected operation name in quotes
+db45ab7bb42f4ca3aba5985c94468dec	p-07c8ba7c2d85	<input> -o /dev/null	1	<input>:3:28: error: custom op 'moore.variable' invalid kind of type specified
+db45ab7bb42f4ca3aba5985c94468dec	p-0894d99f6b75	<input> -o /dev/null	1	<input>:6:35: error: use of value '%arr' expects different type than prior uses: '!sim.assoc_array<i32, i32>' vs '!sim.assoc_array<!moore.i32, i32>'
+db45ab7bb42f4ca3aba5985c94468dec	p-0e0961893473	<input> -o /dev/null	1	<input>:3:10: error: 'firrtl.shr' op inferred type(s) '!firrtl.uint<0>' are incompatible with return type(s) of operation '!firrtl.uint<1>'
+db45ab7bb42f4ca3aba5985c94468dec	p-0fb2c25de7b6	<input> -o /dev/null	1	<input>:4:3: error: 'func.call' op operand type mismatch: expected operand type '!sim.assoc_array<i32, i32>', but provided '!sim.assoc_array<!moore.i32, i32>' for operand number 0
+db45ab7bb42f4ca3aba5985c94468dec	p-1539b0a20e6e	<input> -o /dev/null	1	<input>:3:31: error: use of value '%idx' expects different type than prior uses: '!moore.i32' vs 'i32'
+db45ab7bb42f4ca3aba5985c94468dec	p-16bcfba6c3e8	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-1bb89495476d	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:15: error: expected '}' in attribute dictionary
+db45ab7bb42f4ca3aba5985c94468dec	p-1cba29431755	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-1ed057ef5b46	<input> -o /dev/null	1	<input>:8:13: error: custom op 'hw.output' number of operands and types do not match: got 2 operands and 1 types
+db45ab7bb42f4ca3aba5985c94468dec	p-203058f89108	--import-only <input>	1	..<input>:5:19: error: invalid operands to binary expression ('bit$[$]' and 'logic$[$]')
+db45ab7bb42f4ca3aba5985c94468dec	p-2030df2fe695	<input> -o /dev/null	1	<input>:1:42: error: invalid kind of type specified
+db45ab7bb42f4ca3aba5985c94468dec	p-215ca6fcc9a2	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-22cfd150b431	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-2591c38a3bcc	--import-only <input>	1	..<input>:6:10: error: 'moore.queue.cmp' op requires all operands to have the same type
+db45ab7bb42f4ca3aba5985c94468dec	p-28e3c3a6bc47	--import-only <input>	1	..<input>:6:9: error: unknown name `arr`
+db45ab7bb42f4ca3aba5985c94468dec	p-29363871f09c	--import-only <input>	1	..<input>:4:17: error: cannot refer to element 2 of 'string$[2]' [-Windex-oob]
+db45ab7bb42f4ca3aba5985c94468dec	p-29df22f92ecb	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-2dba60619c65	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:15: error: expected '}' in attribute dictionary
+db45ab7bb42f4ca3aba5985c94468dec	p-2f355bee53e9	--import-only <input>	1	..<input>:6:10: error: 'moore.queue.cmp' op requires all operands to have the same type
+db45ab7bb42f4ca3aba5985c94468dec	p-310d688794ae	--import-only <input>	1	..<input>:5:17: error: invalid operands to binary expression ('bit$[2]' and 'logic$[2]')
+db45ab7bb42f4ca3aba5985c94468dec	p-330e0c7881d0	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-35bd57365919	<input> -o /dev/null	1	<input>:2:11: error: custom op 'seq.clock_invert' is unknown
+db45ab7bb42f4ca3aba5985c94468dec	p-3a237f85fb5c	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-3aa3afdb44af	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-3bf607a75bbb	<input> -o /dev/null	1	<input>:3:103: error: expected '{' to begin a region
+db45ab7bb42f4ca3aba5985c94468dec	p-3bf6b34eee47	<input> -o /dev/null	1	<input>:3:8: error: expected named operation to have at least 1 result
+db45ab7bb42f4ca3aba5985c94468dec	p-4174ea1012b1	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-47d02d3df97b	<input> -o /dev/null	1	<input>:4:10: error: 'firrtl.ref.rwprobe' op has non-local target
+db45ab7bb42f4ca3aba5985c94468dec	p-4b6b03e0b471	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-4c159f113355	<input> -o /dev/null	1	<input>:5:60: error: custom op 'firrtl.instance' domain name '"clk"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-522eae1c98df	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-5a7be5e6b4f7	<input> -o /dev/null	1	<input>:3:10: error: 'firrtl.shr' op inferred type(s) '!firrtl.uint<0>' are incompatible with return type(s) of operation '!firrtl.uint<1>'
+db45ab7bb42f4ca3aba5985c94468dec	p-5e1c920691d5	<input> -o /dev/null	1	<input>:4:10: error: 'firrtl.sub' op inferred type(s) '!firrtl.uint<1>' are incompatible with return type(s) of operation '!firrtl.sint<1>'
+db45ab7bb42f4ca3aba5985c94468dec	p-65e8253448ac	<input> -o /dev/null	1	<input>:3:92: error: expected '{' to begin a region
+db45ab7bb42f4ca3aba5985c94468dec	p-6a55d05928ec	--import-only <input>	1	..<input>:6:17: error: range of selection [1:0] from 'int$[]' is reversed [-Wrange-select-reversed]
+db45ab7bb42f4ca3aba5985c94468dec	p-6bdc54e60f45	--import-only <input>	1	..<input>:6:5: error: 'moore.queue.insert' op operand #1 must be 32-bit two-valued integer type, but got '!moore.i16'
+db45ab7bb42f4ca3aba5985c94468dec	p-71a5769d00b3	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:15: error: expected '}' in attribute dictionary
+db45ab7bb42f4ca3aba5985c94468dec	p-73cff8431943	<input> -o /dev/null	1	<input>:3:10: error: 'firrtl.shr' op inferred type(s) '!firrtl.uint<0>' are incompatible with return type(s) of operation '!firrtl.uint<1>'
+db45ab7bb42f4ca3aba5985c94468dec	p-73dbc3af50d0	--import-only <input>	1	..<input>:5:9: error: `$test$plusargs` argument must be a string literal
+db45ab7bb42f4ca3aba5985c94468dec	p-797344ba731a	--import-only <input>	1	..<input>:5:9: error: unsupported conversion from '!moore.open_uarray<i32>' to '!moore.queue<i32, 0>'
+db45ab7bb42f4ca3aba5985c94468dec	p-7de8d6c5fc14	--mlir-print-local-scope --mlir-print-debuginfo <input> -o /dev/null	1	<input>:1:1: error: 'om.class' op region #0 ('body') failed to verify constraint: region with 1 blocks
+db45ab7bb42f4ca3aba5985c94468dec	p-8331f8a29b30	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-8a2aaa4b97a9	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1:29: error: expected '='
+db45ab7bb42f4ca3aba5985c94468dec	p-8ab3623e0296	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:39: error: expected non-function type
+db45ab7bb42f4ca3aba5985c94468dec	p-8dbc0b938841	--import-only <input>	1	..<input>:5:9: error: unsupported conversion from '!moore.open_uarray<i32>' to '!moore.queue<i32, 0>'
+db45ab7bb42f4ca3aba5985c94468dec	p-9b3ae79e50e4	--import-only <input>	1	..<input>:5:5: error: 'moore.queue.delete' op operand #1 must be 32-bit two-valued integer type, but got '!moore.i16'
+db45ab7bb42f4ca3aba5985c94468dec	p-a5afbc77cd51	--import-only <input>	1	..<input>:5:9: error: unknown name `arr`
+db45ab7bb42f4ca3aba5985c94468dec	p-a7b9b80f95b2	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-a84c2d9f9ac3	<input> -o /dev/null	1	<input>:3:51: error: custom op 'firrtl.extmodule' domain name '"clk"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-a8b7a9ea212f	--mlir-print-local-scope --mlir-print-debuginfo <input> -o /dev/null	1	<input>:3:3: error: 'om.class.fields' op attribute 'field_locs' failed to satisfy constraint: location array attribute
+db45ab7bb42f4ca3aba5985c94468dec	p-a99a7a5ae9e0	<input> -o /dev/null	1	<input>:2:35: error: expected '->' in function type
+db45ab7bb42f4ca3aba5985c94468dec	p-b04eb4e9fd20	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-bad38cc02439	<input> -o /dev/null	1	<input>:2:41: error: custom op 'hw.module.generated' unknown port direction 'param'
+db45ab7bb42f4ca3aba5985c94468dec	p-baeb06d0095d	<input> -o /dev/null	1	<input>:3:8: error: custom op 'moore.assoc_array.extract' is unknown
+db45ab7bb42f4ca3aba5985c94468dec	p-bbc1b0bf7458	--import-only <input>	1	..<input>:4:13: error: 'moore.queue.cmp' op requires all operands to have the same type
+db45ab7bb42f4ca3aba5985c94468dec	p-bcd04cc7ca1c	--import-only <input>	1	..<input>:6:10: error: 'moore.queue.cmp' op requires all operands to have the same type
+db45ab7bb42f4ca3aba5985c94468dec	p-bdf183279321	<input> -o /dev/null	1	<input>:3:96: error: expected '{' to begin a region
+db45ab7bb42f4ca3aba5985c94468dec	p-bf951e1fc7ea	<input> -o /dev/null	1	<input>:3:36: error: custom op 'firrtl.module' domain name '"x"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-c133507aa037	<input> -o /dev/null	1	<input>:1:1: error: 'firrtl.class' op expects parent op 'firrtl.circuit'
+db45ab7bb42f4ca3aba5985c94468dec	p-c1e9b0e94d61	<input> -o /dev/null	1	<input>:4:103: error: expected '{' to begin a region
+db45ab7bb42f4ca3aba5985c94468dec	p-c881cc7d0c31	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-c98b02dcac9e	<input> -o /dev/null	1	<input>:3:20: error: use of value '%sel' expects different type than prior uses: '!dc.value<i1>' vs '!dc.value<i0>'
+db45ab7bb42f4ca3aba5985c94468dec	p-c9fe60b7dedc	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-cd0ae95eeef5	<input> -o /dev/null	1	<input>:1:1: error: Cannot find generator definition 'MEMORY'
+db45ab7bb42f4ca3aba5985c94468dec	p-d112d19f269c	--import-only <input>	1	..<input>:5:9: error: `$test$plusargs` argument must be a string literal
+db45ab7bb42f4ca3aba5985c94468dec	p-d62bf64cbf7a	--mlir-print-local-scope --mlir-print-debuginfo <input> -o /dev/null	1	<input>:1:1: error: 'om.class.extern' op region #0 ('body') failed to verify constraint: region with 1 blocks
+db45ab7bb42f4ca3aba5985c94468dec	p-d8af90ac12a3	--import-only <input>	1	..<input>:5:19: error: invalid operands to binary expression ('bit$[$]' and 'logic$[$]')
+db45ab7bb42f4ca3aba5985c94468dec	p-dbaef25be502	--import-only <input>	1	..<input>:4:30: error: cannot change width or signedness of non-integral expression (type is 'string')
+db45ab7bb42f4ca3aba5985c94468dec	p-dc383dc1684a	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:15: error: expected '}' in attribute dictionary
+db45ab7bb42f4ca3aba5985c94468dec	p-df5266a5530f	<input> -o /dev/null	1	<input>:3:32: error: expected ':'
+db45ab7bb42f4ca3aba5985c94468dec	p-e0da767b801b	<input> -o /dev/null	1	<input>:3:59: error: custom op 'firrtl.module' domain name '"clk"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-e0fb7e3f0147	--import-only <input>	1	..<input>:5:17: error: invalid operands to binary expression ('bit$[2]' and 'logic$[2]')
+db45ab7bb42f4ca3aba5985c94468dec	p-e12c5f0904df	<input> -o /dev/null	1	<input>:3:287: error: Unexpected hw attribute 'inner_sym'
+db45ab7bb42f4ca3aba5985c94468dec	p-e494ebbb013a	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-e59d67ffccb5	<input> -o /dev/null	0	
+db45ab7bb42f4ca3aba5985c94468dec	p-e6cb31d9ee02	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:3:15: error: expected '}' in attribute dictionary
+db45ab7bb42f4ca3aba5985c94468dec	p-e9fdb1beff03	<input> -o /dev/null	1	<input>:5:10: error: 'firrtl.ref.rwprobe' op has target that cannot be probed
+db45ab7bb42f4ca3aba5985c94468dec	p-ef47bcb1499b	--import-only <input>	1	..<input>:2:7: error: expected a declaration name
+db45ab7bb42f4ca3aba5985c94468dec	p-f080e1fda835	<input> -o /dev/null	1	<input>:3:73: error: expected '{' to begin a region
+db45ab7bb42f4ca3aba5985c94468dec	p-f39b841cadc9	--import-only <input>	1	..<input>:5:9: error: unknown name `arr`
+db45ab7bb42f4ca3aba5985c94468dec	p-f7ccca68de40	<input> -o /dev/null	1	<input>:1:1: error: Cannot find generator definition 'MEMORY'
+db45ab7bb42f4ca3aba5985c94468dec	p-fb023aebc646	<input> -o /dev/null	1	<input>:5:8: error: custom op 'firrtl.module' domain name '"a"' not found
+db45ab7bb42f4ca3aba5985c94468dec	p-ff724b7ca0aa	--import-only <input>	1	..<input>:6:10: error: 'moore.queue.cmp' op requires all operands to have the same type
+f0b2ef10e17849f4b4ae45510024f96a	p-03156f4909e9	<input> -o /dev/null	1	<input>:3:5: error: custom op 'firrtl.propassert' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-06a212e099be	--import-only <input>	1	..<input>:2:13: error: invalid target type 'logic' for assignment pattern
+f0b2ef10e17849f4b4ae45510024f96a	p-0f23e5a8eebc	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-10bac2f42682	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-113d5fcd2120	<input> -o /dev/null	1	<input>:3:37: error: expected '<'
+f0b2ef10e17849f4b4ae45510024f96a	p-11c3c252b26c	<input> -o /dev/null	1	<input>:9:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-12c1b2c18e15	--import-only <input>	1	..<input>:5:12: error: destination of unformatted scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-13edfcdd3b33	<input> -o /dev/null	1	<input>:6:28: error: expected ':'
+f0b2ef10e17849f4b4ae45510024f96a	p-17060d2e1154	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-175574b80522	<input> -o /dev/null	1	<input>:11:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-189822932ae6	--import-only <input>	1	..<input>:5:12: error: destination of char scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-1911367f18d7	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-1b6af555eccf	<input> -o /dev/null	1	<input>:3:29: error: expected '('
+f0b2ef10e17849f4b4ae45510024f96a	p-1dbe66028193	--import-only <input>	1	..<input>:3:5: error: 'moore.cover' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-1dcab56fe049	<input> -o /dev/null	1	<input>:1:1: error: 'om.class' op returns '0' fields, but its terminator returned '1' fields
+f0b2ef10e17849f4b4ae45510024f96a	p-1decce476e4d	<input> -o /dev/null	1	<input>:6:11: error: 'hw.bitcast' op operand #0 must be Type wherein the bitwidth in hardware is known, but got '!hw.array<1x!seq.clock>'
+f0b2ef10e17849f4b4ae45510024f96a	p-1dfe4318fa9a	<input> -o /dev/null	1	<input>:8:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-1e93d7156969	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-278fdd066ac8	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-28e3bda423ba	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-290fb339e912	<input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-2d670eff73d3	<input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-30e01a1832d4	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:5:93: error: expected operation name in quotes
+f0b2ef10e17849f4b4ae45510024f96a	p-36c2f98bfa62	--import-only <input>	1	..<input>:5:20: error: expected a 1-bit integer
+f0b2ef10e17849f4b4ae45510024f96a	p-396c4239f3eb	--import-only <input>	1	..<input>:4:10: error: unsupported conversion from 'i4' to '!moore.struct<{x: l4}>'
+f0b2ef10e17849f4b4ae45510024f96a	p-3d52ad38fe39	<input> -o /dev/null	1	<input>:8:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-3d5e6f190508	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-3d771ef4e1cc	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-3fc999a16fb9	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-451c63eef360	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-46db476d8746	<input> -o /dev/null	1	<input>:2:8: error: 'moore.reduce_or' op operand #0 must be simple bit vector type, but got '!moore.struct<{a: i8, b: i8}>'
+f0b2ef10e17849f4b4ae45510024f96a	p-4919e63d1516	<input> -o /dev/null	1	<input>:6:7: error: destination cannot be driven by multiple operations
+f0b2ef10e17849f4b4ae45510024f96a	p-512c20144433	--import-only <input>	1	..<input>:4:20: error: expected a 1-bit integer
+f0b2ef10e17849f4b4ae45510024f96a	p-51e838479fa4	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-533710040afe	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-535f7e9d6475	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-560f6c7f49e2	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-574a2b2929d1	<input> -o /dev/null	1	<input>:3:37: error: expected '<'
+f0b2ef10e17849f4b4ae45510024f96a	p-58a45ee57647	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-59ce49eecdbd	<input> -o /dev/null	1	<input>:2:34: error: custom op 'moore.extract' expected valid keyword
+f0b2ef10e17849f4b4ae45510024f96a	p-5b47124c143f	--import-only <input>	1	..<input>:6:9: error: destination of char scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-5b67b4888706	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-5ba0875a4cf2	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:11:39: error: custom op 'firrtl.instance' expected 'in' or 'out'
+f0b2ef10e17849f4b4ae45510024f96a	p-5ba635454dbc	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:9:39: error: custom op 'firrtl.instance' expected 'in' or 'out'
+f0b2ef10e17849f4b4ae45510024f96a	p-5e3f9827d798	<input> -o /dev/null	1	<input>:3:54: error: custom op 'firrtl.extmodule' domain name '"clk"' not found
+f0b2ef10e17849f4b4ae45510024f96a	p-5f4cab7386dc	--import-only <input>	1	..<input>:6:9: error: destination of unformatted scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-63865f5dd929	<input> -o /dev/null	1	<input>:5:16: error: 'firrtl.instance' op expects parent op to be one of 'firrtl.contract, firrtl.module, firrtl.layerblock, firrtl.match, firrtl.when, sv.ifdef'
+f0b2ef10e17849f4b4ae45510024f96a	p-6a86d1c98556	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-6ab400286c15	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-6b395fbd3ddf	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-6fc9b1de92ad	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-6fe015a5de8d	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-704bf0312aed	--import-only <input>	1	..<input>:3:5: error: 'moore.assume' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-72405a6e6f80	--import-only <input>	1	..<input>:3:5: error: concurrent assertion statements may only appear in always and initial blocks
+f0b2ef10e17849f4b4ae45510024f96a	p-72baa2c67835	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-739498241e6c	--import-only <input>	1	..<input>:3:5: error: 'moore.cover' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-73aa17dda55b	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-755297ff2188	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-760ceaf2f211	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:9:39: error: custom op 'firrtl.instance' expected 'in' or 'out'
+f0b2ef10e17849f4b4ae45510024f96a	p-780050353c65	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-7887eddd9f62	<input> -o /dev/null	1	<input>:3:21: error: custom op 'firrtl.layer' expected string or keyword containing one of the following enum values for attribute 'convention' [bind, inline]
+f0b2ef10e17849f4b4ae45510024f96a	p-788efb04d1a6	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-78b9b7831ce0	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f0b2ef10e17849f4b4ae45510024f96a	p-7c064eab8689	<input> -o /dev/null	1	<input>:6:10: error: 'moore.class.property_ref' op no field `@not_found` in class @C
+f0b2ef10e17849f4b4ae45510024f96a	p-81685e1217f6	<input> -o /dev/null	1	<input>:3:58: error: custom op 'firrtl.module' domain name '"clk"' not found
+f0b2ef10e17849f4b4ae45510024f96a	p-8531ace5e270	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-85fb28cbd878	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-87804fa5be56	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-882e4a06dfca	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:3: error: 'hw.hierpath' op  module: "Foo" does not contain any instance with symbol: "m"
+f0b2ef10e17849f4b4ae45510024f96a	p-8c90b738839d	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-8cc52251e532	<input> -o /dev/null	1	<input>:2:8: error: 'moore.not' op operand #0 must be simple bit vector type, but got '!moore.array<2 x i8>'
+f0b2ef10e17849f4b4ae45510024f96a	p-8e3e0c010e1b	<input> -o /dev/null	1	<input>:5:10: error: 'firrtl.ref.rwprobe' op has non-local target
+f0b2ef10e17849f4b4ae45510024f96a	p-8ee2b8c130f9	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f0b2ef10e17849f4b4ae45510024f96a	p-8f0b983ef0bf	<input> -o /dev/null	1	<input>:3:10: error: custom op 'firrtl.bundle_create' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-91635a0e8327	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-9423813b816e	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f0b2ef10e17849f4b4ae45510024f96a	p-943453d0ee7a	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-951093976a8c	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-95934430a62f	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-95aa387f73d0	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-9808bee5eebc	--import-only <input>	1	..<input>:3:5: error: 'moore.assume' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-9a026a929d03	<input> -o /dev/null	1	<input>:2:10: error: 'moore.class.property_ref' op referenced class symbol `@MissingClass` was not found
+f0b2ef10e17849f4b4ae45510024f96a	p-9a0574d5a1b1	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-9d73f9497f01	--import-only <input>	1	..<input>:6:11: error: unsupported conversion from 'i8' to '!moore.struct<{a: l4, b: l4}>'
+f0b2ef10e17849f4b4ae45510024f96a	p-9db87b242b19	--import-only <input>	1	..<input>:6:9: error: destination of integer scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-a3ff775f73cb	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-a776dfb45038	<input> -o /dev/null	1	<input>:9:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-aa24539708ff	<input> -o /dev/null	1	<input>:1:1: error: custom op 'esi.interface' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-adb5bbb1b5f8	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-af11b2eec88f	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-b15bc8cfdc0d	<input> -o /dev/null	1	<input>:5:55: error: expected operation name in quotes
+f0b2ef10e17849f4b4ae45510024f96a	p-b27bd7e029a4	<input> -o /dev/null	1	<input>:11:5: error: custom op 'firrtl.strictconnect' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-b61ff3c3beae	<input> -o /dev/null	1	<input>:11:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-b8e514dc3fa2	<input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-ba6f966d0006	--import-only <input>	1	..<input>:5:12: error: destination of integer scan specifier must be an integer
+f0b2ef10e17849f4b4ae45510024f96a	p-baacfdce367c	<input> -o /dev/null	1	<input>:2:8: error: 'moore.reduce_and' op operand #0 must be simple bit vector type, but got '!moore.array<2 x i8>'
+f0b2ef10e17849f4b4ae45510024f96a	p-bdbb00b52a23	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:1:1: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-bee803cec3c1	<input> -o /dev/null	1	<input>:1:1: error: custom op 'calyx.program' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-bfea9fecdad3	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-c1ec6b1efaa2	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f0b2ef10e17849f4b4ae45510024f96a	p-c40ba40ccea7	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-c5c604ad555d	<input> -o /dev/null	1	<input>:13:22: error: custom op 'firrtl.path' expected string or keyword containing one of the following enum values for attribute 'targetKind' [dont_touch, instance, member_instance, member_reference
+f0b2ef10e17849f4b4ae45510024f96a	p-c7c69d308ab0	<input> -o /dev/null	1	<input>:2:8: error: 'moore.class.new' op referenced class symbol `@MissingClass` was not found
+f0b2ef10e17849f4b4ae45510024f96a	p-c853a31da83d	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-cce76e046ab7	<input> -o /dev/null	1	<input>:5:51: error: custom op 'firrtl.instance_choice' expected 'alternatives'
+f0b2ef10e17849f4b4ae45510024f96a	p-cd5002abaadf	<input> -o /dev/null	1	<input>:5:10: error: 'firrtl.unsafe_domain_cast' op operand #0 must be a passive base type (contain no flips), but got '!firrtl.string'
+f0b2ef10e17849f4b4ae45510024f96a	p-cebde68242f2	<input> -o /dev/null	1	<input>:14:22: error: custom op 'firrtl.path' expected string or keyword containing one of the following enum values for attribute 'targetKind' [dont_touch, instance, member_instance, member_reference
+f0b2ef10e17849f4b4ae45510024f96a	p-d0444840a64b	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f0b2ef10e17849f4b4ae45510024f96a	p-d2ac55ae0efc	<input> -o /dev/null	1	<input>:8:35: error: expected attribute value
+f0b2ef10e17849f4b4ae45510024f96a	p-d41f8889fb35	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-d4395d1e836c	<input> -o /dev/null	1	<input>:3:5: error: custom op 'firrtl.propassert' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-d4655686e8f7	<input> -o /dev/null	1	<input>:3:59: error: input probe not allowed
+f0b2ef10e17849f4b4ae45510024f96a	p-db5d5fa36d46	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-dbc38a3d5e31	<input> -o /dev/null	1	<input>:11:11: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-dc9283592b2e	<input> -o /dev/null	1	<input>:3:10: error: 'firrtl.mux' op inferred type(s) '!firrtl.enum<>' are incompatible with return type(s) of operation '!firrtl.const.enum<>'
+f0b2ef10e17849f4b4ae45510024f96a	p-e096072654cc	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f0b2ef10e17849f4b4ae45510024f96a	p-e0a9fb70955a	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-e655e587b675	<input> -o /dev/null	1	<input>:2:3: error: 'firrtl.circuit' op does not contain module with same name as circuit
+f0b2ef10e17849f4b4ae45510024f96a	p-e910ce141517	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-ea4711714701	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-ec1434887622	<input> -o /dev/null	1	<input>:10:9: error: 'firrtl.connect' op connects to a destination which is defined outside its enclosing layer block
+f0b2ef10e17849f4b4ae45510024f96a	p-ee3cef44c5b0	<input> -o /dev/null	1	<input>:1:1: error: custom op 'esi.interface' is unknown
+f0b2ef10e17849f4b4ae45510024f96a	p-f1ad7ce3127e	-allow-unregistered-dialect <input> -o /dev/null	1	<input>:2:3: error: 'hw.hierpath' op  module: "Middle" does not contain any instance with symbol: "m"
+f0b2ef10e17849f4b4ae45510024f96a	p-f38805b5d456	<input> -o /dev/null	1	<input>:2:34: error: custom op 'moore.extract' expected valid keyword
+f0b2ef10e17849f4b4ae45510024f96a	p-f3e0c1559a77	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-fb9d01136823	<input> -o /dev/null	1	<input>:4:34: error: expected operation name in quotes
+f0b2ef10e17849f4b4ae45510024f96a	p-fbcec27b3419	<input> -o /dev/null	0	
+f0b2ef10e17849f4b4ae45510024f96a	p-ff7d6bd1cefe	<input> -o /dev/null	1	<input>:1:11: error: custom op 'arc.model' expected valid '@'-identifier for symbol name
+f1e4fef5db314bef8d187bceca8f6a80	p-0145d839e2f8	<input> -o /dev/null	1	<input>:3:10: error: use of value '%0' expects different type than prior uses: 'i1' vs '!moore.i1'
+f1e4fef5db314bef8d187bceca8f6a80	p-01b9ab03b774	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-079ec96951fc	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-082360b0c913	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-0b1506f83200	<input> -o /dev/null	1	<input>:1:57: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-0c70f1fa84be	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-1329a5cead4a	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-183a482dba55	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-22a2ba28d5c1	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-22db90a4b361	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-263cb1b7d1cc	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-29088461782e	<input> -o /dev/null	1	<input>:3:18: error: expected operation name in quotes
+f1e4fef5db314bef8d187bceca8f6a80	p-4471aea5233f	<input> -o /dev/null	1	<input>:2:43: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-4a758dd1968b	--import-only <input>	1	..<input>:3:5: error: 'moore.cover' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-555079cdcdad	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-558faac5558b	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-5f904ad04e06	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-6603a73705bd	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-6e68850ce695	<input> -o /dev/null	1	<input>:2:29: error: expected '->' in function type
+f1e4fef5db314bef8d187bceca8f6a80	p-764e35019df9	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-7814fddd8e43	<input> -o /dev/null	1	<input>:1:17: error: custom op 'hw.module' expected valid keyword
+f1e4fef5db314bef8d187bceca8f6a80	p-797e45651862	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-82e69c848e71	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-8d4ffe2f202b	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-964b30f81cb9	--import-only <input>	1	..<input>:3:5: error: 'moore.cover' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-97d0c132e831	<input> -o /dev/null	1	<input>:4:15: error: expected ','
+f1e4fef5db314bef8d187bceca8f6a80	p-983f7c6a1a9a	<input> -o /dev/null	1	<input>:3:10: error: use of value '%0' expects different type than prior uses: 'i1' vs '!moore.i1'
+f1e4fef5db314bef8d187bceca8f6a80	p-a14b7185c6b5	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-a98a0cca40e2	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-b188b852f370	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-b3848f1798df	<input> -o /dev/null	1	<input>:3:10: error: use of value '%0' expects different type than prior uses: 'i1' vs '!moore.i1'
+f1e4fef5db314bef8d187bceca8f6a80	p-bb09a5afa31a	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-c01b46a308c0	--import-only <input>	1	..<input>:2:3: error: immediate assertion statements may only appear in procedural contexts
+f1e4fef5db314bef8d187bceca8f6a80	p-ca690dd78b40	<input> -o /dev/null	1	<input>:2:3: error: 'sv.func' op expects parent op 'builtin.module'
+f1e4fef5db314bef8d187bceca8f6a80	p-cb3cd7a2a264	<input> -o /dev/null	1	<input>:2:18: error: expected operation name in quotes
+f1e4fef5db314bef8d187bceca8f6a80	p-cd26961297d1	<input> -o /dev/null	0	
+f1e4fef5db314bef8d187bceca8f6a80	p-cd9956da6a07	--import-only <input>	1	..<input>:3:5: error: 'moore.assert' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-d1498f482b2d	--import-only <input>	1	..<input>:3:5: error: 'moore.assume' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-d2e0811e8274	<input> -o /dev/null	1	<input>:2:3: error: 'sv.func' op expects parent op 'builtin.module'
+f1e4fef5db314bef8d187bceca8f6a80	p-de9d7996cf27	--import-only <input>	1	..<input>:3:5: error: 'moore.assume' op expects parent op to be one of 'moore.procedure, func.func'
+f1e4fef5db314bef8d187bceca8f6a80	p-e2627d681250	--import-only <input>	1	..<input>:4:7: error: return statement is not allowed in fork-join block
+f1e4fef5db314bef8d187bceca8f6a80	p-e5c0cad1d421	<input> -o /dev/null	1	<input>:7:34: error: expected '['
+f1e4fef5db314bef8d187bceca8f6a80	p-fa692837ffd2	<input> -o /dev/null	1	<input>:3:10: error: use of value '%0' expects different type than prior uses: 'i1' vs '!moore.i1'
