@@ -1,0 +1,2498 @@
+{
+"query": "GET https://api.github.com/repos/llvm/circt/issues?state=all&since=2026-09-16T00:00:00Z (all pages), fetched 2026-10-26T19:5xZ, unauthenticated, read-only",
+"items": [
+{
+"number": 7753,
+"kind": "issue",
+"state": "closed",
+"created_at": "2024-10-31T00:20:57Z",
+"updated_at": "2026-10-08T08:44:38Z",
+"title": "[circt-verilog] zero parameter at module declaration fails when used ",
+"url": "https://github.com/llvm/circt/issues/7753"
+},
+{
+"number": 7781,
+"kind": "pr",
+"state": "closed",
+"created_at": "2024-11-07T18:38:52Z",
+"updated_at": "2026-10-15T23:38:17Z",
+"title": "[FIRRTL] infer more return types in asm format",
+"url": "https://github.com/llvm/circt/pull/7781"
+},
+{
+"number": 9302,
+"kind": "issue",
+"state": "open",
+"created_at": "2025-12-04T19:16:52Z",
+"updated_at": "2026-10-06T18:07:28Z",
+"title": "[firtool] New blackbox/external-module behavior in firtool-1.137.0",
+"url": "https://github.com/llvm/circt/issues/9302"
+},
+{
+"number": 10235,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-04-16T09:39:48Z",
+"updated_at": "2026-10-09T23:51:58Z",
+"title": "ImportVerilog: fix signedness propagation in ConversionExpression lowering",
+"url": "https://github.com/llvm/circt/pull/10235"
+},
+{
+"number": 10571,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-06-01T14:37:45Z",
+"updated_at": "2026-09-22T09:44:35Z",
+"title": "[HWAggregateToComb] Mux of unions",
+"url": "https://github.com/llvm/circt/issues/10571"
+},
+{
+"number": 10803,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-07-09T15:31:25Z",
+"updated_at": "2026-10-22T19:36:02Z",
+"title": "[FIRRTL] Add RWProbe force/release synthesis to ProbesToSignals",
+"url": "https://github.com/llvm/circt/pull/10803"
+},
+{
+"number": 10912,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-07-28T15:42:20Z",
+"updated_at": "2026-10-23T10:14:45Z",
+"title": "[crict-verilog][Mem2Reg] Lowering for `llhd.combinational` with peculiar CFG",
+"url": "https://github.com/llvm/circt/issues/10912"
+},
+{
+"number": 10940,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-08-04T07:00:43Z",
+"updated_at": "2026-10-26T08:59:11Z",
+"title": "[FIRRTL] Prototype Registry type and domain insert statement",
+"url": "https://github.com/llvm/circt/pull/10940"
+},
+{
+"number": 10990,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-08-14T10:27:02Z",
+"updated_at": "2026-09-22T15:48:02Z",
+"title": "[ImportVerilog] Save the source text of the assert/assume/cover statements.",
+"url": "https://github.com/llvm/circt/pull/10990"
+},
+{
+"number": 11018,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-08-18T18:31:36Z",
+"updated_at": "2026-10-16T17:04:57Z",
+"title": "[LLHD][Mem2Reg] Finer-grained promotion slots",
+"url": "https://github.com/llvm/circt/pull/11018"
+},
+{
+"number": 11033,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-08-19T23:02:33Z",
+"updated_at": "2026-09-29T16:33:34Z",
+"title": "[ImportVerilog] Fix lvalue conversion for output/inout/ref arguments",
+"url": "https://github.com/llvm/circt/pull/11033"
+},
+{
+"number": 11037,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-08-20T23:07:01Z",
+"updated_at": "2026-10-15T06:27:15Z",
+"title": "[OM] Allow evaluator to skip ModuleOp verification",
+"url": "https://github.com/llvm/circt/pull/11037"
+},
+{
+"number": 11064,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-08-29T02:10:57Z",
+"updated_at": "2026-09-28T21:13:34Z",
+"title": "[FIRRTL] SizeOf intrinsic requires optimizations enabled to successfully lower",
+"url": "https://github.com/llvm/circt/issues/11064"
+},
+{
+"number": 11065,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-08-30T13:38:47Z",
+"updated_at": "2026-09-17T08:31:33Z",
+"title": "[ImportVerilog] Emit labeled concurrent assertions outside a procedure",
+"url": "https://github.com/llvm/circt/pull/11065"
+},
+{
+"number": 11069,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-01T19:09:34Z",
+"updated_at": "2026-09-25T16:26:46Z",
+"title": "[FIRRTL] Preserve register initial values in optimizer",
+"url": "https://github.com/llvm/circt/pull/11069"
+},
+{
+"number": 11070,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-01T19:39:42Z",
+"updated_at": "2026-10-02T15:11:36Z",
+"title": "[FIRRTL] Handle RWProbes in comb loop analysis",
+"url": "https://github.com/llvm/circt/pull/11070"
+},
+{
+"number": 11073,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-02T11:32:18Z",
+"updated_at": "2026-10-01T17:38:11Z",
+"title": "[Arc] Lower local LLHD signals to model state",
+"url": "https://github.com/llvm/circt/pull/11073"
+},
+{
+"number": 11077,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-03T17:48:52Z",
+"updated_at": "2026-10-13T05:26:38Z",
+"title": "[ProbeToSV] Lower probe.send/probe.read to SV",
+"url": "https://github.com/llvm/circt/pull/11077"
+},
+{
+"number": 11081,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-05T13:24:46Z",
+"updated_at": "2026-10-06T16:18:40Z",
+"title": "[LLHD] Preserve explicit register initializers through Deseq",
+"url": "https://github.com/llvm/circt/pull/11081"
+},
+{
+"number": 11086,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-08T08:20:22Z",
+"updated_at": "2026-09-18T03:27:22Z",
+"title": "[FIRRTL] Add preserve-modules option for DropNamePass",
+"url": "https://github.com/llvm/circt/pull/11086"
+},
+{
+"number": 11089,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-08T18:51:30Z",
+"updated_at": "2026-09-24T08:08:13Z",
+"title": "[ImportVerilog] Add support for three-stage buffers and inverters",
+"url": "https://github.com/llvm/circt/pull/11089"
+},
+{
+"number": 11090,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-09T00:00:12Z",
+"updated_at": "2026-09-28T21:13:32Z",
+"title": "[FIRRTL] Lower SizeOfIntrinsicOp when optimizations are disabled",
+"url": "https://github.com/llvm/circt/pull/11090"
+},
+{
+"number": 11091,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-09T00:32:17Z",
+"updated_at": "2026-09-28T21:13:34Z",
+"title": "[FIRRTL] some zero-width types fail ExportToVerilog pass w/ out optimizations",
+"url": "https://github.com/llvm/circt/issues/11091"
+},
+{
+"number": 11093,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-09T14:14:52Z",
+"updated_at": "2026-09-28T08:00:45Z",
+"title": "[ImportVerilog] Add MOS switch primitive support",
+"url": "https://github.com/llvm/circt/pull/11093"
+},
+{
+"number": 11094,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-09T21:25:23Z",
+"updated_at": "2026-09-30T06:30:06Z",
+"title": "[HandshakeToHW] Reject non-integer constants instead of crashing",
+"url": "https://github.com/llvm/circt/pull/11094"
+},
+{
+"number": 11096,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-10T01:18:34Z",
+"updated_at": "2026-10-12T00:56:15Z",
+"title": "Bump LLVM",
+"url": "https://github.com/llvm/circt/pull/11096"
+},
+{
+"number": 11101,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-10T22:50:56Z",
+"updated_at": "2026-09-18T19:17:32Z",
+"title": "[ExportVerilog] Emit sv.package and package-qualified types",
+"url": "https://github.com/llvm/circt/pull/11101"
+},
+{
+"number": 11110,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-12T12:52:40Z",
+"updated_at": "2026-09-24T18:36:42Z",
+"title": "[ImportVerilog] Support fixed-size aggregates in streaming operators",
+"url": "https://github.com/llvm/circt/pull/11110"
+},
+{
+"number": 11112,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-12T16:57:35Z",
+"updated_at": "2026-09-16T12:54:17Z",
+"title": "[Handshake] Fix argument indexing in LowerExtmemToHW with several memories",
+"url": "https://github.com/llvm/circt/pull/11112"
+},
+{
+"number": 11117,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-15T01:31:27Z",
+"updated_at": "2026-09-16T17:42:35Z",
+"title": "[ImportVerilog] Fix interface-array connections and output port lowering",
+"url": "https://github.com/llvm/circt/pull/11117"
+},
+{
+"number": 11118,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-15T04:37:55Z",
+"updated_at": "2026-09-24T19:17:29Z",
+"title": "[FIRRTL] Bounce non-connect users of dropped zero-width instance ports",
+"url": "https://github.com/llvm/circt/pull/11118"
+},
+{
+"number": 11120,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-15T12:25:49Z",
+"updated_at": "2026-10-01T11:30:41Z",
+"title": "[HW][ExportVerilog] Union Bitcast Layout: Left or Right Jusitfied",
+"url": "https://github.com/llvm/circt/issues/11120"
+},
+{
+"number": 11121,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-15T20:00:02Z",
+"updated_at": "2026-09-16T17:33:40Z",
+"title": "[ImportVerilog] Support connected interface-array ports",
+"url": "https://github.com/llvm/circt/issues/11121"
+},
+{
+"number": 11122,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-15T20:00:03Z",
+"updated_at": "2026-09-16T17:33:43Z",
+"title": "[ImportVerilog] Resolve hierarchical outputs from expanded interfaces",
+"url": "https://github.com/llvm/circt/issues/11122"
+},
+{
+"number": 11123,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-15T20:00:04Z",
+"updated_at": "2026-09-17T00:01:39Z",
+"title": "[ImportVerilog] Support assignment patterns as assignment destinations",
+"url": "https://github.com/llvm/circt/issues/11123"
+},
+{
+"number": 11124,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-15T22:57:38Z",
+"updated_at": "2026-09-17T19:16:47Z",
+"title": "[LLHD] CombineDrives asserts on a drive to a packed union member",
+"url": "https://github.com/llvm/circt/issues/11124"
+},
+{
+"number": 11125,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T12:27:40Z",
+"updated_at": "2026-09-21T13:25:04Z",
+"title": "[AXI4ToHW] Lower AXI4 ports",
+"url": "https://github.com/llvm/circt/pull/11125"
+},
+{
+"number": 11126,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-16T16:23:40Z",
+"updated_at": "2026-09-16T18:21:35Z",
+"title": "[Moore] Document x/z behaviour of logic_to_int",
+"url": "https://github.com/llvm/circt/pull/11126"
+},
+{
+"number": 11127,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-16T16:47:05Z",
+"updated_at": "2026-09-16T21:53:25Z",
+"title": "[ESI][Cosim] Enable Questa +acc only in debug mode",
+"url": "https://github.com/llvm/circt/pull/11127"
+},
+{
+"number": 11128,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-16T17:32:42Z",
+"updated_at": "2026-09-16T17:33:47Z",
+"title": "[ImportVerilog] Support concurrent cover property and cover sequence statements",
+"url": "https://github.com/llvm/circt/issues/11128"
+},
+{
+"number": 11129,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T17:40:17Z",
+"updated_at": "2026-09-17T13:20:33Z",
+"title": "[ImportVerilog] Support connected interface-array ports",
+"url": "https://github.com/llvm/circt/pull/11129"
+},
+{
+"number": 11130,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T17:40:19Z",
+"updated_at": "2026-09-18T09:59:01Z",
+"title": "[ImportVerilog] Resolve hierarchical outputs from expanded interfaces",
+"url": "https://github.com/llvm/circt/pull/11130"
+},
+{
+"number": 11131,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T17:40:21Z",
+"updated_at": "2026-09-22T17:10:50Z",
+"title": "[ImportVerilog] Support assignment patterns as assignment destinations",
+"url": "https://github.com/llvm/circt/pull/11131"
+},
+{
+"number": 11132,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T17:40:23Z",
+"updated_at": "2026-09-17T10:16:45Z",
+"title": "[ImportVerilog] Support concurrent cover properties and sequences",
+"url": "https://github.com/llvm/circt/pull/11132"
+},
+{
+"number": 11133,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-16T18:03:36Z",
+"updated_at": "2026-09-16T18:03:36Z",
+"title": "[ImportVerilog] String casts to packed byte arrays fail",
+"url": "https://github.com/llvm/circt/issues/11133"
+},
+{
+"number": 11134,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-16T18:03:58Z",
+"updated_at": "2026-09-16T23:13:09Z",
+"title": "[ImportVerilog] Support string casts to packed arrays",
+"url": "https://github.com/llvm/circt/pull/11134"
+},
+{
+"number": 11135,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-16T22:35:52Z",
+"updated_at": "2026-10-01T11:30:40Z",
+"title": "[ExportVerilog] Change hw.union padding to match bitcast layout",
+"url": "https://github.com/llvm/circt/pull/11135"
+},
+{
+"number": 11136,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-16T22:47:53Z",
+"updated_at": "2026-09-17T19:16:48Z",
+"title": "[LLHD] Support UnionType in CombineDrives",
+"url": "https://github.com/llvm/circt/pull/11136"
+},
+{
+"number": 11137,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-18T17:31:12Z",
+"updated_at": "2026-09-18T17:54:10Z",
+"title": "[ESI][Cosim] Add command-line macro definitions",
+"url": "https://github.com/llvm/circt/pull/11137"
+},
+{
+"number": 11138,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-18T18:56:01Z",
+"updated_at": "2026-09-18T20:35:06Z",
+"title": "[Doc] Update the pass tutorial",
+"url": "https://github.com/llvm/circt/pull/11138"
+},
+{
+"number": 11139,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-18T19:25:41Z",
+"updated_at": "2026-09-18T19:25:41Z",
+"title": "[SV][ExportVerilog] Determine `sv.package` ordering via dependence analysis",
+"url": "https://github.com/llvm/circt/issues/11139"
+},
+{
+"number": 11140,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-18T21:21:45Z",
+"updated_at": "2026-09-18T22:46:57Z",
+"title": "[ESI] Avoid resetting data paths",
+"url": "https://github.com/llvm/circt/pull/11140"
+},
+{
+"number": 11141,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-19T20:08:47Z",
+"updated_at": "2026-09-19T20:08:47Z",
+"title": "[Moore] Some packed aggregate references fail to lower",
+"url": "https://github.com/llvm/circt/issues/11141"
+},
+{
+"number": 11142,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-20T15:11:54Z",
+"updated_at": "2026-09-29T18:26:49Z",
+"title": "[MooreToCore][LLHD] Support dynamic part-select writes to packed structs",
+"url": "https://github.com/llvm/circt/pull/11142"
+},
+{
+"number": 11143,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-21T08:16:23Z",
+"updated_at": "2026-09-21T08:18:55Z",
+"title": "[circt-synth] Use circt-synth in OpenROAD-flow-scripts",
+"url": "https://github.com/llvm/circt/issues/11143"
+},
+{
+"number": 11144,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-21T12:22:34Z",
+"updated_at": "2026-09-22T13:17:17Z",
+"title": "[NFC][ImportVerilog] Clean up clang-tidy else-after-return complaints",
+"url": "https://github.com/llvm/circt/pull/11144"
+},
+{
+"number": 11146,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-21T12:47:14Z",
+"updated_at": "2026-09-29T16:08:17Z",
+"title": "[AXI4] Add cut op",
+"url": "https://github.com/llvm/circt/pull/11146"
+},
+{
+"number": 11147,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-21T12:53:14Z",
+"updated_at": "2026-09-29T16:08:18Z",
+"title": "[AXI4] Add cdc op",
+"url": "https://github.com/llvm/circt/pull/11147"
+},
+{
+"number": 11149,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-21T13:22:14Z",
+"updated_at": "2026-09-22T10:37:15Z",
+"title": "[HWAggregateToComb] Add support for !hw.union",
+"url": "https://github.com/llvm/circt/pull/11149"
+},
+{
+"number": 11150,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-21T19:02:04Z",
+"updated_at": "2026-09-21T19:38:36Z",
+"title": "[ESI][Cosim] Add macro definition file support",
+"url": "https://github.com/llvm/circt/pull/11150"
+},
+{
+"number": 11151,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-22T08:11:42Z",
+"updated_at": "2026-09-22T08:11:42Z",
+"title": "[FIRRTL] LowerSignatures reverses strictconnect direction for output fields in analog-containing bundles",
+"url": "https://github.com/llvm/circt/issues/11151"
+},
+{
+"number": 11152,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-23T17:12:25Z",
+"updated_at": "2026-10-22T15:22:59Z",
+"title": "[Arc] Fix aggregate feedback handling in enable inference",
+"url": "https://github.com/llvm/circt/pull/11152"
+},
+{
+"number": 11153,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-23T19:02:53Z",
+"updated_at": "2026-09-24T01:38:51Z",
+"title": "[ESI] Run Verilator tests on Windows",
+"url": "https://github.com/llvm/circt/pull/11153"
+},
+{
+"number": 11154,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-23T22:16:08Z",
+"updated_at": "2026-09-25T19:07:44Z",
+"title": "[SV] Add core `!sv.net<T>` and `!sv.var<T>` type support",
+"url": "https://github.com/llvm/circt/pull/11154"
+},
+{
+"number": 11155,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-23T22:28:26Z",
+"updated_at": "2026-09-29T23:29:43Z",
+"title": "[ESI] ChannelArbiter: add wide_fanin timing structures",
+"url": "https://github.com/llvm/circt/pull/11155"
+},
+{
+"number": 11156,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-23T23:56:38Z",
+"updated_at": "2026-09-24T00:01:27Z",
+"title": "[PyCDE] Pin nanobind build dependency",
+"url": "https://github.com/llvm/circt/pull/11156"
+},
+{
+"number": 11157,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T01:07:49Z",
+"updated_at": "2026-09-24T17:54:06Z",
+"title": "[ESI][Cosim] Order directory sources by ExportVerilog's filelist",
+"url": "https://github.com/llvm/circt/pull/11157"
+},
+{
+"number": 11158,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T01:07:56Z",
+"updated_at": "2026-09-24T18:22:48Z",
+"title": "[PyCDE] Emit type aliases in an sv.package",
+"url": "https://github.com/llvm/circt/pull/11158"
+},
+{
+"number": 11160,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-24T01:16:32Z",
+"updated_at": "2026-09-24T01:16:32Z",
+"title": "[PyCDE] publishing pipeline is flakey",
+"url": "https://github.com/llvm/circt/issues/11160"
+},
+{
+"number": 11161,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T08:54:46Z",
+"updated_at": "2026-09-24T14:02:20Z",
+"title": "[NFC][ImportVerilog] Drop a few unnecessary includes",
+"url": "https://github.com/llvm/circt/pull/11161"
+},
+{
+"number": 11162,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T09:39:53Z",
+"updated_at": "2026-09-28T09:25:03Z",
+"title": "[ImportVerilog] Refactor delayed prim assignment into shared helper",
+"url": "https://github.com/llvm/circt/pull/11162"
+},
+{
+"number": 11163,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T09:49:15Z",
+"updated_at": "2026-09-24T14:59:59Z",
+"title": "[NFC][ImportVerilog] Add three-state primitive error tests",
+"url": "https://github.com/llvm/circt/pull/11163"
+},
+{
+"number": 11164,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T10:02:54Z",
+"updated_at": "2026-09-30T11:13:49Z",
+"title": "[ImportVerilog] Drop unreachable tristate prim error",
+"url": "https://github.com/llvm/circt/pull/11164"
+},
+{
+"number": 11165,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-24T14:50:28Z",
+"updated_at": "2026-10-21T15:55:38Z",
+"title": "[ImportVerilog] Support $size on strings",
+"url": "https://github.com/llvm/circt/pull/11165"
+},
+{
+"number": 11166,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-24T14:51:53Z",
+"updated_at": "2026-10-21T15:21:03Z",
+"title": "[Sim] Add sim.string.put for string-index assignments",
+"url": "https://github.com/llvm/circt/pull/11166"
+},
+{
+"number": 11167,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T16:38:55Z",
+"updated_at": "2026-09-24T20:25:12Z",
+"title": "[ImportVerilog] Error out on unsupported task call outputs",
+"url": "https://github.com/llvm/circt/pull/11167"
+},
+{
+"number": 11168,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T18:29:01Z",
+"updated_at": "2026-09-24T20:22:51Z",
+"title": "[Arcilator] Register LTL dialect",
+"url": "https://github.com/llvm/circt/pull/11168"
+},
+{
+"number": 11169,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T19:52:14Z",
+"updated_at": "2026-09-24T20:46:53Z",
+"title": "[CI] tweak python wheel building to limit parallelism, use lld.",
+"url": "https://github.com/llvm/circt/pull/11169"
+},
+{
+"number": 11170,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-24T21:02:37Z",
+"updated_at": "2026-10-02T21:19:26Z",
+"title": "[PyCDE] Constructing a value of a TypeAlias type aborts with an LLVM assertion",
+"url": "https://github.com/llvm/circt/issues/11170"
+},
+{
+"number": 11171,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-24T21:04:27Z",
+"updated_at": "2026-09-25T19:39:48Z",
+"title": "[PyCDE] TypeAlias should support as_bits()/bitcast (missing .width)",
+"url": "https://github.com/llvm/circt/issues/11171"
+},
+{
+"number": 11172,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-24T21:05:15Z",
+"updated_at": "2026-09-29T00:47:34Z",
+"title": "[PyCDE] Add a public recursive canonicalization for aliased types",
+"url": "https://github.com/llvm/circt/issues/11172"
+},
+{
+"number": 11173,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-24T21:05:40Z",
+"updated_at": "2026-09-25T20:17:25Z",
+"title": "[PyCDE] TypeAlias should forward field lookup to the aliased type",
+"url": "https://github.com/llvm/circt/issues/11173"
+},
+{
+"number": 11174,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T21:40:19Z",
+"updated_at": "2026-09-25T19:39:56Z",
+"title": "[PyCDE] TypeAlias should support as_bits()/bitcast (missing .width)",
+"url": "https://github.com/llvm/circt/pull/11174"
+},
+{
+"number": 11175,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-24T21:40:26Z",
+"updated_at": "2026-10-02T17:12:57Z",
+"title": "[circt-verilog] Infer clock ports from clock uses",
+"url": "https://github.com/llvm/circt/pull/11175"
+},
+{
+"number": 11176,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T08:17:52Z",
+"updated_at": "2026-09-25T08:20:46Z",
+"title": "Bump 0924",
+"url": "https://github.com/llvm/circt/pull/11176"
+},
+{
+"number": 11177,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T12:21:31Z",
+"updated_at": "2026-09-25T12:29:00Z",
+"title": "[Sim] Remove trailing whitespaces in SimOps.td, NFC",
+"url": "https://github.com/llvm/circt/pull/11177"
+},
+{
+"number": 11178,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T12:37:29Z",
+"updated_at": "2026-10-03T20:38:10Z",
+"title": "[ExportVerilog] Do not emit \"logic\" before typedef, enum and union types",
+"url": "https://github.com/llvm/circt/pull/11178"
+},
+{
+"number": 11179,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-25T14:30:43Z",
+"updated_at": "2026-09-25T14:30:43Z",
+"title": "[Moore] Support packed bit vector to open array conversion for DPI calls",
+"url": "https://github.com/llvm/circt/pull/11179"
+},
+{
+"number": 11180,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T15:27:36Z",
+"updated_at": "2026-10-06T17:41:38Z",
+"title": "[PIR] Introduce the SVA interfacing `pir` dialect",
+"url": "https://github.com/llvm/circt/pull/11180"
+},
+{
+"number": 11181,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-25T18:42:09Z",
+"updated_at": "2026-10-23T17:22:50Z",
+"title": "Detect conflicting forced instance names during FIRRTL lowering",
+"url": "https://github.com/llvm/circt/pull/11181"
+},
+{
+"number": 11182,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T19:03:42Z",
+"updated_at": "2026-09-25T20:00:59Z",
+"title": "[FIRRTL] Parse static indexing after probe/rwprobe in ref expressions",
+"url": "https://github.com/llvm/circt/pull/11182"
+},
+{
+"number": 11183,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T19:45:27Z",
+"updated_at": "2026-09-25T20:17:29Z",
+"title": "[PyCDE] Forward type field lookup through aliases",
+"url": "https://github.com/llvm/circt/pull/11183"
+},
+{
+"number": 11184,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T20:24:15Z",
+"updated_at": "2026-09-29T00:47:33Z",
+"title": "[PyCDE] Add recursive type alias canonicalization",
+"url": "https://github.com/llvm/circt/pull/11184"
+},
+{
+"number": 11185,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-25T23:13:26Z",
+"updated_at": "2026-09-29T17:03:45Z",
+"title": "[SV] Add var op",
+"url": "https://github.com/llvm/circt/pull/11185"
+},
+{
+"number": 11186,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T08:27:09Z",
+"updated_at": "2026-09-28T09:30:14Z",
+"title": "[NFC][ImportVerilog] Clean up unnecessary insertion guards",
+"url": "https://github.com/llvm/circt/pull/11186"
+},
+{
+"number": 11187,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-28T09:03:00Z",
+"updated_at": "2026-09-30T08:29:52Z",
+"title": "[ImportVerilog] Delays are ignored on (C)MOS primitives",
+"url": "https://github.com/llvm/circt/issues/11187"
+},
+{
+"number": 11188,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T09:24:30Z",
+"updated_at": "2026-09-29T16:07:27Z",
+"title": "[ImportVerilog] Refactor delayed prim assignment into shared helper",
+"url": "https://github.com/llvm/circt/pull/11188"
+},
+{
+"number": 11189,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T09:29:27Z",
+"updated_at": "2026-09-30T07:56:41Z",
+"title": "[ImportVerilog] Handle delays on (C)MOS primitives",
+"url": "https://github.com/llvm/circt/pull/11189"
+},
+{
+"number": 11191,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T13:21:30Z",
+"updated_at": "2026-09-28T13:38:17Z",
+"title": "[NFC][ImportVerilog] Add missing (C)MOS prim error tests",
+"url": "https://github.com/llvm/circt/pull/11191"
+},
+{
+"number": 11192,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T13:29:31Z",
+"updated_at": "2026-09-29T16:06:35Z",
+"title": "[NFC][ImportVerilog] Drop unreachable MOS primitive input errors",
+"url": "https://github.com/llvm/circt/pull/11192"
+},
+{
+"number": 11193,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T14:47:38Z",
+"updated_at": "2026-10-05T11:30:37Z",
+"title": "[Sim] Add `!sim.variant` type",
+"url": "https://github.com/llvm/circt/pull/11193"
+},
+{
+"number": 11194,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-09-28T17:01:11Z",
+"updated_at": "2026-10-09T01:13:50Z",
+"title": "[Sim] Export integer DPI function interfaces as JSON",
+"url": "https://github.com/llvm/circt/pull/11194"
+},
+{
+"number": 11195,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-28T18:17:58Z",
+"updated_at": "2026-10-07T01:37:15Z",
+"title": "[FIRRTL] LowerToHW: exceeding IntegerType bitwidth limits causes an assert",
+"url": "https://github.com/llvm/circt/issues/11195"
+},
+{
+"number": 11196,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T22:15:57Z",
+"updated_at": "2026-10-01T23:56:43Z",
+"title": "[HW] Allow hw.constant to produce type aliases of integers",
+"url": "https://github.com/llvm/circt/pull/11196"
+},
+{
+"number": 11197,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T22:16:07Z",
+"updated_at": "2026-10-02T18:46:14Z",
+"title": "[HWArith] Allow hwarith.constant to produce type aliases of integers",
+"url": "https://github.com/llvm/circt/pull/11197"
+},
+{
+"number": 11198,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T22:16:17Z",
+"updated_at": "2026-10-02T21:25:39Z",
+"title": "[PyCDE] Raise an error when creating signals outside a generator",
+"url": "https://github.com/llvm/circt/pull/11198"
+},
+{
+"number": 11200,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-09-28T22:55:14Z",
+"updated_at": "2026-10-02T22:30:56Z",
+"title": "[PyCDE] Support importing an sv.package without re-emitting it",
+"url": "https://github.com/llvm/circt/issues/11200"
+},
+{
+"number": 11201,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T23:24:29Z",
+"updated_at": "2026-09-28T23:38:48Z",
+"title": "[ESI] Expose bundled channel subelements to MLIR replacers",
+"url": "https://github.com/llvm/circt/pull/11201"
+},
+{
+"number": 11202,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-28T23:26:13Z",
+"updated_at": "2026-09-29T00:19:24Z",
+"title": "[HW] Recursively canonicalize type aliases with MLIR replacer",
+"url": "https://github.com/llvm/circt/pull/11202"
+},
+{
+"number": 11203,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-29T00:39:41Z",
+"updated_at": "2026-09-30T18:13:07Z",
+"title": "[SV] Support externally provided packages via attribute",
+"url": "https://github.com/llvm/circt/pull/11203"
+},
+{
+"number": 11204,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-29T00:39:45Z",
+"updated_at": "2026-10-02T22:30:57Z",
+"title": "[PyCDE] Support importing externally provided packages",
+"url": "https://github.com/llvm/circt/pull/11204"
+},
+{
+"number": 11206,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-29T17:31:22Z",
+"updated_at": "2026-09-29T18:22:11Z",
+"title": "[CI] Use circt-bot token to kick off circt-tests runs",
+"url": "https://github.com/llvm/circt/pull/11206"
+},
+{
+"number": 11207,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-29T20:54:40Z",
+"updated_at": "2026-10-02T22:26:11Z",
+"title": "[SV] Add externally defined packages via `sv.package.extern`",
+"url": "https://github.com/llvm/circt/pull/11207"
+},
+{
+"number": 11208,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-09-29T23:01:09Z",
+"updated_at": "2026-10-01T07:10:35Z",
+"title": "[ExportVerilog] Missing whitespace after escaped package identifiers",
+"url": "https://github.com/llvm/circt/issues/11208"
+},
+{
+"number": 11209,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-29T23:10:33Z",
+"updated_at": "2026-10-01T19:35:34Z",
+"title": "[ExportVerilog] Add sv.var declaration support",
+"url": "https://github.com/llvm/circt/pull/11209"
+},
+{
+"number": 11211,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-09-30T23:00:01Z",
+"updated_at": "2026-10-02T23:49:45Z",
+"title": "[FIRRTL] Separate domain stripping from inference",
+"url": "https://github.com/llvm/circt/pull/11211"
+},
+{
+"number": 11212,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-01T00:01:13Z",
+"updated_at": "2026-10-01T00:30:51Z",
+"title": "[PyCDE] Add If construct with callable branches",
+"url": "https://github.com/llvm/circt/pull/11212"
+},
+{
+"number": 11213,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-01T00:23:08Z",
+"updated_at": "2026-10-02T19:07:09Z",
+"title": "[FIRRTL] Fix forceable RWProbe handling in `CheckCombLoops`",
+"url": "https://github.com/llvm/circt/pull/11213"
+},
+{
+"number": 11214,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-01T15:55:13Z",
+"updated_at": "2026-10-01T15:55:18Z",
+"title": "[FIRRTLToHW] Fix lowering of invalid clock values",
+"url": "https://github.com/llvm/circt/pull/11214"
+},
+{
+"number": 11215,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-01T19:47:24Z",
+"updated_at": "2026-10-02T17:30:39Z",
+"title": "[SV] Enforce packed type boundaries for nets",
+"url": "https://github.com/llvm/circt/pull/11215"
+},
+{
+"number": 11216,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-01T20:01:12Z",
+"updated_at": "2026-10-01T21:55:53Z",
+"title": "[HWArithToHW] hw.aggregate_constant field attributes keep their signedness after lowering",
+"url": "https://github.com/llvm/circt/issues/11216"
+},
+{
+"number": 11217,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-01T21:19:45Z",
+"updated_at": "2026-10-01T21:55:54Z",
+"title": "[HWArithToHW] Convert aggregate constant field attributes",
+"url": "https://github.com/llvm/circt/pull/11217"
+},
+{
+"number": 11218,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-01T23:03:13Z",
+"updated_at": "2026-10-02T17:31:07Z",
+"title": "[Docs][ExportVerilog] Document svVarDeclStyle lowering option",
+"url": "https://github.com/llvm/circt/pull/11218"
+},
+{
+"number": 11219,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T04:45:52Z",
+"updated_at": "2026-10-14T17:50:29Z",
+"title": "[OM] Don't assume the ClassFieldsOp has a FusedLoc with metadata.",
+"url": "https://github.com/llvm/circt/pull/11219"
+},
+{
+"number": 11220,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-02T09:11:07Z",
+"updated_at": "2026-10-21T12:19:44Z",
+"title": "[ImportVerilog] Support tran/tranif0/tranif1 switch primitives",
+"url": "https://github.com/llvm/circt/pull/11220"
+},
+{
+"number": 11222,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T12:12:33Z",
+"updated_at": "2026-10-06T16:06:01Z",
+"title": "[AXI4] Verify port windows fit in the address width",
+"url": "https://github.com/llvm/circt/pull/11222"
+},
+{
+"number": 11223,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-02T20:45:34Z",
+"updated_at": "2026-10-02T22:01:48Z",
+"title": "[HWArith] Arithmetic, comparison and cast ops don't support type aliases",
+"url": "https://github.com/llvm/circt/issues/11223"
+},
+{
+"number": 11224,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T20:56:50Z",
+"updated_at": "2026-10-03T03:43:39Z",
+"title": "[SV] Enforce type boundaries for vars",
+"url": "https://github.com/llvm/circt/pull/11224"
+},
+{
+"number": 11225,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T21:02:51Z",
+"updated_at": "2026-10-03T09:06:49Z",
+"title": "[ESI] Bump ABI version and reject incompatible manifests",
+"url": "https://github.com/llvm/circt/pull/11225"
+},
+{
+"number": 11226,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T21:02:51Z",
+"updated_at": "2026-10-02T22:54:12Z",
+"title": "[ESI][Runtime] Match corrected hw.union alignment",
+"url": "https://github.com/llvm/circt/pull/11226"
+},
+{
+"number": 11227,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T22:46:33Z",
+"updated_at": "2026-10-02T23:02:23Z",
+"title": "[PyCDE] Unwrap typedefs before integer operations",
+"url": "https://github.com/llvm/circt/pull/11227"
+},
+{
+"number": 11228,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T23:02:04Z",
+"updated_at": "2026-10-02T23:22:17Z",
+"title": "[PyCDE] Normalize array selectors without changing their width",
+"url": "https://github.com/llvm/circt/pull/11228"
+},
+{
+"number": 11229,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T23:13:08Z",
+"updated_at": "2026-10-02T23:14:31Z",
+"title": "[PyCDE] Add changelog for 0.12.0",
+"url": "https://github.com/llvm/circt/pull/11229"
+},
+{
+"number": 11230,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T23:16:38Z",
+"updated_at": "2026-10-02T23:17:21Z",
+"title": "PyCDE: Add a PyPI package description",
+"url": "https://github.com/llvm/circt/pull/11230"
+},
+{
+"number": 11231,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-02T23:26:44Z",
+"updated_at": "2026-10-02T23:28:54Z",
+"title": "[ESI][Runtime] Add package description and 0.8.0 changelog",
+"url": "https://github.com/llvm/circt/pull/11231"
+},
+{
+"number": 11232,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-03T05:30:08Z",
+"updated_at": "2026-10-07T17:05:03Z",
+"title": "[HW] Remove generic InOut port direction support",
+"url": "https://github.com/llvm/circt/pull/11232"
+},
+{
+"number": 11233,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-04T12:19:31Z",
+"updated_at": "2026-10-04T23:23:33Z",
+"title": "[HW] Unwrap bitcasts and concats into array_create",
+"url": "https://github.com/llvm/circt/pull/11233"
+},
+{
+"number": 11234,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-04T20:19:49Z",
+"updated_at": "2026-10-23T01:36:01Z",
+"title": "[FIRRT] Treating cases without body on firrtl",
+"url": "https://github.com/llvm/circt/pull/11234"
+},
+{
+"number": 11235,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-05T14:09:35Z",
+"updated_at": "2026-10-05T22:33:34Z",
+"title": "[HW][Sim][Support] Move aggregate FieldInfo to Support library",
+"url": "https://github.com/llvm/circt/pull/11235"
+},
+{
+"number": 11236,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-05T18:48:23Z",
+"updated_at": "2026-10-05T18:48:23Z",
+"title": "Migrate to strict properties in assembly formats",
+"url": "https://github.com/llvm/circt/issues/11236"
+},
+{
+"number": 11237,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-05T19:09:39Z",
+"updated_at": "2026-10-05T19:09:56Z",
+"title": "Update PyCDE version requirement in CHANGELOG",
+"url": "https://github.com/llvm/circt/pull/11237"
+},
+{
+"number": 11238,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-06T04:50:24Z",
+"updated_at": "2026-10-14T22:54:15Z",
+"title": "Support combinational user-defined primitives (UDPs) in circt::ImportVerilog",
+"url": "https://github.com/llvm/circt/pull/11238"
+},
+{
+"number": 11239,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-06T14:16:41Z",
+"updated_at": "2026-10-07T15:50:11Z",
+"title": "[LLHD] CombineDrives creates invalid UnionCreateOp",
+"url": "https://github.com/llvm/circt/issues/11239"
+},
+{
+"number": 11240,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-06T16:16:36Z",
+"updated_at": "2026-10-06T22:37:04Z",
+"title": "[FIRRTL][InferDomains] Support bottom-up inference",
+"url": "https://github.com/llvm/circt/pull/11240"
+},
+{
+"number": 11241,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-06T16:22:18Z",
+"updated_at": "2026-10-26T18:02:21Z",
+"title": "[PIR] Add clocking operations",
+"url": "https://github.com/llvm/circt/pull/11241"
+},
+{
+"number": 11242,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-06T18:06:04Z",
+"updated_at": "2026-10-06T18:09:47Z",
+"title": "FIRRTL: unprocessed annotation warning for `circt.VerbatimBlackBoxAnno` after `LowerToHW`",
+"url": "https://github.com/llvm/circt/issues/11242"
+},
+{
+"number": 11243,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-06T20:38:30Z",
+"updated_at": "2026-10-08T18:45:12Z",
+"title": "Add bitwise operations for integer properties",
+"url": "https://github.com/llvm/circt/pull/11243"
+},
+{
+"number": 11244,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-06T21:00:37Z",
+"updated_at": "2026-10-07T04:01:27Z",
+"title": "[ImportVerilog] Support module-level SV attributes.",
+"url": "https://github.com/llvm/circt/pull/11244"
+},
+{
+"number": 11245,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-06T22:06:06Z",
+"updated_at": "2026-10-07T03:03:07Z",
+"title": "[Moore] Fix SVModuleOp::print to print attributes before body region.",
+"url": "https://github.com/llvm/circt/pull/11245"
+},
+{
+"number": 11246,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-07T01:33:44Z",
+"updated_at": "2026-10-16T15:44:22Z",
+"title": "[FIRRTLToHW] Emit error for integer widths exceeding IntegerType max",
+"url": "https://github.com/llvm/circt/pull/11246"
+},
+{
+"number": 11247,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-07T09:36:42Z",
+"updated_at": "2026-10-07T10:00:16Z",
+"title": "Request Commit Access For mafeguimaraes",
+"url": "https://github.com/llvm/circt/issues/11247"
+},
+{
+"number": 11248,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-07T15:21:19Z",
+"updated_at": "2026-10-07T20:39:00Z",
+"title": "[Sim] Add operations on Variant values",
+"url": "https://github.com/llvm/circt/pull/11248"
+},
+{
+"number": 11249,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-07T19:54:28Z",
+"updated_at": "2026-10-08T17:04:40Z",
+"title": "[HW][SV] Derive port kind from type ",
+"url": "https://github.com/llvm/circt/pull/11249"
+},
+{
+"number": 11250,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-07T23:03:36Z",
+"updated_at": "2026-10-13T01:14:41Z",
+"title": "[FIRRTL] Misc aggregate fold fixes",
+"url": "https://github.com/llvm/circt/pull/11250"
+},
+{
+"number": 11251,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-07T23:09:02Z",
+"updated_at": "2026-10-08T05:18:55Z",
+"title": "[ExportVerilog] Fix grouping of input and inout ports",
+"url": "https://github.com/llvm/circt/pull/11251"
+},
+{
+"number": 11252,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-07T23:16:54Z",
+"updated_at": "2026-10-08T00:07:46Z",
+"title": "Add `svVarDeclStyle` to `--lowering-options` help text",
+"url": "https://github.com/llvm/circt/pull/11252"
+},
+{
+"number": 11253,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T00:28:05Z",
+"updated_at": "2026-10-09T01:13:43Z",
+"title": "[ESI][Runtime] Let SegmentedMessageData hand HostMem regions to backends",
+"url": "https://github.com/llvm/circt/pull/11253"
+},
+{
+"number": 11254,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T01:43:32Z",
+"updated_at": "2026-10-08T03:06:30Z",
+"title": "[ESI][BSP] Allow custom ChannelService implementations in CosimBSP",
+"url": "https://github.com/llvm/circt/pull/11254"
+},
+{
+"number": 11255,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T02:10:01Z",
+"updated_at": "2026-10-08T18:46:00Z",
+"title": "[FIRRTL] Reject domain values in aggregates",
+"url": "https://github.com/llvm/circt/pull/11255"
+},
+{
+"number": 11256,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-08T08:59:03Z",
+"updated_at": "2026-10-09T05:41:25Z",
+"title": "Can't remove LLHD operations for SystemVerilog generation",
+"url": "https://github.com/llvm/circt/issues/11256"
+},
+{
+"number": 11257,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T17:50:35Z",
+"updated_at": "2026-10-08T22:33:15Z",
+"title": "[FIRRTL] Add bitwise operations for integer properties",
+"url": "https://github.com/llvm/circt/pull/11257"
+},
+{
+"number": 11258,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T18:23:37Z",
+"updated_at": "2026-10-14T18:22:40Z",
+"title": "[OM] Support arbitrary precision integer bitwise properties",
+"url": "https://github.com/llvm/circt/pull/11258"
+},
+{
+"number": 11259,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T21:28:10Z",
+"updated_at": "2026-10-09T18:41:47Z",
+"title": "[Comb] Fix computeKnownBits for comb.shl and comb.shru overshift.",
+"url": "https://github.com/llvm/circt/pull/11259"
+},
+{
+"number": 11260,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-08T23:08:29Z",
+"updated_at": "2026-10-14T16:09:01Z",
+"title": "[LLHD][Deseq] Infer register preset value from concurrent drives",
+"url": "https://github.com/llvm/circt/pull/11260"
+},
+{
+"number": 11261,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-09T00:47:24Z",
+"updated_at": "2026-10-20T18:42:21Z",
+"title": "[Comb] Fix a dangling condition in foldCommonMuxValue",
+"url": "https://github.com/llvm/circt/pull/11261"
+},
+{
+"number": 11262,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T01:28:56Z",
+"updated_at": "2026-10-14T22:16:35Z",
+"title": "[ExportVerilog] Add  `emitPortType` lowering option ",
+"url": "https://github.com/llvm/circt/pull/11262"
+},
+{
+"number": 11263,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T09:25:54Z",
+"updated_at": "2026-10-09T09:54:26Z",
+"title": "Anticipate upstream addition of `MapVector` to `MLIRSupport`.",
+"url": "https://github.com/llvm/circt/pull/11263"
+},
+{
+"number": 11264,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-09T17:52:58Z",
+"updated_at": "2026-10-09T17:52:58Z",
+"title": "Don't allow force out of a contract",
+"url": "https://github.com/llvm/circt/issues/11264"
+},
+{
+"number": 11265,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T18:52:02Z",
+"updated_at": "2026-10-09T22:22:23Z",
+"title": "[ExportVerilog][NFC] Derive port name alignment from the emitted prefixes",
+"url": "https://github.com/llvm/circt/pull/11265"
+},
+{
+"number": 11266,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T19:33:26Z",
+"updated_at": "2026-10-14T05:21:41Z",
+"title": "[RTG] Destroy instruction format AST nodes before freeing the arena",
+"url": "https://github.com/llvm/circt/pull/11266"
+},
+{
+"number": 11267,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-09T23:51:38Z",
+"updated_at": "2026-10-20T18:38:38Z",
+"title": "[MooreToCore] Range-check dynamic array element accesses",
+"url": "https://github.com/llvm/circt/pull/11267"
+},
+{
+"number": 11268,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-09T23:51:40Z",
+"updated_at": "2026-10-13T22:19:48Z",
+"title": "[ImportVerilog] Decide case exhaustiveness by distinct label values",
+"url": "https://github.com/llvm/circt/pull/11268"
+},
+{
+"number": 11269,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T23:51:43Z",
+"updated_at": "2026-10-21T16:32:31Z",
+"title": "[MooreToCore] Lower ==?, ===, case and casez against X/Z constants",
+"url": "https://github.com/llvm/circt/pull/11269"
+},
+{
+"number": 11270,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T23:51:45Z",
+"updated_at": "2026-10-21T16:33:13Z",
+"title": "[LLHD] Unroll loops with early exits, do-while, and any constant compare",
+"url": "https://github.com/llvm/circt/pull/11270"
+},
+{
+"number": 11271,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-09T23:51:47Z",
+"updated_at": "2026-10-16T20:05:00Z",
+"title": "[HW] ArrayGetOp::fold: leave a constant out-of-range index unfolded",
+"url": "https://github.com/llvm/circt/pull/11271"
+},
+{
+"number": 11272,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-10T00:19:59Z",
+"updated_at": "2026-10-14T03:22:34Z",
+"title": "[ESI] Add a DRAM standard service declaration",
+"url": "https://github.com/llvm/circt/pull/11272"
+},
+{
+"number": 11273,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-10T00:20:05Z",
+"updated_at": "2026-10-14T03:28:18Z",
+"title": "[PyCDE] Add the esi.Dram standard service",
+"url": "https://github.com/llvm/circt/pull/11273"
+},
+{
+"number": 11274,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-10T00:20:07Z",
+"updated_at": "2026-10-14T03:23:01Z",
+"title": "[ESI][Runtime] Add a DRAM service implementation and cosim DRAM model",
+"url": "https://github.com/llvm/circt/pull/11274"
+},
+{
+"number": 11277,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-12T02:59:22Z",
+"updated_at": "2026-10-12T18:05:51Z",
+"title": "[NFC] Fix deprecation warnings related to aggregate builders",
+"url": "https://github.com/llvm/circt/pull/11277"
+},
+{
+"number": 11278,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-12T17:13:21Z",
+"updated_at": "2026-10-12T18:48:02Z",
+"title": "[Arc] Remove DenseMapInfo specialization for `SmallVector<Value>`, NFC",
+"url": "https://github.com/llvm/circt/pull/11278"
+},
+{
+"number": 11279,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-12T18:48:14Z",
+"updated_at": "2026-10-12T23:04:55Z",
+"title": "[FIRRTL] Support setting instance name in hierarcy injection",
+"url": "https://github.com/llvm/circt/pull/11279"
+},
+{
+"number": 11280,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T16:07:34Z",
+"updated_at": "2026-10-13T20:13:58Z",
+"title": "Drop `using namespace llvm` from several files, NFC",
+"url": "https://github.com/llvm/circt/pull/11280"
+},
+{
+"number": 11281,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T17:38:49Z",
+"updated_at": "2026-10-13T19:10:00Z",
+"title": "[SV] Fix dangling Properties in InterfaceInstanceOp builder",
+"url": "https://github.com/llvm/circt/pull/11281"
+},
+{
+"number": 11282,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T20:31:51Z",
+"updated_at": "2026-10-13T23:40:13Z",
+"title": "[ESI][BSP] Support multiple outstanding reads in HostMemReadReqSplitter",
+"url": "https://github.com/llvm/circt/pull/11282"
+},
+{
+"number": 11283,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T20:32:02Z",
+"updated_at": "2026-10-13T20:35:43Z",
+"title": "[ESI][Runtime] Expose HostMem.start() to Python",
+"url": "https://github.com/llvm/circt/pull/11283"
+},
+{
+"number": 11284,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T20:32:16Z",
+"updated_at": "2026-10-13T20:40:41Z",
+"title": "[ESI][Runtime] Cosim test for multiple outstanding HostMem reads",
+"url": "https://github.com/llvm/circt/pull/11284"
+},
+{
+"number": 11285,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T21:55:15Z",
+"updated_at": "2026-10-15T11:43:56Z",
+"title": "[Comb] Simplify zero- and single-input truth tables in comb-simplify-tt",
+"url": "https://github.com/llvm/circt/pull/11285"
+},
+{
+"number": 11286,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T22:08:12Z",
+"updated_at": "2026-10-21T04:34:41Z",
+"title": "[Comb] Narrow trailing bits of add and sub when carry/borrow-free.",
+"url": "https://github.com/llvm/circt/pull/11286"
+},
+{
+"number": 11287,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T22:08:14Z",
+"updated_at": "2026-10-21T19:28:27Z",
+"title": "[Comb] Narrow shl to highest demanded bit when shift upper bits are 0",
+"url": "https://github.com/llvm/circt/pull/11287"
+},
+{
+"number": 11288,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-13T22:08:17Z",
+"updated_at": "2026-10-21T19:31:18Z",
+"title": "[Comb] Fold single-bit extract of add with constant low bits into icmp.",
+"url": "https://github.com/llvm/circt/pull/11288"
+},
+{
+"number": 11289,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-13T23:43:25Z",
+"updated_at": "2026-10-22T04:00:22Z",
+"title": "[ImportVerilog] Support sequential user-defined primitives (UDPs) in circt::ImportVerilog (edge-sensitive/sync-row only).",
+"url": "https://github.com/llvm/circt/pull/11289"
+},
+{
+"number": 11291,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-14T20:36:40Z",
+"updated_at": "2026-10-15T21:54:14Z",
+"title": "[FIRRTL] Remove Grand Central's dependency on SV interface ops",
+"url": "https://github.com/llvm/circt/issues/11291"
+},
+{
+"number": 11292,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-14T21:46:27Z",
+"updated_at": "2026-10-15T20:25:34Z",
+"title": "[ESI] Remove SystemVerilog interface lowering",
+"url": "https://github.com/llvm/circt/pull/11292"
+},
+{
+"number": 11293,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-14T21:46:56Z",
+"updated_at": "2026-10-21T18:05:48Z",
+"title": "[SV] Remove SystemVerilog interface support",
+"url": "https://github.com/llvm/circt/pull/11293"
+},
+{
+"number": 11294,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-14T22:58:35Z",
+"updated_at": "2026-10-16T03:34:41Z",
+"title": "[SV] Add `sv.var_assign` driver lint pass",
+"url": "https://github.com/llvm/circt/pull/11294"
+},
+{
+"number": 11295,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-15T00:24:10Z",
+"updated_at": "2026-10-15T01:01:06Z",
+"title": "[circt-test] Add instrumentation and various performance improvements",
+"url": "https://github.com/llvm/circt/pull/11295"
+},
+{
+"number": 11296,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-15T01:35:15Z",
+"updated_at": "2026-10-15T20:31:31Z",
+"title": "[SV] Add `sv.var_assign` op",
+"url": "https://github.com/llvm/circt/pull/11296"
+},
+{
+"number": 11297,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-15T06:36:46Z",
+"updated_at": "2026-10-16T03:55:24Z",
+"title": "[FIRRTL] Remove FIRRTL vectorization pass",
+"url": "https://github.com/llvm/circt/pull/11297"
+},
+{
+"number": 11298,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-15T10:32:11Z",
+"updated_at": "2026-10-23T13:12:27Z",
+"title": "[LLHD] Combinational cycle bug fix",
+"url": "https://github.com/llvm/circt/pull/11298"
+},
+{
+"number": 11299,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-15T19:51:42Z",
+"updated_at": "2026-10-26T17:42:31Z",
+"title": "[MooreToCore][Sim] Add lowering for substring",
+"url": "https://github.com/llvm/circt/pull/11299"
+},
+{
+"number": 11300,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-15T22:28:35Z",
+"updated_at": "2026-10-16T20:51:03Z",
+"title": "[ESI][BSP] Connect engines' hostmem_read_list ports in ChannelEngineService",
+"url": "https://github.com/llvm/circt/pull/11300"
+},
+{
+"number": 11301,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-16T01:29:53Z",
+"updated_at": "2026-10-16T01:29:53Z",
+"title": "[firtool][OM] Unable to link designs with domain preserved",
+"url": "https://github.com/llvm/circt/issues/11301"
+},
+{
+"number": 11302,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-16T21:22:20Z",
+"updated_at": "2026-10-17T00:27:31Z",
+"title": "[ESI][Runtime] Add HostMem alignment options",
+"url": "https://github.com/llvm/circt/pull/11302"
+},
+{
+"number": 11303,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-16T21:28:11Z",
+"updated_at": "2026-10-19T21:49:41Z",
+"title": "[ESI][Runtime] Make cosim HostMem width configurable",
+"url": "https://github.com/llvm/circt/pull/11303"
+},
+{
+"number": 11304,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-16T21:48:52Z",
+"updated_at": "2026-10-20T17:41:18Z",
+"title": "[SV] Removal of `hw.inout` type (hard break)",
+"url": "https://github.com/llvm/circt/pull/11304"
+},
+{
+"number": 11305,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-16T22:37:06Z",
+"updated_at": "2026-10-17T03:28:01Z",
+"title": "[FIRRTL] [Dedup] Missing bundle arity in structural hash causes incorrect  deduplication and firtool crash",
+"url": "https://github.com/llvm/circt/issues/11305"
+},
+{
+"number": 11306,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-16T22:57:05Z",
+"updated_at": "2026-10-17T03:28:01Z",
+"title": "[FIRRTL][Dedup] Include bundle arity in structural hash",
+"url": "https://github.com/llvm/circt/pull/11306"
+},
+{
+"number": 11307,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-19T04:58:03Z",
+"updated_at": "2026-10-20T20:54:03Z",
+"title": "[arc] Fix stale reset operand in ConvertToArcs shuffling arcs.",
+"url": "https://github.com/llvm/circt/pull/11307"
+},
+{
+"number": 11308,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-19T10:35:08Z",
+"updated_at": "2026-10-26T18:07:20Z",
+"title": "[Seq] Add UnrollMemoryLatencies Pass",
+"url": "https://github.com/llvm/circt/pull/11308"
+},
+{
+"number": 11309,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-19T13:33:27Z",
+"updated_at": "2026-10-25T01:33:40Z",
+"title": "[HW] Canonicalizing non-signless constants in struct fails",
+"url": "https://github.com/llvm/circt/issues/11309"
+},
+{
+"number": 11310,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-19T14:46:44Z",
+"updated_at": "2026-10-20T03:09:56Z",
+"title": "[Comb] XorOp::fold: fold xor(x, ~x) to all-ones",
+"url": "https://github.com/llvm/circt/pull/11310"
+},
+{
+"number": 11311,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-20T00:14:24Z",
+"updated_at": "2026-10-20T22:49:02Z",
+"title": "[ESI][Runtime] Add callback mode and writeAsync() to WriteChannelPort",
+"url": "https://github.com/llvm/circt/pull/11311"
+},
+{
+"number": 11312,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-20T02:28:28Z",
+"updated_at": "2026-10-20T03:05:46Z",
+"title": "[NFC] Qualify MapVector with llvm namespace",
+"url": "https://github.com/llvm/circt/pull/11312"
+},
+{
+"number": 11313,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-20T19:53:08Z",
+"updated_at": "2026-10-21T20:50:05Z",
+"title": "[SV] Allow sv handles and inout to coexist",
+"url": "https://github.com/llvm/circt/pull/11313"
+},
+{
+"number": 11314,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-20T23:29:04Z",
+"updated_at": "2026-10-21T00:07:31Z",
+"title": "[ESI][Runtime] Add segmented tryWrite to WriteChannelPort and TypedWritePort",
+"url": "https://github.com/llvm/circt/pull/11314"
+},
+{
+"number": 11315,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T00:29:50Z",
+"updated_at": "2026-10-21T01:04:32Z",
+"title": "[Comb] Keep the first mux's two-state flag in the array-of-muxes fold",
+"url": "https://github.com/llvm/circt/pull/11315"
+},
+{
+"number": 11316,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-21T07:57:02Z",
+"updated_at": "2026-10-21T12:51:59Z",
+"title": "[circt-bmc] Clocked assertions sample updated register values and miss negedge failures",
+"url": "https://github.com/llvm/circt/issues/11316"
+},
+{
+"number": 11317,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-21T15:55:15Z",
+"updated_at": "2026-10-22T17:56:48Z",
+"title": "[Arc] Add separate arc outlining pass",
+"url": "https://github.com/llvm/circt/pull/11317"
+},
+{
+"number": 11318,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-21T19:17:54Z",
+"updated_at": "2026-10-26T18:02:44Z",
+"title": "[CI] Generate docs",
+"url": "https://github.com/llvm/circt/issues/11318"
+},
+{
+"number": 11319,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-21T19:20:00Z",
+"updated_at": "2026-10-26T18:02:45Z",
+"title": "[CI] Build `circt-doc` alongside `check-circt`",
+"url": "https://github.com/llvm/circt/pull/11319"
+},
+{
+"number": 11320,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T19:51:55Z",
+"updated_at": "2026-10-23T15:41:30Z",
+"title": "[LLHD] Split blocking assigns out of DriveOp, remove epsilon delays",
+"url": "https://github.com/llvm/circt/pull/11320"
+},
+{
+"number": 11321,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-21T22:50:19Z",
+"updated_at": "2026-10-21T23:00:48Z",
+"title": "[Seq] FIFO lowering: register status flags and drop redundant guards to shorten pointer/count paths",
+"url": "https://github.com/llvm/circt/issues/11321"
+},
+{
+"number": 11322,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T23:00:13Z",
+"updated_at": "2026-10-23T10:21:21Z",
+"title": "[LLHD] Simplify the Sig2Reg pass",
+"url": "https://github.com/llvm/circt/pull/11322"
+},
+{
+"number": 11324,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T23:40:20Z",
+"updated_at": "2026-10-22T00:14:57Z",
+"title": "[ESI][Runtime] Make connect() return a future",
+"url": "https://github.com/llvm/circt/pull/11324"
+},
+{
+"number": 11325,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T23:40:24Z",
+"updated_at": "2026-10-22T06:10:11Z",
+"title": "[ESI][Cosim] Protocol v4: report when the simulator side is connected",
+"url": "https://github.com/llvm/circt/pull/11325"
+},
+{
+"number": 11326,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-21T23:40:28Z",
+"updated_at": "2026-10-22T06:10:00Z",
+"title": "[ESI][Cosim] Add credit-based backpressure in both directions",
+"url": "https://github.com/llvm/circt/pull/11326"
+},
+{
+"number": 11328,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T00:12:38Z",
+"updated_at": "2026-10-22T19:48:46Z",
+"title": "[PyCDE][Python] Add net and var support",
+"url": "https://github.com/llvm/circt/pull/11328"
+},
+{
+"number": 11329,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T01:17:33Z",
+"updated_at": "2026-10-22T19:48:30Z",
+"title": "[HWArithToHW] Add net and var type support",
+"url": "https://github.com/llvm/circt/pull/11329"
+},
+{
+"number": 11330,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T01:29:28Z",
+"updated_at": "2026-10-23T04:46:32Z",
+"title": "[ExportVerilog] Add net and var type support",
+"url": "https://github.com/llvm/circt/pull/11330"
+},
+{
+"number": 11331,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T01:46:30Z",
+"updated_at": "2026-10-22T11:11:02Z",
+"title": "[HandshakeToHW] Fix swapped signedness in arith.divui/divsi lowering",
+"url": "https://github.com/llvm/circt/pull/11331"
+},
+{
+"number": 11332,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-22T08:18:38Z",
+"updated_at": "2026-10-22T08:18:38Z",
+"title": "[Seq] seq.fifo with rd_latency >= 3 returns overwritten entries",
+"url": "https://github.com/llvm/circt/issues/11332"
+},
+{
+"number": 11333,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-22T08:18:44Z",
+"updated_at": "2026-10-22T08:25:40Z",
+"title": "[ESI] esi.buffer lowering ignores a FIFO channel's dataDelay",
+"url": "https://github.com/llvm/circt/issues/11333"
+},
+{
+"number": 11334,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-22T08:18:50Z",
+"updated_at": "2026-10-22T08:18:50Z",
+"title": "[PyCDE] ChannelSignal.buffer(output_signaling=...) keeps the input's data_delay",
+"url": "https://github.com/llvm/circt/issues/11334"
+},
+{
+"number": 11335,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-22T09:31:01Z",
+"updated_at": "2026-10-22T17:28:43Z",
+"title": "[Moore][LLHD][ImportVerilog] Add net types (tracking issue)",
+"url": "https://github.com/llvm/circt/issues/11335"
+},
+{
+"number": 11336,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T13:25:56Z",
+"updated_at": "2026-10-25T22:35:27Z",
+"title": "[Synth] Lower non-constant division and remainder to a restoring array divider    ",
+"url": "https://github.com/llvm/circt/pull/11336"
+},
+{
+"number": 11337,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-22T16:22:18Z",
+"updated_at": "2026-10-23T18:34:48Z",
+"title": "[FIRRTL][GatedClockConversion] Simplify and fix dominance, dead ports and sync resets",
+"url": "https://github.com/llvm/circt/pull/11337"
+},
+{
+"number": 11338,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-22T16:25:57Z",
+"updated_at": "2026-10-23T22:26:33Z",
+"title": "[FIRRTL] Add a clock alias analysis to GatedClockConversion",
+"url": "https://github.com/llvm/circt/pull/11338"
+},
+{
+"number": 11339,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T17:01:32Z",
+"updated_at": "2026-10-22T17:02:07Z",
+"title": "[NFC][LLHD] Clarify current time op",
+"url": "https://github.com/llvm/circt/pull/11339"
+},
+{
+"number": 11340,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-22T19:44:25Z",
+"updated_at": "2026-10-23T04:55:32Z",
+"title": "[SV] Add NetType helper builder to WireOp",
+"url": "https://github.com/llvm/circt/pull/11340"
+},
+{
+"number": 11341,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-22T23:13:02Z",
+"updated_at": "2026-10-23T19:44:28Z",
+"title": "[Verif] Respect enables of assert-like ops in VerifToSMT and the Verif passes",
+"url": "https://github.com/llvm/circt/pull/11341"
+},
+{
+"number": 11342,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T01:03:35Z",
+"updated_at": "2026-10-23T06:14:01Z",
+"title": "[FSMToSV] Migrate from !hw.inout to SV handle types",
+"url": "https://github.com/llvm/circt/pull/11342"
+},
+{
+"number": 11343,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T01:35:19Z",
+"updated_at": "2026-10-23T02:13:38Z",
+"title": "[VerifToSV] Migrate from !hw.inout to SV handle types",
+"url": "https://github.com/llvm/circt/pull/11343"
+},
+{
+"number": 11344,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T01:50:52Z",
+"updated_at": "2026-10-23T06:52:04Z",
+"title": "[ESI] Migrate !hw.inout to SV handle types",
+"url": "https://github.com/llvm/circt/pull/11344"
+},
+{
+"number": 11345,
+"kind": "issue",
+"state": "closed",
+"created_at": "2026-10-23T09:38:29Z",
+"updated_at": "2026-10-23T20:57:51Z",
+"title": "[HWToBTOR2] Use of undefined id",
+"url": "https://github.com/llvm/circt/issues/11345"
+},
+{
+"number": 11346,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-23T09:56:14Z",
+"updated_at": "2026-10-23T17:03:43Z",
+"title": "[ImportVerilog] Support concurrent `cover property` assertions.",
+"url": "https://github.com/llvm/circt/pull/11346"
+},
+{
+"number": 11347,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-23T12:49:45Z",
+"updated_at": "2026-10-23T15:30:25Z",
+"title": "[HWToBTOR2] Don't overwrite reg inputs with reset logic",
+"url": "https://github.com/llvm/circt/pull/11347"
+},
+{
+"number": 11348,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-23T13:03:25Z",
+"updated_at": "2026-10-23T16:06:24Z",
+"title": "[HWToBTOR2] Handle inputs as reset values",
+"url": "https://github.com/llvm/circt/pull/11348"
+},
+{
+"number": 11350,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T15:29:22Z",
+"updated_at": "2026-10-26T16:53:36Z",
+"title": "[Moore] Add net type",
+"url": "https://github.com/llvm/circt/pull/11350"
+},
+{
+"number": 11351,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T16:40:08Z",
+"updated_at": "2026-10-26T16:55:30Z",
+"title": "[Moore][NFC] Add summary to ref type",
+"url": "https://github.com/llvm/circt/pull/11351"
+},
+{
+"number": 11353,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T16:50:39Z",
+"updated_at": "2026-10-23T23:35:51Z",
+"title": "[HWArithToHW][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11353"
+},
+{
+"number": 11354,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T16:51:02Z",
+"updated_at": "2026-10-26T16:51:18Z",
+"title": "[Moore] Split AssignOpBase into procedural and continuous assignments",
+"url": "https://github.com/llvm/circt/pull/11354"
+},
+{
+"number": 11355,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T17:34:06Z",
+"updated_at": "2026-10-24T04:25:51Z",
+"title": "[SimToSV] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11355"
+},
+{
+"number": 11356,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T17:55:06Z",
+"updated_at": "2026-10-23T18:32:08Z",
+"title": "[DebugInfo] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11356"
+},
+{
+"number": 11357,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T18:01:57Z",
+"updated_at": "2026-10-23T23:20:36Z",
+"title": "[kanagawatool][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11357"
+},
+{
+"number": 11358,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T18:07:44Z",
+"updated_at": "2026-10-23T23:21:14Z",
+"title": "[PipelineToHW][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11358"
+},
+{
+"number": 11359,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T18:24:31Z",
+"updated_at": "2026-10-23T21:45:33Z",
+"title": "[CalyxToHW] Migrate hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11359"
+},
+{
+"number": 11360,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T19:23:58Z",
+"updated_at": "2026-10-23T20:35:06Z",
+"title": "[SeqToSV] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11360"
+},
+{
+"number": 11361,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T19:48:48Z",
+"updated_at": "2026-10-26T18:54:00Z",
+"title": "[ProbeToSV] Migrate hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11361"
+},
+{
+"number": 11362,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T20:29:06Z",
+"updated_at": "2026-10-24T04:21:27Z",
+"title": "[Seq] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11362"
+},
+{
+"number": 11363,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T20:38:36Z",
+"updated_at": "2026-10-24T04:19:09Z",
+"title": "[Verif] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11363"
+},
+{
+"number": 11364,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T22:19:27Z",
+"updated_at": "2026-10-24T01:56:59Z",
+"title": "[SV] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11364"
+},
+{
+"number": 11365,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T22:33:39Z",
+"updated_at": "2026-10-24T01:36:43Z",
+"title": "[Arc] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11365"
+},
+{
+"number": 11366,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T22:50:13Z",
+"updated_at": "2026-10-24T02:14:23Z",
+"title": "[HW][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11366"
+},
+{
+"number": 11367,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T23:24:54Z",
+"updated_at": "2026-10-24T00:47:07Z",
+"title": "[FIRRTLToHW] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11367"
+},
+{
+"number": 11368,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T23:30:41Z",
+"updated_at": "2026-10-24T04:18:08Z",
+"title": "[EmitVerilog][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11368"
+},
+{
+"number": 11369,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-23T23:37:59Z",
+"updated_at": "2026-10-24T00:12:44Z",
+"title": "[Tcl][NFC] Migrate hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11369"
+},
+{
+"number": 11370,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-24T00:03:44Z",
+"updated_at": "2026-10-24T03:00:38Z",
+"title": "[ImportLiberty] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11370"
+},
+{
+"number": 11371,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-24T00:19:48Z",
+"updated_at": "2026-10-24T01:27:38Z",
+"title": "[PyCDE][Python][NFC] Migrate !hw.inout to SV handles",
+"url": "https://github.com/llvm/circt/pull/11371"
+},
+{
+"number": 11372,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-24T01:43:27Z",
+"updated_at": "2026-10-24T04:28:39Z",
+"title": "[FIRRTL] Preserve analyses in PassiveWires when unchanged",
+"url": "https://github.com/llvm/circt/pull/11372"
+},
+{
+"number": 11373,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-24T02:06:27Z",
+"updated_at": "2026-10-24T03:30:04Z",
+"title": "[FIRRTL] Introduce FObjectLike interface",
+"url": "https://github.com/llvm/circt/pull/11373"
+},
+{
+"number": 11374,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-24T02:16:43Z",
+"updated_at": "2026-10-24T17:29:21Z",
+"title": "[FIRRTL][Kanagawa] Remove stale getReferencedModuleSlow, NFC",
+"url": "https://github.com/llvm/circt/pull/11374"
+},
+{
+"number": 11375,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-26T07:26:06Z",
+"updated_at": "2026-10-26T08:36:42Z",
+"title": "[FIRRTL] Add value-like object creation",
+"url": "https://github.com/llvm/circt/pull/11375"
+},
+{
+"number": 11377,
+"kind": "issue",
+"state": "open",
+"created_at": "2026-10-26T07:43:16Z",
+"updated_at": "2026-10-26T07:43:16Z",
+"title": "[FIRRTL] test/Dialect/FIRRTL/round-trip.mlir doesn't need individual `CHECK` for round-trip",
+"url": "https://github.com/llvm/circt/issues/11377"
+},
+{
+"number": 11378,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-26T08:32:09Z",
+"updated_at": "2026-10-26T09:27:33Z",
+"title": "[FIRRTL] Exclude Registry from property types",
+"url": "https://github.com/llvm/circt/pull/11378"
+},
+{
+"number": 11379,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-26T11:06:53Z",
+"updated_at": "2026-10-26T11:54:52Z",
+"title": "[HW] Support StructInjectOp in HWAggregateToComb",
+"url": "https://github.com/llvm/circt/pull/11379"
+},
+{
+"number": 11380,
+"kind": "pr",
+"state": "open",
+"created_at": "2026-10-26T11:58:29Z",
+"updated_at": "2026-10-26T16:41:25Z",
+"title": "[HW] Improve ArrayInjectOp lowering in HWAggregateToComb",
+"url": "https://github.com/llvm/circt/pull/11380"
+},
+{
+"number": 11381,
+"kind": "pr",
+"state": "closed",
+"created_at": "2026-10-26T12:09:08Z",
+"updated_at": "2026-10-26T13:27:29Z",
+"title": "[arcilator] Don't run AllocState pass twice",
+"url": "https://github.com/llvm/circt/pull/11381"
+}
+]
+}
