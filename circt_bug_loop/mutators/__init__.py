@@ -210,15 +210,21 @@ def eligible(mutator_set: dict, language: str) -> list:
 
 
 def mutant_seed_int(seed_sha: str, test_path: str, mutator_id: str,
-                    iteration: int, index: int) -> int:
-    """Derive one mutant's RNG seed, which the ProbeSpec records (8.2 rule 5)."""
-    digest = hashlib.sha256(
-        f"{seed_sha}|{test_path}|{mutator_id}|{iteration}|{index}".encode("utf-8"))
+                    iteration: int, index: int, mutation_round: int = 0) -> int:
+    """Derive one mutant's RNG seed, which the ProbeSpec records (8.2 rule 5).
+
+    Round 0 is the registered campaigns' derivation; a later round of the same
+    seed set appends its number, so its seeds are fresh and still reproducible.
+    """
+    key = f"{seed_sha}|{test_path}|{mutator_id}|{iteration}|{index}"
+    if mutation_round:
+        key += f"|round={mutation_round}"
+    digest = hashlib.sha256(key.encode("utf-8"))
     return int.from_bytes(digest.digest()[:8], "big") & SEED_INT_MASK
 
 
 def mutate_seed(seed, iteration: int, cap: int, mutator_set: dict,
-                argv: Optional[list] = None) -> tuple:
+                argv: Optional[list] = None, mutation_round: int = 0) -> tuple:
     """Produce up to *cap* mutants for one seed, deterministically."""
     files = [(path, seed.test_files[path]) for path in seed.test_paths
              if path in seed.test_files]
@@ -237,7 +243,7 @@ def mutate_seed(seed, iteration: int, cap: int, mutator_set: dict,
                 continue
             mutator_id = choices[position]["id"]
             seed_int = mutant_seed_int(seed.seed_sha, path, mutator_id,
-                                       iteration, index)
+                                       iteration, index, mutation_round)
             index += 1
             try:
                 mutated, new_argv = apply(mutator_id, text, seed_int,

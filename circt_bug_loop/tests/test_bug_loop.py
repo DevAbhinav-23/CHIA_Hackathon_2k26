@@ -2,6 +2,7 @@
 import hashlib
 import dataclasses
 import inspect
+import itertools
 import json
 import os
 import socket
@@ -17,7 +18,7 @@ from circt_bug_loop import results as results_module
 from circt_bug_loop.contract import schema
 from circt_bug_loop.store import (BuildResult, DedupVerdict, DifferentialVerdict,
                                   Fingerprint, Frame, ImageSpec, OracleVerdict,
-                                  ReducedCase)
+                                  ReducedCase, add_probe_mutation_round)
 from circt_bug_loop.tests.conftest import call_node
 from circt_bug_loop.tests.test_store import open_store
 
@@ -941,6 +942,8 @@ def mini_campaign(tmp_path: Path, *, repair_enabled: bool = False,
                   **overrides) -> dict:
     """Drive one whole campaign into a throwaway `loop.db`, with no Ray."""
     loop = open_store(tmp_path)
+    if overrides.get("mutation_rounds"):
+        add_probe_mutation_round(loop)
     built = manifest(args=parsed_args(artefact_root=str(tmp_path)))
     spec = image_spec("ok")
     seed = seed_record()
@@ -2280,3 +2283,89 @@ def test_T_U_driver_56_report_turns_needs_the_interlock_and_an_llm_worker(
     with pytest.raises(bug_loop.PreflightFailed) as raised:
         bug_loop.report_turns_dispatch()
     assert "`llm` resource" in str(raised.value)
+
+
+def _round_stages(calls: list) -> bug_loop.Stages:
+    """`fake_stages` whose generator names each probe by arm, round and iteration."""
+    def generate(seed, feedback, remaining, cfg):
+        rnd = cfg.get("mutation_round")
+        calls.append((remaining.arm, rnd, cfg["iteration"]))
+        head = "f00000" if remaining.arm == "seeded" else f"{rnd or 0:06x}"
+        return {"specs": [probe_spec(f"p-{head}{cfg['iteration']:03x}{k:03x}",
+                                     remaining.arm, iteration=cfg["iteration"])
+                          for k in (2, 4)],
+                "logs": {}, "failure": None,
+                "counters": schema.CounterBlock(stage="stage_2", started=1,
+                                                completed=1, failed=0, seconds=0.1)}
+
+    return dataclasses.replace(fake_stages(fires=False), generate_seeded=generate,
+                               generate_mutation=generate)
+
+
+def _rounds_campaign(tmp_path: Path, calls: list, **overrides) -> dict:
+    """`mini_campaign` on a clock that ticks once per read, two iterations per seed."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    clock = itertools.count()
+    return mini_campaign(tmp_path, stages=_round_stages(calls),
+                         now=lambda: float(next(clock)),
+                         budget={"arm_window_seconds": 300.0,
+                                 "per_seed_iteration_cap": 2}, **overrides)
+
+
+@pytest.mark.t0
+def test_the_mutation_arm_runs_rounds_until_its_window_ends(tmp_path, monkeypatch):
+    """Review T3: after the seed set, the mutation arm starts a new round until W ends."""
+    monkeypatch.setattr(bug_loop, "_TABLE_COLUMNS", {})
+    calls = []
+    run = _rounds_campaign(tmp_path, calls, mutation_rounds=True)
+    arm = run["outcome"]["arms"]["mutation"]
+    assert arm["stop_reason"] == "arm_window"
+    assert arm["rounds"] >= 3 and arm["seconds"] >= 300.0
+
+    # Each round re-entered the seed set and told A4 which round it was.
+    mutation = [c for c in calls if c[0] == "mutation"]
+    assert mutation[:4] == [("mutation", 0, 1), ("mutation", 0, 2),
+                            ("mutation", 1, 1), ("mutation", 1, 2)]
+    rows = run["store"].query("SELECT probe_id, mutation_round FROM probe "
+                              "WHERE arm = 'mutation' ORDER BY rowid")
+    seen = [r["mutation_round"] for r in rows]
+    assert seen == sorted(seen) and set(seen) == set(range(arm["rounds"]))
+    assert len({r["probe_id"] for r in rows}) == len(rows) == arm["probes"]
+
+    # One arm_window row per arm, and round 0's feedback row is the only one kept.
+    windows = run["store"].query("SELECT arm, stop_reason FROM ledger_entry "
+                                 "WHERE scope = 'arm_window' ORDER BY arm")
+    assert [(w["arm"], w["stop_reason"]) for w in windows] == [
+        ("mutation", "arm_window"), ("seeded", "seed_set_exhausted")]
+    assert run["store"].query("SELECT iteration FROM feedback WHERE arm = 'mutation'") \
+        == [{"iteration": 2}]
+
+
+@pytest.mark.t0
+def test_mutation_rounds_leave_the_seeded_arm_as_it_was(tmp_path, monkeypatch):
+    """Review T3: with rounds on, the seeded arm's calls, probes and record are unchanged."""
+    monkeypatch.setattr(bug_loop, "_TABLE_COLUMNS", {})
+    seen = {}
+    for rounds in (False, True):
+        calls = []
+        monkeypatch.setattr(bug_loop, "_TABLE_COLUMNS", {})
+        run = _rounds_campaign(tmp_path / str(rounds), calls,
+                               **({"mutation_rounds": True} if rounds else {}))
+        seeded = [s for s in run["outcome"]["seeds"] if s["arm"] == "seeded"]
+        seen[rounds] = (run["outcome"]["arms"]["seeded"],
+                        [c for c in calls if c[0] == "seeded"],
+                        [(p["probe_id"], p["stages"], p["verdicts"])
+                         for s in seeded for p in s["probes"]],
+                        [s["terminating_condition"] for s in seeded],
+                        run["store"].query("SELECT probe_id, spec_json FROM probe "
+                                           "WHERE arm = 'seeded' ORDER BY rowid"))
+        if rounds:
+            assert run["outcome"]["arms"]["mutation"]["rounds"] >= 2
+            assert {r["mutation_round"] for r in run["store"].query(
+                "SELECT mutation_round FROM probe WHERE arm = 'seeded'")} == {None}
+        else:
+            assert run["outcome"]["arms"]["mutation"]["stop_reason"] == "seed_set_exhausted"
+            assert "rounds" not in run["outcome"]["arms"]["mutation"]
+    assert seen[False] == seen[True]
+    assert all(rnd is None for _, rnd, _ in seen[True][1])
+    assert seen[True][0]["stop_reason"] == "seed_set_exhausted"

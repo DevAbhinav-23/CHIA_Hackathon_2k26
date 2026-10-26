@@ -33,9 +33,9 @@ from circt_bug_loop.contract.schema import (BudgetFile, CounterBlock, FeedbackBu
                                             LedgerEntry, ProbeSpec, RunCommit,
                                             RunManifest, SeedRecord)
 from circt_bug_loop.store import (PARTIAL, CandidateRecord, ImageSpec, LoopStore,
-                                  Report, utc_now, validate_candidate,
-                                  widen_fingerprint_basis, write_artefact,
-                                  write_turn_failure)
+                                  Report, add_probe_mutation_round, utc_now,
+                                  validate_candidate, widen_fingerprint_basis,
+                                  write_artefact, write_turn_failure)
 
 logger = logging.getLogger("circt_bug_loop")
 
@@ -1224,11 +1224,13 @@ def finish_run(store: LoopStore, manifest: RunManifest, ended_utc: str) -> None:
                  {"ended_utc": ended_utc})
 
 
-def write_probe(store: LoopStore, spec: ProbeSpec, artefact_dir: str) -> None:
+def write_probe(store: LoopStore, spec: ProbeSpec, artefact_dir: str,
+                mutation_round: Optional[int] = None) -> None:
     """Write the `probe` row, before the probe that fills the rest of its tables."""
+    extra = {} if mutation_round is None else {"mutation_round": mutation_round}
     store.insert("probe", _row(store, "probe", spec,
                                spec_json=schema.to_json(spec),
-                               artefact_dir=artefact_dir))
+                               artefact_dir=artefact_dir, **extra))
 
 
 def write_build_result(store: LoopStore, build) -> None:
@@ -1409,6 +1411,7 @@ def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
     cap_bytes = int(cfg.get("artefact_inline_cap_bytes", 262144))
     probe_root = str(Path(generator_dir(cfg, seed.seed_sha, iteration)) / "probes")
     mutation = arm == "mutation"
+    rnd = int(cfg.get("mutation_round") or 0)
     specs: list = []
     failure = None
     try:
@@ -1421,9 +1424,11 @@ def _recorded_generation(seed: SeedRecord, cfg: dict, arm: str) -> dict:
                 turn_cost={"turn": None, "wall_seconds": 0.0, "metered": False,
                            "tokens_in": None, "tokens_out": None,
                            "cost_usd": None},
-                key=f"recorded:{index}", cap_bytes=cap_bytes,
+                key=f"recorded:{rnd}:{index}" if rnd else f"recorded:{index}",
+                cap_bytes=cap_bytes,
                 mutator_id=RECORDED_MUTATOR_ID if mutation else None,
-                mutator_seed_int=_seed_int(text) if mutation else None,
+                mutator_seed_int=(_seed_int(f"{rnd}|{text}" if rnd else text)
+                                  if mutation else None),
                 source_test_path=(source or seed.test_paths[0]) if mutation else None))
     except Exception as error:                      # noqa: BLE001 - FR-04.8
         failure = f"recorded_generator_failed:{type(error).__name__}:{error}"
@@ -1646,9 +1651,12 @@ class Campaign:
                  bin_dir: str = CIRCT_BIN_DIR,
                  head_options: Optional[dict] = None,
                  skip_turn: bool = False,
-                 repair_backend: str = _METERED_REPAIR_BACKEND):
+                 repair_backend: str = _METERED_REPAIR_BACKEND,
+                 mutation_rounds: bool = False):
         """Take everything a stage call needs, and compute nothing else."""
         self.head_options = head_options
+        # Review: the mutation arm re-enters its seed set until W ends.
+        self.mutation_rounds = mutation_rounds
         self.repair_backend = repair_backend
         self.manifest = manifest
         self.budget = budget
@@ -1744,7 +1752,8 @@ class Campaign:
                                self.budget)
 
 
-def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
+def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord, *,
+                mutation_round: Optional[int] = None) -> dict:
     """Run one probing input through stages 3 to the gate, and record what happened."""
     out = {"probe_id": spec.probe_id, "arm": spec.arm, "seed_sha": spec.seed_sha,
            "iteration": spec.iteration, "stages": [], "verdicts": {},
@@ -1753,7 +1762,7 @@ def drive_probe(campaign: Campaign, spec: ProbeSpec, seed: SeedRecord) -> dict:
     artefact_dir = probe_dir(campaign.manifest, spec.seed_sha, spec.iteration,
                              spec.probe_id)
     write_artefact(artefact_dir, PARTIAL, b"")
-    write_probe(campaign.store, spec, artefact_dir)
+    write_probe(campaign.store, spec, artefact_dir, mutation_round)
     try:
         return _drive_probe(campaign, spec, seed, out, artefact_dir)
     finally:
@@ -1999,8 +2008,13 @@ def _drive_differential(campaign: Campaign, spec: ProbeSpec, build, result,
 
 
 def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
-               deadline: Optional[float] = None) -> dict:
-    """Run one seed's iterations on one arm: generate, then every probe it wrote."""
+               deadline: Optional[float] = None,
+               mutation_round: Optional[int] = None) -> dict:
+    """Run one seed's iterations on one arm: generate, then every probe it wrote.
+
+    *mutation_round* is None unless the mutation arm runs in rounds; round 0
+    is the registered single pass, and a later round re-keys its ledger rows.
+    """
     out = {"seed_sha": seed.seed_sha, "arm": arm, "iterations": 0, "probes": [],
            "verdicts": {}, "terminating_condition": "iteration_cap"}
     bundle = empty_feedback(campaign.manifest, seed, arm, 1)
@@ -2019,10 +2033,14 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
         cfg = campaign.cfg(iteration=iteration, spend_usd=aggregate.spend_usd)
         if reading is not None:
             cfg["seed_reading"] = reading
+        key = f"{seed.seed_sha}:{iteration}"
+        if mutation_round is not None:
+            cfg["mutation_round"] = mutation_round
+            key += f":r{mutation_round}" if mutation_round else ""
         try:
             generated = campaign.call(
                 f"generate_{arm}", campaign.stages.generator(arm), seed, bundle,
-                snapshot, cfg, _arm=arm, _key=f"{seed.seed_sha}:{iteration}")
+                snapshot, cfg, _arm=arm, _key=key)
         except Exception as error:
             out["terminating_condition"] = f"generator_failed:{type(error).__name__}"
             return out
@@ -2045,7 +2063,7 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
             campaign.recorder.record(spec)
         results = []
         for spec in specs:
-            probe = drive_probe(campaign, spec, seed)
+            probe = drive_probe(campaign, spec, seed, mutation_round=mutation_round)
             out["probes"].append(probe)
             if probe["probe_result"] is not None:
                 results.append(probe["probe_result"])
@@ -2059,8 +2077,9 @@ def drive_seed(campaign: Campaign, seed: SeedRecord, arm: str, *,
                                 [s.probe_id for s in specs], snapshot,
                                 len(out["probes"]))
         campaign.recorder.record(bundle)
-        # A bundle no iteration will read is not written (D-14).
-        if iteration < cap:
+        # A bundle no iteration will read is not written (D-14); `feedback` is
+        # keyed by iteration, so a later mutation round keeps round 0's rows.
+        if iteration < cap and not mutation_round:
             write_feedback(campaign.store, bundle,
                            str(Path(iteration_dir(campaign.manifest, seed.seed_sha,
                                                   bundle.iteration)) / "feedback.json"))
@@ -2109,23 +2128,35 @@ def campaign_drive(campaign: Campaign, seeds: list, *, arms=None) -> dict:
         deadline = started + campaign.budget.arm_window_seconds
         reason = None
         seeds_run = probes_run = 0
-        for seed in seeds:
-            reason = _arm_stop(campaign, arm, deadline)
-            if reason:
+        rounds = arm == "mutation" and campaign.mutation_rounds
+        mutation_round = 0 if rounds else None
+        while True:
+            round_probes = 0
+            for seed in seeds:
+                reason = _arm_stop(campaign, arm, deadline)
+                if reason:
+                    break
+                record = drive_seed(campaign, seed, arm, deadline=deadline,
+                                    mutation_round=mutation_round)
+                out["seeds"].append(record)
+                seeds_run += 1
+                round_probes += len(record["probes"])
+                # W1: a turn refused by the pre-authorisation stops the arm HERE.
+                if record["terminating_condition"] == "campaign_spend_cap":
+                    reason = "campaign_spend_cap"
+                    break
+            probes_run += round_probes
+            # A round that wrote no probe would only repeat itself.
+            if reason or not rounds or not round_probes or campaign.now() >= deadline:
                 break
-            record = drive_seed(campaign, seed, arm, deadline=deadline)
-            out["seeds"].append(record)
-            seeds_run += 1
-            probes_run += len(record["probes"])
-            # W1: a turn refused by the pre-authorisation stops the arm HERE.
-            if record["terminating_condition"] == "campaign_spend_cap":
-                reason = "campaign_spend_cap"
-                break
+            mutation_round += 1
         reason = reason or _arm_stop(campaign, arm, deadline) or "seed_set_exhausted"
         seconds = round(campaign.now() - started, 6)
         out["arms"][arm] = {"stop_reason": reason, "seconds": seconds,
                             "seeds": seeds_run, "probes": probes_run,
                             "started": True}
+        if rounds:
+            out["arms"][arm]["rounds"] = mutation_round + 1
         _accrue_arm_window(campaign, arm, seconds, reason)
         if reason == "campaign_spend_cap":
             out["stopped"] = reason
@@ -2683,6 +2714,7 @@ def build_parser() -> argparse.ArgumentParser:
                         choices=("model", "recorded"))
     parser.add_argument("--seed-sha", action="append", default=None, metavar="SHA")
     parser.add_argument("--shard", default=None, metavar="K/N")
+    parser.add_argument("--mutation-rounds", action="store_true")
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument("--resume", default=None, metavar="RUN_MANIFEST_ID")
     parser.add_argument("--dry-run", action="store_true")
@@ -2902,6 +2934,8 @@ def run_campaign(args, out) -> int:
     if widen_fingerprint_basis(store):
         print("pre-flight: `fingerprint` rebuilt for contract 2.4's `verifier` "
               "basis (D-13)", file=out)
+    if add_probe_mutation_round(store):
+        print("pre-flight: `probe.mutation_round` added", file=out)
     mirror = _mirror(store, budget, args, dispatch, triage_task)
     check_10_issue_mirror(mirror=mirror, refresh_requested=args.refresh_mirror)
     check_11_forum_post(forum_post_url=args.forum_post_url,
@@ -3004,7 +3038,8 @@ def run_campaign(args, out) -> int:
                         clone_path=args.clone, image_spec=image_spec,
                         repair_enabled=repair_enabled(args),
                         repair_backend=repair_backend,
-                        head_options=dispatch.head_options())
+                        head_options=dispatch.head_options(),
+                        mutation_rounds=args.mutation_rounds)
     arms = None if args.arm == "both" else [args.arm]
     outcome = campaign_drive(campaign, seeds, arms=arms)
     outcome["reconciliation"] = reconcile(store, ISSUES_DB_PATH)

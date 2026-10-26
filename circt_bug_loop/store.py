@@ -1242,6 +1242,15 @@ def widen_fingerprint_basis(store: "LoopStore") -> bool:
     return True
 
 
+def add_probe_mutation_round(store: "LoopStore") -> bool:
+    """Add `probe.mutation_round`: NULL on seeded probes and on runs before rounds."""
+    if store.query("SELECT 1 FROM pragma_table_info('probe') "
+                   "WHERE name = 'mutation_round'"):
+        return False
+    store.transaction([("ALTER TABLE probe ADD COLUMN mutation_round INTEGER", ())])
+    return True
+
+
 def load_candidate(store: "LoopStore", candidate_id: str) -> "CandidateRecord":
     """Join the six tables that hold one candidate back into one record."""
     row = store.query_one("SELECT * FROM candidate WHERE candidate_id = ?",

@@ -726,7 +726,8 @@ def generate_mutation(seed: SeedRecord, feedback: FeedbackBundle,
     mutator_set = mutators.load_set(cfg.get("mutator_set_path"),
                                     expected_sha=cfg.get("mutator_set_sha"))
     produced, no_ops, failures = mutators.mutate_seed(
-        seed, iteration, cap, mutator_set, argv_template)
+        seed, iteration, cap, mutator_set, argv_template,
+        int(cfg.get("mutation_round") or 0))
     specs = []
     for mutator_id, source_test_path, text, seed_int, argv in produced:
         try:

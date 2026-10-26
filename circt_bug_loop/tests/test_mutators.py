@@ -351,3 +351,40 @@ def test_T_U_mut_13_the_newest_frozen_set_wins_and_the_dev_set_never_does(tmp_pa
     assert mutators.SET_PATH != mutators.DEVELOPMENT_SET, \
         "a frozen set exists, so the development set is out of reach"
     assert mutators.load_set()["frozen"] is True
+
+
+@pytest.mark.t0
+def test_a_later_mutation_round_draws_fresh_reproducible_seed_ints(tmp_path):
+    """Review T3: round 0 is the registered derivation; a later round is fresh and replays."""
+    import hashlib
+
+    key = f"{'a' * 40}|t.mlir|m.t.i.flip|1|0".encode("utf-8")
+    registered = (int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+                  & mutators.SEED_INT_MASK)
+    args = ("a" * 40, "t.mlir", "m.t.i.flip", 1, 0)
+    assert mutators.mutant_seed_int(*args) == registered
+    assert mutators.mutant_seed_int(*args, 0) == registered
+    later = [mutators.mutant_seed_int(*args, r) for r in (1, 2)]
+    assert len({registered, *later}) == 3
+    assert later == [mutators.mutant_seed_int(*args, r) for r in (1, 2)]
+
+    # Through A4: round 0 is the single pass the campaigns ran, round 1 is new,
+    # and round 1 run twice is the same round.
+    def run(name, **extra):
+        return call_node(generate_task.generate_mutation, seed(), _feedback(), _snapshot(),
+                         {"iteration": 0, "per_seed_probe_cap": 8,
+                          "run_manifest_id": "run-1",
+                          "artefact_dir": str(tmp_path / name),
+                          "mutator_set_path": str(mutators.DEVELOPMENT_SET), **extra})
+
+    def ints(out):
+        return [spec.mutator_seed_int for spec in out["specs"]]
+
+    single, zero = run("single"), run("zero", mutation_round=0)
+    first, again = run("one", mutation_round=1), run("again", mutation_round=1)
+    assert ints(single) and ints(single) == ints(zero)
+    assert [s.probe_id for s in single["specs"]] == [s.probe_id for s in zero["specs"]]
+    assert set(ints(first)).isdisjoint(ints(zero))
+    assert {s.probe_id for s in first["specs"]}.isdisjoint(s.probe_id for s in zero["specs"])
+    assert ints(first) == ints(again)
+    assert [s.input_text for s in first["specs"]] == [s.input_text for s in again["specs"]]
