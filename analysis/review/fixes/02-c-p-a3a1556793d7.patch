@@ -1,0 +1,71 @@
+From a612fac433362c388aa0d5385ebcd9fb4050b01c Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:17:31 +0530
+Subject: [PATCH] [OM] Verify that every class field name has a type
+
+A class-like op written in generic form can list a field in `fieldNames`
+without an entry in `fieldTypes`; the custom parser never produces this,
+but nothing rejected it. Users of the class then call
+`getFieldType(name).value()` on the missing entry: verifying an
+`om.elaborated_object` of such an `om.class.extern` crashed in
+`ElaboratedObjectOp::verifySymbolUses`, and printing the class in custom
+form crashed in `printClassLike`.
+
+Check in `verifyClassLike`, shared by `om.class` and `om.class.extern`,
+that each field name is a string with a type in `fieldTypes`.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Dialect/OM/OMOps.cpp    | 10 ++++++++++
+ test/Dialect/OM/errors.mlir | 12 ++++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/lib/Dialect/OM/OMOps.cpp b/lib/Dialect/OM/OMOps.cpp
+index 79ba030..cb8d2b6 100644
+--- a/lib/Dialect/OM/OMOps.cpp
++++ b/lib/Dialect/OM/OMOps.cpp
+@@ -259,6 +259,16 @@ LogicalResult verifyClassLike(ClassLike classLike) {
+     return error;
+   }
+ 
++  // Verify every field name has a type; users of the class look it up.
++  for (Attribute fieldName : classLike.getFieldNames()) {
++    auto name = dyn_cast<StringAttr>(fieldName);
++    if (!name)
++      return classLike.emitOpError("field name ")
++             << fieldName << " is not a string";
++    if (!classLike.getFieldType(name))
++      return classLike.emitOpError("field ") << name << " has no type";
++  }
++
+   return success();
+ }
+ 
+diff --git a/test/Dialect/OM/errors.mlir b/test/Dialect/OM/errors.mlir
+index 534c374..c97da43 100644
+--- a/test/Dialect/OM/errors.mlir
++++ b/test/Dialect/OM/errors.mlir
+@@ -120,6 +120,18 @@ om.class.extern @Extern(%param1: i1) -> (field1: i1) {
+ 
+ // -----
+ 
++// expected-error @+1 {{'om.class.extern' op field "x" has no type}}
++"om.class.extern"() ({
++^bb0:
++}) {sym_name = "Extern", formalParamNames = [], fieldNames = ["x"], fieldTypes = {}} : () -> ()
++om.class @Test() {
++  %0 = om.constant 0 : i32
++  %1 = "om.elaborated_object"(%0) <{className = @Extern}> : (i32) -> !om.class.type<@Extern>
++  om.class.fields
++}
++
++// -----
++
+ // CHECK-LABEL: @List
+ om.class @List() -> (list: !om.list<i32>){
+   // expected-error @+1 {{an element of a list attribute must have a type 'i32' but got 'i64'}}
+-- 
+2.56.0
+

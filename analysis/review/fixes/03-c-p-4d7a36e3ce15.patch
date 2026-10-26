@@ -1,0 +1,109 @@
+From e2c062967ee80069a038adcc550bb5ef1343d5fd Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:21:25 +0530
+Subject: [PATCH] [Moore] Verify class declaration base classes
+
+`moore.class.classdecl` accepted any symbol in its `extends` clause.
+MooreToCore's `resolveClassStructBody` looks the base up and does
+`cast<ClassDeclOp>` on the result, so `--convert-moore-to-core` on a class
+extending an undefined symbol crashed with a null dereference (and asserted
+when the symbol named another op), and a cycle of `extends` clauses
+recursed until the stack overflowed.
+
+Make `ClassDeclOp` a symbol user and verify that its base class resolves to
+a `moore.class.classdecl` and that no class inherits from itself.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ include/circt/Dialect/Moore/MooreOps.td |  3 ++-
+ lib/Dialect/Moore/MooreOps.cpp          | 28 +++++++++++++++++++++++++
+ test/Dialect/Moore/errors.mlir          | 21 +++++++++++++++++++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/include/circt/Dialect/Moore/MooreOps.td b/include/circt/Dialect/Moore/MooreOps.td
+index adf0fe6..32eac4d 100644
+--- a/include/circt/Dialect/Moore/MooreOps.td
++++ b/include/circt/Dialect/Moore/MooreOps.td
+@@ -3706,7 +3706,8 @@ def ClassDeclOp
+     : MooreOp<"class.classdecl", [
+       SymbolName, SymbolVisibility, Symbol,
+       SymbolTable, IsolatedFromAbove,
+-      NoTerminator, SingleBlock
++      NoTerminator, SingleBlock,
++      DeclareOpInterfaceMethods<SymbolUserOpInterface>
+     ]> {
+   let summary = "Class declaration";
+   let arguments = (ins
+diff --git a/lib/Dialect/Moore/MooreOps.cpp b/lib/Dialect/Moore/MooreOps.cpp
+index d3bb854..e8882f5 100644
+--- a/lib/Dialect/Moore/MooreOps.cpp
++++ b/lib/Dialect/Moore/MooreOps.cpp
+@@ -1513,6 +1513,34 @@ LogicalResult ClassDeclOp::verify() {
+   return mlir::success();
+ }
+ 
++LogicalResult
++ClassDeclOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
++  auto base = getBaseAttr();
++  if (!base)
++    return success();
++
++  // The base class must be a class declaration.
++  auto decl = symbolTable.lookupNearestSymbolFrom<ClassDeclOp>(
++      getOperation()->getParentOp(), base);
++  if (!decl)
++    return emitOpError("base class ")
++           << base << " does not name a 'moore.class.classdecl'";
++
++  // No class may inherit from itself. Missing bases further up are reported by
++  // their own class.
++  SmallPtrSet<Operation *, 8> visited;
++  while (decl && visited.insert(decl).second) {
++    if (decl == *this)
++      return emitOpError("inherits from itself");
++    if (auto next = decl.getBaseAttr())
++      decl = symbolTable.lookupNearestSymbolFrom<ClassDeclOp>(
++          decl->getParentOp(), next);
++    else
++      decl = {};
++  }
++  return success();
++}
++
+ LogicalResult ClassNewOp::verify() {
+   // The result is constrained to ClassHandleType in ODS, so this cast should be
+   // safe.
+diff --git a/test/Dialect/Moore/errors.mlir b/test/Dialect/Moore/errors.mlir
+index 163945f..25bf0d1 100644
+--- a/test/Dialect/Moore/errors.mlir
++++ b/test/Dialect/Moore/errors.mlir
+@@ -253,3 +253,24 @@ func.func @ReadMemBadDest(%arg0: !moore.string, %arg1: !moore.ref<i8>) {
+   moore.builtin.readmem hex %arg0, %arg1 {dimDescending = array<i1: false>, dimLows = array<i64: 0>} : !moore.ref<i8>
+   return
+ }
++
++// -----
++
++// expected-error @below {{'moore.class.classdecl' op base class @MissingBase does not name a 'moore.class.classdecl'}}
++moore.class.classdecl @Derived extends @MissingBase {
++}
++
++// -----
++
++func.func private @NotAClass()
++// expected-error @below {{'moore.class.classdecl' op base class @NotAClass does not name a 'moore.class.classdecl'}}
++moore.class.classdecl @C extends @NotAClass {
++}
++
++// -----
++
++// expected-error @below {{'moore.class.classdecl' op inherits from itself}}
++moore.class.classdecl @A extends @B {
++}
++moore.class.classdecl @B extends @A {
++}
+-- 
+2.56.0
+

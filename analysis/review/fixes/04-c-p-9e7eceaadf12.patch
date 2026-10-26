@@ -1,0 +1,69 @@
+From a0d1119bbebffce834957bbd471afbd725936c9c Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:23:30 +0530
+Subject: [PATCH] [DC] Reject dc.join without tokens
+
+`dc.join` takes a variadic list of tokens and its builder asserts that the
+list is non-empty, but the verifier accepted `dc.join` with no operands.
+DCToHW then built a `comb.and` over the empty list of input valids and
+asserted (`!empty()` in `ValueRange::front`).
+
+Add a verifier that requires at least one token.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ include/circt/Dialect/DC/DCOps.td | 1 +
+ lib/Dialect/DC/DCOps.cpp          | 6 ++++++
+ test/Dialect/DC/errors.mlir       | 8 ++++++++
+ 3 files changed, 15 insertions(+)
+
+diff --git a/include/circt/Dialect/DC/DCOps.td b/include/circt/Dialect/DC/DCOps.td
+index 2e0f3b3..c8d3c99 100644
+--- a/include/circt/Dialect/DC/DCOps.td
++++ b/include/circt/Dialect/DC/DCOps.td
+@@ -95,6 +95,7 @@ def JoinOp : DCOp<"join", [Commutative]> {
+   let assemblyFormat = "$tokens attr-dict";
+   let hasFolder = 1;
+   let hasCanonicalizer = 1;
++  let hasVerifier = 1;
+   let skipDefaultBuilders = 1;
+   let builders = [
+     OpBuilder<(ins "mlir::ValueRange":$ins), [{
+diff --git a/lib/Dialect/DC/DCOps.cpp b/lib/Dialect/DC/DCOps.cpp
+index 8cccdb4..38ee3f1 100644
+--- a/lib/Dialect/DC/DCOps.cpp
++++ b/lib/Dialect/DC/DCOps.cpp
+@@ -33,6 +33,12 @@ namespace dc {
+ // JoinOp
+ // =============================================================================
+ 
++LogicalResult JoinOp::verify() {
++  if (getTokens().empty())
++    return emitOpError("expected at least one token");
++  return success();
++}
++
+ OpFoldResult JoinOp::fold(FoldAdaptor adaptor) {
+   // Fold simple joins (joins with 1 input).
+   if (auto tokens = getTokens(); tokens.size() == 1)
+diff --git a/test/Dialect/DC/errors.mlir b/test/Dialect/DC/errors.mlir
+index 008945d..57fb848 100644
+--- a/test/Dialect/DC/errors.mlir
++++ b/test/Dialect/DC/errors.mlir
+@@ -11,3 +11,11 @@ hw.module @types(in %0 : i1) {
+   // expected-error @+1 {{custom op 'dc.buffer' 'input' must be must be a !dc.value or !dc.token type, but got 'i1'}}
+   %bufferInit = dc.buffer [2] %0 : i1
+ }
++
++// -----
++
++hw.module @joinNoTokens(out a : !dc.token) {
++  // expected-error @+1 {{'dc.join' op expected at least one token}}
++  %0 = dc.join
++  hw.output %0 : !dc.token
++}
+-- 
+2.56.0
+

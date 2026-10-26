@@ -1,0 +1,119 @@
+From 91087819f1c10284f06551c4115900b6a4eb2862 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:25:51 +0530
+Subject: [PATCH] [DC] Reject !dc.value types that wrap a DC type
+
+`dc.pack %token, %otherToken : !dc.token` produced a
+`!dc.value<!dc.token>`. Such a type has no hardware meaning, since a token
+carries no data and its own handshake would be dropped, and no lowering
+handles it: DCToHW converted the result to `!esi.channel<!dc.token>` but
+the packed operand to `!esi.channel<i0>`, so `Backedge::setValue` asserted
+on the type mismatch. A `!dc.value<!dc.token>` port went through the same
+conversion unchecked.
+
+Verify that the inner type of `!dc.value` is not a `!dc.token` or
+`!dc.value`, and make the type inference of `dc.pack` and `dc.from_esi`
+report such an operand instead of building the invalid type.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ include/circt/Dialect/DC/DCTypes.td |  3 ++-
+ lib/Dialect/DC/DCOps.cpp            |  9 ++++++---
+ lib/Dialect/DC/DCTypes.cpp          |  7 +++++++
+ test/Dialect/DC/errors.mlir         | 20 ++++++++++++++++++++
+ 4 files changed, 35 insertions(+), 4 deletions(-)
+
+diff --git a/include/circt/Dialect/DC/DCTypes.td b/include/circt/Dialect/DC/DCTypes.td
+index ba20a43..ba743f8 100644
+--- a/include/circt/Dialect/DC/DCTypes.td
++++ b/include/circt/Dialect/DC/DCTypes.td
+@@ -31,8 +31,9 @@ def ValueType : DCTypeDef<"Value"> {
+   let description = [{
+     A `!dc.value`-typed value represents a value which is wrapped with
+     `!dc.token` semantics. This type is used to attach control semantics to
+-    values. The inner value may be of any type.
++    values. The inner value may be of any type except a DC type.
+   }];
++  let genVerifyDecl = 1;
+ }
+ 
+ def I1ValueType : Type<
+diff --git a/lib/Dialect/DC/DCOps.cpp b/lib/Dialect/DC/DCOps.cpp
+index 38ee3f1..1d32514 100644
+--- a/lib/Dialect/DC/DCOps.cpp
++++ b/lib/Dialect/DC/DCOps.cpp
+@@ -384,10 +384,10 @@ LogicalResult PackOp::inferReturnTypes(
+     MLIRContext *context, std::optional<Location> loc, ValueRange operands,
+     DictionaryAttr attrs, mlir::PropertyRef properties,
+     mlir::RegionRange regions, SmallVectorImpl<Type> &results) {
+-  llvm::SmallVector<Type> inputTypes;
+   Type inputType = operands.back().getType();
+-  auto valueType = dc::ValueType::get(context, inputType);
+-  results.push_back(valueType);
++  if (isa<TokenType, ValueType>(inputType))
++    return emitOptionalError(loc, "cannot pack a value of DC type ", inputType);
++  results.push_back(dc::ValueType::get(context, inputType));
+   return success();
+ }
+ 
+@@ -499,6 +499,9 @@ LogicalResult FromESIOp::inferReturnTypes(
+     mlir::RegionRange regions, SmallVectorImpl<Type> &results) {
+   auto innerType =
+       cast<esi::ChannelType>(operands.front().getType()).getInner();
++  if (isa<TokenType, ValueType>(innerType))
++    return emitOptionalError(loc, "cannot convert a channel of DC type ",
++                             innerType);
+   if (auto intType = dyn_cast<IntegerType>(innerType); intType.getWidth() == 0)
+     results.push_back(dc::TokenType::get(context));
+   else
+diff --git a/lib/Dialect/DC/DCTypes.cpp b/lib/Dialect/DC/DCTypes.cpp
+index 728a5d2..c08671f 100644
+--- a/lib/Dialect/DC/DCTypes.cpp
++++ b/lib/Dialect/DC/DCTypes.cpp
+@@ -19,6 +19,13 @@ using namespace mlir;
+ #define GET_TYPEDEF_CLASSES
+ #include "circt/Dialect/DC/DCTypes.cpp.inc"
+ 
++LogicalResult ValueType::verify(function_ref<InFlightDiagnostic()> emitError,
++                                Type innerType) {
++  if (isa<TokenType, ValueType>(innerType))
++    return emitError() << "!dc.value cannot wrap DC type " << innerType;
++  return success();
++}
++
+ void DCDialect::registerTypes() {
+   addTypes<
+ #define GET_TYPEDEF_LIST
+diff --git a/test/Dialect/DC/errors.mlir b/test/Dialect/DC/errors.mlir
+index 57fb848..23f242c 100644
+--- a/test/Dialect/DC/errors.mlir
++++ b/test/Dialect/DC/errors.mlir
+@@ -19,3 +19,23 @@ hw.module @joinNoTokens(out a : !dc.token) {
+   %0 = dc.join
+   hw.output %0 : !dc.token
+ }
++
++// -----
++
++// expected-error @+1 {{!dc.value cannot wrap DC type '!dc.token'}}
++hw.module @valueOfToken(in %a : !dc.value<!dc.token>) {
++}
++
++// -----
++
++hw.module @packToken(in %a : !dc.token, in %b : !dc.token) {
++  // expected-error @+1 {{cannot pack a value of DC type '!dc.token'}}
++  %0 = dc.pack %a, %b : !dc.token
++}
++
++// -----
++
++hw.module @fromESIOfToken(in %a : !esi.channel<!dc.token>) {
++  // expected-error @+1 {{cannot convert a channel of DC type '!dc.token'}}
++  %0 = dc.from_esi %a : !esi.channel<!dc.token>
++}
+-- 
+2.56.0
+

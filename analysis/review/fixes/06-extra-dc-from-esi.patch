@@ -1,0 +1,50 @@
+From bf4ad9f8321c5788a3f9e9e0a393c94093d952c4 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:26:30 +0530
+Subject: [PATCH] [DC] Fix dc.from_esi type inference for non-integer channels
+
+`FromESIOp::inferReturnTypes` called `getWidth()` on the result of
+`dyn_cast<IntegerType>` without checking it, so parsing or building
+`dc.from_esi` on a channel of a non-integer type (e.g. a struct)
+dereferenced a null type and crashed. Check the cast before reading the
+width.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Dialect/DC/DCOps.cpp       | 3 ++-
+ test/Dialect/DC/roundtrip.mlir | 6 ++++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/lib/Dialect/DC/DCOps.cpp b/lib/Dialect/DC/DCOps.cpp
+index 1d32514..320e0d9 100644
+--- a/lib/Dialect/DC/DCOps.cpp
++++ b/lib/Dialect/DC/DCOps.cpp
+@@ -502,7 +502,8 @@ LogicalResult FromESIOp::inferReturnTypes(
+   if (isa<TokenType, ValueType>(innerType))
+     return emitOptionalError(loc, "cannot convert a channel of DC type ",
+                              innerType);
+-  if (auto intType = dyn_cast<IntegerType>(innerType); intType.getWidth() == 0)
++  if (auto intType = dyn_cast<IntegerType>(innerType);
++      intType && intType.getWidth() == 0)
+     results.push_back(dc::TokenType::get(context));
+   else
+     results.push_back(dc::ValueType::get(context, innerType));
+diff --git a/test/Dialect/DC/roundtrip.mlir b/test/Dialect/DC/roundtrip.mlir
+index 8e29827..0411741 100644
+--- a/test/Dialect/DC/roundtrip.mlir
++++ b/test/Dialect/DC/roundtrip.mlir
+@@ -26,3 +26,9 @@ hw.module @foo(in %0 : !dc.token, in %1 : !dc.value<i1>, in %2 : i32) {
+   %from_esi_token = dc.from_esi %esi_token : !esi.channel<i0>
+   %from_esi_value = dc.from_esi %esi_value : !esi.channel<i1>
+ }
++
++// CHECK-LABEL: hw.module @fromESIStruct
++// CHECK-NEXT:    %0 = dc.from_esi %a : <!hw.struct<a: i2>>
++hw.module @fromESIStruct(in %a : !esi.channel<!hw.struct<a: i2>>) {
++  %0 = dc.from_esi %a : !esi.channel<!hw.struct<a: i2>>
++}
+-- 
+2.56.0
+

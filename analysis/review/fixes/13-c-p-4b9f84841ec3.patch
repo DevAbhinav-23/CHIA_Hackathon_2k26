@@ -1,0 +1,119 @@
+From 112cd91f5ef0dce2592cb0d472f6dd7ac4a4e02a Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:59:23 +0530
+Subject: [PATCH] [CoreToFSM] Deassert removed reset arguments in transition
+ actions
+
+CoreToFSM removes the reset arguments of the state registers from the
+generated `fsm.machine` and, in each state's output region and each
+transition's guard region, replaces their uses with the deasserted value.
+The action regions, which compute the next values of variable registers,
+instead mapped every block argument to the machine's argument. A reset
+that also fed a variable register's next value therefore kept a use in
+the action region, the reset argument was erased anyway, and the dangling
+operand crashed the verifier after the pass (segfault in
+`OperationVerifier::verifyOpAndDominance`).
+
+Remember the deasserted value of each removed reset argument (0 for an
+active-high reset, 1 for the operand of an active-low one) and use it in
+the action regions as well.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/CoreToFSM/CoreToFSM.cpp        | 18 +++++++++---
+ .../Conversion/CoreToFSM/variable-action.mlir | 28 +++++++++++++++++++
+ 2 files changed, 42 insertions(+), 4 deletions(-)
+
+diff --git a/lib/Conversion/CoreToFSM/CoreToFSM.cpp b/lib/Conversion/CoreToFSM/CoreToFSM.cpp
+index e9ef1ac..dffc6db 100644
+--- a/lib/Conversion/CoreToFSM/CoreToFSM.cpp
++++ b/lib/Conversion/CoreToFSM/CoreToFSM.cpp
+@@ -697,8 +697,9 @@ public:
+     // Collect reset arguments to exclude from the FSM's function type.
+     // All CompReg reset signals are ignored during FSM extraction since the
+     // FSM dialect does not have an explicit reset concept. The reset behavior
+-    // is only captured in the initial state value.
+-    llvm::DenseSet<size_t> asyncResetArguments;
++    // is only captured in the initial state value. Each reset argument maps to
++    // the value that deasserts it.
++    llvm::DenseMap<size_t, bool> asyncResetArguments;
+     Location loc = moduleOp.getLoc();
+     SmallVector<Type> inputTypes = moduleOp.getInputTypes();
+ 
+@@ -851,7 +852,7 @@ public:
+         TypedValue<IntegerType> registerReset = r.getReset();
+         if (registerReset) {
+           if (BlockArgument blockArg = dyn_cast<BlockArgument>(registerReset)) {
+-            asyncResetArguments.insert(blockArg.getArgNumber());
++            asyncResetArguments[blockArg.getArgNumber()] = false;
+             auto falseConst = hw::ConstantOp::create(
+                 opBuilder, blockArg.getLoc(), blockArg.getType(), 0);
+             blockArg.replaceAllUsesWith(falseConst.getResult());
+@@ -860,7 +861,7 @@ public:
+             if (xorOp.isBinaryNot()) {
+               Value rhs = xorOp.getOperand(0);
+               if (BlockArgument blockArg = dyn_cast<BlockArgument>(rhs)) {
+-                asyncResetArguments.insert(blockArg.getArgNumber());
++                asyncResetArguments[blockArg.getArgNumber()] = true;
+                 auto trueConst = hw::ConstantOp::create(
+                     opBuilder, blockArg.getLoc(), blockArg.getType(), 1);
+                 blockArg.replaceAllUsesWith(trueConst.getResult());
+@@ -1031,8 +1032,17 @@ public:
+                                       actionBlock->getIterator(), mapping);
+           actionBlock->erase();
+           Block &newActionBlock = actionRegion.front();
++          opBuilder.setInsertionPointToStart(&newActionBlock);
+           for (BlockArgument arg : newActionBlock.getArguments()) {
+             int argIndex = arg.getArgNumber();
++            // Reset arguments are removed from the machine; see them as
++            // deasserted, as in the output and guard regions.
++            if (auto it = asyncResetArguments.find(argIndex);
++                it != asyncResetArguments.end()) {
++              arg.replaceAllUsesWith(hw::ConstantOp::create(
++                  opBuilder, arg.getLoc(), arg.getType(), it->second));
++              continue;
++            }
+             BlockArgument topLevelArg = machine.getBody().getArgument(argIndex);
+             arg.replaceAllUsesWith(topLevelArg);
+           }
+diff --git a/test/Conversion/CoreToFSM/variable-action.mlir b/test/Conversion/CoreToFSM/variable-action.mlir
+index 07d7d4b..9645932 100644
+--- a/test/Conversion/CoreToFSM/variable-action.mlir
++++ b/test/Conversion/CoreToFSM/variable-action.mlir
+@@ -78,3 +78,31 @@ hw.module @counter_with_variable(in %clk : !seq.clock, in %rst : i1, in %inp : i
+ // In state_2, counter keeps its value
+ // CHECK:     fsm.update %[[COUNTER]], %[[COUNTER]] : i4
+ // CHECK:   }
++
++// A reset that feeds a variable's next value is deasserted in the action
++// region, like in the output and guard regions, before it is removed.
++// CHECK-LABEL: fsm.machine @reset_in_action
++// CHECK-SAME: (%[[IN:.+]]: i4)
++// CHECK: } action {
++// CHECK-NEXT:   fsm.update %{{.+}}, %[[IN]] : i4
++hw.module @reset_in_action(in %clk : !seq.clock, in %rst : i1, in %in : i4) {
++  %c0_i2 = hw.constant 0 : i2
++  %c0_i4 = hw.constant 0 : i4
++  %state = seq.compreg name "state" %state, %clk reset %rst, %c0_i2 : i2
++  %next = comb.mux %rst, %c0_i4, %in : i4
++  %var = seq.compreg name "var" %next, %clk reset %rst, %c0_i4 : i4
++}
++
++// CHECK-LABEL: fsm.machine @active_low_reset_in_action
++// CHECK-SAME: (%[[IN:.+]]: i4)
++// CHECK: } action {
++// CHECK-NEXT:   fsm.update %{{.+}}, %[[IN]] : i4
++hw.module @active_low_reset_in_action(in %clk : !seq.clock, in %rst_n : i1, in %in : i4) {
++  %true = hw.constant true
++  %c0_i2 = hw.constant 0 : i2
++  %c0_i4 = hw.constant 0 : i4
++  %rst = comb.xor %rst_n, %true : i1
++  %state = seq.compreg name "state" %state, %clk reset %rst, %c0_i2 : i2
++  %next = comb.mux %rst_n, %in, %c0_i4 : i4
++  %var = seq.compreg name "var" %next, %clk reset %rst, %c0_i4 : i4
++}
+-- 
+2.56.0
+

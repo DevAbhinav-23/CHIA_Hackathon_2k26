@@ -1,0 +1,118 @@
+From c6e24104a0f9c34b756b8ac3e7eacf2d951ba359 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:33:05 +0530
+Subject: [PATCH] [MooreToCore] Lower moore.dyn_extract of integers to any
+ bitcastable type
+
+`DynExtractOpConversion` assumed that a dynamic extract out of an integer
+yields an integer no wider than the input, and that one out of an array
+yields an element or a slice. Other result types, which
+`ExtractOpConversion` already handles for constant offsets, produced
+invalid IR: `moore.dyn_extract %x from %i : i4, i32 -> array<2 x i2>`
+became a `comb.extract` with an `!hw.array` result, a result wider than
+the input a `comb.extract` past the input's width, and an array input with
+an integer result an `hw.array_slice` with an integer result.
+
+For integer inputs, extract the result's bit width and bitcast it to the
+result type, zero-extending the input first when the result is wider (the
+bits above the input read as zero, as for the constant-offset case). For
+array inputs, reject results that are neither the element type nor an
+array of it, as `ExtractOpConversion` does.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/MooreToCore/MooreToCore.cpp | 28 +++++++++++++++++-----
+ test/Conversion/MooreToCore/basic.mlir     |  8 +++++++
+ test/Conversion/MooreToCore/errors.mlir    |  8 +++++++
+ 3 files changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/lib/Conversion/MooreToCore/MooreToCore.cpp b/lib/Conversion/MooreToCore/MooreToCore.cpp
+index eb4dbcf..5e9b8d6 100644
+--- a/lib/Conversion/MooreToCore/MooreToCore.cpp
++++ b/lib/Conversion/MooreToCore/MooreToCore.cpp
+@@ -1509,13 +1509,25 @@ struct DynExtractOpConversion : public OpConversionPattern<DynExtractOp> {
+     Type resultType = typeConverter->convertType(op.getResult().getType());
+     Type inputType = adaptor.getInput().getType();
+ 
+-    if (auto intType = dyn_cast<IntegerType>(inputType)) {
++    if (isa<IntegerType>(inputType)) {
++      // Extract the bits of any bitcastable result type. Bits above the input
++      // read as zero.
++      int64_t resultWidth = hw::getBitWidth(resultType);
++      if (resultWidth < 0)
++        return failure();
++      Value input = adaptor.getInput();
++      if (resultWidth > inputType.getIntOrFloatBitWidth())
++        input = comb::createZExt(rewriter, op->getLoc(), input, resultWidth);
+       Value amount = adjustIntegerWidth(rewriter, adaptor.getLowBit(),
+-                                        intType.getWidth(), op->getLoc());
+-      Value value = comb::ShrUOp::create(rewriter, op->getLoc(),
+-                                         adaptor.getInput(), amount);
++                                        input.getType().getIntOrFloatBitWidth(),
++                                        op->getLoc());
++      Value value = comb::ShrUOp::create(rewriter, op->getLoc(), input, amount);
+ 
+-      rewriter.replaceOpWithNewOp<comb::ExtractOp>(op, resultType, value, 0);
++      Value res = rewriter.createOrFold<comb::ExtractOp>(
++          op->getLoc(), rewriter.getIntegerType(resultWidth), value, 0);
++      if (res.getType() != resultType)
++        res = hw::BitcastOp::create(rewriter, op->getLoc(), resultType, res);
++      rewriter.replaceOp(op, res);
+       return success();
+     }
+ 
+@@ -1529,9 +1541,13 @@ struct DynExtractOpConversion : public OpConversionPattern<DynExtractOp> {
+       if (isSingleElementExtract)
+         rewriter.replaceOpWithNewOp<hw::ArrayGetOp>(op, adaptor.getInput(),
+                                                     idx);
+-      else
++      else if (auto resArrType = dyn_cast<hw::ArrayType>(resultType);
++               resArrType &&
++               resArrType.getElementType() == arrType.getElementType())
+         rewriter.replaceOpWithNewOp<hw::ArraySliceOp>(op, resultType,
+                                                       adaptor.getInput(), idx);
++      else
++        return failure();
+ 
+       return success();
+     }
+diff --git a/test/Conversion/MooreToCore/basic.mlir b/test/Conversion/MooreToCore/basic.mlir
+index ec817b6..ecf5cea 100644
+--- a/test/Conversion/MooreToCore/basic.mlir
++++ b/test/Conversion/MooreToCore/basic.mlir
+@@ -214,6 +214,14 @@ func.func @Expressions(%arg0: !moore.i1, %arg1: !moore.l1, %arg2: !moore.i6, %ar
+   // CHECK-NEXT: [[V25:%.+]] = comb.shru %arg2, [[V24]] : i6
+   // CHECK-NEXT: comb.extract [[V25]] from 0 : (i6) -> i1
+   moore.dyn_extract %arg2 from %2 : !moore.i6, !moore.i32 -> !moore.i1
++  // CHECK:      [[V25:%.+]] = comb.shru %arg2, {{%.+}} : i6
++  // CHECK-NEXT: [[V26:%.+]] = comb.extract [[V25]] from 0 : (i6) -> i4
++  // CHECK-NEXT: hw.bitcast [[V26]] : (i4) -> !hw.array<2xi2>
++  moore.dyn_extract %arg2 from %2 : !moore.i6, !moore.i32 -> !moore.array<2 x i2>
++  // CHECK:      [[C0:%.+]] = hw.constant 0 : i2
++  // CHECK-NEXT: [[V25:%.+]] = comb.concat [[C0]], %arg2 : i2, i6
++  // CHECK:      comb.shru [[V25]], {{%.+}} : i8
++  moore.dyn_extract %arg2 from %2 : !moore.i6, !moore.i32 -> !moore.i8
+   // CHECK-NEXT: [[V21:%.+]] = comb.extract %c2_i32 from 3 : (i32) -> i29
+   // CHECK-NEXT: [[CONST_0:%.+]] = hw.constant 0 : i29
+   // CHECK-NEXT: [[V22:%.+]] = comb.icmp eq [[V21]], [[CONST_0]] : i29
+diff --git a/test/Conversion/MooreToCore/errors.mlir b/test/Conversion/MooreToCore/errors.mlir
+index 64e67ae..cf92e3c 100644
+--- a/test/Conversion/MooreToCore/errors.mlir
++++ b/test/Conversion/MooreToCore/errors.mlir
+@@ -36,3 +36,11 @@ func.func @classNewWithString() {
+ }
+ 
+ // -----
++
++// -----
++
++func.func @dynExtractArrayToInt(%arg0: !moore.array<4 x i2>, %arg1: !moore.i32) -> !moore.i4 {
++  // expected-error @below {{failed to legalize operation 'moore.dyn_extract'}}
++  %0 = moore.dyn_extract %arg0 from %arg1 : array<4 x i2>, i32 -> i4
++  return %0 : !moore.i4
++}
+-- 
+2.56.0
+

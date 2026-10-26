@@ -1,0 +1,141 @@
+From 1b4cff97bc2de13c7e8aa220e74e71e69efc21c2 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:56:03 +0530
+Subject: [PATCH] [CombToSynth] Lower comb.icmp with zero-width operands
+
+The `comb.icmp` lowering assumed its operands have at least one bit:
+
+- unsigned comparisons built a parallel-prefix tree over zero bits when an
+  architecture other than ripple carry was selected, so Kogge-Stone
+  asserted (`width must be positive`) and Sklansky/Brent-Kung indexed an
+  empty vector;
+- signed `i1` comparisons hit the same path, because their magnitude
+  (all bits but the sign) is zero-width;
+- `eq`/`ne` built an `and_inv`/`or` over an empty bit list and asserted;
+- signed `i0` comparisons were rejected as unsupported.
+
+All zero-width values are equal, so fold an `i0` comparison to the result
+for equal operands (reusing the Comb folder's
+`applyCmpPredicateToEqualOperands`, now exported from CombOps.h), and use
+the ripple-carry comparator, which handles zero bits, for zero-width
+magnitudes.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ include/circt/Dialect/Comb/CombOps.h          |  3 +++
+ lib/Conversion/CombToSynth/CombToSynth.cpp    | 16 ++++++++----
+ lib/Dialect/Comb/CombFolds.cpp                |  2 +-
+ .../CombToSynth/comb-to-aig-arith.mlir        | 26 +++++++++++++++++++
+ 4 files changed, 41 insertions(+), 6 deletions(-)
+
+diff --git a/include/circt/Dialect/Comb/CombOps.h b/include/circt/Dialect/Comb/CombOps.h
+index fb615d5..1df865f 100644
+--- a/include/circt/Dialect/Comb/CombOps.h
++++ b/include/circt/Dialect/Comb/CombOps.h
+@@ -73,6 +73,9 @@ Value createOrFoldNot(ImplicitLocOpBuilder &builder, Value value,
+ /// Extract bits from a value.
+ void extractBits(OpBuilder &builder, Value val, SmallVectorImpl<Value> &bits);
+ 
++/// Return the result of a comparison whose operands are equal.
++bool applyCmpPredicateToEqualOperands(ICmpPredicate predicate);
++
+ /// Construct a mux tree for given leaf nodes. `selectors` is the selector for
+ /// each level of the tree. Currently the selector is tested from MSB to LSB.
+ Value constructMuxTree(OpBuilder &builder, Location loc,
+diff --git a/lib/Conversion/CombToSynth/CombToSynth.cpp b/lib/Conversion/CombToSynth/CombToSynth.cpp
+index 6fba8b5..07ea273 100644
+--- a/lib/Conversion/CombToSynth/CombToSynth.cpp
++++ b/lib/Conversion/CombToSynth/CombToSynth.cpp
+@@ -1454,9 +1454,10 @@ struct CombICmpOpConversion : OpConversionPattern<ICmpOp> {
+       std::swap(a, b);
+     auto width = a.getType().getIntOrFloatBitWidth();
+ 
+-    // Check if the architecture is specified by an attribute.
++    // Check if the architecture is specified by an attribute. Prefix trees
++    // need at least one bit, so zero-width operands use ripple carry.
+     auto arch = determineAdderArch(op, width);
+-    if (arch == AdderArchitecture::RippleCarry)
++    if (arch == AdderArchitecture::RippleCarry || width == 0)
+       return constructRippleCarry(loc, a, b, includeEq, rewriter);
+ 
+     // For larger widths, use parallel prefix tree
+@@ -1495,6 +1496,14 @@ struct CombICmpOpConversion : OpConversionPattern<ICmpOp> {
+     auto lhs = adaptor.getLhs();
+     auto rhs = adaptor.getRhs();
+ 
++    // All zero-width values are equal.
++    if (lhs.getType().getIntOrFloatBitWidth() == 0) {
++      replaceOpWithNewOpAndCopyNamehint<hw::ConstantOp>(
++          rewriter, op,
++          APInt(1, applyCmpPredicateToEqualOperands(op.getPredicate())));
++      return success();
++    }
++
+     switch (op.getPredicate()) {
+     default:
+       return failure();
+@@ -1537,9 +1546,6 @@ struct CombICmpOpConversion : OpConversionPattern<ICmpOp> {
+     case ICmpPredicate::sle:
+     case ICmpPredicate::sgt:
+     case ICmpPredicate::sge: {
+-      if (lhs.getType().getIntOrFloatBitWidth() == 0)
+-        return rewriter.notifyMatchFailure(
+-            op.getLoc(), "i0 signed comparison is unsupported");
+       bool isLess = op.getPredicate() == ICmpPredicate::slt ||
+                     op.getPredicate() == ICmpPredicate::sle;
+       bool includeEq = op.getPredicate() == ICmpPredicate::sge ||
+diff --git a/lib/Dialect/Comb/CombFolds.cpp b/lib/Dialect/Comb/CombFolds.cpp
+index 45d877a..a614f05 100644
+--- a/lib/Dialect/Comb/CombFolds.cpp
++++ b/lib/Dialect/Comb/CombFolds.cpp
+@@ -3043,7 +3043,7 @@ static bool applyCmpPredicate(ICmpPredicate predicate, const APInt &lhs,
+ 
+ // Returns the result of applying the predicate when the LHS and RHS are the
+ // exact same value.
+-static bool applyCmpPredicateToEqualOperands(ICmpPredicate predicate) {
++bool comb::applyCmpPredicateToEqualOperands(ICmpPredicate predicate) {
+   switch (predicate) {
+   case ICmpPredicate::eq:
+   case ICmpPredicate::sle:
+diff --git a/test/Conversion/CombToSynth/comb-to-aig-arith.mlir b/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
+index 70d4453..7aaaa13 100644
+--- a/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
++++ b/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
+@@ -312,6 +312,32 @@ hw.module @icmp_signed_compare(in %lhs: i2, in %rhs: i2, out out_sgt: i1, out ou
+   hw.output %sgt, %sge, %slt, %sle : i1, i1, i1, i1
+ }
+ 
++// Zero-width operands are always equal.
++// CHECK-LABEL: @icmp_zero_width
++// CHECK-NEXT:   %[[TRUE:.+]] = hw.constant true
++// CHECK-NEXT:   %[[FALSE:.+]] = hw.constant false
++// CHECK-NEXT:   hw.output %[[TRUE]], %[[FALSE]], %[[FALSE]], %[[TRUE]], %[[FALSE]], %[[TRUE]]
++hw.module @icmp_zero_width(in %lhs: i0, in %rhs: i0, out out_eq: i1, out out_ne: i1, out out_ult: i1, out out_uge: i1, out out_slt: i1, out out_sle: i1) {
++  %eq = comb.icmp eq %lhs, %rhs : i0
++  %ne = comb.icmp ne %lhs, %rhs : i0
++  %ult = comb.icmp ult %lhs, %rhs {synth.test.arch = "KOGGE-STONE"} : i0
++  %uge = comb.icmp uge %lhs, %rhs {synth.test.arch = "SKLANSKEY"} : i0
++  %slt = comb.icmp slt %lhs, %rhs : i0
++  %sle = comb.icmp sle %lhs, %rhs : i0
++  hw.output %eq, %ne, %ult, %uge, %slt, %sle : i1, i1, i1, i1, i1, i1
++}
++
++// The magnitude of an i1 signed comparison is zero-width.
++// CHECK-LABEL: @icmp_signed_i1_prefix_tree
++// CHECK-NEXT:   %[[FALSE:.+]] = hw.constant false
++// CHECK-NEXT:   %[[SIGNS_DIFFER:.+]] = comb.xor %lhs, %rhs : i1
++// CHECK-NEXT:   %[[SLT:.+]] = comb.mux %[[SIGNS_DIFFER]], %lhs, %[[FALSE]] : i1
++// CHECK-NEXT:   hw.output %[[SLT]] : i1
++hw.module @icmp_signed_i1_prefix_tree(in %lhs: i1, in %rhs: i1, out out_slt: i1) {
++  %slt = comb.icmp slt %lhs, %rhs {synth.test.arch = "KOGGE-STONE"} : i1
++  hw.output %slt : i1
++}
++
+ // CHECK-LABEL: @shift2
+ // ALLOW_ICMP-LABEL: @shift2
+ hw.module @shift2(in %lhs: i2, in %rhs: i2, out out_shl: i2, out out_shr: i2, out out_shrs: i2) {
+-- 
+2.56.0
+

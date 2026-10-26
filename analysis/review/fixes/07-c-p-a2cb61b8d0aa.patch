@@ -1,0 +1,130 @@
+From 16da288e097245e28a4a589ca96fa7225c66a278 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:30:44 +0530
+Subject: [PATCH] [MooreToCore] Fix overflow in moore.extract padding for
+ extreme offsets
+
+`ExtractOpConversion` computes the zero padding for out-of-bounds bit and
+array-slice extracts as `-low` and `low + resultWidth` in `int32_t`. For a
+`lowBit` of -2^31 the negation overflows, and for offsets near 2^31 so
+does the sum. The resulting padding widths were garbage: an array slice
+ended up with nothing to concatenate and `hw::ArrayConcatOp::build`
+asserted ("Cannot build array of zero elements"), and an integer extract
+produced an `hw.bitcast` from `i0`, which fails verification.
+
+Do the offset arithmetic in `int64_t`; the 32-bit `lowBit` cannot overflow
+it. Such extracts are now fully out of bounds and lower to zero, like
+other out-of-bounds extracts.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/MooreToCore/MooreToCore.cpp | 33 ++++++++++++----------
+ test/Conversion/MooreToCore/basic.mlir     | 10 +++++++
+ 2 files changed, 28 insertions(+), 15 deletions(-)
+
+diff --git a/lib/Conversion/MooreToCore/MooreToCore.cpp b/lib/Conversion/MooreToCore/MooreToCore.cpp
+index 2ae6342..eb4dbcf 100644
+--- a/lib/Conversion/MooreToCore/MooreToCore.cpp
++++ b/lib/Conversion/MooreToCore/MooreToCore.cpp
+@@ -1347,20 +1347,22 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+     Type resultType = typeConverter->convertType(op.getResult().getType());
+     Value input = adaptor.getInput();
+     Type inputType = input.getType();
+-    int32_t low = adaptor.getLowBit();
++    // Compute offsets in 64 bits; `low` may be close to the 32-bit limits.
++    int64_t low = static_cast<int32_t>(adaptor.getLowBit());
+     auto loc = op.getLoc();
+ 
+     // Bit-addressed extract out of an integer into any bitcastable result.
+     if (isa<IntegerType>(inputType)) {
+-      int32_t inputWidth = inputType.getIntOrFloatBitWidth();
+-      int32_t resultWidth = hw::getBitWidth(resultType);
++      int64_t inputWidth = inputType.getIntOrFloatBitWidth();
++      int64_t resultWidth = hw::getBitWidth(resultType);
+       if (resultWidth < 0)
+         return failure();
+ 
+-      int32_t high = low + resultWidth;
+-      int32_t lsbPad = std::clamp(-low, 0, resultWidth);
+-      int32_t msbPad = std::clamp(high - inputWidth, 0, resultWidth - lsbPad);
+-      int32_t extractWidth = resultWidth - lsbPad - msbPad;
++      int64_t high = low + resultWidth;
++      int64_t lsbPad = std::clamp<int64_t>(-low, 0, resultWidth);
++      int64_t msbPad =
++          std::clamp<int64_t>(high - inputWidth, 0, resultWidth - lsbPad);
++      int64_t extractWidth = resultWidth - lsbPad - msbPad;
+ 
+       SmallVector<Value> sbv;
+       if (msbPad > 0)
+@@ -1369,7 +1371,7 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+       if (extractWidth > 0)
+         sbv.push_back(rewriter.createOrFold<comb::ExtractOp>(
+             loc, rewriter.getIntegerType(extractWidth), input,
+-            std::max(low, 0)));
++            std::max<int64_t>(low, 0)));
+ 
+       if (lsbPad > 0)
+         sbv.push_back(hw::ConstantOp::create(rewriter, loc, APInt(lsbPad, 0)));
+@@ -1386,7 +1388,7 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+     if (auto arrTy = dyn_cast<hw::ArrayType>(inputType)) {
+       Type elementType = arrTy.getElementType();
+       int32_t idxWidth = llvm::Log2_64_Ceil(arrTy.getNumElements());
+-      int32_t inputWidth = arrTy.getNumElements();
++      int64_t inputWidth = arrTy.getNumElements();
+ 
+       // Array element
+       if (resultType == elementType) {
+@@ -1407,12 +1409,13 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+       // Array slice
+       if (auto resArrTy = dyn_cast<hw::ArrayType>(resultType);
+           resArrTy && resArrTy.getElementType() == elementType) {
+-        int32_t resultWidth = resArrTy.getNumElements();
+-        int32_t high = low + resultWidth;
++        int64_t resultWidth = resArrTy.getNumElements();
++        int64_t high = low + resultWidth;
+ 
+-        int32_t lsbPad = std::clamp(-low, 0, resultWidth);
+-        int32_t msbPad = std::clamp(high - inputWidth, 0, resultWidth - lsbPad);
+-        int32_t extractWidth = resultWidth - lsbPad - msbPad;
++        int64_t lsbPad = std::clamp<int64_t>(-low, 0, resultWidth);
++        int64_t msbPad =
++            std::clamp<int64_t>(high - inputWidth, 0, resultWidth - lsbPad);
++        int64_t extractWidth = resultWidth - lsbPad - msbPad;
+ 
+         SmallVector<Value> toConcat;
+         if (msbPad > 0) {
+@@ -1428,7 +1431,7 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+               loc, hw::ArrayType::get(elementType, extractWidth), input,
+               hw::ConstantOp::create(rewriter, loc,
+                                      rewriter.getIntegerType(idxWidth),
+-                                     std::max(low, 0))));
++                                     std::max<int64_t>(low, 0))));
+ 
+         if (lsbPad > 0) {
+           auto zeros = createZeroValue(hw::ArrayType::get(elementType, lsbPad),
+diff --git a/test/Conversion/MooreToCore/basic.mlir b/test/Conversion/MooreToCore/basic.mlir
+index 027b85c..ec817b6 100644
+--- a/test/Conversion/MooreToCore/basic.mlir
++++ b/test/Conversion/MooreToCore/basic.mlir
+@@ -180,6 +180,16 @@ func.func @Expressions(%arg0: !moore.i1, %arg1: !moore.l1, %arg2: !moore.i6, %ar
+   // CHECK: hw.aggregate_constant [0 : i32, 0 : i32] : !hw.array<2xi32>
+   moore.extract %arg5 from 5 : !moore.array<5 x i32> -> !moore.array<2 x i32>
+ 
++  // Offsets at the 32-bit limits are out of bounds, not overflowing.
++  // CHECK: hw.aggregate_constant [0 : i32, 0 : i32] : !hw.array<2xi32>
++  moore.extract %arg5 from -2147483648 : !moore.array<5 x i32> -> !moore.array<2 x i32>
++  // CHECK: hw.aggregate_constant [0 : i32, 0 : i32] : !hw.array<2xi32>
++  moore.extract %arg5 from 2147483647 : !moore.array<5 x i32> -> !moore.array<2 x i32>
++  // CHECK-NEXT: hw.constant 0 : i4
++  moore.extract %arg2 from -2147483648 : !moore.i6 -> !moore.i4
++  // CHECK-NEXT: hw.constant 0 : i4
++  moore.extract %arg2 from 2147483647 : !moore.i6 -> !moore.i4
++
+   // CHECK-NEXT: hw.constant 0 : i32
+   moore.extract %arg5 from -2 : !moore.array<5 x i32> -> i32
+   // CHECK-NEXT: hw.constant 0 : i32
+-- 
+2.56.0
+

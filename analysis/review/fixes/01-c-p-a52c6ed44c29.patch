@@ -1,0 +1,109 @@
+From 1a6d05deae510f0f055dbd470ca95e51ea239261 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:16:21 +0530
+Subject: [PATCH] [OM] Fix integer shift folders for out-of-range shift amounts
+
+Folding `om.integer.shl` or `om.integer.shr` with a large constant shift
+amount tripped APInt assertions (`ShiftAmt <= BitWidth`).
+
+`IntegerShrOp::fold` passed the 64-bit shift amount straight to
+`APSInt::operator>>`, which takes an `unsigned` no larger than the bit
+width. Amounts at or above the width asserted, and amounts of 2^32 or more
+were truncated, so they could fold to a wrong value. An arithmetic shift by
+the bit width or more leaves only sign bits, so clamp the amount to the
+width.
+
+`IntegerShlOp::fold` extends the operand to `width + shiftAmt` bits, but
+the sum was truncated to `unsigned` before the shift, so the shift amount
+exceeded the new width. The folded value is materialized as a builtin
+`IntegerAttr`, whose width is capped at `IntegerType::kMaxWidth`; emit an
+error when the result would be wider, as the folder already does for
+negative and non-64-bit shift amounts.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Dialect/OM/OMOps.cpp                         | 11 ++++++++++-
+ test/Dialect/OM/canonicalizers.mlir              | 16 ++++++++++++++++
+ .../OM/elaborate-object-errors-unevaluated.mlir  | 11 +++++++++++
+ 3 files changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/lib/Dialect/OM/OMOps.cpp b/lib/Dialect/OM/OMOps.cpp
+index 4f58d3a..79ba030 100644
+--- a/lib/Dialect/OM/OMOps.cpp
++++ b/lib/Dialect/OM/OMOps.cpp
+@@ -840,7 +840,10 @@ OpFoldResult IntegerShrOp::fold(FoldAdaptor adaptor) {
+         if (!rhs.isRepresentableByInt64())
+           return (emitOpError("shift amount must be representable in 64 bits"),
+                   failure());
+-        return success(lhs >> rhs.getExtValue());
++        // Shifting by the bit width or more leaves only sign bits; clamp the
++        // amount since APInt does not support larger shifts.
++        return success(lhs >>
++                       std::min<int64_t>(rhs.getExtValue(), lhs.getBitWidth()));
+       });
+ }
+ 
+@@ -861,6 +864,12 @@ OpFoldResult IntegerShlOp::fold(FoldAdaptor adaptor) {
+           return (emitOpError("shift amount must be representable in 64 bits"),
+                   failure());
+         int64_t shiftAmt = rhs.getExtValue();
++        // The result is materialized as a builtin integer attribute, so its
++        // width cannot exceed the maximum integer type width.
++        if (shiftAmt > IntegerType::kMaxWidth - lhs.getBitWidth())
++          return (emitOpError("shift result must not exceed ")
++                      << IntegerType::kMaxWidth << " bits",
++                  failure());
+         // Extend lhs to lhsWidth + shiftAmt bits so no bits are truncated.
+         return success(lhs.extend(lhs.getBitWidth() + shiftAmt) << shiftAmt);
+       });
+diff --git a/test/Dialect/OM/canonicalizers.mlir b/test/Dialect/OM/canonicalizers.mlir
+index 247b225..de67b86 100644
+--- a/test/Dialect/OM/canonicalizers.mlir
++++ b/test/Dialect/OM/canonicalizers.mlir
+@@ -108,6 +108,22 @@ om.class @IntegerBinaryArithmeticFold(%x: !om.integer) -> (out1: !om.integer, ou
+   om.class.fields %0, %1, %2, %3, %4, %5 : !om.integer, !om.integer, !om.integer, !om.integer, !om.integer, !om.integer
+ }
+ 
++// Shift amounts at or above the bit width leave only sign bits.
++// CHECK-LABEL: @IntegerShrOversized
++om.class @IntegerShrOversized() -> (out1: !om.integer, out2: !om.integer) {
++  %neg5 = om.constant #om.integer<-5 : si8> : !om.integer
++  %i100 = om.constant #om.integer<100 : si8> : !om.integer
++  %i2pow32 = om.constant #om.integer<4294967296 : si64> : !om.integer
++
++  // CHECK-DAG: [[SHR0:%.+]] = om.constant #om.integer<-1 : si8> : !om.integer
++  // CHECK-DAG: [[SHR1:%.+]] = om.constant #om.integer<-1 : si64> : !om.integer
++  %0 = om.integer.shr %neg5, %i100 : !om.integer
++  %1 = om.integer.shr %neg5, %i2pow32 : !om.integer
++
++  // CHECK: om.class.fields [[SHR0]], [[SHR1]]
++  om.class.fields %0, %1 : !om.integer, !om.integer
++}
++
+ // CHECK-LABEL: @IntegerBitwiseOpsFold
+ om.class @IntegerBitwiseOpsFold(%x: !om.integer) -> (out1: !om.integer, out2: !om.integer,
+                                                      out3: !om.integer, out4: !om.integer,
+diff --git a/test/Dialect/OM/elaborate-object-errors-unevaluated.mlir b/test/Dialect/OM/elaborate-object-errors-unevaluated.mlir
+index 76e0935..d4a13eb 100644
+--- a/test/Dialect/OM/elaborate-object-errors-unevaluated.mlir
++++ b/test/Dialect/OM/elaborate-object-errors-unevaluated.mlir
+@@ -26,3 +26,14 @@ om.class @NonConstantMessage() {
+   om.property_assert %false, %msg : i1
+   om.class.fields
+ }
++
++// -----
++
++// The folded result would exceed the maximum integer width.
++om.class @ShlTooWide() -> (result: !om.integer) {
++  %c1 = om.constant #om.integer<1 : si64> : !om.integer
++  %c2 = om.constant #om.integer<4294967290 : si64> : !om.integer
++  // expected-error @below {{'om.integer.shl' op shift result must not exceed 16777215 bits}}
++  %result = om.integer.shl %c1, %c2 : !om.integer
++  om.class.fields %result : !om.integer
++}
+-- 
+2.56.0
+

@@ -1,0 +1,80 @@
+From 409d261c3171d22f4067a99d457850dc35c46319 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:58:15 +0530
+Subject: [PATCH] [CoreToFSM] Give the deasserted reset constant the reset's
+ type
+
+CoreToFSM treats a register's reset as deasserted in the generated states
+and replaces the reset block argument with a constant 0 in each state's
+output region and each transition's guard region. That constant was
+created with the type of the state register instead of the reset's own
+type. When the state register is wider than one bit and the reset also
+feeds other logic, its `i1` uses received an `iN` constant: the greedy
+canonicalization then folded `comb.and`/`comb.icmp` on operands of
+different widths and asserted in APInt (`Bit widths must be the same`,
+`Comparison requires equal bit widths`), or the pass emitted ill-typed IR.
+
+Create the constant with the block argument's type, as the active-low
+reset path already does.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/CoreToFSM/CoreToFSM.cpp |  4 ++--
+ test/Conversion/CoreToFSM/basic.mlir   | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/lib/Conversion/CoreToFSM/CoreToFSM.cpp b/lib/Conversion/CoreToFSM/CoreToFSM.cpp
+index a721ebf..e9ef1ac 100644
+--- a/lib/Conversion/CoreToFSM/CoreToFSM.cpp
++++ b/lib/Conversion/CoreToFSM/CoreToFSM.cpp
+@@ -853,7 +853,7 @@ public:
+           if (BlockArgument blockArg = dyn_cast<BlockArgument>(registerReset)) {
+             asyncResetArguments.insert(blockArg.getArgNumber());
+             auto falseConst = hw::ConstantOp::create(
+-                opBuilder, blockArg.getLoc(), clonedRegValue.getType(), 0);
++                opBuilder, blockArg.getLoc(), blockArg.getType(), 0);
+             blockArg.replaceAllUsesWith(falseConst.getResult());
+           }
+           if (auto xorOp = registerReset.getDefiningOp<XorOp>()) {
+@@ -962,7 +962,7 @@ public:
+             if (BlockArgument blockArg =
+                     dyn_cast<BlockArgument>(registerReset)) {
+               auto falseConst = hw::ConstantOp::create(
+-                  opBuilder, blockArg.getLoc(), clonedRegValue.getType(), 0);
++                  opBuilder, blockArg.getLoc(), blockArg.getType(), 0);
+               blockArg.replaceAllUsesWith(falseConst.getResult());
+             }
+             if (auto xorOp = registerReset.getDefiningOp<XorOp>()) {
+diff --git a/test/Conversion/CoreToFSM/basic.mlir b/test/Conversion/CoreToFSM/basic.mlir
+index 1307f8a..805f28c 100644
+--- a/test/Conversion/CoreToFSM/basic.mlir
++++ b/test/Conversion/CoreToFSM/basic.mlir
+@@ -73,3 +73,23 @@ hw.module @regs_without_reset(in %clk : !seq.clock) {
+     %state = seq.compreg name "state" %state, %clk : i1
+     %var = seq.compreg name "var" %state, %clk : i1
+ }
++
++// A reset that also feeds logic is replaced by a constant of its own type, not
++// of the state register's type, in the output and guard regions.
++// CHECK-LABEL: fsm.machine @reset_used_in_logic
++// CHECK-SAME: (%{{.+}}: i1) -> i1
++// CHECK: fsm.state @state_0 output {
++// CHECK-NEXT:   %[[FALSE:.+]] = hw.constant false
++// CHECK-NEXT:   fsm.output %[[FALSE]] : i1
++// CHECK-NEXT: } transitions {
++// CHECK-NEXT:   fsm.transition @state_1 guard {
++// CHECK-NEXT:     %[[TRUE:.+]] = hw.constant true
++// CHECK-NEXT:     fsm.return %[[TRUE]]
++hw.module @reset_used_in_logic(in %clk : !seq.clock, in %rst : i1, in %in : i1, out out : i1) {
++    %c0_i2 = hw.constant 0 : i2
++    %c1_i2 = hw.constant 1 : i2
++    %next = comb.mux %rst, %c0_i2, %c1_i2 : i2
++    %state = seq.compreg name "state" %next, %clk reset %rst, %c0_i2 : i2
++    %0 = comb.and %rst, %in : i1
++    hw.output %0 : i1
++}
+-- 
+2.56.0
+

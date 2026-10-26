@@ -1,0 +1,113 @@
+From 548ae7d611587fb5f7eca70f31ad47e5df7ec535 Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:35:20 +0530
+Subject: [PATCH] [MooreToCore] Reject extract_ref types that have no LLHD
+ projection
+
+`ExtractRefOpConversion` and `DynExtractRefOpConversion` cast the converted
+input to `llhd::RefType` and picked an LLHD projection from the input type
+alone, without checking the result type:
+
+- A reference to an open (dynamic) array converts to `!llvm.ptr`, so the
+  `cast<llhd::RefType>` asserted, e.g. for
+  `moore.dyn_extract_ref %a from %i : <open_uarray<i32>>, i32 -> <i32>`.
+- An integer reference with a non-integer or wider result, e.g.
+  `moore.extract_ref %x from 0 : <i6> -> <struct<{a: i2, b: i2}>>`,
+  produced an `llhd.sig.extract` that fails verification. Likewise for an
+  array reference whose result is neither its element type nor a narrower
+  array of it, which produced an invalid `llhd.sig.array_slice`.
+
+LLHD has no projection that reinterprets a reference as another type, so
+these cannot be lowered. Check the converted types up front and fail the
+pattern, which reports the op as not legalizable, instead of crashing or
+emitting invalid IR.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/MooreToCore/MooreToCore.cpp | 29 ++++++++++++++++++++++
+ test/Conversion/MooreToCore/errors.mlir    | 16 ++++++++++++
+ 2 files changed, 45 insertions(+)
+
+diff --git a/lib/Conversion/MooreToCore/MooreToCore.cpp b/lib/Conversion/MooreToCore/MooreToCore.cpp
+index 5e9b8d6..8051eba 100644
+--- a/lib/Conversion/MooreToCore/MooreToCore.cpp
++++ b/lib/Conversion/MooreToCore/MooreToCore.cpp
+@@ -1451,6 +1451,31 @@ struct ExtractOpConversion : public OpConversionPattern<ExtractOp> {
+   }
+ };
+ 
++/// Check that a reference extract from `input` to `result` maps onto an LLHD
++/// projection: `llhd.sig.extract` for integers, `llhd.sig.array_get` or
++/// `llhd.sig.array_slice` for arrays.
++static bool isSupportedRefExtract(Type input, Type result) {
++  auto inputRef = dyn_cast<llhd::RefType>(input);
++  auto resultRef = dyn_cast_or_null<llhd::RefType>(result);
++  if (!inputRef || !resultRef)
++    return false;
++  Type inputType = inputRef.getNestedType();
++  Type resultType = resultRef.getNestedType();
++  if (auto intType = dyn_cast<IntegerType>(inputType)) {
++    auto resultIntType = dyn_cast<IntegerType>(resultType);
++    return resultIntType && resultIntType.getWidth() <= intType.getWidth();
++  }
++  if (auto arrType = dyn_cast<hw::ArrayType>(inputType)) {
++    if (resultType == arrType.getElementType())
++      return true;
++    auto resultArrType = dyn_cast<hw::ArrayType>(resultType);
++    return resultArrType &&
++           resultArrType.getElementType() == arrType.getElementType() &&
++           resultArrType.getNumElements() <= arrType.getNumElements();
++  }
++  return false;
++}
++
+ struct ExtractRefOpConversion : public OpConversionPattern<ExtractRefOp> {
+   using OpConversionPattern::OpConversionPattern;
+ 
+@@ -1459,6 +1484,8 @@ struct ExtractRefOpConversion : public OpConversionPattern<ExtractRefOp> {
+                   ConversionPatternRewriter &rewriter) const override {
+     // TODO: properly handle out-of-bounds accesses
+     Type resultType = typeConverter->convertType(op.getResult().getType());
++    if (!isSupportedRefExtract(adaptor.getInput().getType(), resultType))
++      return failure();
+     Type inputType =
+         cast<llhd::RefType>(adaptor.getInput().getType()).getNestedType();
+ 
+@@ -1564,6 +1591,8 @@ struct DynExtractRefOpConversion : public OpConversionPattern<DynExtractRefOp> {
+                   ConversionPatternRewriter &rewriter) const override {
+     // TODO: properly handle out-of-bounds accesses
+     Type resultType = typeConverter->convertType(op.getResult().getType());
++    if (!isSupportedRefExtract(adaptor.getInput().getType(), resultType))
++      return failure();
+     Type inputType =
+         cast<llhd::RefType>(adaptor.getInput().getType()).getNestedType();
+ 
+diff --git a/test/Conversion/MooreToCore/errors.mlir b/test/Conversion/MooreToCore/errors.mlir
+index cf92e3c..f38d82f 100644
+--- a/test/Conversion/MooreToCore/errors.mlir
++++ b/test/Conversion/MooreToCore/errors.mlir
+@@ -44,3 +44,19 @@ func.func @dynExtractArrayToInt(%arg0: !moore.array<4 x i2>, %arg1: !moore.i32)
+   %0 = moore.dyn_extract %arg0 from %arg1 : array<4 x i2>, i32 -> i4
+   return %0 : !moore.i4
+ }
++
++// -----
++
++func.func @extractRefIntToStruct(%arg0: !moore.ref<i6>) -> !moore.ref<struct<{a: i2, b: i2}>> {
++  // expected-error @below {{failed to legalize operation 'moore.extract_ref'}}
++  %0 = moore.extract_ref %arg0 from 0 : <i6> -> <struct<{a: i2, b: i2}>>
++  return %0 : !moore.ref<struct<{a: i2, b: i2}>>
++}
++
++// -----
++
++func.func @dynExtractRefOpenArray(%arg0: !moore.ref<open_uarray<i32>>, %arg1: !moore.i32) -> !moore.ref<i32> {
++  // expected-error @below {{failed to legalize operation 'moore.dyn_extract_ref'}}
++  %0 = moore.dyn_extract_ref %arg0 from %arg1 : <open_uarray<i32>>, i32 -> <i32>
++  return %0 : !moore.ref<i32>
++}
+-- 
+2.56.0
+

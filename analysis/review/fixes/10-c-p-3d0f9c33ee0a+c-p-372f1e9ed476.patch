@@ -1,0 +1,75 @@
+From 4d262e244e6c6cc73bc547ef2c7cfc114caca50a Mon Sep 17 00:00:00 2001
+From: Adithya J <adithya2685@gmail.com>
+Date: Tue, 27 Oct 2026 02:39:05 +0530
+Subject: [PATCH] [CombToSynth] Fix shift lowering when no shift amount is in
+ bounds
+
+`createShiftLogic` builds a mux tree over the results for the in-bounds
+shift amounts `[0, maxShiftAmount)` and falls back to the out-of-bounds
+value. With `maxShiftAmount == 0` there are no in-bounds results, which
+happens for `comb.shl`/`comb.shru` on `i0` and `comb.shrs` on `i1`:
+
+- for `i0` shifts the out-of-bounds padding is the null "i0 value", so
+  the `outOfBoundsValue must be valid` assertion fired;
+- for an `i1` `comb.shrs`, `comb::constructMuxTree` indexed the empty list
+  of results and asserted (`Index < Length`).
+
+Materialize a null padding as an `i0` constant and, when no shift amount is
+in bounds, return the out-of-bounds value directly. This is the correct
+result: an `i0` shift yields the only `i0` value, and an `i1` arithmetic
+shift right always yields its sign bit, i.e. the operand.
+
+Fixes:
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ lib/Conversion/CombToSynth/CombToSynth.cpp         |  9 +++++++--
+ test/Conversion/CombToSynth/comb-to-aig-arith.mlir | 11 +++++++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/lib/Conversion/CombToSynth/CombToSynth.cpp b/lib/Conversion/CombToSynth/CombToSynth.cpp
+index a6b1064..6fba8b5 100644
+--- a/lib/Conversion/CombToSynth/CombToSynth.cpp
++++ b/lib/Conversion/CombToSynth/CombToSynth.cpp
+@@ -96,9 +96,14 @@ static Value createShiftLogic(ConversionPatternRewriter &rewriter, Location loc,
+           rewriter.createOrFold<comb::ConcatOp>(loc, padding, extract));
+   }
+ 
+-  // Create out-of-bounds value
++  // Create out-of-bounds value. A null padding stands for an i0 value.
+   auto outOfBoundsValue = getPadding(maxShiftAmount);
+-  assert(outOfBoundsValue && "outOfBoundsValue must be valid");
++  if (!outOfBoundsValue)
++    outOfBoundsValue = hw::ConstantOp::create(rewriter, loc, APInt::getZero(0));
++
++  // Without any in-bounds shift amount the result is the out-of-bounds value.
++  if (maxShiftAmount == 0)
++    return outOfBoundsValue;
+ 
+   // Construct mux tree for shift operation
+   auto result =
+diff --git a/test/Conversion/CombToSynth/comb-to-aig-arith.mlir b/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
+index 2b57c90..70d4453 100644
+--- a/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
++++ b/test/Conversion/CombToSynth/comb-to-aig-arith.mlir
+@@ -354,6 +354,17 @@ hw.module @shift2(in %lhs: i2, in %rhs: i2, out out_shl: i2, out out_shr: i2, ou
+   hw.output %0, %1, %2 : i2, i2, i2
+ }
+ 
++// Shifts without any in-bounds shift amount lower to the out-of-bounds value.
++// CHECK-LABEL: @shift_no_in_bounds_amount
++// CHECK-NEXT: %[[C0:.+]] = hw.constant 0 : i0
++// CHECK-NEXT: hw.output %[[C0]], %[[C0]], %c : i0, i0, i1
++hw.module @shift_no_in_bounds_amount(in %a: i0, in %b: i0, in %c: i1, in %d: i1, out out_shl: i0, out out_shr: i0, out out_shrs: i1) {
++  %0 = comb.shl %a, %b : i0
++  %1 = comb.shru %a, %b : i0
++  %2 = comb.shrs %c, %d : i1
++  hw.output %0, %1, %2 : i0, i0, i1
++}
++
+ // CHECK-LABEL: @divmod
+ // ALLOW_ICMP-LABEL: @divmod
+ hw.module @divmod(in %in: i1, in %rhs: i2, out out_divu: i2, out out_modu: i2, out out_divs: i2, out out_mods: i2) {
+-- 
+2.56.0
+
