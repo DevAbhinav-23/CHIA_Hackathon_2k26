@@ -139,12 +139,18 @@ def main() -> int:
 
     stages = dataclasses.replace(bug_loop.default_stages(),
                                  triage_report=bug_loop.recorded_report)
+    # counters.json is written once at the end: CounterLog rewrites it on every
+    # stage call, and its violations list grows by 162 per round here.
+    counters = bug_loop.CounterLog(run_id, None)
     campaign = bug_loop.Campaign(
         manifest=manifest, budget=budget, store=store, stages=stages, dispatch=dispatch,
-        counters=bug_loop.CounterLog(run_id, str(run_root / "results")),
-        clone_path=args.clone, image_spec=image, repair_enabled=False,
-        mutation_rounds=True)
-    outcome = bug_loop.campaign_drive(campaign, seeds, arms=["mutation"])
+        counters=counters, clone_path=args.clone, image_spec=image,
+        repair_enabled=False, mutation_rounds=True)
+    try:
+        outcome = bug_loop.campaign_drive(campaign, seeds, arms=["mutation"])
+    finally:
+        counters.results_dir = str(run_root / "results")
+        counters.write()
     bug_loop.finish_run(store, manifest, bug_loop.utc_now())
     print(json.dumps(outcome["arms"], sort_keys=True, indent=2), flush=True)
     with open(args.status_file, "a", encoding="utf-8") as status:

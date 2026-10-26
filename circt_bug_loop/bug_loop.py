@@ -56,7 +56,7 @@ SHIPPED_MODULES = ("circt_bug_loop", "chia", "issue_task.py", "circt_util.py")
 
 #: What is left behind when the flow package is staged.
 _STAGE_EXCLUDES = ("tests", "_shipped", "__pycache__", "*.pyc",
-                   "loop.db", "loop.db-shm", "loop.db-wal")
+                   "loop.db*")          # the store, its WAL files and any backup
 _RUNTIME_ENV_EXCLUDES = ["**/__pycache__", "**/*.pyc"]
 
 #: The two upstream patches the staged copy carries.

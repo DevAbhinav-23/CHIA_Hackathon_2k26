@@ -80,43 +80,50 @@ def accrue(entry: LedgerEntry, db_path: str, budget: BudgetFile) -> dict:
 
 
 def aggregate(run_manifest_id: str, db_path: str, *, today: str = None) -> BudgetLedger:
-    """Sum one run's ledger into the aggregate A6b maintains."""
+    """Sum one run's ledger into the aggregate A6b maintains.
+
+    The sums run in SQL, one group per (arm, scope, stage): the driver calls
+    this per seed and per iteration, and a fold over every row in Python made a
+    long mutation arm quadratic in its own ledger.
+    """
     day = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     store = LoopStore(db_path)
-    rows = store.query("SELECT * FROM ledger_entry WHERE run_manifest_id = ? "
-                       "ORDER BY timestamp_utc, entry_id", (run_manifest_id,))
+    # A turn the loop cannot meter counts at what it was authorised for,
+    # which is the only bound the campaign cap has on it (§3.8).
+    cost = ("COALESCE(json_extract(observed_json, '$.cost_usd'), "
+            "json_extract(observed_json, '$.authorised_usd'))")
+    groups = store.query(
+        f"SELECT arm, scope, stage, SUM(amount) AS amount, SUM({cost}) AS cost, "
+        f"COUNT({cost}) AS priced, SUM(substr(timestamp_utc, 1, 10) = ?) AS today "
+        "FROM ledger_entry WHERE run_manifest_id = ? GROUP BY arm, scope, stage",
+        (day, run_manifest_id))
 
     per_arm_window: dict = {}
     per_arm_stage: dict = {arm: {} for arm in _ARMS}
     shared_stage: dict = {}
     inputs_today: dict = {arm: 0 for arm in _ARMS}
     per_arm_spend_usd: dict = {}
-    stops: dict = {arm: None for arm in _ARMS}
     spend_usd = 0.0
-
-    for row in rows:
-        arm, stage, amount = row["arm"], row["stage"], float(row["amount"])
-        observed = json.loads(row["observed_json"])
-        cost = observed.get("cost_usd")
-        if cost is None:
-            # A turn the loop cannot meter counts at what it was authorised for,
-            # which is the only bound the campaign cap has on it (§3.8).
-            cost = observed.get("authorised_usd")
-        if cost is not None:
-            spend_usd += float(cost)
-            per_arm_spend_usd[arm] = per_arm_spend_usd.get(arm, 0.0) + float(cost)
-        if row["scope"] == "arm_window":
-            per_arm_window[arm] = amount
+    for group in groups:
+        arm, stage, amount = group["arm"], group["stage"], float(group["amount"])
+        if group["priced"]:
+            spend_usd += float(group["cost"])
+            per_arm_spend_usd[arm] = per_arm_spend_usd.get(arm, 0.0) + float(group["cost"])
+        if group["scope"] == "arm_window":
+            per_arm_window[arm] = amount          # one row per arm (FR-14.4)
         elif arm == "shared":
             shared_stage[stage] = shared_stage.get(stage, 0.0) + amount
         else:
             bucket = per_arm_stage.setdefault(arm, {})
             bucket[stage] = bucket.get(stage, 0.0) + amount
-        if (row["scope"] == "stage" and stage == _INPUT_STAGE and arm in inputs_today
-                and row["timestamp_utc"][:10] == day):
-            inputs_today[arm] += 1
-        if row["stop_reason"] is not None and arm in stops:
-            stops[arm] = row["stop_reason"]
+        if group["scope"] == "stage" and stage == _INPUT_STAGE and arm in inputs_today:
+            inputs_today[arm] += int(group["today"] or 0)
+    stops: dict = {arm: None for arm in _ARMS}
+    for row in store.query("SELECT arm, stop_reason FROM ledger_entry WHERE "
+                           "run_manifest_id = ? AND stop_reason IS NOT NULL "
+                           "ORDER BY timestamp_utc, entry_id", (run_manifest_id,)):
+        if row["arm"] in stops:
+            stops[row["arm"]] = row["stop_reason"]
 
     # THIS RUN's filings (W11).
     filings = store.query(
