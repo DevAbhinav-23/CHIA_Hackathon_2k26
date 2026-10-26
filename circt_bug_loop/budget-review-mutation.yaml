@@ -1,0 +1,232 @@
+# budget.yaml - the pre-registration of the CIRCT bug-loop campaign.
+#
+# THE COMMIT THAT LANDS THIS FILE IS THE REGISTRATION (G-32, FR-14.3). Editing it
+# mid-campaign invalidates the campaign (FR-14.7): every stage compares this
+# file's commit SHA against the one in the RunManifest and refuses on a
+# difference. Every [DEFAULT] in 01-FRD.md resolves to exactly one key here.
+
+# budget-review-mutation.yaml - pre-registration of review-mutation-1 (2026-10-27).
+#
+# A copy of campaign 2's registered budget (paper Table II; tag
+# registration/campaign-3, a65331b) for ONE job: `--arm mutation` with
+# `--mutation-rounds`, driven locally (one process, no Ray, no model), over the
+# same corpus head and the same frozen mutator set (set_v2.json). arm_order
+# still names both arms because budget.py check 3 requires it; the arm is the
+# command line's. Exactly two values differ from the registered file:
+#
+#   arm_window_seconds 150000 -> 42836: the seeded arm's actual elapsed wall
+#     clock in campaign 2 (19:01:00 -> operator stop 06:54:56 UTC, both shards;
+#     analysis/measurements/2026-10-27-review-numbers.md section d).
+#   generated_inputs_per_day 2000 -> 1000000: the damage cap counts stage-3
+#     probes per UTC day and STOPS the arm (ledger.stop_reason). Campaign 2's
+#     mutation pass ran 1,154 probes in 266 s, so 2000 would end this arm after
+#     about two rounds, ~8 minutes into a 42,836 s window. The seeded arm never
+#     came near 2000 (624 probes over 11.9 h, two shards). 1000000 cannot bind
+#     in this window at that rate (~185,000 probes) and so is not the budget.
+#
+# --- the primary budget unit (G-48) -----------------------------------------
+# One elapsed wall-clock second of an arm's fixed window W, metered by the
+# campaign driver on the head. The arms run SEQUENTIALLY, each for this same W,
+# in the order below, on the same fixed-size cluster at the same apparatus
+# concurrency. Nothing else is the budget.
+# 7200, not 14400 (W-22, 2026-09-16). The pilot's SEEDED arm spent about
+# USD 0.6 a minute of wall clock, so a four-hour arm run twice is USD 288 against
+# a cap of 200 and the money would stop the campaign inside its first arm - which
+# is exactly what happened to pilot 1, at 43.3 % over. Two hours an arm, four for
+# the campaign, is what the cap can pay for at the measured rate with the head
+# room the fixes of W-18b are expected to open: the tool-loop cap, the per-turn
+# ceiling and stage 6's skipped turn all cut the rate and none of them was
+# measured at campaign scale when this number was chosen. The window is the
+# BUDGET (G-48) and must not be chosen to fit a result, so it is fixed here,
+# before the campaign, from the pilot's own rate and the registered cap.
+# 150000 for campaign 3 (2026-09-16): the whole corpus. Campaign 2's two shards
+# probed 5 and 4 seeds in their 7200 s windows, 2.25 seeds an hour a shard; 184
+# eligible seeds over two shards is 92 a shard, about 41 hours. The window covers
+# the corpus at the measured rate. The money cap below is expected to stop each
+# shard first, at about 35 seeds, and the run then reports `campaign_spend_cap`.
+arm_window_seconds: 42836.0            # review: campaign 2 seeded arm elapsed (see header)
+arm_order: [seeded, mutation]
+
+# --- the model, and the money cap (ADR-D-03, superseding section 2026-09-14) --
+# ONE model id for every agent stage: stages 1, 2 and 6 and the offline mutator
+# synthesis. CHIA's vertex backend in Vertex AI express mode. There is no
+# per-stage model selector and no --model default in the code.
+model_id: gemini-3.8-flash
+
+# The HARD money cap for the whole campaign, both arms together. It is a CAP and
+# not the budget: the primary unit is still the arm window above (G-48). The
+# driver stops BOTH arms when the cumulative cost_usd of the ledger reaches it
+# (FR-18.10's third stop condition), and the results artefact states the spend.
+# 200 against the user's USD 300 credit, leaving headroom for the pilot and for
+# a re-run.
+# 175 per job for campaign 3, two seeded shards and one mutation job: 350 of list
+# price at most. Campaign 2 billed about 45 % of list (68 % of input tokens were
+# cache hits, priced at list by the ledger), and USD 30 of the 300 credit is spent.
+campaign_spend_cap_usd: 175.0
+
+# The two prices the ledger turns tokens into money with. The backend reports
+# usage_metadata token counts and no price, so the arithmetic is the ledger's:
+#   cost_usd = tokens_in/1e6 * input_price + tokens_out/1e6 * output_price
+# VERIFIED 2026-09-15 on Google's own pricing page,
+# ai.google.dev/gemini-api/docs/pricing: gemini-3.8-flash at USD 0.75 and 3.75
+# per million tokens through 2026-12-31, DOUBLING on 2027-01-01, and THINKING
+# TOKENS ARE BILLED AS OUTPUT. ADR-D-03's superseding section is the record and
+# commit ecf4497 is where it was written down; this header said
+# AGGREGATOR-SOURCED and [UNVERIFIED] until W-20b, so the registration artefact
+# and the ADR disagreed about the provenance of the two numbers the whole money
+# cap is computed from (W8). budget.py check 6 requires both.
+#
+# The output rate is what `llm.turn_usage` prices a turn's thinking tokens at,
+# which is K11's fix: `thoughts_token_count` is a separate scalar from
+# `candidates_token_count` and nothing summed it, so every priced turn and this
+# cap were understated by whatever the model thought.
+#
+# A CAMPAIGN THAT RUNS PAST 2026-12-31 IS BILLED AT DOUBLE THESE RATES and this
+# file may not be edited after its registration commit (FR-14.7), so a run that
+# crosses the year end reports a spend that is half of what was charged. The
+# campaign window ends 2026-09-24 (campaign_end_utc below), so it does not.
+price_usd_per_m_input_tokens: 0.75
+price_usd_per_m_output_tokens: 3.75
+
+# --- safety caps, equal for both arms, which bound damage and are not the budget
+generated_inputs_per_day: 1000000       # review: see header; 2000 would stop the arm in minutes
+filings_per_day: 3
+filings_total: 10
+
+# --- the campaign's own window ----------------------------------------------
+campaign_start_utc: "2026-09-15T00:00:00+00:00"
+campaign_end_utc:   "2026-09-24T11:59:00+00:00"
+
+# --- the corpus (FR-01.11) --------------------------------------------------
+# Measured, not chosen: this is the HEAD at which analysis/pin_window_raw.json was
+# computed, and the SHA at which FR-01.1's counts of 187 and 171 hold.
+corpus_head_sha: "d7e94049bde30f2cf95f81bf7cc4b6cf26dd18a2"
+
+# --- the fingerprint (G-43) -------------------------------------------------
+# The headline metric counts DISTINCT bugs, one per primary fingerprint, and a
+# crash fingerprint is this many frame names long. Fixing it here is what stops
+# the headline carrying a parameter chosen after the data exists.
+fingerprint_top_n: 5
+
+# --- calibration (ADR-D-01, D-01(d)) ----------------------------------------
+# DRAWN BEFORE THIS FILE IS COMMITTED, by `bug_loop.draw_calibration`, which
+# samples 20 of the 171 exact-pin seeds with random.Random(corpus_head_sha). The
+# commit that lands this file is the registration, so a sample drawn afterwards
+# would invalidate the campaign (FR-14.3, FR-14.7). budget.py check 5 asserts
+# len(calibration_sample_shas) == calibration_sample_size and that every entry
+# is an exact-pin seed.
+#
+# THE SAMPLE IS EMPTY, AND IT IS EMPTY BECAUSE NOTHING IS ELIGIBLE (W-22).
+# A seed can be calibrated only when its parent's `llvm` gitlink IS the run's own
+# pin, which is the equality FR-03.2 makes the image's build condition, and when
+# its SDK tag is exact. MEASURED 2026-09-15 and recorded in
+# `bug_loop.calibratable`'s own docstring: **0 of the 187 seed parents carry this
+# deployment's pin** `6279700538792da0c5a08e17babfe9b6e824c69f`, and the 187
+# parents are spread over 44 distinct pins, the commonest covering 27 seeds. So
+# the eligible set on this deployment is EMPTY; a sample of twenty drawn from the
+# 171 exact-pin seeds - which is what this file carried until W-22, drawn at the
+# join with `random.Random(corpus_head_sha)` - names twenty seeds calibration
+# mode would refuse to probe, because probing them would mean building a CIRCT
+# commit the image's SDK does not match.
+#
+# The campaign is therefore registered as DISCOVERY MODE with no calibration
+# sample, and the six host-built crash fixtures of W-09 remain the oracle and
+# reducer calibration, as they were recorded. `budget.py` check 5 asserts the
+# length agrees with the size, which it does at zero.
+calibration_sample_size: 0
+calibration_sample_shas: []
+
+# --- the model's own tool loop (errata row 38) -------------------------------
+# How many `generate_content` calls ONE turn of each model-bearing stage may
+# make. CHIA's backend default is 100 and its loop re-sends the whole
+# conversation on every call, so a turn's input cost grows QUADRATICALLY in the
+# number of tool calls. MEASURED, W-18: three turns made 14, 21 and 37 calls and
+# cost USD 1.23, 1.98 and 3.96 against pre-authorisations of about USD 0.06 -
+# 19.7x, 32.3x and 64.1x - and the pilot finished 43.3 % past its registered
+# cap. This is a REGISTERED parameter and not an implementation constant,
+# because `llm.SpendGuard` computes the authorisation from it and the same
+# figure becomes the per-turn ceiling the patched backend enforces from the
+# inside: change it and every authorised number changes.
+#
+# 12 for stages 1 and 2: pilot 2 ran both stage-1 turns out of a cap of 6 and
+# they returned nothing at all, so the cap is doubled and the exhausted loop
+# now asks for a final answer instead of returning empty. 6 for stage 6, which
+# reads the record and writes prose. 20 for stage 7, which is CHIA's OWN repair
+# chain: the loop there is the chain's and this value is RECORDED rather than
+# enforced by this file.
+max_tool_iterations:
+  stage_1: 12
+  stage_2: 12
+  stage_6: 6
+  stage_7: 20
+
+# --- minimality (FR-13.3, gate question 2) -----------------------------------
+# The lines at or below which a case is minimal WHETHER OR NOT the reducer
+# removed anything. MEASURED, W-18: `circt-reduce` made 20 interestingness
+# calls on a three-operation module, removed nothing, reported
+# `reason=no_progress` with `fixpoint=1`, and gate question 2 then answered
+# `not_minimal` for all three of the pilot's candidates - the reducer having
+# reached a fixpoint is EVIDENCE OF minimality and was being read as evidence
+# against it. 12 lines is the threshold: every case the pilot produced was
+# six lines or fewer, and a bug report a maintainer reads is not improved by a
+# case being eight lines rather than twelve. A case ABOVE it that the reducer
+# could not shrink still fails, which is the case worth failing.
+minimal_case_lines: 12
+
+# --- per-seed caps ----------------------------------------------------------
+per_seed_probe_cap: 5                  # FR-04.5, and the mutation arm's cap too
+per_seed_iteration_cap: 3              # FR-16.3
+
+# --- per-probe limits (FR-06.2, FR-06.4) ------------------------------------
+# Applied to the child by prlimit --as --cpu --nofile, never by the container's
+# limits: container limits protect the machine, rlimits classify the probe.
+probe_wall_seconds: 60
+probe_address_space_bytes: 4294967296  # 4 GiB
+probe_cpu_seconds: 45
+probe_output_byte_cap: 1000000         # per stream
+
+# --- reduction (FR-09.4, FR-09.13) ------------------------------------------
+# 600, not 60. circt-reduce made 56 interestingness calls to remove 27% of a
+# SIX-OPERATION module (measured by the LLD review), and each call is bounded by
+# probe_wall_seconds, which is 60. At 60 s the reducer got one or two calls on
+# any realistic input, every ReducedCase came back fixpoint=false, and FR-13.3
+# refused every candidate at gate question 2 as not_minimal. The per-CALL wall is
+# probe_wall_seconds and lives in the interestingness script; this key is the
+# wall for the WHOLE reduction and they are not the same number.
+reduction_wall_seconds: 600
+reduction_sigkill_grace_seconds: 10
+
+# --- the issue mirror (FR-10.9) ---------------------------------------------
+# An ISSUE cap, not a page cap: the mirror walk pages internally. Comments are
+# never mirrored.
+#
+# 12000 [DEFAULT], lowered from 20000 at the join (W-17, architect decision 1,
+# C-22). It is a ROW bound and it now sits below what two directions can reach.
+# MEASURED 2026-09-14 by T-U-triage-35: GitHub refuses page 100 of the issues
+# listing with a 422, so ONE direction sees at most 9,900 numbered items, issues
+# and pull requests together. triage_task.issue_mirror_refresh therefore walks
+# `direction=desc` and then, on that refusal, `direction=asc`, and unions the
+# two by issue number; 19,800 reachable numbers covers llvm/circt's whole
+# history, whose newest number on 2026-09-14 was 11,113. 12000 is that number
+# with headroom for the campaign's own months and no more: a cap above the
+# union's reach would be a promise the endpoint cannot keep.
+issue_mirror_issue_cap: 12000
+
+# --- filing (FR-13.16) ------------------------------------------------------
+filing_poll_window_seconds: 3600
+
+# --- artefacts (FR-17.7) ----------------------------------------------------
+# 256 KiB. Larger artefacts go to disk by path. It also caps a SourceReadTool
+# return (3.5) and a SeedRecord's diff and test_files (2.4). It was 10 MB, which
+# contradicted SQLiteNode's own guidance that this design quotes.
+artefact_inline_cap_bytes: 262144
+
+# --- feature-acceptance sample sizes (9.3) ----------------------------------
+acceptance:
+  seed_sample: 5
+  entry_tools: 3
+  probe_batch: 20
+  recorded_failures: 5
+  recorded_crashes_for_reduction: 3
+  labelled_pairs: 20
+  iterations: 3
