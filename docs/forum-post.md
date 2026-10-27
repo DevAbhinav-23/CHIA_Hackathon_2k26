@@ -1,7 +1,7 @@
 # Forum post (FR-20.1): draft for a human to post
 
 **Where:** LLVM Discourse, category **CIRCT**
-(https://discourse.llvm.org/c/projects-that-want-to-become-official-llvm-projects/circt/40).
+(https://discourse.llvm.org/c/incubator/circt/40).
 **Who posts:** one of the three authors, under their own account and name.
 **Then:** give the architect the post URL and its date; they go into the run
 manifest through `--forum-post-url` and `--forum-post-date` (pre-flight check 11).
@@ -33,7 +33,7 @@ compares arcilator against Verilator on the few designs where both apply.
 
 - Nothing is filed automatically. A named person reads every report and files
   it by hand, or does not. The loop's default is to file nothing.
-- At most 3 issues per day and 10 in total, for the whole campaign.
+- At most 3 issues per day and 10 per campaign.
 - Every issue carries the reduced input, the exact command line and commit,
   the note that the build has assertions on, and the trailer
   `Assisted-by: <tool>:<model>` per CIRCT's AI tool policy.
@@ -43,15 +43,16 @@ compares arcilator against Verilator on the few designs where both apply.
 - Anything labelled `good first issue` is left alone.
 - Your replies are read and answered by a human; nothing you write is fed to
   a model.
-- We will not offer patches unless you say you want them; if we do, they are
-  for crashes and assertion failures only, reviewed and understood by the
-  author, and licensable under Apache-2.0 with LLVM exceptions.
+- We have drafted a candidate patch with a regression test for each, but we
+  will offer them only if you want them; any patch is reviewed and understood
+  by its author, carries `Assisted-by:`, and is licensable under Apache-2.0
+  with LLVM exceptions.
 
 **Timing.** Two runs have finished, one of two hours per arm and one we
-stopped ourselves after twelve hours. Fifteen candidates are now held, each
-reduced and checked against your issues, waiting for a human to read them; the
-caps above still apply, so most of them will never be filed. Filings would
-follow over the days after this post, only after a person has looked at each.
+stopped ourselves after twelve hours. Fifteen candidates are held, from twelve
+root causes; each is reduced, still reproduces on main (4738bd26, 26 October),
+and matches none of your issues. We would file one issue per root cause, at
+most 3 a day, only after a person has read each.
 
 **Two questions.** Would you prefer these as individual issues, or one tracking
 issue with the reduced cases attached? Is there a label you would like on them?
