@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CIRCT bug loop poster, v1 (48 x 36 in)</title>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+a{color:#2F6FAF}a:hover{color:#1E4E7E}
+code{font-family:'IBM Plex Mono',Menlo,Consolas,monospace;font-size:0.88em;font-weight:500;color:#18181D}
+p{margin:0}
+table{border-collapse:collapse}
+</style>
+</helmet>
+<div style="position: relative; width: 4608px; height: 3456px; box-sizing: border-box; padding: 64px 96px; background: #FFFFFF; color: #18181D; font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 28px; line-height: 38px; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="display: flex; gap: 96px; height: 436px; flex: none">
+<div style="width: 2240px; flex: none; display: flex; flex-direction: column">
+<div style="display: flex; align-items: center; gap: 28px; height: 60px">
+<img src="assets/micro-logo.svg" alt="MICRO logo" style="width: 74px; height: 60px; display: block">
+<div style="font-size: 28px; line-height: 34px; font-weight: 600; letter-spacing: 0.08em; color: #3F3F48">MICRO 2026, ATHENS  ·  A<sup style="font-size: 0.6em; line-height: 0">3</sup> WORKSHOP  ·  CHIA HACKATHON</div>
+<img src="assets/ieee-logo.svg" alt="IEEE logo" style="width: 159px; height: 48px; display: block; margin-left: 12px">
+<img src="assets/acm-logo.svg" alt="ACM logo" style="width: 60px; height: 60px; display: block">
+</div>
+<h1 style="margin: 18px 0 0; font-size: 92px; line-height: 98px; font-weight: 600; letter-spacing: -0.015em">From Mined Fixes to Gated Repair:<br>Closed-Loop Defect Synthesis for CIRCT</h1>
+<div style="margin-top: 22px; display: flex; align-items: center; gap: 44px; height: 140px">
+<div style="width: 279px; height: 140px; flex: none; overflow: hidden; position: relative"><img src="assets/iiit-hyderabad-logo.jpg" alt="IIIT Hyderabad logo" style="position: absolute; left: -29px; top: -13px; width: 340px; height: 170px; display: block"></div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 42px; line-height: 52px; font-weight: 500">Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla</div>
+<div style="font-size: 26px; line-height: 34px; color: #3F3F48">International Institute of Information Technology, Hyderabad<br>{abhinav.kota, adithya.jillellamudi}@students.iiit.ac.in, priyesh.shukla@iiit.ac.in</div>
+</div>
+</div>
+</div>
+<div style="width: 1700px; flex: none; display: flex; flex-direction: column; justify-content: center; gap: 22px; border-left: 2px solid #C9C9D1; padding-left: 48px; box-sizing: border-box">
+<div style="display: flex; align-items: center; gap: 32px; height: 112px">
+<div style="width: 200px; flex: none; font-size: 128px; line-height: 112px; font-weight: 700; letter-spacing: -0.04em; color: #6B4FA0; text-align: right">15</div>
+<p style="font-size: 30px; line-height: 40px; text-wrap: pretty"><b style="font-weight: 600">new CIRCT bugs through a four-question gate</b>, sharing 12 root causes, from 758 inputs written by a model that read past fixes</p>
+</div>
+<div style="display: flex; align-items: center; gap: 32px; height: 112px">
+<div style="width: 200px; flex: none; font-size: 128px; line-height: 112px; font-weight: 700; letter-spacing: -0.04em; color: #7A7A84; text-align: right">0</div>
+<p style="font-size: 30px; line-height: 40px; text-wrap: pretty"><b style="font-weight: 600">candidates from 2,308 inputs</b> that mutate the same seed tests on the same harness, in the same two campaigns</p>
+</div>
+<div style="display: flex; align-items: center; gap: 32px; height: 112px">
+<div style="width: 200px; flex: none; font-size: 128px; line-height: 112px; font-weight: 700; letter-spacing: -0.04em; color: #3E6B52; text-align: right">13</div>
+<p style="font-size: 30px; line-height: 40px; text-wrap: pretty"><b style="font-weight: 600">patches with regression tests</b>, written after review. On CIRCT main of 26 October all 15 bugs still fail, and no issue reports them</p>
+</div>
+</div>
+<div style="width: 280px; flex: none; display: flex; flex-direction: column; gap: 12px">
+<img src="assets/repo-qr.svg" alt="QR code linking to the project repository on GitHub" style="width: 280px; height: 280px; display: block">
+<div style="font-size: 24px; line-height: 30px; font-weight: 600">Code, corpus, every verdict</div>
+<div style="font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 20px; line-height: 26px; color: #3F3F48">github.com/DevAbhinav-23/<br>CHIA_Hackathon_2k26</div>
+</div>
+</header>
+
+<div style="height: 3px; background: #18181D; margin: 12px 0; flex: none"></div>
+
+<section style="flex: none; display: flex; flex-direction: column">
+<div style="display: flex; gap: 96px; align-items: flex-end; height: 64px">
+<h2 style="margin: 0; width: 1500px; flex: none; font-size: 54px; line-height: 64px; font-weight: 600; letter-spacing: -0.01em">The loop: the model writes, tools decide</h2>
+<p style="font-size: 28px; line-height: 36px; color: #3F3F48; text-wrap: pretty">A fix that corrects one wrong assumption usually leaves the same assumption at other sites. The agent reads each past fix and writes inputs aimed at those sites, after AFuzz [4]; tools build, judge, reduce and deduplicate, and discard almost everything it writes.</p>
+</div>
+
+<div style="position: relative; width: 4416px; height: 1070px; margin-top: 14px; font-size: 24px; line-height: 30px">
+<div style="position: absolute; left: 380px; top: 0px; width: 2980px; height: 300px; box-sizing: border-box; background: #F3EFFA; border: 2.5px solid #6B4FA0; border-radius: 8px"></div>
+
+<svg width="4416" height="1070" viewBox="0 0 4416 1070" aria-hidden="true" style="position: absolute; left: 0px; top: 0px; width: 4416px; height: 1070px; overflow: visible">
+<rect x="0" y="74" width="294" height="200" rx="6" fill="#FFFFFF" stroke="#9A9AA0" stroke-width="2"></rect>
+<rect x="22" y="60" width="294" height="200" rx="6" fill="#FFFFFF" stroke="#9A9AA0" stroke-width="2"></rect>
+<rect x="44" y="46" width="294" height="200" rx="6" fill="#FFFFFF" stroke="#9A9AA0" stroke-width="2"></rect>
+<polygon points="1165,300 1312,300 1349,600 1006,600" fill="#F3EFFA" stroke="#6B4FA0" stroke-width="2.5"></polygon>
+<rect x="2944" y="300" width="257" height="300" fill="#F3EFFA"></rect>
+<rect x="1006" y="600" width="834" height="220" fill="#C6D8EC"></rect>
+<rect x="1840" y="600" width="491" height="190" fill="#C6D8EC"></rect>
+<rect x="2331" y="600" width="490" height="71" fill="#C6D8EC"></rect>
+<rect x="2821" y="600" width="496" height="51" fill="#C6D8EC"></rect>
+<rect x="3317" y="600" width="486" height="26" fill="#C6D8EC"></rect>
+<g fill="none" stroke="#2F6FAF" stroke-width="2.5">
+<path d="M1006 600 L3803 600"></path>
+<path d="M1006 600 L1006 820 L1840 820"></path>
+<path d="M1840 790 L2331 790"></path>
+<path d="M2331 671 L2821 671"></path>
+<path d="M2821 651 L3317 651"></path>
+<path d="M3317 626 L3803 626"></path>
+</g>
+<g fill="#E4E4E8" stroke="#9A9AA0" stroke-width="2">
+<path d="M1840 790 C1962 790 1950 953 2073 953 L2281 953 L2281 983 L2073 983 C1950 983 1962 820 1840 820 Z"></path>
+<path d="M2331 671 C2453 671 2441 864 2564 864 L2772 864 L2772 983 L2564 983 C2441 983 2453 790 2331 790 Z"></path>
+<path d="M2821 651 C2943 651 2931 963 3054 963 L3262 963 L3262 983 L3054 983 C2931 983 2943 671 2821 671 Z"></path>
+<path d="M3317 626 C3439 626 3427 958 3550 958 L3758 958 L3758 983 L3550 983 C3427 983 3439 651 3317 651 Z"></path>
+</g>
+<g stroke="#2B2B30" stroke-width="4" stroke-linecap="square">
+<path d="M1840 834 L1840 592"></path>
+<path d="M2331 804 L2331 592"></path>
+<path d="M2821 685 L2821 592"></path>
+<path d="M3317 665 L3317 592"></path>
+</g>
+<g stroke="#8A8A93" stroke-width="2" stroke-dasharray="3 6">
+<path d="M1595 474 L1595 598"></path>
+<path d="M2085 474 L2085 598"></path>
+<path d="M2576 504 L2576 598"></path>
+<path d="M3560 474 L3560 598"></path>
+</g>
+<path d="M0 983 L4416 983" stroke="#8A8A93" stroke-width="2"></path>
+<path d="M0 432 L880 432 M0 886 L880 886" stroke="#8A8A93" stroke-width="2"></path>
+<rect x="3803" y="430" width="613" height="390" rx="8" fill="#3E6B52"></rect>
+<circle cx="4110" cy="470" r="19" fill="#FFFFFF"></circle>
+<path d="M4079 520 A31 31 0 0 1 4141 520 Z" fill="#FFFFFF"></path>
+<rect x="3963" y="969" width="306" height="14" fill="#3E6B52"></rect>
+</svg>
+
+<svg width="59" height="8" viewBox="0 0 59 8" preserveAspectRatio="none" style="position: absolute; left: 340px; top: 156px; width: 59px; height: 8px; overflow: visible; fill: none; stroke: #3F3F48; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-1" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#3F3F48" stroke="none" style="stroke: none; fill: #3F3F48; fill: context-stroke"></path></marker></defs><path d="M 0 4 L 54 4" marker-end="url(#dc-arrow-head-filled-1)"></path></svg>
+<svg width="79" height="8" viewBox="0 0 79 8" preserveAspectRatio="none" style="position: absolute; left: 920px; top: 163px; width: 79px; height: 8px; overflow: visible; fill: none; stroke: #3F3F48; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-2" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#3F3F48" stroke="none" style="stroke: none; fill: #3F3F48; fill: context-stroke"></path></marker></defs><path d="M 0 4 L 74 4" marker-end="url(#dc-arrow-head-filled-2)"></path></svg>
+<svg width="2517" height="8" viewBox="0 0 2517 8" preserveAspectRatio="none" style="position: absolute; left: 800px; top: 348px; width: 2517px; height: 8px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><path d="M 0 4 L 2517 4"></path></svg>
+<svg width="8" height="51" viewBox="0 0 8 51" preserveAspectRatio="none" style="position: absolute; left: 796px; top: 301px; width: 8px; height: 51px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-3" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FAF" stroke="none" style="stroke: none; fill: #2F6FAF; fill: context-stroke"></path></marker></defs><path d="M 4 51 L 4 5" marker-end="url(#dc-arrow-head-filled-3)"></path></svg>
+<svg width="8" height="199" viewBox="0 0 8 199" preserveAspectRatio="none" style="position: absolute; left: 1836px; top: 353px; width: 8px; height: 199px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-4" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FAF" stroke="none" style="stroke: none; fill: #2F6FAF; fill: context-stroke"></path></marker></defs><path d="M 4 199 L 4 5" marker-end="url(#dc-arrow-head-filled-4)"></path></svg>
+<svg width="8" height="199" viewBox="0 0 8 199" preserveAspectRatio="none" style="position: absolute; left: 2327px; top: 353px; width: 8px; height: 199px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-5" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FAF" stroke="none" style="stroke: none; fill: #2F6FAF; fill: context-stroke"></path></marker></defs><path d="M 4 199 L 4 5" marker-end="url(#dc-arrow-head-filled-5)"></path></svg>
+<svg width="8" height="199" viewBox="0 0 8 199" preserveAspectRatio="none" style="position: absolute; left: 2817px; top: 353px; width: 8px; height: 199px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-6" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FAF" stroke="none" style="stroke: none; fill: #2F6FAF; fill: context-stroke"></path></marker></defs><path d="M 4 199 L 4 5" marker-end="url(#dc-arrow-head-filled-6)"></path></svg>
+<svg width="8" height="199" viewBox="0 0 8 199" preserveAspectRatio="none" style="position: absolute; left: 3313px; top: 353px; width: 8px; height: 199px; overflow: visible; fill: none; stroke: #2F6FAF; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-7" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#2F6FAF" stroke="none" style="stroke: none; fill: #2F6FAF; fill: context-stroke"></path></marker></defs><path d="M 4 199 L 4 5" marker-end="url(#dc-arrow-head-filled-7)"></path></svg>
+<svg width="8" height="299" viewBox="0 0 8 299" preserveAspectRatio="none" style="position: absolute; left: 3014px; top: 301px; width: 8px; height: 299px; overflow: visible; fill: none; stroke: #3F3F48; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-8" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#3F3F48" stroke="none" style="stroke: none; fill: #3F3F48; fill: context-stroke"></path></marker></defs><path d="M 4 299 L 4 5" marker-end="url(#dc-arrow-head-filled-8)"></path></svg>
+<svg width="8" height="297" viewBox="0 0 8 297" preserveAspectRatio="none" style="position: absolute; left: 3124px; top: 301px; width: 8px; height: 297px; overflow: visible; fill: none; stroke: #3F3F48; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-9" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#3F3F48" stroke="none" style="stroke: none; fill: #3F3F48; fill: context-stroke"></path></marker></defs><path d="M 4 0 L 4 292" marker-end="url(#dc-arrow-head-filled-9)"></path></svg>
+<svg width="8" height="148" viewBox="0 0 8 148" preserveAspectRatio="none" style="position: absolute; left: 4106px; top: 820px; width: 8px; height: 148px; overflow: visible; fill: none; stroke: #3E6B52; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round"><defs><marker id="dc-arrow-head-filled-10" orient="auto" markerWidth="5" markerHeight="5" refX="2" refY="2" overflow="visible"><path d="M0 0 L4 2 L0 4 Z" fill="#3E6B52" stroke="none" style="stroke: none; fill: #3E6B52; fill: context-stroke"></path></marker></defs><path d="M 4 0 L 4 143" marker-end="url(#dc-arrow-head-filled-10)"></path></svg>
+
+<div style="position: absolute; left: 400px; top: 54px; width: 520px; height: 226px; box-sizing: border-box; padding: 20px 24px; display: flex; align-items: flex-start; background: #FFFFFF; border: 2.5px solid #6B4FA0; border-radius: 6px; color: #3F3F48"><span><b style="font-size: 30px; line-height: 40px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 34px; height: 34px; border-radius: 17px; background: #6B4FA0; color: #FFFFFF; font-size: 21px; line-height: 34px; text-align: center; vertical-align: 2px">1</span> Read the seed</b><br>States the root-cause class the fix corrected and names sibling sites.</span></div>
+<div style="position: absolute; left: 1000px; top: 54px; width: 700px; height: 226px; box-sizing: border-box; padding: 20px 24px; display: flex; align-items: flex-start; background: #FFFFFF; border: 2.5px solid #6B4FA0; border-radius: 6px; color: #3F3F48"><span><b style="font-size: 30px; line-height: 40px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 34px; height: 34px; border-radius: 17px; background: #6B4FA0; color: #FFFFFF; font-size: 21px; line-height: 34px; text-align: center; vertical-align: 2px">2</span> Write probing inputs</b><br>For those sites, in the seed's own language. It reads CIRCT's source through its own tools and runs no command.<br><code style="color: #5C5C66">circt-opt · firtool · circt-verilog</code></span></div>
+<div style="position: absolute; left: 2620px; top: 54px; width: 640px; height: 226px; box-sizing: border-box; padding: 20px 24px; display: flex; align-items: flex-start; background: #FFFFFF; border: 2.5px solid #6B4FA0; border-radius: 6px; color: #3F3F48"><span><b style="font-size: 30px; line-height: 40px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 34px; height: 34px; border-radius: 17px; background: #6B4FA0; color: #FFFFFF; font-size: 21px; line-height: 34px; text-align: center; vertical-align: 2px">6</span> Triage and report</b><br>Writes the report. Duplicates and tracker matches are decided by tools, and no gate reads what it concluded.</span></div>
+
+<div style="position: absolute; left: 400px; top: 14px; width: 2900px; font-size: 22px; line-height: 30px; color: #3F3F48"><b style="font-weight: 700; letter-spacing: 0.12em; color: #6B4FA0">AGENT</b>  proposes and writes; judges nothing. One model for every stage, Gemini 3.8 Flash, through CHIA's Vertex backend</div>
+<div style="position: absolute; left: 1760px; top: 92px; width: 800px; text-align: center; font-style: italic; font-size: 24px; line-height: 32px; color: #573F86">Between stage 2 and stage 6 the agent does not act. The stages on the ribbon are fixed tools, so no number in the result comes from the model.</div>
+<div style="position: absolute; left: 64px; top: 66px; width: 254px; font-size: 24px; line-height: 30px; color: #3F3F48">A past CIRCT fix: its diff and the test its author added</div>
+<div style="position: absolute; left: 0px; top: 262px; width: 360px; font-size: 24px; line-height: 30px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Seed corpus:</b> 187 mined CIRCT fixes, 24 months</div>
+
+<div style="position: absolute; left: 1900px; top: 312px; width: 1000px; text-align: right; font-style: italic; font-size: 22px; line-height: 30px; color: #22507F">reasons, verdicts and reduced cases return to the agent</div>
+
+<div style="position: absolute; left: 1385px; top: 372px; width: 420px; text-align: center; font-size: 22px; line-height: 28px; color: #3F3F48"><b style="font-size: 28px; line-height: 36px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 30px; height: 30px; border-radius: 15px; background: #2F6FAF; color: #FFFFFF; font-size: 19px; line-height: 30px; text-align: center; vertical-align: 2px">3</span> Build</b><br>CIRCT at the seed's commit, assertions on</div>
+<div style="position: absolute; left: 1875px; top: 372px; width: 420px; text-align: center; font-size: 22px; line-height: 28px; color: #3F3F48"><b style="font-size: 28px; line-height: 36px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 30px; height: 30px; border-radius: 15px; background: #2F6FAF; color: #FFFFFF; font-size: 19px; line-height: 30px; text-align: center; vertical-align: 2px">4</span> Judge</b><br>A crash, or an assertion that fired</div>
+<div style="position: absolute; left: 2366px; top: 372px; width: 420px; text-align: center; font-size: 22px; line-height: 28px; color: #3F3F48"><b style="font-size: 28px; line-height: 36px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 30px; height: 30px; border-radius: 15px; background: #2F6FAF; color: #FFFFFF; font-size: 19px; line-height: 30px; text-align: center; vertical-align: 2px">5</span> Reduce</b><br>Shrink the failing input<br><code style="color: #5C5C66">circt-reduce</code></div>
+<div style="position: absolute; left: 3350px; top: 372px; width: 420px; text-align: center; font-size: 22px; line-height: 28px; color: #3F3F48"><b style="font-size: 28px; line-height: 36px; font-weight: 700; color: #18181D"><span style="display: inline-block; width: 30px; height: 30px; border-radius: 15px; background: #2F6FAF; color: #FFFFFF; font-size: 19px; line-height: 30px; text-align: center; vertical-align: 2px">7</span> Repair</b><br>CHIA's phases; a failure still reports</div>
+
+<div style="position: absolute; left: 1770px; top: 556px; width: 140px; text-align: center; font-size: 24px; line-height: 30px; font-weight: 600; background: #FFFFFF">builds?</div>
+<div style="position: absolute; left: 2261px; top: 556px; width: 140px; text-align: center; font-size: 24px; line-height: 30px; font-weight: 600; background: #FFFFFF">fails?</div>
+<div style="position: absolute; left: 2751px; top: 556px; width: 140px; text-align: center; font-size: 24px; line-height: 30px; font-weight: 600; background: #FFFFFF">minimal?</div>
+<div style="position: absolute; left: 3247px; top: 556px; width: 140px; text-align: center; font-size: 24px; line-height: 30px; font-weight: 600; background: #FFFFFF">new?</div>
+
+<div style="position: absolute; left: 1223px; top: 680px; width: 400px; text-align: center; font-size: 24px; line-height: 32px; color: #1E4E7E"><span>generated inputs<br><b style="font-weight: 600">758 seeded, 2,308 mutated</b></span></div>
+<div style="position: absolute; left: 2376px; top: 622px; width: 400px; text-align: center; font-size: 22px; line-height: 28px; color: #1E4E7E">failing inputs</div>
+
+<div style="position: absolute; left: 0px; top: 396px; width: 880px; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: 0.12em; color: #55555F">FIXED OUTSIDE THE LOOP</div>
+<div style="position: absolute; left: 0px; top: 446px; width: 880px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Build point</b>  CIRCT at release-pinned main, <code>eade0de6</code>, prebuilt SDK <code>firtool-1.159.0</code></div>
+<div style="position: absolute; left: 0px; top: 520px; width: 880px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Build image</b>  CIRCT's own assertions compiled back in, <code>-UNDEBUG</code></div>
+<div style="position: absolute; left: 0px; top: 564px; width: 880px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Issue mirror</b>  2,652 open and closed issues, read only, refreshed once per run</div>
+<div style="position: absolute; left: 0px; top: 638px; width: 880px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Budget file</b>  wall-clock, input, filing and spend caps, registered by a git tag before the run</div>
+<div style="position: absolute; left: 0px; top: 712px; width: 880px; color: #3F3F48"><b style="font-weight: 600; color: #18181D">Second oracle</b>  Verilator differential; reports only, never gates</div>
+<div style="position: absolute; left: 0px; top: 850px; width: 880px; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: 0.12em; color: #55555F">WHAT THE GATES DISCARD</div>
+<div style="position: absolute; left: 0px; top: 898px; width: 880px; color: #3F3F48">A no answer ends the iteration and sends its reason back up the rail.</div>
+
+<div style="position: absolute; left: 2073px; top: 995px; width: 230px; color: #3F3F48">does not build</div>
+<div style="position: absolute; left: 2564px; top: 995px; width: 230px; color: #3F3F48">no failure</div>
+<div style="position: absolute; left: 3054px; top: 995px; width: 230px; color: #3F3F48">not minimal</div>
+<div style="position: absolute; left: 3550px; top: 995px; width: 240px; color: #3F3F48">duplicate or known</div>
+<div style="position: absolute; left: 3963px; top: 995px; width: 440px; color: #3E6B52"><b style="font-weight: 700">Filed.</b> One report, with its patch.</div>
+
+<div style="position: absolute; left: 3803px; top: 544px; width: 613px; text-align: center; font-size: 22px; line-height: 30px; font-weight: 700; letter-spacing: 0.12em; color: #FFFFFF">HUMAN GATE</div>
+<div style="position: absolute; left: 3843px; top: 584px; width: 533px; text-align: center; font-size: 24px; line-height: 32px; color: #FFFFFF">A named author approves each filing at a command line, under a daily cap. Nothing is filed by default.</div>
+</div>
+
+<p style="margin-top: 10px; font-size: 25px; line-height: 34px; color: #3F3F48; text-wrap: pretty"><b style="font-weight: 600; color: #18181D">Seeded CIRCT bug loop.</b> The agent holds the violet band and acts three times only, at stages 1, 2 and 6. The blue ribbon below it is fixed apparatus. The ribbon is the candidates in flight, pinched at each gate by a yes-or-no question; the share answering no peels onto the floor. Widths are illustrative. Measured over both campaigns, the seeded arm went 758 inputs → 84 candidates → 17 distinct new fingerprints → 15 through the gate → 0 filed; the mutation arm went 2,308 inputs → 0 candidates.</p>
+</section>
+
+<div style="flex: 1; display: flex; gap: 104px; min-height: 0; margin-top: 24px">
+
+<div style="width: 760px; flex: none; border-top: 3px solid #18181D; padding-top: 22px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">Bugs nobody reports</h2>
+<p style="text-wrap: pretty">CIRCT, built on MLIR [1], compiles hardware to Verilog; wrong Verilog passes every tool below it and can reach a chip. CHIA's issue solver [2] fixed 5 of 16 CIRCT issues and maintainers merged 3. Its bottleneck is supply.</p>
+<div style="font-size: 24px; line-height: 30px; font-weight: 600; color: #3F3F48">(a) Bug-labelled CIRCT issues: the queue does not drain</div>
+<div style="position: relative; width: 760px; height: 168px; font-size: 24px; line-height: 32px">
+<div style="position: absolute; left: 0px; top: 6px; width: 210px; color: #3F3F48">opened, 12 months</div>
+<div style="position: absolute; left: 222px; top: 4px; width: 341px; height: 40px; background: #7FA3CC"></div>
+<div style="position: absolute; left: 575px; top: 6px; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">82</div>
+<div style="position: absolute; left: 0px; top: 62px; width: 210px; color: #3F3F48">closed, 12 months</div>
+<div style="position: absolute; left: 222px; top: 60px; width: 270px; height: 40px; background: #C6D8EC"></div>
+<div style="position: absolute; left: 504px; top: 62px; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">65 <span style="font-family: 'IBM Plex Sans', Arial, sans-serif; font-weight: 500; color: #3E6B52">(net +17)</span></div>
+<div style="position: absolute; left: 0px; top: 118px; width: 210px; font-weight: 600">open now</div>
+<div style="position: absolute; left: 222px; top: 116px; width: 420px; height: 40px; background: #55555F"></div>
+<div style="position: absolute; left: 654px; top: 118px; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">101</div>
+</div>
+<div style="font-size: 24px; line-height: 30px; color: #3F3F48">The open ones have a median age of 911 days.</div>
+<div style="font-size: 24px; line-height: 30px; font-weight: 600; color: #3F3F48; margin-top: 6px">(b) What a naive mined-fix loop cannot see</div>
+<div style="position: relative; width: 760px; height: 320px; font-size: 22px; line-height: 28px">
+<div style="position: absolute; left: 0px; top: 0px; color: #3F3F48">Seeds a FIRRTL input can reach</div>
+<div style="position: absolute; left: 0px; top: 32px; width: 160px; height: 38px; background: #2F6FAF; color: #FFFFFF; font-weight: 600; line-height: 38px; padding-left: 10px; box-sizing: border-box">≈60</div>
+<div style="position: absolute; left: 160px; top: 32px; width: 520px; height: 38px; background: #DCDCE0; color: #18181D; line-height: 38px; padding-left: 12px; box-sizing: border-box">≈127 need <code>circt-opt</code> or SystemVerilog</div>
+<div style="position: absolute; left: 0px; top: 80px; color: #3F3F48">Seeds with an exactly matching prebuilt SDK</div>
+<div style="position: absolute; left: 0px; top: 112px; width: 635px; height: 38px; background: #2F6FAF; color: #FFFFFF; font-weight: 600; line-height: 38px; padding-left: 10px; box-sizing: border-box">171 of 187</div>
+<div style="position: absolute; left: 635px; top: 112px; width: 45px; height: 38px; background: #DCDCE0; line-height: 38px; text-align: center">16</div>
+<div style="position: absolute; left: 0px; top: 160px; color: #3F3F48">Objects that can assert, CHIA's published image</div>
+<div style="position: absolute; left: 0px; top: 192px; width: 680px; height: 38px; background: #DCDCE0; line-height: 38px; padding-left: 12px; box-sizing: border-box">none: built with <code>-DNDEBUG</code></div>
+<div style="position: absolute; left: 0px; top: 240px; color: #3F3F48">Objects that can assert, this loop's image</div>
+<div style="position: absolute; left: 0px; top: 272px; width: 657px; height: 38px; background: #2F6FAF; color: #FFFFFF; font-weight: 600; line-height: 38px; padding-left: 10px; box-sizing: border-box">536 of 555</div>
+<div style="position: absolute; left: 657px; top: 272px; width: 23px; height: 38px; background: #DCDCE0"></div>
+<div style="position: absolute; left: 690px; top: 277px; color: #3F3F48">19</div>
+</div>
+<h2 style="margin: 14px 0 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">What we do not claim</h2>
+<div style="display: flex; flex-direction: column; font-size: 26px; line-height: 34px">
+<div style="border-top: 1px solid #C9C9D1; padding: 10px 0">No maintainer has confirmed these bugs; none is filed until a named author approves.</div>
+<div style="border-top: 1px solid #C9C9D1; padding: 10px 0">43 of 187 seeds ran, 3.6 an hour under Vertex rate limits: the list is not exhaustive.</div>
+<div style="border-top: 1px solid #C9C9D1; padding: 10px 0">Inside the loop, CHIA's repair chain reached one patch: a debug print. We claim no fix from it.</div>
+<div style="border-top: 1px solid #C9C9D1; border-bottom: 1px solid #C9C9D1; padding: 10px 0">The loop finds crashes and assertion failures; the wrong-output oracle (6 of 187 seeds) only reports.</div>
+</div>
+</div>
+
+<div style="width: 760px; flex: none; border-top: 3px solid #18181D; padding-top: 22px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">Measured preconditions</h2>
+<p style="text-wrap: pretty">CIRCT builds only against the LLVM commit it pins; where a prebuilt SDK carries that pin, it rebuilds in minutes, not hours. CHIA's image compiles assertions out; <code>-UNDEBUG</code> puts them back.</p>
+<table style="width: 760px; font-size: 23px; line-height: 30px">
+<thead><tr style="border-bottom: 2px solid #18181D"><th style="text-align: left; font-weight: 600; padding: 4px 0 8px">Measurement</th><th style="text-align: right; font-weight: 600; padding: 4px 0 8px">Result</th></tr></thead>
+<tbody>
+<tr><td colspan="2" style="padding: 8px 0 2px; font-style: italic; color: #3F3F48">Building the past cheaply</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Fix-shaped commits mined from 24 months</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">187</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Seeds with an exactly matching prebuilt SDK</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">171</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Pin windows with no release, worst 16 days</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">16 of 63</td></tr>
+<tr><td colspan="2" style="padding: 10px 0 2px; font-style: italic; color: #3F3F48">Letting the compiler complain</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Compile commands carrying <code>-UNDEBUG</code></td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">778 of 778</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Objects carrying the assertion handler</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">536 of 555</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">CHIA's test gate, assertions on, then off</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">1,119 = 1,119</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0">Cost: wall clock, bytes, per probe</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">18%, 25%, 4%</td></tr>
+<tr style="border-bottom: 2px solid #18181D"><td style="padding: 5px 0">Tests <code>lit</code> discovers, SDK as source root</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">1,390</td></tr>
+</tbody>
+</table>
+<h2 style="margin: 14px 0 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">Controls</h2>
+<p style="text-wrap: pretty"><b style="font-weight: 600">One experiment.</b> Both arms share harness, oracles, reducer and gate. The mutation arm rewrites seed tests syntactically, after Mut4All [3], without the diff or the root-cause class.</p>
+<p style="text-wrap: pretty"><b style="font-weight: 600">Pre-registration.</b> Every threshold sits in one budget file, registered by an annotated git tag. The loop refuses an untagged file and mutators committed after the tag.</p>
+<div style="display: flex; gap: 24px; align-items: flex-start">
+<p style="width: 400px; flex: none; text-wrap: pretty"><b style="font-weight: 600">Deduplication.</b> One bug when primary fingerprints match. On 22 hand-labelled pairs:</p>
+<table style="width: 336px; font-size: 22px; line-height: 28px">
+<thead><tr style="border-bottom: 2px solid #18181D"><th style="text-align: left; font-weight: 500; color: #3F3F48; padding: 2px 0 6px">label</th><th style="text-align: right; font-weight: 600; padding: 2px 0 6px">merged</th><th style="text-align: right; font-weight: 600; padding: 2px 0 6px">split</th></tr></thead>
+<tbody>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0">duplicate</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">10</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">1</td></tr>
+<tr style="border-bottom: 2px solid #18181D"><td style="padding: 4px 0">distinct</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">1</td><td style="text-align: right; font-family: 'IBM Plex Mono', Menlo, monospace">10</td></tr>
+</tbody>
+</table>
+</div>
+<p style="text-wrap: pretty"><b style="font-weight: 600">Known issues.</b> GitHub stops paginating at page 100, so the mirror walks both directions and unions them: 2,652 issues.</p>
+<p style="text-wrap: pretty"><b style="font-weight: 600">Contamination.</b> The model may have memorised later fixes. A symbol-level screen flags 77% of the corpus (96% at file level); a flag marks a candidate, never drops it.</p>
+</div>
+
+<div style="width: 800px; flex: none; border-top: 3px solid #18181D; padding-top: 22px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">Results: two registered campaigns</h2>
+<p style="text-wrap: pretty">Campaign 1 gave each arm two hours; campaign 2 the whole corpus, stopped by us after 11.9 h. Every number is read from the loop's database; no model turn was re-run.</p>
+<table style="width: 800px; font-size: 23px; line-height: 29px">
+<thead><tr style="border-bottom: 2px solid #18181D"><th style="width: 362px; text-align: left; font-weight: 600; padding: 4px 0 8px">Measure</th><th style="text-align: right; font-weight: 600; padding: 4px 0 8px; color: #6B4FA0">seeded 1</th><th style="text-align: right; font-weight: 600; padding: 4px 0 8px; color: #6B4FA0">seeded 2</th><th style="text-align: right; font-weight: 600; padding: 4px 0 8px; color: #55555F">mutation</th></tr></thead>
+<tbody style="font-family: 'IBM Plex Mono', Menlo, monospace; font-size: 22px">
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Seeds probed</td><td style="text-align: right">9</td><td style="text-align: right">43</td><td style="text-align: right">96</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Inputs written</td><td style="text-align: right">134</td><td style="text-align: right">624</td><td style="text-align: right">1,154</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Output rejected by its own verifier</td><td style="text-align: right">10</td><td style="text-align: right">7</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Assertion failures</td><td style="text-align: right">5</td><td style="text-align: right">54</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Crashes</td><td style="text-align: right">0</td><td style="text-align: right">8</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Candidates</td><td style="text-align: right">15</td><td style="text-align: right">69</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Distinct new fingerprints</td><td style="text-align: right">3</td><td style="text-align: right">14</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC; background: #F3EFFA"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px; font-weight: 600">Through the gate</td><td style="text-align: right; font-weight: 600">3</td><td style="text-align: right; font-weight: 600">12</td><td style="text-align: right; font-weight: 600">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Filed</td><td style="text-align: right">0</td><td style="text-align: right">0</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Model turns</td><td style="text-align: right">57</td><td style="text-align: right">191</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Input tokens, M (from cache)</td><td style="text-align: right">56.0 (68%)</td><td style="text-align: right">148.7 (59%)</td><td style="text-align: right">0</td></tr>
+<tr style="border-bottom: 2px solid #18181D"><td style="padding: 4px 0; font-family: 'IBM Plex Sans', Arial, sans-serif; font-size: 23px">Output tokens, M</td><td style="text-align: right">0.72</td><td style="text-align: right">3.00</td><td style="text-align: right">0</td></tr>
+</tbody>
+</table>
+<div style="font-size: 22px; line-height: 28px; color: #3F3F48; margin-top: -8px">A seeded column is its two shards together; the mutation column is one run per campaign, and the two runs agree in every cell.</div>
+<div style="position: relative; width: 800px; height: 300px; font-size: 22px; line-height: 28px">
+<div style="position: absolute; left: 0px; top: 0px; font-size: 24px; line-height: 30px; font-weight: 600; color: #3F3F48">Per 100 inputs</div>
+<div style="position: absolute; left: 250px; top: 5px; width: 22px; height: 22px; box-sizing: border-box; background: #BDB0DD; border: 2px solid #6B4FA0"></div>
+<div style="position: absolute; left: 280px; top: 0px; color: #3F3F48">campaign 1</div>
+<div style="position: absolute; left: 430px; top: 5px; width: 22px; height: 22px; background: #6B4FA0"></div>
+<div style="position: absolute; left: 460px; top: 0px; color: #3F3F48">campaign 2</div>
+<div style="position: absolute; left: 610px; top: 5px; width: 22px; height: 22px; background: #9D9DA6"></div>
+<div style="position: absolute; left: 640px; top: 0px; color: #3F3F48">mutation</div>
+<div style="position: absolute; left: 40px; top: 90px; width: 80px; height: 170px; box-sizing: border-box; background: #BDB0DD; border: 2px solid #6B4FA0"></div>
+<div style="position: absolute; left: 130px; top: 91px; width: 80px; height: 169px; background: #6B4FA0"></div>
+<div style="position: absolute; left: 220px; top: 256px; width: 80px; height: 4px; background: #9D9DA6"></div>
+<div style="position: absolute; left: 440px; top: 227px; width: 80px; height: 33px; box-sizing: border-box; background: #BDB0DD; border: 2px solid #6B4FA0"></div>
+<div style="position: absolute; left: 530px; top: 231px; width: 80px; height: 29px; background: #6B4FA0"></div>
+<div style="position: absolute; left: 620px; top: 256px; width: 80px; height: 4px; background: #9D9DA6"></div>
+<div style="position: absolute; left: 0px; top: 260px; width: 800px; height: 2px; background: #18181D"></div>
+<div style="position: absolute; left: 40px; top: 58px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">11.2</div>
+<div style="position: absolute; left: 130px; top: 59px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">11.1</div>
+<div style="position: absolute; left: 220px; top: 224px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">0</div>
+<div style="position: absolute; left: 440px; top: 195px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">2.2</div>
+<div style="position: absolute; left: 530px; top: 199px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">1.9</div>
+<div style="position: absolute; left: 620px; top: 224px; width: 80px; text-align: center; font-family: 'IBM Plex Mono', Menlo, monospace; font-weight: 600">0</div>
+<div style="position: absolute; left: 40px; top: 268px; width: 260px; text-align: center; color: #18181D">candidates</div>
+<div style="position: absolute; left: 440px; top: 268px; width: 260px; text-align: center; color: #18181D">through the gate</div>
+</div>
+<p style="text-wrap: pretty">Campaigns five times apart in size give the same rates; fifteen bugs show a consistent rate, not an effect size. Mutation exhausted its mutants in 775 s and 266 s, and only 34% reached the pass they target, against 47% and 54% of seeded inputs.</p>
+<p style="text-wrap: pretty">A gated bug cost 18.7 M input tokens in campaign 1 and 12.4 M in campaign 2: USD 14.8 and 10.2 at list price. CHIA's backend resends the conversation on every tool call.</p>
+</div>
+
+<div style="width: 1784px; flex: none; border-top: 3px solid #18181D; padding-top: 22px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 44px; line-height: 52px; font-weight: 600; letter-spacing: -0.01em">Fifteen new bugs, twelve root causes, thirteen patches</h2>
+<p style="text-wrap: pretty">Each of the 15 reproduced on another worker, was minimal at the reducer's fixpoint, was valid input, and matched no issue and no commit since the pin. <b style="font-weight: 600">Re-checked on CIRCT main of 26 October</b> (<code>4738bd2</code>), all 15 still fail as the same bug: 8 with the same fingerprint, 7 with only source lines moved. Of 277 issues and PRs since 16 September, none reports or fixes them; #11141, #11142 and #11267 are related, not the same.</p>
+<table style="width: 1784px; font-size: 23px; line-height: 30px">
+<thead><tr style="border-bottom: 2px solid #18181D"><th style="width: 56px; text-align: left; font-weight: 600; padding: 4px 0 8px">#</th><th style="width: 220px; text-align: left; font-weight: 600; padding: 4px 0 8px">Area</th><th style="text-align: left; font-weight: 600; padding: 4px 0 8px">Root cause</th><th style="width: 90px; text-align: right; font-weight: 600; padding: 4px 16px 8px 0">Bugs</th><th style="width: 460px; text-align: left; font-weight: 600; padding: 4px 0 8px">Before → after the patch</th></tr></thead>
+<tbody>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">01</td><td>OM folder</td><td><code>shr</code> passed a 64-bit amount to <code>APSInt &gt;&gt;</code>; <code>shl</code> truncated to 32 bits</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>assertion → correct fold, or a diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">02</td><td>OM verifier</td><td>class-like ops never checked that each field has a type</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>crash in <code>verifySymbolUses</code> → diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">03</td><td>Moore → Core</td><td><code>classdecl</code> base symbol unverified; <code>resolveClassStructBody</code> casts the lookup</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>segfault → diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">04</td><td>DC</td><td><code>dc.join</code> with zero tokens passed verification</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>assertion → diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">05</td><td>DC</td><td><code>!dc.value</code> accepted DC payload types that DCToHW converts inconsistently</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>assertion → diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">06</td><td>DC</td><td><code>from_esi</code> type inference read an unchecked <code>dyn_cast</code> (found on the way)</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">–</td><td>segfault → round-trips</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">07</td><td>Moore → Core</td><td><code>moore.extract</code> padding computed in <code>int32_t</code>, overflowing near ±2<sup style="font-size: 0.7em; line-height: 0">31</sup> (<code>HWOps.cpp:1995</code>)</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>assertion → valid IR</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">08</td><td>Moore → Core</td><td><code>dyn_extract</code> lowering assumed the result is no wider than the input</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>invalid <code>comb.extract</code> → valid IR</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">09</td><td>Moore → Core</td><td><code>extract_ref</code> and <code>dyn_extract_ref</code> lowerings ignored the result type</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">2</td><td>invalid IR, assertion → diagnostic</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">10</td><td>Comb → Synth</td><td>shift lowering mishandles a zero maximum shift amount (<code>i0</code>, <code>i1</code>)</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">2</td><td>assertion → valid IR</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">11</td><td>Comb → Synth</td><td><code>comb.icmp</code> lowering assumed at least one operand bit</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>assertion → valid IR</td></tr>
+<tr style="border-bottom: 1px solid #D5D5DC"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">12</td><td>Core → FSM</td><td>deasserted-reset constant built with the state register's type</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">2</td><td>assertion → valid FSM</td></tr>
+<tr style="border-bottom: 2px solid #18181D"><td style="padding: 5px 0; font-family: 'IBM Plex Mono', Menlo, monospace; color: #5C5C66">13</td><td>Core → FSM</td><td>reset uses left in transition actions, then the reset argument erased</td><td style="text-align: right; padding-right: 16px; font-family: 'IBM Plex Mono', Menlo, monospace">1</td><td>segfault in the verifier → valid FSM</td></tr>
+</tbody>
+</table>
+<p style="text-wrap: pretty">Written after the campaigns, outside the loop: each new test fails on unpatched main and passes with its patch, and CIRCT's 1,432 <code>lit</code> tests give identical results before and after (1,358 pass, 68 unsupported, 6 expected failures, 0 fail). None is submitted yet. The reduced cases are 4 to 10 lines, against seed tests of 18 to 2,321; 7 of the 15 sit in a different dialect or library from the fix that seeded them.</p>
+<div style="display: flex; gap: 104px; border-top: 2px solid #C9C9D1; padding-top: 16px; font-size: 25px; line-height: 33px">
+<div style="width: 840px; flex: none; display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 30px; line-height: 38px; font-weight: 600">What the gate missed, found after review</div>
+<p style="text-wrap: pretty">18 seeded probes booked as the model's fault were compiler bugs: each input parses and verifies, then the pass emits invalid IR. 4 are other symptoms of root causes 07, 08 and 12, and those patches fix them. 14 show three new root causes, unpatched and not yet shown reachable from a frontend:</p>
+<div style="font-size: 23px; line-height: 31px"><code>firrtl-flatten-memory</code>  SInt memory with a multi-bit mask (5)<br><code>firrtl-infer-domains</code>  a domain used inside <code>firrtl.when</code> (3)<br><code>synth-lower-word-to-bits</code>  lowering inside <code>func.func</code> (6)</div>
+</div>
+<div style="width: 840px; flex: none; display: flex; flex-direction: column; gap: 10px">
+<div style="font-size: 30px; line-height: 38px; font-weight: 600">Mutation, given its whole window</div>
+<p style="text-wrap: pretty">A post-review run wrote 115,869 mutants in 11.1 h; 34% reached the pass they target. 45 fired the oracle and 27 passed the gate: 3 fingerprints, 2 root causes, neither among the 15:</p>
+<div style="font-size: 23px; line-height: 31px"><code>FIRRTLOps.cpp</code>  segfault in <code>RWProbeOp::verifyInnerRefs</code> (16)<br><code>-hw-memory-sim</code>  takes <code>i0</code> clock and enable ports on trust (11)</div>
+<p style="text-wrap: pretty">The gate dropped 14 more as fixed after the pin; they still crash on main, likely a third bug.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+<footer style="flex: none; margin-top: 20px; border-top: 2px solid #18181D; padding-top: 16px; font-size: 25px; line-height: 34px; color: #3F3F48">
+<div style="display: flex; gap: 96px">
+<p style="width: 2160px; flex: none; text-wrap: pretty"><b style="font-weight: 600; color: #18181D">Take it.</b> Every input, verdict, reduced case, transcript and gate decision is in the repository and its data release <code>data-2026-09-25</code>. The loop ships as CHIA nodes and tools meeting at a frozen contract of seven record types, with 739 tests, 689 needing no cluster, network or model. Upstream to CHIA: the assertions-on image and its build workflow (ucb-bar/chia#117) and three CIRCT helpers (#118); the repair-backend branch is not yet submitted.</p>
+<p style="width: 2160px; flex: none; text-wrap: pretty"><b style="font-weight: 600; color: #18181D">Acknowledgements and disclosure.</b> We thank the CHIA developers and the A<sup style="font-size: 0.6em; line-height: 0">3</sup> organisers. Claude (Anthropic) helped draft text, code and this poster. The authors answer for every claim, number and decision.</p>
+</div>
+<p style="margin-top: 8px; font-size: 21px; line-height: 28px; color: #5C5C66">[1] C. Lattner et al., “MLIR: Scaling compiler infrastructure for domain specific computation,” CGO 2021.   [2] A. Cui et al., “CHIA: An open-source framework for principled, agentic AI-driven hardware/software co-design research,” arXiv:2606.27350, 2026.   [3] B. Wang et al., “Mut4All,” arXiv:2507.19275, 2025.   [4] J. Park and I. Yun, “Agentic fuzzing: Opportunities and challenges,” arXiv:2605.10074, 2026.</p>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":4608,"height":3456}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
