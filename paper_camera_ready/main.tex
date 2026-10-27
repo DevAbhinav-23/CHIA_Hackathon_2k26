@@ -53,8 +53,8 @@ while a mutation baseline over 2,308 inputs found none. % runs 460b7b48 and 91e5
 Both campaigns together read 205 million tokens, three of every five from cache,
 and wrote 3.7 million. % 204.7 M in, 126.3 M cached (61.7 %), 3.72 M out: ledger_entry tokens_in/tokens_out/cached_tokens, runs f1e4fef5, 73effefc, f0b2ef10, db45ab7b
 A maintainer receives a bug already reduced, checked and paired with a candidate
-fix. \\
-Source url: \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}
+fix.\par
+{\raggedright Code and data: \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}\par}
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -381,6 +381,9 @@ in \texttt{circt-opt.cpp}, and an abort in
 Each of the fifteen reproduced on another worker, was minimal at the reducer's
 fixpoint, was valid, and matched neither an issue nor a commit since the pin.
 A named human holds the reports the model wrote. % gate q1-q4 per candidate: runs f1e4fef5, f0b2ef10, db45ab7b store
+The fifteen share twelve root causes. We re-ran every reduced case on CIRCT main
+of 26 October, built the same way, and all fifteen still fail as the same bug;
+no issue or commit since the pin reports or fixes any of them. % main 4738bd26, firtool-1.162.0 SDK, 277 issues/PRs since 2026-09-16 searched: analysis/measurements/2026-10-27-recheck-main.md; root causes: 2026-10-27-repairs.md
 Two further new fingerprints did not survive the gate: one did not reproduce on
 re-run, and the validity checker rejected the other. % c-p-0eec26191ff2 unreproducible, c-p-bb144e1c880c invalid_input
 
@@ -415,7 +418,12 @@ twelve times over, and the cache served 68\% and 59\% of that input. % quadratic
 reached a patch, because the loop's own script handed the tool two input files.
 With that fixed, the chain reproduced the failure, wrote a one-line change,
 rebuilt CIRCT, ran its test gate, and hit the 45-minute wall while writing up.
-The change was a debug print. We claim no fix. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
+The change was a debug print. We claim no fix from the chain. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
+After the campaigns we wrote patches outside the loop, against that main: 13
+commits with regression tests, one per root cause and one for a further crash
+found on the way. Every reproducer now lowers to valid IR or stops with a
+diagnostic, each new test fails without its patch, and CIRCT's 1,432 lit tests
+give the same results before and after. None is submitted yet. % analysis/measurements/2026-10-27-repairs.md: 1,358 pass / 68 unsupported / 6 xfail / 0 fail on both; patches and PR drafts: analysis/review/fixes/
 
 % =====================================================================
 \section{Related Work}
@@ -437,12 +445,12 @@ and discards by default.
 % =====================================================================
 \section{Artefact and Limitations}
 We release the loop as CHIA nodes and tools that meet at a frozen contract of
-seven record types, with 736 tests, 686 of which need no cluster, network or
-model. % contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
-Four pieces are ready for CHIA upstream but not yet submitted: the
-assertions-on image, its build workflow,
-three helpers for its CIRCT module, and the branch that lets its repair chain
-select our backend. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
+seven record types, with 739 tests, 689 of which need no cluster, network or
+model. % 736/686 at campaign 3 plus the three t0 tests of 72115f0 (--mutation-rounds); contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
+Two of four pieces for CHIA upstream are submitted as a pull request: the
+assertions-on image and its build workflow (ucb-bar/chia\#117). The other two,
+three helpers for its CIRCT module and the branch that lets its repair chain
+select our backend, are ready but not yet submitted. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
 The corpus and every input, verdict, reduced case, transcript and gate decision
 are at \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
 
