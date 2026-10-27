@@ -1,0 +1,466 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{hyperref} 
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
+\usepackage{cite}
+\usepackage{microtype}
+\usepackage{url}
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\dbltextfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+
+% ==== figure palette: three hues plus greys, separated by value in greyscale
+\definecolor{agF}{HTML}{F6F2FC}\definecolor{agB}{HTML}{6B4FA0} % agent, violet
+\definecolor{rbF}{HTML}{A9C4DC}\definecolor{rbB}{HTML}{2F6FAF} % apparatus, blue
+\definecolor{dsF}{HTML}{DCDCE0}\definecolor{dsB}{HTML}{9A9AA0} % discarded, grey
+\definecolor{hgB}{HTML}{3E6B52}                                % human, green
+\definecolor{dgrey}{HTML}{555555}\definecolor{fgrey}{HTML}{7A7A7A}
+
+\begin{document}
+
+\title{From Mined Fixes to Gated Repair:\\Closed-Loop Defect Synthesis for CIRCT}
+
+\author{
+  Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla \\
+  International Institute of Information Technology, Hyderabad \\
+  \{abhinav.kota, adithya.jillellamudi\}@students.iiit.ac.in, priyesh.shukla@iiit.ac.in
+}
+
+\maketitle
+
+\begin{abstract}
+A bug in a hardware compiler such as CIRCT can put a silent defect into a chip.
+Repair agents can fix the bugs people report, but people report few, and the
+open ones grow old. We built a closed loop on the CHIA agent framework that
+manufactures its own bug supply: a model reads each of 187 past CIRCT fixes, % 187 fix-shaped commits over 24 months: analysis/pin-window-analysis.md
+learns the mistake behind it, and writes new inputs that expose the same mistake
+elsewhere. Deterministic tools build, judge, reduce and deduplicate every input,
+CHIA's existing repair chain drafts the patch, and a named person approves every
+filing. We also restored the compiler's own assertions, which CHIA's published
+image had compiled out, in 536 of its 555 objects, % 606/606 compile commands -DNDEBUG in the published image (frd-followups A-10); 536 of 555 objects reference the assertion handler: 2026-09-14-image-build.md 4
+so the checks its authors wrote can fire again. In two campaigns the
+loop found fifteen new bugs, each reproduced, minimised, validated and unmatched
+against 2,652 issues, % 3 + 12 candidates new -> report: runs f1e4fef5, f0b2ef10, db45ab7b; 2,652-issue mirror: docs/HANDOFF.md 2026-09-15 entries
+while a mutation baseline over 2,308 inputs found none. % runs 460b7b48 and 91e58983: 1,154 mutants each, 0 firings
+Both campaigns together read 205 million tokens, three of every five from cache,
+and wrote 3.7 million. % 204.7 M in, 126.3 M cached (61.7 %), 3.72 M out: ledger_entry tokens_in/tokens_out/cached_tokens, runs f1e4fef5, 73effefc, f0b2ef10, db45ab7b
+A maintainer receives a bug already reduced, checked and paired with a candidate
+fix. \\
+Source url: \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}
+\end{abstract}
+
+\begin{IEEEkeywords}
+Hardware compilers, Program repair, Test generation, Compiler fuzzing, CIRCT.
+\end{IEEEkeywords}
+
+% \begin{IEEEkeywords}
+% Hardware compilers, Program repair, Test generation, Compiler fuzzing, CIRCT
+% \begin{IEEEkeywords}
+
+% =====================================================================
+\section{Introduction}
+CIRCT is an open-source compiler for hardware, built on MLIR \cite{mlir}. A
+designer describes a circuit in FIRRTL or SystemVerilog, CIRCT lowers it to
+Verilog, and synthesis tools turn the Verilog into a chip. When CIRCT crashes,
+the designer sees the crash and works around it. When CIRCT emits wrong Verilog,
+nobody sees anything: the output passes every tool below the compiler and can
+reach fabrication. CIRCT tests the LLVM way. Each regression test carries the
+command to run and the output to expect, and a tool called \texttt{lit} runs
+them.
+
+CHIA \cite{chia} is the agent framework this hackathon builds on. Its CIRCT
+issue solver takes a GitHub issue through six phases: it assesses the issue,
+reproduces it, fixes it, runs the whole test suite, repairs regressions, and
+writes the pull request. On 16 CIRCT issues it fixed five, and maintainers
+merged three. Its bottleneck is supply. Over the past year CIRCT received 82
+bug-labelled issues and closed 65. The backlog does not drain: 101 issues stay
+open, at a median age of 911 days (Fig.~\ref{fig:motiv}a). % 82 bug-labelled issues, 65 closed, 101 open, median age 911 d: analysis/measurements/2026-09-13-frd-followups.md M1
+The bug a maintainer wants is small, already checked
+against known issues, and comes with a candidate fix, from a source that files
+nothing else. A past fix that corrects one wrong assumption inside a pass usually leaves the same assumption at other
+sites. CIRCT ships no fuzzer to find them, and a naive loop would be blind to
+most of them (Fig.~\ref{fig:motiv}b).
+
+\begin{figure}[!t]
+\centering
+\input{fig-motivation}
+\vspace{-5pt}
+\caption{Motivation. (a) CIRCT closes fewer bug issues than it receives,
+and what stays open is old. (b) What a mined-fix loop must overcome.}
+\label{fig:motiv}
+\end{figure}
+
+The main idea of this paper is simple: an agent reads each past fix and writes
+inputs aimed at the sibling sites, and tools then discard almost everything it
+writes. We make four claims.
+\begin{itemize}
+\item We build a loop in which the model acts three times, reading a fix,
+  writing inputs and writing the report, and a tool answers every gate
+  (Section~\ref{sec:loop}, Fig.~\ref{fig:loop}).
+\item We rebuild 171 of 187 historical CIRCT commits in minutes from prebuilt
+  SDKs, and we restore the assertions CHIA's image compiled out, in 536 of 555
+  objects, without changing which of CIRCT's tests pass
+  (Section~\ref{sec:pre}, Table~\ref{tab:meas}).
+\item We pre-register every threshold by git tag, run a mutation baseline on
+  the same harness, and measure the dedup rule on 22 labelled pairs
+  (Section~\ref{sec:eval}).
+\item We put fifteen new CIRCT bugs through a four-question gate in two
+  campaigns, the baseline puts none, and we read every number from the loop's
+  database (Section~\ref{sec:res}, Table~\ref{tab:res}).
+\end{itemize}
+
+\begin{figure*}[!t]
+\centering
+\scalebox{0.78}{\input{fig-loop}}
+\caption{Seeded CIRCT bug loop. The agent holds the violet band and acts three
+times only, at stages 1, 2 and 6. The blue ribbon below it is fixed apparatus,
+so no number in the result comes from the model. The ribbon is the candidates in
+flight, pinched at each gate by a yes-or-no question, and the share answering no
+peels onto the floor. Widths are illustrative.}
+\label{fig:loop}
+\end{figure*}
+
+% =====================================================================
+\section{The Loop}\label{sec:loop}
+Fig.~\ref{fig:loop} names the stages and marks the ones the agent runs. Tools
+decide everything else. One model serves every agent stage, Gemini 3.8 Flash
+through CHIA's Vertex backend, % model and backend, express mode: design/ADR/ADR-D-03-model-backend.md, superseding decision 2026-09-14
+and no stage can build a client for it unless the operator sets one environment
+variable for that run. A test or a dry run therefore cannot reach the model. % live-call interlock BUGLOOP_ALLOW_LIVE_MODEL: ADR-D-03 rule (1); design/03-LLD.md 3.5.1
+
+\textbf{Read the seed (1).} A seed is one of 187 CIRCT commits from the last two
+years that look like bug fixes, together with its diff and the test its author
+added or changed. The agent reads both, states in one sentence which root-cause
+class the fix corrected, and names other sites where the same assumption still
+stands. % the SeedRecord carries that diff and those tests, so the worker needs no clone: design/00-README.md, seam rule
+
+\textbf{Write probing inputs (2).} The seed's own test decides the language,
+because its command line names the tool through which the bug was reachable:
+\texttt{circt-opt}, \texttt{firtool} or the SystemVerilog front end. About 127
+of the 187 seeds sit in code that no FIRRTL input can reach, so a FIRRTL-only
+generator would miss most of the corpus. The agent reads the compiler's source
+and writes each candidate through tools of its own. It runs no command.
+
+\textbf{Build (3).} CIRCT compiles against one pinned commit of LLVM and MLIR,
+and Section~\ref{sec:pre} explains how the loop avoids building those from
+source. The build compiles in CIRCT's assertions, the internal checks its own
+authors wrote, which stop the compiler the moment an assumption breaks.
+
+\textbf{Judge (4).} An oracle is the rule that decides whether an input found a
+bug. The primary oracle admits no argument: the compiler crashed, or an
+assertion fired. A second oracle compares CIRCT's simulator with Verilator and
+only reports, because the two disagree routinely over uninitialised and reset
+signals.
+
+\textbf{Reduce (5).} A crashing input is usually large. \texttt{circt-reduce},
+which CIRCT ships, deletes parts of it and keeps each deletion while the failure
+survives. A textual reducer takes over where that tool dies.
+
+\textbf{Triage and report (6).} Many failures are one failure, and deciding
+which are the same is mechanical. A fingerprint is the assertion text with its
+source location or, for a crash, the symbolised frames that remain after the
+loop strips the crash handler's prologue. It matches survivors against a mirror of
+CIRCT's issues and against commits made since the build point. The agent writes
+the report, and no gate reads what it concluded. % gate reads no triage classification: design/03-LLD.md 3.9 (FR-13.4)
+
+\textbf{Repair (7).} CHIA's phase chain runs unaltered except for one branch
+that selects our backend and an entry point that takes a local report in place
+of a GitHub issue. We restrict repair to crashes and assertion failures, where the solution is unambiguous.
+
+\textbf{The gates.} Between stages sit questions with two answers, the bars that
+pinch the ribbon in Fig.~\ref{fig:loop}. A no ends the iteration and returns its
+reason to the agent with the verdicts and reduced cases. The last gate asks four
+questions, and a tool answers each: does the failure reproduce in a fresh
+process on another worker, is the case minimal, is the input valid, and is it
+new. % four mechanical gate questions: design/03-LLD.md 3.9 (FR-13.1)
+The third question runs three parse-and-verify commands, and a clean rejection
+makes the input the loop's fault rather than the compiler's. % gate question 3, the three commands: design/03-LLD.md 4.8 (FR-13.15)
+After the tools, the gate is a person: a named author approves every filing at
+a command line, and the loop files nothing by default. % approval CLI, python -m circt_bug_loop.approve: design/03-LLD.md 16.2, 13.2 errata
+
+\begin{table}[!t]
+\caption{What we measured on the image the loop runs}
+\label{tab:meas}
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.90}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.55cm}@{\hspace{5pt}}>{\raggedright\arraybackslash}p{2.04cm}@{}}
+\toprule
+\textbf{Measurement} & \textbf{Result} \\
+\midrule
+\multicolumn{2}{@{}l}{\textit{Building the past cheaply}}\\
+% 187 and 171: analysis/pin-window-analysis.md
+Fix-shaped commits mined from 24 months & 187 \\
+Of those, seeds with an exactly matching prebuilt SDK & 171 \\
+% 16 of 63, worst run 100 commits / 16.1 d: design/ADR/ADR-D-10-lag-window-policy.md, Context
+Pin windows with no matching release, worst 16 days & 16 of 63 \\
+\addlinespace[2pt]
+\multicolumn{2}{@{}l}{\textit{Letting the compiler complain}}\\
+% 778 of 778 carry -UNDEBUG, 0 carry -DNDEBUG: analysis/measurements/2026-09-14-image-build.md 4, FR-03.4
+Compile commands carrying \texttt{-UNDEBUG} & 778 of 778 \\
+% 536 of 555 objects (96.58%): analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
+Object files carrying the assertion handler again & 536 of 555 \\
+% 1119 passed, 0 failed of 1127 considered, identical in both images: 2026-09-14-image-build.md 5 run 2, and W-04b 3
+CHIA's whole test gate, assertions on and then off & 1{,}119 pass, 0 fail, identical \\
+% +179 s = 18.4% of wall; +24.48% over six targets; median +4.84% per probe: W-04b 1, 2, 4
+What the assertions cost: wall clock, bytes, per probe & 18\%, 25\%, 4\% \\
+% lit discovers 1,390 tests with 0 parse errors once MLIR_SOURCE_DIR is the SDK: 2026-09-14-image-build.md 4 (FR-03.17)
+Tests \texttt{lit} discovers, once its source root is the SDK & 1{,}390, 0 errors \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Measured Preconditions}\label{sec:pre}
+The loop has to build CIRCT at arbitrary points of its history, and the compiler
+has to be able to complain. Neither held when we started. Table~\ref{tab:meas}
+lists what we measured on the image the loop now runs.
+
+\textbf{Building the past cheaply.} CIRCT records the exact LLVM commit it
+expects, its pin. A build against any other commit fails, and compiling that
+LLVM costs hours per seed. CIRCT also publishes an SDK of prebuilt LLVM and MLIR
+libraries that carries its own pin, and where the two pins match, CIRCT rebuilds
+in minutes. 171 of the 187 seeds do. The same mechanism fixes where the loop
+runs: at release-pinned main, the newest commit whose pin has a published
+release, 8 commits and 4.8 days behind the head for this image. % lag measured at eade0de6 with SDK firtool-1.159.0: analysis/measurements/2026-09-14-image-build.md 1; ADR-D-10 first application
+A long lag lowers the filing rate, because more candidates come back already
+fixed.
+
+\textbf{Letting the compiler complain.} Optimised builds delete assertions by
+defining the macro \texttt{NDEBUG}, and CHIA's published CIRCT image is such a
+build. Its binaries hold no reference to the assertion handler, so a loop whose
+oracle is a failed assertion would find nothing under it. One compiler flag,
+\texttt{-UNDEBUG}, puts the assertions back. The image the loop runs is that
+build at release-pinned main, with the flag in every compile command and the
+handler back in all but 19 of its 555 compiler objects, which assert nothing. % 536 of 555 objects reference the handler: analysis/measurements/2026-09-14-image-build.md 4, FR-03.5
+
+The oracle rests on whether the restored checks fire on CIRCT's own tests. We
+therefore built the image twice, differing in that flag alone, and ran CHIA's
+whole test gate in both. The two runs pass the same 1,119 tests and fail none, % 1,119 of 1,127 considered, 0 failed, identical in both images: image-build.md 5 run 2 and W-04b 3
+so a probe that trips an assertion trips it because of what the probe does. We
+had to repair one defect first: at CIRCT commits after mid-2026 a test
+directory's configuration raises while \texttt{lit} discovers tests, and CHIA's
+exclusion of that directory hid the error, so the gate discovered nothing.
+Pointing the build at the SDK as its MLIR source root restores discovery. % MLIR_SOURCE_DIR fix, 1,390 tests discovered: 2026-09-14-image-build.md 4
+
+\textbf{Tested on real failures.} We calibrated the oracle and its fingerprints
+on six past CIRCT bugs, rebuilt at the commit before their fix and recorded with
+input, argument vector and error output. % six fixtures, three classes, two SDK tags, build costs 14 s to 601 s: analysis/measurements/2026-09-14-crash-fixtures.md 1 and 2
+Two defects in the fingerprinting rules appeared only there: the name normaliser
+erased every frame in an anonymous namespace, where CIRCT's passes live, and
+the scope test read an inlined frame instead of the physical one. Together they
+put three of the four real bugs outside the repair stage's reach. We fixed both. % the two frame defects: 2026-09-14-crash-fixtures.md 3.2 and 3.4; design/reviews/implementation-errata-log.md W-08 rows 1 and 2
+
+% =====================================================================
+\section{Controls}\label{sec:eval}
+The loop embodies one experiment: does reading a past fix make an agent better
+at finding new bugs than mutating the same tests at random? Two arms share the
+harness, oracles, reducer and gate, and only the generator differs. The mutation
+arm rewrites the same seed tests syntactically without seeing the diff or the
+root-cause class, following Mut4All's design for mutators that a language model
+synthesises \cite{mut4all}.
+Both arms spend the same budget, a fixed window of wall-clock seconds, one after
+the other at the same concurrency. The artefact renders one
+headline: distinct bugs a CIRCT maintainer confirmed by labelling, commenting on
+or fixing them.
+
+\textbf{Pre-registration.} Every threshold lives in one budget file, and an
+annotated git tag on the commit that lands that file registers the run. The
+loop refuses a file no tag names and a mutator set committed after the tag, so
+nobody can choose a threshold after the fact. % registration/<run> tag, load_budget checks, mutator set must be an ancestor: circt_bug_loop/budget.py; docs/HANDOFF.md W-12b
+Safety caps bound damage rather than effort: 2,000 inputs per arm per day, 3
+filings per day and 10 per run, 60 seconds and 4\,GiB per probe, and a hard cap
+on model spending. % the caps: circt_bug_loop/budget.yaml
+The loop files nothing until a human has posted the method to the project's
+forum. % FR-20.1 enforced at approval (python -m circt_bug_loop.approve), FR-20.2
+
+\textbf{Deduplication.} Two candidates are one bug when their primary
+fingerprints are equal. On a hand-labelled set of 22 candidate pairs the rule
+collides on 1 of the 11 distinct pairs and falsely merges 1 of the 11 duplicate
+pairs, and we print both rates beside the headline. % 22 labelled pairs, collision 1/11, false merge 1/11: design/reviews/implementation-errata-log.md W-10 row 20
+
+\textbf{Known issues.} A mirror of the tracker answers whether a candidate is
+already reported. GitHub stops paginating at its hundredth page, so the mirror
+walks newest first, then oldest first, and unions the two: 2,652 issues in 198
+requests. % 422 at page 100: implementation-errata-log.md W-14 row 21; live mirror 2,652 issues (1,795 closed / 857 open), 198 pages, 200 s: docs/HANDOFF.md W-17 join
+
+\textbf{Contamination.} CIRCT's could be in the training data of any model
+we can use, so the agent may reproduce a fix it memorised. We screen every
+candidate against fixes made after its seed, at the level of the symbols the
+seed's fix touched. That screen flags 77\% of the corpus where the same screen
+at file level flags 96\%. % symbol level 77.0%, file level 96.3%: analysis/measurements/2026-09-13-frd-followups.md M4
+A real crash stays a real crash, so the flag marks the candidate and does not
+exclude it.
+
+% =====================================================================
+\section{Results}\label{sec:res}
+Table~\ref{tab:res} reports two registered campaigns, each running the seeded
+arm as two shards in parallel. The first gave every arm two hours under a fixed
+spending cap per job. We started it three times and stopped the first two early
+for defects the live run exposed. % registration/campaign-2 on cb75a0f; docs/HANDOFF.md 2026-09-15 06:05 and 07:05 entries
+The second changed three registered numbers and nothing else: the whole corpus
+instead of its head, a 41.7-hour window and a higher cap. We stopped it
+ourselves after 11.9 hours, well inside both. % registration/campaign-3 on a65331b; launched 19:01 UTC, stopped 06:54:56 UTC
+We read every number from the loop's database after re-judging the stored
+probes under the corrections below, and we re-ran no model turn. % --reclassify and --rescreen, head-only, no model turn
+
+\begin{table}[!t]
+\caption{Both campaigns, from the loop's database. A seeded column is its two
+shards together. The mutation column is one run per campaign, and the two runs
+agree in every cell}
+\label{tab:res}
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{0.90}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.65cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{\hspace{4pt}}>{\centering\arraybackslash}p{1.15cm}@{}}
+\toprule
+\textbf{Measure} & \textbf{seeded 1} & \textbf{seeded 2} & \textbf{mutation} \\
+\midrule
+% campaign_aggregate.py: f1e4fef5+73effefc, f0b2ef10+db45ab7b, 460b7b48 = 91e58983
+Seeds probed & 9 & 43 & 96 \\
+Probes written & 134 & 624 & 1{,}154 \\
+Output rejected by its own verifier & 10 & 7 & 0 \\
+Assertion failures & 5 & 54 & 0 \\
+Crashes & 0 & 8 & 0 \\
+Candidates & 15 & 69 & 0 \\
+Distinct new fingerprints & 3 & 14 & 0 \\
+\textbf{Through the gate} & \textbf{3} & \textbf{12} & \textbf{0} \\
+Filed & 0 & 0 & 0 \\
+% 57 and 191 metered turns carrying a call count (the 57 include the three stage-6 report turns of f1e4fef5)
+Model turns & 57 & 191 & 0 \\
+% tokens_in: 56,034,371 and 148,709,459; tokens_out: 723,615 and 2,995,789; cached 37,901,964 (67.6%) and 88,433,498 (59.5%)
+Input tokens, millions (share from cache) & 56.0 (68\%) & 148.7 (59\%) & 0 \\
+Output tokens, millions & 0.72 & 3.00 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[!t]
+\centering
+\input{fig-analysis}
+\vspace{-5pt}
+\caption{Both registered campaigns (Table~\ref{tab:res}). (a)~One harness,
+oracle and gate, and only the generator differs. Zeros sit at the log axis
+floor. (b)~Rates agree though campaign~2 is five times larger. (c)~Model use
+per gated bug. (d)~Overheads of Table~\ref{tab:meas}.}
+\label{fig:analysis}
+\end{figure*}
+
+\textbf{The yield is stable, and the baseline is not close.}
+Fig.~\ref{fig:analysis} reads Table~\ref{tab:res} as rates. The seeded
+campaigns differ fivefold in size, yet they yield 11.2 and 11.1 candidates and
+2.2 and 1.9 gated bugs per 100 inputs. The mutation arm wrote three times as
+many inputs as both seeded campaigns together, and none reached the oracle. A
+gated bug cost 18.7 million input tokens in the first campaign and 12.4 million
+in the second. % 56.03 M / 3 and 148.71 M / 12
+Fifteen bugs show a consistent rate. They do not measure an effect size.
+
+\textbf{Fifteen new bugs through the gate.} The first campaign's three bugs are
+the ones the introduction opens with, all from the August \texttt{moore.extract}
+seed: the zero-element array trips the assertion at \texttt{HWOps.cpp:1995},
+and a dynamic extract and an extract of a reference lower to
+\texttt{comb.extract} and \texttt{llhd.sig.extract} with aggregate types. % candidates c-p-a2cb61b8d0aa, c-p-075cf1d70f3a, c-p-356e9e6e061d; seed cc71d34a
+The second campaign's twelve spread across the compiler, and three of them are
+not assertions at all: a segmentation fault in \texttt{resolveClassStructBody}
+in \texttt{MooreToCore.cpp}, a second whose only named frame is \texttt{main}
+in \texttt{circt-opt.cpp}, and an abort in
+\texttt{ElaboratedObjectOp::}\allowbreak\texttt{verifySymbolUses} in
+\texttt{OMOps.cpp}. % candidates c-p-4d7a36e3ce15, c-p-4b9f84841ec3, c-p-a3a1556793d7
+Each of the fifteen reproduced on another worker, was minimal at the reducer's
+fixpoint, was valid, and matched neither an issue nor a commit since the pin.
+A named human holds the reports the model wrote. % gate q1-q4 per candidate: runs f1e4fef5, f0b2ef10, db45ab7b store
+Two further new fingerprints did not survive the gate: one did not reproduce on
+re-run, and the validity checker rejected the other. % c-p-0eec26191ff2 unreproducible, c-p-bb144e1c880c invalid_input
+
+\textbf{The oracle had to learn a class.} Seventeen of the seeded arm's
+rejected probes were the compiler's fault and not the model's: the input alone
+parses and verifies, and the diagnostic has the shape of MLIR's generated
+verifier. We require both conditions, since a pass may complain legitimately
+about a valid input, such as two top-level modules. % D-13: probe_task._GENERATED_VERIFIER and the parse-and-verify command; docs/HANDOFF.md 07:55 entry
+No rejection in either mutation run qualified, because a mutated test that fails
+to parse is broken syntax. Across 2{,}308 mutants that arm raised no candidate
+to judge. % runs 460b7b48 and 91e58983
+
+\textbf{Dedup needed four corrections, and we found each on a real candidate.}
+A post-pin commit counted as a fix if it touched the crash's file, so an LLVM
+bump touching 87 files silenced the first find. It now has to touch a frame
+symbol. A generic MLIR assertion text matched an open issue, and now also needs
+a CIRCT frame token. A verifier failure matched an issue on the op name alone,
+and now needs the constraint. Two candidates sharing a fingerprint were each
+the other's duplicate, which left thirteen without a representative. % D-11, D-16, D-17, D-18: docs/HANDOFF.md 2026-09-15 entries
+The loop recomputes every verdict from stored evidence, so a corrected rule
+re-judges every candidate without a model turn.
+
+\textbf{Tokens.} The first campaign read 56.0 million input tokens over 9 seeds
+and the second 148.7 million over 43, about 6.2 and 3.5 million a seed, and
+they wrote 0.7 and 3.0 million output tokens. % ledger_entry tokens_in/tokens_out per run
+Almost all of the reading is re-reading. CHIA's backend resends the whole
+conversation on every tool call, so a turn with twelve calls reads its context
+twelve times over, and the cache served 68\% and 59\% of that input. % quadratic resend measured W-18 (budget.yaml, max_tool_iterations note); cached_tokens 37.9 M of 56.0 M and 88.4 M of 148.7 M
+% stage_1 68.1 M / 77 turns, stage_2 135.0 M / 154, stage_6 1.6 M / 17: a seed-reading or probe-writing turn reads about 0.9 M tokens, a report turn 0.1 M
+
+\textbf{Repair.} We made three attempts on the assertion. The first two never
+reached a patch, because the loop's own script handed the tool two input files.
+With that fixed, the chain reproduced the failure, wrote a one-line change,
+rebuilt CIRCT, ran its test gate, and hit the 45-minute wall while writing up.
+The change was a debug print. We claim no fix. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
+
+% =====================================================================
+\section{Related Work}
+SWE-bench \cite{swebench} scores agents on GitHub issues, and CHIA's issue
+solver \cite{chia} applies the pattern to a hardware compiler. Both draw from a
+queue, and we fill one. Fuzzers fill queues without repairing or withholding:
+CSmith \cite{csmith} for C, and for MLIR, MLIRod \cite{mlirod}, N\"uwa
+\cite{nuwa}, DESIL \cite{desil} and FLEX \cite{flex}. Our mutation arm follows
+Mut4All's synthesised mutators \cite{mut4all}. IssueMut \cite{issuemut} mines
+mutators from bug histories, and Fuzz4All \cite{fuzz4all} generates inputs with
+a model. AFuzz \cite{afuzz} is the origin of our method, an agent that tests
+where else a reference bug's cause could live, and we apply it behind a gate.
+Delta debugging \cite{deltadebug} is stage 5's algorithm. Abstain-and-Validate
+\cite{abstain}, llvm-autofix \cite{llvmharness} and CodeRover-S
+\cite{coderovers} make a repair agent more selective. Our gate sits downstream
+and discards by default.
+
+% =====================================================================
+\section{Artefact and Limitations}
+We release the loop as CHIA nodes and tools that meet at a frozen contract of
+seven record types, with 736 tests, 686 of which need no cluster, network or
+model. % contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
+Four pieces go upstream to CHIA: the assertions-on image, its build workflow,
+three helpers for its CIRCT module, and the branch that lets its repair chain
+select our backend. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
+The corpus and every input, verdict, reduced case, transcript and gate decision
+are at \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
+
+\textbf{Limitations.} We have not yet confirmed the bugs with an active maintainer, to send the patches upstream. We were able to only run 43 out of the 187 seeds. Therefore, the fixes we found are not exhaustive. The bounded
+throughput is at about 3.6 seeds an hour across two shards by using vertex. % 43 of 187; 43/11.9 h; shard db45ab7b idle ~10:00-12:20 IST under 429s; repair token_capture unavailable_remote_dispatch
+The second oracle applies to 6 of the 187 seeds, and the seeds rest on a
+subject-keyword filter: we read no diff to confirm that each is a bug fix. % A-19: 2026-09-15-a19-differential-applicability.md
+The contamination screen misses a sibling fixed in a commit whose subject does
+not name it. The loop finds crashes and assertion failures, and the oracle that
+would find wrong output only reports.
+
+\textbf{Acknowledgements and disclosure.} We thank the CHIA developers and the
+A\textsuperscript{3} organisers. Claude (Anthropic) helped
+draft text and code. The authors answer for every claim, number and decision.
+
+\section{Conclusion}
+A repair agent for a hardware compiler need not wait for people to report bugs.
+Reading past fixes exposes sibling defects, restored assertions make them
+observable, and a gate of tools discards almost everything else. Fifteen new
+CIRCT bugs went through that gate where a mutation baseline sent none. The loop turns the human event from writing a bug report
+into reading one, and one person decides whether to file it.
+
+% \clearpage
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}

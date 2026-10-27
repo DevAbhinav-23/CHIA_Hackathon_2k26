@@ -16,6 +16,7 @@ __pycache__/
 # loop runtime state (never commit)
 loop.db
 loop.db-*
+loop.db.bak-*
 issues.db*
 artefacts/
 # the staged package the workers run, rebuilt at every start-up (W6, K7)
