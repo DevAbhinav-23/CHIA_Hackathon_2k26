@@ -8,7 +8,9 @@
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{tikz}
-\usepackage{hyperref} 
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue!70!black,linkcolor=black,citecolor=black}
+\newcommand{\repourl}{\href{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}{github.com/DevAbhinav-23/CHIA\_Hackathon\_2k26}}
 \usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
 \usepackage{cite}
 \usepackage{microtype}
@@ -54,7 +56,7 @@ Both campaigns together read 205 million tokens, three of every five from cache,
 and wrote 3.7 million. % 204.7 M in, 126.3 M cached (61.7 %), 3.72 M out: ledger_entry tokens_in/tokens_out/cached_tokens, runs f1e4fef5, 73effefc, f0b2ef10, db45ab7b
 A maintainer receives a bug already reduced, checked and paired with a candidate
 fix.\par
-{\raggedright Code and data: \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}\par}
+{\raggedright Code and data: \repourl\par}
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -448,11 +450,11 @@ We release the loop as CHIA nodes and tools that meet at a frozen contract of
 seven record types, with 739 tests, 689 of which need no cluster, network or
 model. % 736/686 at campaign 3 plus the three t0 tests of 72115f0 (--mutation-rounds); contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
 Three of four pieces for CHIA upstream are submitted as pull requests: the
-assertions-on image and its build workflow (ucb-bar/chia\#117), and three
-helpers for its CIRCT module (\#118). The fourth, the branch that lets its
+assertions-on image and its build workflow (\href{https://github.com/ucb-bar/chia/pull/117}{ucb-bar/chia\#117}), and three
+helpers for its CIRCT module (\href{https://github.com/ucb-bar/chia/pull/118}{\#118}). The fourth, the branch that lets its
 repair chain select our backend, is not yet submitted. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
 The corpus and every input, verdict, reduced case, transcript and gate decision
-are at \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}.
+are at\\\repourl.
 
 \textbf{Limitations.} No maintainer has yet confirmed the bugs, and none is
 filed. The campaigns reached only 43 of the 187 seeds, so the bugs we found are
