@@ -8,7 +8,6 @@ paper/*.log
 paper/*.bbl
 paper/*.blg
 paper/*.out
-paper/main.pdf
 # python
 __pycache__/
 *.pyc

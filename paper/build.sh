@@ -15,7 +15,4 @@ if grep -qE '^(\./)?.*:[0-9]+: ' main.log; then
   grep -E '^(\./)?.*:[0-9]+: ' main.log >&2
   exit 1
 fi
-
-cp main.pdf circt-bug-loop-paper-v3.pdf
-echo "pages: $(pdfinfo circt-bug-loop-paper-v3.pdf | awk '/^Pages:/{print $2}')"
-echo "wrote circt-bug-loop-paper-v3.pdf"
+echo "pages: $(pdfinfo main.pdf | awk '/^Pages:/{print $2}')"
