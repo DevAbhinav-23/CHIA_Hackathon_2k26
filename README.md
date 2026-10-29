@@ -22,7 +22,7 @@ Nothing has been filed. Filing is a named human's act, and it follows the forum 
 | `circt_bug_loop/` | The loop: CHIA nodes and tools, the frozen contract (`contract/FROZEN.md`), the driver `bug_loop.py`, the budget file, the tests |
 | `design/00-README.md` | Entry point to the formal design set: FRD, HLD, LLD, test plan, work plan, ADRs, red-team reviews |
 | `analysis/measurements/` | Every measurement with its script and raw output: the image build, the crash fixtures, eight pilots, the repair runs |
-| `upstream/README.md` | The four files prepared for CHIA core, and why each exists. None is submitted |
+| `upstream/README.md` | The four files prepared for CHIA core (not yet submitted), and why each exists |
 | `docs/HANDOFF.md` | The running state of the work, newest entries last; read it first |
 | `docs/explainer.md` | The same story for a reader new to CIRCT and to CHIA |
 

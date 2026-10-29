@@ -169,7 +169,7 @@ jobs:
             # FR-03.7: every target runs its own --version.
             for t in $BUGLOOP_TOOL_TARGETS; do /workspace/circt/build/bin/$t --version >/dev/null; done
             # FR-03.8 / FR-03.9 / FR-03.17.
-            lit --version && verilator --version && ssh -V && rsync --version | sed -n 1p
+            lit --version && verilator --version && ssh -V && rsync --version | head -1
             grep mlir_src_root /workspace/circt/build/test/lit.site.cfg.py
             lit --no-progress-bar --show-tests /workspace/circt/build/test > /tmp/lit.txt
             ! grep -q "unable to parse config file" /tmp/lit.txt
