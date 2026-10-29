@@ -409,11 +409,6 @@ and discards by default.
 \section{Artefact and Limitations}
 The loop ships as CHIA nodes and tools meeting at a frozen contract of seven
 record types, with 739 tests, 689 needing no cluster, network or model. % 736/686 at campaign 3 plus the three t0 tests of 72115f0 (--mutation-rounds); contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
-Upstream pull requests to CHIA carry the assertions-on image and its build
-workflow (\href{https://github.com/ucb-bar/chia/pull/117}{ucb-bar/chia\#117})
-and three helpers for its CIRCT module
-(\href{https://github.com/ucb-bar/chia/pull/118}{\#118}); the repair-backend
-branch is not yet submitted. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
 The corpus and every input, verdict, reduced case, transcript and gate decision
 are at\\\repourl.
 
@@ -426,9 +421,8 @@ The contamination screen misses a sibling fixed in a commit whose subject does
 not name it. The loop finds crashes and assertion failures only; the
 wrong-output oracle only reports.
 
-\subhead{Acknowledgements and disclosure} We thank the CHIA developers and the
-A\textsuperscript{3} organisers. Claude (Anthropic) helped
-draft text and code. The authors answer for every claim, number and decision.
+\subhead{Acknowledgements} We thank the CHIA developers , Google and the
+A\textsuperscript{3} organisers.
 
 \section{Conclusion}
 Reading past fixes exposes sibling defects, restored assertions make them
