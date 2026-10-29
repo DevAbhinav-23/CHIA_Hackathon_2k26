@@ -273,8 +273,8 @@ of the 184 eligible seeds, without seeing the diff or the root-cause class, foll
 synthesises \cite{mut4all}.
 Both arms receive the same budget, a fixed window of wall-clock seconds, but
 the mutation arm exhausts its mutants after 775 and 266 seconds, so only the
-seeded arm uses its window; a post-review run that used it gated 2 bugs from
-115,869 inputs. The registered headline is distinct bugs a CIRCT
+seeded arm uses its window; a separate run that used the whole window gated 2
+bugs from 115,869 inputs. Both arms walk the seeds newest first. The registered headline is distinct bugs a CIRCT
 maintainer confirmed by labelling, commenting on or fixing them; until filing,
 we report bugs through the gate.
 
@@ -365,60 +365,53 @@ tokens. (d)~Overheads of Table~\ref{tab:meas}.}
 Fig.~\ref{fig:analysis} reads Table~\ref{tab:res} as rates. The seeded
 campaigns differ fivefold in size, yet they yield 11.2 and 11.1 candidates and
 2.2 and 1.9 gated bugs per 100 inputs. The mutation arm wrote three times as
-many inputs as both seeded campaigns together, and none fired the oracle; only
-34\% of them reached the pass they target. A
+many inputs as both seeded campaigns together, and none fired the oracle. Per run, 162 mutants never ran, 395 were rejected
+before any pass, 206 lost the flag that names their pass, and 391 (34\%)
+reached it. A
 gated bug cost 18.7 million input tokens in the first campaign and 12.4 million
 in the second. % 56.03 M / 3 and 148.71 M / 12
 Fifteen bugs show a consistent rate. They do not measure an effect size.
 
 \pointhead{Fifteen new bugs through the gate} The first campaign's three bugs all
-come from the August \texttt{moore.extract} seed: the zero-element array trips the assertion at \texttt{HWOps.cpp:1995},
+come from the August \texttt{moore.extract} seed, a fix in
+\texttt{MooreToCore.cpp}: a seven-line input whose extract starts at the most
+negative 32-bit offset builds a zero-element array, which trips the assertion
+at \texttt{HWOps.cpp:1995}, a different file,
 and a dynamic extract and an extract of a reference lower to
 \texttt{comb.extract} and \texttt{llhd.sig.extract} with aggregate types. % candidates c-p-a2cb61b8d0aa, c-p-075cf1d70f3a, c-p-356e9e6e061d; seed cc71d34a
-The second campaign's twelve spread across the compiler, and three of them are
-not assertions at all: a segmentation fault in \texttt{resolveClassStructBody}
-in \texttt{MooreToCore.cpp}, a second whose only named frame is \texttt{main}
-in \texttt{circt-opt.cpp}, and an abort in
-\texttt{ElaboratedObjectOp::}\allowbreak\texttt{verifySymbolUses} in
-\texttt{OMOps.cpp}. % candidates c-p-4d7a36e3ce15, c-p-4b9f84841ec3, c-p-a3a1556793d7
+The second campaign's twelve spread across the compiler; three are crashes
+rather than assertions, among them a segmentation fault in
+\texttt{resolveClassStructBody} in \texttt{MooreToCore.cpp}. % candidates c-p-4d7a36e3ce15, c-p-4b9f84841ec3, c-p-a3a1556793d7
 Each of the fifteen reproduced on another worker, was minimal at the reducer's
 fixpoint, was valid, and matched neither an issue nor a commit since the pin.
-A named human holds the reports the model wrote. % gate q1-q4 per candidate: runs f1e4fef5, f0b2ef10, db45ab7b store
-Two further new fingerprints did not survive the gate: one did not reproduce on
-re-run, and the validity checker rejected the other. % c-p-0eec26191ff2 unreproducible, c-p-bb144e1c880c invalid_input
+All fifteen still fail on CIRCT main of 26 October. Their faulting lines had
+been unchanged for a median of 652 days, 7 of the 12 sites inside CIRCT lie in
+a different file and dialect from the seed's fix, and the reduced inputs are 4
+to 10 lines.
 
 \pointhead{The oracle had to learn a class} Seventeen of the seeded arm's
 rejected probes were the compiler's fault and not the model's: the input alone
 parses and verifies, and the diagnostic has the shape of MLIR's generated
 verifier. We require both conditions, since a pass may complain legitimately
 about a valid input, such as two top-level modules. % D-13: probe_task._GENERATED_VERIFIER and the parse-and-verify command; docs/HANDOFF.md 07:55 entry
-No rejection in either mutation run qualified, because a mutated test that fails
-to parse is broken syntax. Across 2{,}308 mutants that arm raised no candidate
-to judge. % runs 460b7b48 and 91e58983
+No mutant rejection qualified: a mutated test that fails to parse is broken
+syntax. % runs 460b7b48 and 91e58983
 
 \pointhead{Dedup needed four corrections, and we found each on a real candidate}
-A post-pin commit counted as a fix if it touched the crash's file, so an LLVM
-bump touching 87 files silenced the first find. It now has to touch a frame
-symbol. A generic MLIR assertion text matched an open issue, and now also needs
-a CIRCT frame token. A verifier failure matched an issue on the op name alone,
-and now needs the constraint. Two candidates sharing a fingerprint were each
-the other's duplicate, which left thirteen without a representative. % D-11, D-16, D-17, D-18: docs/HANDOFF.md 2026-09-15 entries
-The loop recomputes every verdict from stored evidence, so a corrected rule
-re-judges every candidate without a model turn.
+The loop recomputes every verdict from stored evidence, so each corrected rule
+re-judged every candidate without a model turn. % D-11, D-16, D-17, D-18: docs/HANDOFF.md 2026-09-15 entries
 
-\pointhead{Tokens} The first campaign read 56.0 million input tokens over 9 seeds
-and the second 148.7 million over 43, about 6.2 and 3.5 million a seed, and
-they wrote 0.7 and 3.0 million output tokens. % ledger_entry tokens_in/tokens_out per run
-Almost all of the reading is re-reading. CHIA's backend resends the whole
-conversation on every tool call, so a turn with twelve calls reads its context
-twelve times over, and the cache served 68\% and 59\% of that input. % quadratic resend measured W-18 (budget.yaml, max_tool_iterations note); cached_tokens 37.9 M of 56.0 M and 88.4 M of 148.7 M
-% stage_1 68.1 M / 77 turns, stage_2 135.0 M / 154, stage_6 1.6 M / 17: a seed-reading or probe-writing turn reads about 0.9 M tokens, a report turn 0.1 M
+\pointhead{Tokens} Most of Table~\ref{tab:res}'s input is re-reading: CHIA's
+backend resends the whole conversation on every tool call, and the cache served
+68\% and 59\% of it. In the second campaign the two model stages took 83,193
+stage-seconds, rate-limit waits included, and all other stages 1,380. % ledger cached_tokens 37.9 M of 56.0 M and 88.4 M of 148.7 M; stage seconds: analysis/measurements/2026-10-27-review-numbers.md f
 
-\pointhead{Repair} We made three attempts on the assertion. The first two never
-reached a patch, because the loop's own script handed the tool two input files.
-With that fixed, the chain reproduced the failure, wrote a one-line change,
-rebuilt CIRCT, ran its test gate, and hit the 45-minute wall while writing up.
-The change was a debug print. We claim no fix. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
+\pointhead{Repair} CHIA's chain, given one assertion three times, produced no
+fix: two attempts failed on a defect in our script, and the third wrote a
+one-line debug print before its 45-minute wall. A separate coding agent with a
+CIRCT checkout then wrote fixes for all fifteen, 13 patches with regression
+tests, and CIRCT's 1,432 lit tests give the same results with and without them;
+none is submitted yet. % analysis/measurements/2026-09-15-repair-run.md attempts 2 and 3; patch.diff +1/-0 in repair/900000068
 
 % =====================================================================
 \section{Related Work}
@@ -452,7 +445,7 @@ are at\\\href{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}{\textcolor{b
 \pointhead{Limitations} No maintainer has yet confirmed the bugs, and none is
 filed. The campaigns reached only 43 of the 187 seeds, so the bugs we found are
 not exhaustive; throughput was about 3.6 seeds an hour across two shards, bound
-by Vertex rate limits. % 43 of 187; 43/11.9 h; shard db45ab7b idle ~10:00-12:20 IST under 429s; repair token_capture unavailable_remote_dispatch
+by Vertex rate limits. No control runs the same model without the fix. % 43 of 187; 43/11.9 h; shard db45ab7b idle ~10:00-12:20 IST under 429s; repair token_capture unavailable_remote_dispatch
 The second oracle applies to 6 of the 187 seeds, and the seeds rest on a
 subject-keyword filter: we read no diff to confirm that each is a bug fix. % A-19: 2026-09-15-a19-differential-applicability.md
 The contamination screen misses a sibling fixed in a commit whose subject does
@@ -467,8 +460,8 @@ A repair agent for a hardware compiler need not wait for people to report bugs.
 Reading past fixes exposes sibling defects, restored assertions make them
 observable, and a gate of tools discards almost everything else. Fifteen new
 CIRCT bugs went through that gate where a mutation baseline sent none in the
-same campaigns. The loop turns the human event from writing a bug report
-into reading one, and one person decides whether to file it.
+same campaigns. The loop turns writing a bug report into reading one, and one person decides
+whether to file it.
 
 % \clearpage
 \bibliographystyle{IEEEtran}
