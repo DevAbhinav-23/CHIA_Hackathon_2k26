@@ -42,7 +42,7 @@ filing follows the forum post in `docs/forum-post.md`.
 | `design/` | FRD, HLD, LLD, test plan, ADRs and red-team reviews; start at `design/00-README.md` |
 | `analysis/measurements/` | Every measurement with its script and raw output |
 | `analysis/review/` | Post-review work: numbers, re-check on main, fixes, issue drafts |
-| `upstream/` | Four files prepared for CHIA (not yet submitted) |
+| `upstream/` | Four files prepared for CHIA (none merged yet) |
 | `docs/` | `RUN.md` (how to run), `HANDOFF.md` (work log), `forum-post.md`, `problem-statement-FINAL.md` |
 
 ## Running it

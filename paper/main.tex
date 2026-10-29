@@ -8,7 +8,8 @@
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{tikz}
-\usepackage{hyperref} 
+\usepackage{hyperref}
+\hypersetup{hidelinks,pdftitle={From Mined Fixes to Gated Repair: Closed-Loop Defect Synthesis for CIRCT},pdfauthor={Abhinav Venkata Kota, Adithya Jillellamudi, Priyesh Shukla}}
 \usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
 \usepackage{cite}
 \usepackage{microtype}
@@ -54,7 +55,7 @@ Both campaigns together read 205 million tokens, three of every five from cache,
 and wrote 3.7 million. % 204.7 M in, 126.3 M cached (61.7 %), 3.72 M out: ledger_entry tokens_in/tokens_out/cached_tokens, runs f1e4fef5, 73effefc, f0b2ef10, db45ab7b
 A maintainer receives a bug already reduced, checked and paired with a candidate
 fix. \\
-Source url: \url{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}
+Source: \href{https://github.com/DevAbhinav-23/CHIA_Hackathon_2k26}{\nolinkurl{github.com/DevAbhinav-23/CHIA_Hackathon_2k26}}
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -439,7 +440,7 @@ and discards by default.
 We release the loop as CHIA nodes and tools that meet at a frozen contract of
 seven record types, with 736 tests, 686 of which need no cluster, network or
 model. % contract 2.4: circt_bug_loop/contract/FROZEN.md; pytest --co = 736, -m t0 = 686; chia up 38.0 s: 2026-09-16-pilot.md 0; 16 probes in 7.4 s with a recorded generator: docs/HANDOFF.md W-19b
-Four pieces are ready for CHIA upstream but not yet submitted: the
+Four pieces are prepared for CHIA upstream, none merged yet: the
 assertions-on image, its build workflow,
 three helpers for its CIRCT module, and the branch that lets its repair chain
 select our backend. % upstream/: ChiaCirctAssertDockerfile, chia-circt-assert.yml, chia-chipyard-circt-additions.py, issue_task-vertex-branch.patch (19 insertions)
